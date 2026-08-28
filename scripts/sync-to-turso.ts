@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { createClient } from "@libsql/client";
+import { createClient, type InValue } from "@libsql/client";
 import Database from "better-sqlite3";
 import path from "path";
 
@@ -43,7 +43,7 @@ async function main() {
     const t = track as Record<string, unknown>;
     await turso.execute({
       sql: "INSERT OR REPLACE INTO tracks (id, title, release_type, release_date, duration, cover_image, audio_preview_url, spotify_url, youtube_video_id, metrics, production_details, lyrics) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      args: [t.id, t.title, t.release_type, t.release_date, t.duration, t.cover_image, t.audio_preview_url, t.spotify_url, t.youtube_video_id, t.metrics, t.production_details, t.lyrics],
+      args: [t.id, t.title, t.release_type, t.release_date, t.duration, t.cover_image, t.audio_preview_url, t.spotify_url, t.youtube_video_id, t.metrics, t.production_details, t.lyrics] as InValue[],
     });
     synced++;
     console.log(`  ✅ ${t.id}: ${t.title}`);

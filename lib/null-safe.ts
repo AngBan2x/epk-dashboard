@@ -1,8 +1,10 @@
 export const safeString = (v: unknown): string =>
   typeof v === "string" && v.length > 0 ? v : "—";
 
-export const hasValue = <T,>(obj: T, key: keyof T): boolean =>
-  obj != null && key in obj && obj[key] != null && obj[key] !== "";
+export const hasValue = (obj: unknown, key: string): boolean => {
+  if (obj == null || typeof obj !== "object") return false;
+  return key in obj && (obj as Record<string, unknown>)[key] != null && (obj as Record<string, unknown>)[key] !== "";
+};
 
 export const safeNumber = (v: unknown, fallback = 0): number =>
   typeof v === "number" && !isNaN(v) ? v : fallback;
@@ -16,6 +18,15 @@ export const safeDate = (v: unknown): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+export const safeParseJSON = <T>(raw: string | null, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 export const formatDuration = (duration: string): string => {
   const parts = duration.split(":");
   if (parts.length !== 2) return duration;
@@ -25,3 +36,12 @@ export const formatDuration = (duration: string): string => {
 
 export const formatNumber = (n: number): string =>
   new Intl.NumberFormat("es-VE").format(n);
+
+export const formatPercent = (n: number): string =>
+  `${n.toFixed(1)}%`;
+
+export const isDefined = <T>(v: T | null | undefined): v is T =>
+  v != null;
+
+export const coalesce = <T>(...values: (T | null | undefined)[]): T | undefined =>
+  values.find(isDefined);

@@ -45,3 +45,24 @@ export interface CatalogData {
   artist: Artist;
   tracks: Track[];
 }
+
+export interface RawTrackRow {
+  id: string;
+  title: string;
+  release_type: string | null;
+  release_date: string | null;
+  duration: string | null;
+  cover_image: string | null;
+  audio_preview_url: string | null;
+  spotify_url: string | null;
+  youtube_video_id: string | null;
+  metrics: string | null;
+  production_details: string | null;
+  lyrics: string | null;
+}
+
+export interface SyncResult {
+  synced: number;
+  failed: number;
+  errors: string[];
+}

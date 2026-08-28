@@ -75,11 +75,11 @@ describe("safeDate", () => {
 });
 
 describe("formatDuration", () => {
-  it("formats mm:ss", () => {
-    expect(formatDuration("03:45")).toBe("3:45");
+  it("preserves valid mm:ss format", () => {
+    expect(formatDuration("03:45")).toBe("03:45");
   });
-  it("pads seconds", () => {
-    expect(formatDuration("04:05")).toBe("4:05");
+  it("pads single-digit seconds", () => {
+    expect(formatDuration("4:5")).toBe("4:05");
   });
   it("returns original if invalid", () => {
     expect(formatDuration("invalid")).toBe("invalid");

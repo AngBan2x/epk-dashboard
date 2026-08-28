@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails } from "@/types/music";
+import { safeString, safeNumber, safeArray } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
 
@@ -13,46 +14,87 @@ function getDb(): Database.Database {
   return _db;
 }
 
+function parseMetrics(raw: string | null): Metrics {
+  if (!raw) {
+    return { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      streams: safeNumber(parsed.streams),
+      saves: safeNumber(parsed.saves),
+      playlist_additions: safeNumber(parsed.playlist_additions),
+      top_countries: safeArray<{ country: string; pct: number }>(parsed.top_countries),
+    };
+  } catch {
+    return { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
+  }
+}
+
+function parseProductionDetails(raw: string | null): ProductionDetails {
+  if (!raw) {
+    return { daw: null, guitars: null, effects_chain: null, tuning: null, key: null };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      daw: typeof parsed.daw === "string" ? parsed.daw : null,
+      guitars: typeof parsed.guitars === "string" ? parsed.guitars : null,
+      effects_chain: typeof parsed.effects_chain === "string" ? parsed.effects_chain : null,
+      tuning: typeof parsed.tuning === "string" ? parsed.tuning : null,
+      key: typeof parsed.key === "string" ? parsed.key : null,
+    };
+  } catch {
+    return { daw: null, guitars: null, effects_chain: null, tuning: null, key: null };
+  }
+}
+
+function parseTrack(row: RawTrackRow): Track {
+  return {
+    id: row.id,
+    title: row.title,
+    release_type: safeString(row.release_type),
+    release_date: safeString(row.release_date),
+    duration: safeString(row.duration),
+    cover_image: safeString(row.cover_image),
+    audio_preview_url: safeString(row.audio_preview_url),
+    spotify_url: row.spotify_url ?? null,
+    youtube_video_id: row.youtube_video_id ?? null,
+    metrics: parseMetrics(row.metrics),
+    production_details: parseProductionDetails(row.production_details),
+    lyrics: row.lyrics ?? null,
+  };
+}
+
 export function getAllTracks(): Track[] {
   const db = getDb();
-  const rows = db.prepare("SELECT * FROM tracks").all() as RawTrack[];
+  const rows = db.prepare("SELECT * FROM tracks").all() as RawTrackRow[];
   return rows.map(parseTrack);
 }
 
 export function getTrackById(id: string): Track | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM tracks WHERE id = ?").get(id) as RawTrack | undefined;
-  return row ? parseTrack(row) : null;
+  const row = db.prepare("SELECT * FROM tracks WHERE id = ?").get(id) as RawTrackRow | undefined;
+  return row !== undefined ? parseTrack(row) : null;
 }
 
-interface RawTrack {
-  id: string;
-  title: string;
-  release_type: string;
-  release_date: string;
-  duration: string;
-  cover_image: string;
-  audio_preview_url: string;
-  spotify_url: string | null;
-  youtube_video_id: string | null;
-  metrics: string;
-  production_details: string;
-  lyrics: string | null;
+export function getTrackCount(): number {
+  const db = getDb();
+  const result = db.prepare("SELECT COUNT(*) as count FROM tracks").get() as { count: number };
+  return result.count;
 }
 
-function parseTrack(row: RawTrack): Track {
-  return {
-    id: row.id,
-    title: row.title,
-    release_type: row.release_type,
-    release_date: row.release_date,
-    duration: row.duration,
-    cover_image: row.cover_image,
-    audio_preview_url: row.audio_preview_url,
-    spotify_url: row.spotify_url,
-    youtube_video_id: row.youtube_video_id,
-    metrics: JSON.parse(row.metrics),
-    production_details: JSON.parse(row.production_details),
-    lyrics: row.lyrics,
-  };
+export function getTracksByReleaseType(releaseType: string): Track[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM tracks WHERE release_type = ?").all(releaseType) as RawTrackRow[];
+  return rows.map(parseTrack);
+}
+
+export function searchTracks(query: string): Track[] {
+  const db = getDb();
+  const pattern = `%${query}%`;
+  const rows = db
+    .prepare("SELECT * FROM tracks WHERE title LIKE ? OR release_type LIKE ? OR lyrics LIKE ?")
+    .all(pattern, pattern, pattern) as RawTrackRow[];
+  return rows.map(parseTrack);
 }
