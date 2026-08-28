@@ -60,6 +60,53 @@ Registro de la orquestación técnica con herramientas de IA generativa para el 
 
 ---
 
+## Fase F1: Capa de Datos & Tipado
+
+**Fecha:** 2026-08-28
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Audita types/music.ts frente al esquema real de SQLite"
+2. "Refina lib/db.ts con tipos estrictos y eliminando casts implícitos"
+3. "Crea lib/validations.ts con esquemas Zod para Track"
+4. "Crea lib/turso.ts para sync bidireccional"
+5. "Complementa lib/null-safe.ts"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `validar-null-safety` | Auditoría de campos opcionales en componentes |
+| `switch-context` | Generación de HANDOFF_F1_F2.md |
+
+### Servidores MCP Consultados
+| Servidor | Consulta | Resultado |
+|----------|----------|-----------|
+| SQLite | `PRAGMA table_info(tracks)` | ✅ Schema confirmado |
+| Turso | `turso auth whoami` | ✅ angban2x |
+| GitHub | `git push` | ✅ 2a45cef |
+
+### Errores Corregidos (Regla 5)
+1. **Test formatDuration** — Tests esperaban strip de leading zero, función preserva formato → Tests ajustados
+2. **TS hasValue()** — `in` operator no funciona con tipos primitivos → Reescrita con `unknown` + cast interno
+3. **TS turso.ts** — `Row` type no tiene `count` → Cast via `unknown`
+4. **TS sync-to-turso.ts** — `unknown` no asignable a `InValue` → Cast explícito `as InValue[]`
+
+### Archivos Creados/Modificados
+- `lib/validations.ts` — NUEVO (109 líneas)
+- `lib/turso.ts` — NUEVO (108 líneas)
+- `lib/db.ts` — MODIFICADO (+60 líneas, eliminados casts)
+- `lib/null-safe.ts` — MODIFICADO (+10 helpers nuevos)
+- `types/music.ts` — MODIFICADO (+RawTrackRow, SyncResult)
+- `tests/unit/null-safe.test.ts` — MODIFICADO (tests corregidos)
+- `scripts/sync-to-turso.ts` — MODIFICADO (fix InValue)
+
+### Commits
+- `112a191` — feat: add type-safe data layer with Zod validation
+- `2a45cef` — docs: add HANDOFF_F1_F2.md
+
+---
+
 ## Fase F2: Componente EPK Core
 
 *Pendiente de ejecución — Modelo: North Mini Code (OpenRouter)*
