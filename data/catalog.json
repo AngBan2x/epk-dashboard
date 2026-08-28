@@ -1,0 +1,68 @@
+{
+  "artist": {
+    "name": "Angel Bandres",
+    "genre": "Alternative Rock / Grunge / Pop Ballad",
+    "location": "Valencia, Venezuela",
+    "monthly_listeners": 14250,
+    "listeners_growth_pct": 18.5
+  },
+  "tracks": [
+    {
+      "id": "trk-001",
+      "title": "Ecos en el Garaje",
+      "release_type": "Single",
+      "release_date": "2026-03-15",
+      "duration": "03:45",
+      "cover_image": "/images/covers/ecos-en-el-garaje.jpg",
+      "audio_preview_url": "/audio/ecos-en-el-garaje.mp3",
+      "spotify_url": "https://open.spotify.com/track/example1",
+      "youtube_video_id": "dQw4w9WgXcQ",
+      "metrics": {
+        "streams": 48200,
+        "saves": 3200,
+        "playlist_additions": 410,
+        "top_countries": [
+          { "country": "Venezuela", "pct": 42 },
+          { "country": "México", "pct": 25 },
+          { "country": "España", "pct": 15 }
+        ]
+      },
+      "production_details": {
+        "daw": "BandLab / Cakewalk",
+        "guitars": "Custom Strat HSH (Warmoth Parts)",
+        "effects_chain": "Guitar Rig 7 (Grunge Fuzz + Chorus + Tape Delay)",
+        "tuning": "Drop D",
+        "key": "D minor"
+      },
+      "lyrics": "Luces fijas en el techo / Ruido blanco en el amplificador...\n[Coro]\nY si el eco no responde, volveré a empezar..."
+    },
+    {
+      "id": "trk-002",
+      "title": "Frecuencia Cero",
+      "release_type": "Single",
+      "release_date": "2026-06-20",
+      "duration": "04:12",
+      "cover_image": "/images/covers/frecuencia-cero.jpg",
+      "audio_preview_url": "/audio/frecuencia-cero.mp3",
+      "spotify_url": "https://open.spotify.com/track/example2",
+      "youtube_video_id": null,
+      "metrics": {
+        "streams": 19400,
+        "saves": 1150,
+        "playlist_additions": 180,
+        "top_countries": [
+          { "country": "Venezuela", "pct": 50 },
+          { "country": "Argentina", "pct": 20 }
+        ]
+      },
+      "production_details": {
+        "daw": "Waveform",
+        "guitars": "Electric Acoustic Piezo",
+        "effects_chain": null,
+        "tuning": "Standard E",
+        "key": "A Major"
+      },
+      "lyrics": null
+    }
+  ]
+}
