@@ -23,8 +23,6 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
     setIsPlaying(!isPlaying);
   };
 
-  const safeSrc = hasValue(src, "src") ? src : null;
-
   return (
     <div className="flex items-center gap-3 p-3 bg-dark-50 dark:bg-dark-800 rounded-lg">
       <button

@@ -7,7 +7,7 @@ import { ProductionDetails } from "@/components/ProductionDetails";
 import { LyricsModal } from "@/components/LyricsModal";
 import { MetricsCharts } from "@/components/MetricsCharts";
 import { getTrackById, getAllTracks } from "@/lib/db";
-import { safeString, formatNumber, formatDuration } from "@/lib/null-safe";
+import { safeString, formatNumber } from "@/lib/null-safe";
 
 interface TrackDetailPageProps {
   params: Promise<{ id: string }>;

@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import { Header } from "@/components/Header";
-import { TrackFilters } from "@/components/TrackFilters";
 import { EPKCard } from "@/components/EPKCard";
 import { getAllTracks } from "@/lib/db";
 

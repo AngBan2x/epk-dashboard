@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncLocalToTurso, ensureTursoSchema, isTursoConfigured } from "@/lib/turso";
 import { getAllTracks } from "@/lib/db";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   try {
     if (!isTursoConfigured()) {
