@@ -1,11 +1,14 @@
 #!/usr/bin/env tsx
 
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import { createClient, type InValue } from "@libsql/client";
 import Database from "better-sqlite3";
 import path from "path";
 
-const TURSO_URL = process.env.TURSO_DATABASE_URL;
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
+const TURSO_URL = process.env.TURSO_DATABASE_URL?.replace(/^"|"$/g, "");
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN?.replace(/^"|"$/g, "");
 
 async function main() {
   console.log("🔄 Sincronizando SQLite → Turso...\n");
