@@ -197,31 +197,50 @@ Registro de la orquestación técnica con herramientas de IA generativa para el 
 
 ## Fase F4: Integración Turso & Sync
 
-*Pendiente de ejecución — Modelo: Nemotron 3 Ultra (opencode)*
+**Fecha:** 2026-08-29
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Crea .env.local con credenciales Turso proporcionadas"
+2. "Actualiza script sync-to-turso.ts para cargar .env.local"
+3. "Verifica workflow sync-data.yml (cron 6h)"
+4. "Ejecuta pnpm db:sync para sincronización inicial"
+5. "Verifica replicación en Turso remoto con turso db shell"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `switch-context` | Generación de HANDOFF_F4_F5.md |
+| `auditar-mcp` | Verificación servidores Turso/GitHub |
+| `documentar-proyecto` | Actualización AI_LOG.md |
+
+### Servidores MCP Consultados
+| Servidor | Consulta | Resultado |
+|----------|----------|-----------|
+| **Turso** | `turso db shell epk-dashboard "SELECT * FROM tracks;"` | ✅ 2 tracks replicados |
+| **GitHub** | Secrets TURSO_DATABASE_URL, TURSO_AUTH_TOKEN | ✅ Configurados |
+| **SQLite** | `getAllTracks()` local | ✅ 2 tracks |
+
+### Archivos Creados/Modificados
+- `.env.local` — NUEVO (credenciales Turso)
+- `scripts/sync-to-turso.ts` — MODIFICADO (carga .env.local con dotenv)
+- `.github/workflows/sync-data.yml` — EXISTENTE (cron 0 */6 * * *)
+
+### Verificación de Sincronización
+```bash
+pnpm db:sync → 2 tracks sincronizados ✅
+turso db shell epk-dashboard "SELECT * FROM tracks;" → 2 tracks confirmados ✅
+```
+
+### Commits
+- (pendiente commit F4)
 
 ---
 
 ## Fase F5: Testing E2E & Accesibilidad
 
 *Pendiente de ejecución — Modelo: Nemotron 3.5 Lightning (opencode) + Playwright MCP*
-
----
-
-## Fase F6: Despliegue & Entrega
-
-*Pendiente de ejecución — Modelo: Nemotron 3 Ultra (opencode)*
-
----
-
-## Fase F3: Dashboard & Vistas
-
-*Pendiente de ejecución — Modelo: Nemotron 3.5 Lightning (OpenRouter)*
-
----
-
-## Fase F4: Integración Turso & Sync
-
-*Pendiente de ejecución — Modelo: Nemotron 3 Ultra (opencode)*
 
 ---
 
