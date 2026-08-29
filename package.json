@@ -29,6 +29,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.3.3",
     "@playwright/test": "^1.52.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
@@ -36,16 +38,20 @@
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.11",
     "@types/react-dom": "^19.0.4",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
     "autoprefixer": "^10.4.21",
     "dotenv": "^17.4.2",
     "eslint": "^9.22.0",
     "eslint-config-next": "^15.3.1",
+    "eslint-plugin-react": "^7.37.5",
     "jsdom": "^26.0.0",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.68.0",
     "vitest": "^3.0.9"
   }
 }
