@@ -1,11 +1,13 @@
 import { safeString, hasValue } from "@/lib/null-safe";
 import type { ProductionDetails as ProductionDetailsType } from "@/types/music";
+import { cn } from "@/lib/utils";
 
 interface ProductionDetailsProps {
   details: ProductionDetailsType;
+  className?: string;
 }
 
-export function ProductionDetails({ details }: ProductionDetailsProps) {
+export function ProductionDetails({ details, className }: ProductionDetailsProps) {
   const fields = [
     { label: "DAW", key: "daw" as const },
     { label: "Guitarras", key: "guitars" as const },
@@ -15,7 +17,7 @@ export function ProductionDetails({ details }: ProductionDetailsProps) {
   ];
 
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", className)}>
       <h3 className="font-semibold text-lg mb-3">Ficha de Producción</h3>
       <dl className="grid grid-cols-2 gap-2">
         {fields.map(({ label, key }) => (
