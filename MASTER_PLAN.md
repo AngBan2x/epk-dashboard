@@ -1,5 +1,5 @@
 # MASTER PLAN — EPK Dashboard Musical
-**Versión 1.0 | Aprobado para ejecución | Modo Build**
+**Versión 2.0 | Aprobado para ejecución | Modo Build**
 
 ---
 
@@ -9,8 +9,8 @@
 |------|--------|-------------------|-------------------|-------------------|-----------------|
 | **F0** | **Setup & Auditoría Inicial** | Inicializar repo, validar MCP, crear estructura base | `git init`, `.mcp.json` verificado, `package.json` raíz, `tsconfig.json`, estructura carpetas | 1 sesión | **Nemotron 3 Ultra (opencode)** |
 | **F1** | **Capa de Datos & Tipado** | Esquema TypeScript desde SQLite/JSON, helpers null-safe | `types/music.ts`, `lib/db.ts`, `lib/null-safe.ts`, tests unitarios | 1-2 sesiones | **Nemotron 3 Ultra (opencode)** |
-| **F2** | **Componente EPK Core** | Tarjeta responsiva por track (cobertura `/renderizar_epk`) | `components/EPKCard.tsx`, `components/AudioPlayer.tsx`, `components/ProductionDetails.tsx` | 2 sesiones | **North Mini Code (OpenRouter)** |
-| **F3** | **Dashboard & Vistas** | Vista lista, detalle, filtros, métricas agregadas | `app/dashboard/page.tsx`, `app/track/[id]/page.tsx`, `components/MetricsCharts.tsx` | 2 sesiones | **Nemotron 3.5 Lightning (OpenRouter)** |
+| **F2** | **Componente EPK Core** | Tarjeta responsiva por track (cobertura `/renderizar_epk`) | `components/EPKCard.tsx`, `components/AudioPlayer.tsx`, `components/ProductionDetails.tsx`, `components/LyricsModal.tsx` | 2 sesiones | **North Mini Code (OpenRouter)** |
+| **F3** | **Dashboard & Vistas** | Vista lista, detalle, filtros, métricas agregadas | `app/dashboard/page.tsx`, `app/track/[id]/page.tsx`, `components/MetricsCharts.tsx`, `components/TrackFilters.tsx` | 2 sesiones | **Nemotron 3.5 Lightning (OpenRouter)** |
 | **F4** | **Integración Turso & Sync** | Replicación remota, migración schema, CI/CD data | `turso` vinculado, script `sync-data.ts`, GitHub Action `sync-data.yml` | 1 sesión | **Nemotron 3 Ultra (opencode)** |
 | **F5** | **Testing E2E & Accesibilidad** | Playwright flows, null-safety audit, Lighthouse | `tests/e2e/*.spec.ts`, reporte `auditar-mcp`, `validar-null-safety` | 1-2 sesiones | **Nemotron 3.5 Lightning (opencode)** + **Playwright MCP** |
 | **F6** | **Despliegue & Entrega** | Build producción, deploy (Vercel), docs finales | URL pública, `README.md`, `AI_LOG.md`, handoff final | 1 sesión | **Nemotron 3 Ultra (opencode)** |
@@ -81,23 +81,53 @@
 ### 5.2 Helpers Obligatorios (`lib/null-safe.ts`)
 
 ```typescript
-export const safeString = (v: unknown): string => 
-  typeof v === 'string' && v.length > 0 ? v : '—';
+export const safeString = (v: unknown): string =>
+  typeof v === "string" && v.length > 0 ? v : "—";
 
-export const hasValue = <T,>(obj: T, key: keyof T): boolean => 
-  obj && key in obj && obj[key] != null && obj[key] !== '';
+export const hasValue = (obj: unknown, key: string): boolean => {
+  if (obj == null || typeof obj !== "object") return false;
+  return key in obj && (obj as Record<string, unknown>)[key] != null && (obj as Record<string, unknown>)[key] !== "";
+};
 
-export const safeNumber = (v: unknown, fallback = 0): number => 
-  typeof v === 'number' && !isNaN(v) ? v : fallback;
+export const safeNumber = (v: unknown, fallback = 0): number =>
+  typeof v === "number" && !isNaN(v) ? v : fallback;
 
-export const safeArray = <T,>(v: unknown): T[] => 
-  Array.isArray(v) ? v : [];
+export const safeArray = <T,>(v: unknown): T[] =>
+  Array.isArray(v) ? (v as T[]) : [];
 
 export const safeDate = (v: unknown): Date | null => {
   if (!v) return null;
   const d = new Date(v as string | number);
   return isNaN(d.getTime()) ? null : d;
 };
+
+export const safeParseJSON = <T>(raw: string | null, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+export const formatDuration = (duration: string): string => {
+  const parts = duration.split(":");
+  if (parts.length !== 2) return duration;
+  const [min, sec] = parts;
+  return `${min}:${sec.padStart(2, "0")}`;
+};
+
+export const formatNumber = (n: number): string =>
+  new Intl.NumberFormat("es-VE").format(n);
+
+export const formatPercent = (n: number): string =>
+  `${n.toFixed(1)}%`;
+
+export const isDefined = <T>(v: T | null | undefined): v is T =>
+  v != null;
+
+export const coalesce = <T>(...values: (T | null | undefined)[]): T | undefined =>
+  values.find(isDefined);
 ```
 
 ### 5.3 Criterios de Aprobación por Fase (Quality Gates)
@@ -113,7 +143,7 @@ export const safeDate = (v: unknown): Date | null => {
 
 ---
 
-## 6. ARQUITECTURA TÉCNICA DEFINITIVA
+## 6. ARQUITECTURA TÉCNICA PROPUESTA (Resumen)
 
 ```
 epk-dashboard-v2/
@@ -181,7 +211,9 @@ epk-dashboard-v2/
 │   └── audio/                # Previews MP3
 ├── README.md                 # documentar-proyecto output
 ├── AI_LOG.md                 # Bitácora IA (documentar-proyecto)
-├── HANDOFF.md                # switch-context output
+├── HANDOFF_F0_F1.md          # switch-context output
+├── HANDOFF_F1_F2.md           # switch-context output
+├── HANDOFF_F2_F3.md           # switch-context output
 ├── MASTER_PLAN.md            # Este archivo
 ├── package.json
 ├── pnpm-lock.yaml
@@ -197,44 +229,29 @@ epk-dashboard-v2/
 
 ---
 
-## 7. GENERACIÓN DE DATOS SINTÉTICOS (REQUISITO CONFIRMADO)
+## 7. PROCESO DE GENERACIÓN DE DATOS (F4)
 
-**Objetivo:** Poblar `music_catalog.db` con ≥ 20 tracks de ≥ 5 artistas diversos antes de F4 (migración Turso).
-
-**Estructura `data/seed/artists.json`:**
-```json
-[
-  { "name": "Angel Bandres", "genre": "Alternative Rock / Grunge / Pop Ballad", "location": "Valencia, Venezuela", "monthly_listeners": 14250, "listeners_growth_pct": 18.5 },
-  { "name": "Luna Roja", "genre": "Indie Pop / Dream Pop", "location": "Buenos Aires, Argentina", "monthly_listeners": 8900, "listeners_growth_pct": 32.1 },
-  { "name": "Kairo Beats", "genre": "Hip Hop / Trap Latino", "location": "Ciudad de México, México", "monthly_listeners": 45600, "listeners_growth_pct": 55.3 },
-  { "name": "Solar Winds", "genre": "Electronic / Synthwave", "location": "Madrid, España", "monthly_listeners": 22100, "listeners_growth_pct": 24.7 },
-  { "name": "Andes Echo", "genre": "Folk / World Fusion", "location": "Bogotá, Colombia", "monthly_listeners": 11300, "listeners_growth_pct": 15.2 }
-]
-```
-
-**Script `scripts/generate-more-data.ts`:**
-- Usa `faker` + plantillas realistas (títulos, fechas, duraciones, métricas)
-- Genera 4-5 tracks por artista (20-25 total)
+**Script:** `scripts/generate-more-data.ts`
+- Genera 16-20 tracks de 4 artistas sintéticos
 - Inserta directo a SQLite via `better-sqlite3`
-- Respeta schema: `id`, `title`, `release_type`, `release_date`, `duration`, `cover_image`, `audio_preview_url`, `spotify_url`, `youtube_video_id` (nullable), `metrics` (JSON), `production_details` (JSON), `lyrics` (nullable)
+- Respeta schema completo de tracks
+- `pnpm run db:seed` ejecuta seed
+
+**Migración a Turso:** `scripts/sync-to-turso.ts`
+- Sincroniza SQLite → Turso remoto
+- Usado por CI/CD `sync-data.yml` cada 6h
 
 ---
 
-## 8. DESPLIEGUE VERCEL (CONFIRMADO)
+## 8. DESPLIEGUE VERCEL (F6)
 
-| Configuración | Valor |
-|---------------|-------|
-| **Framework** | Next.js 14 (App Router) |
-| **Build Command** | `pnpm build` |
-| **Output Directory** | `.next` |
-| **Install Command** | `pnpm install` |
-| **Node Version** | 20.x (Vercel default) |
-| **Env Vars** | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `NEXT_PUBLIC_APP_URL` |
-| **Domains** | `epk-dashboard.vercel.app` (auto) + custom opcional |
+**GitHub Actions:** `.github/workflows/deploy.yml`
+- Typecheck + Lint + Unit Tests + Build + Vercel deploy
+- Variables de entorno: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 
 ---
 
-## 9. COMANDOS DE EJECUCIÓN LOCAL (POST-F0)
+## 9. COMANDOS DE EJECUCIÓN LOCAL
 
 ```bash
 # Desarrollo
@@ -243,7 +260,7 @@ pnpm dev              # Next.js en localhost:3000
 # Calidad
 pnpm lint             # ESLint + Prettier
 pnpm typecheck        # tsc --noEmit
-pnpm test:unit        # Vitest/Jest
+pnpm test:unit        # Vitest
 pnpm test:e2e         # Playwright
 
 # Build & Preview
@@ -258,25 +275,32 @@ pnpm db:seed          # scripts/generate-more-data.ts
 
 ---
 
-## 10. PRÓXIMO PASO INMEDIATO: F0
+## 10. AGENTE PERSONALIZADO (Regla 4 Directrices)
 
-**Ejecutar ahora en Modo Build con Nemotron 3 Ultra:**
-
-1. `git init` + `gh repo create epk-dashboard --public --source=. --remote=origin`
-2. Crear `package.json` raíz con dependencias:
-   - `next@14`, `react@18`, `react-dom@18`, `typescript@5`
-   - `tailwindcss@3`, `postcss`, `autoprefixer`
-   - `recharts@2`, `framer-motion@11`
-   - `better-sqlite3`, `@libsql/client` (Turso)
-   - `@playwright/test`, `vitest`, `@testing-library/react`
-   - `zod` (validación), `date-fns` (fechas)
-   - `@modelcontextprotocol/sdk` (MCP clients)
-3. `tsconfig.json` strict + `"paths": { "@/*": ["./*"] }`
-4. Estructura carpetas completa (ver sección 6)
-5. **Skill `auditar-mcp`** → valida 4 servidores
-6. Commit `chore: bootstrap project structure` + push
-7. **Skill `switch-context`** → genera `HANDOFF_F0_F1.md` para F1
+**`epk-card-builder`** (`.opencode/agents/epk-card-builder.md`)
+- Consumir `/renderizar_epk` y `validar-null-safety`
+- Generar componentes EPKCard en bucle por tracks
+- Garantiza null-safety en campos opcionales
+- Uso de lib/db.ts y lib/validations.ts
 
 ---
 
-**Documento generado: `MASTER_PLAN.md` | Listo para iniciar F0**
+## 11. ESCENARIOS DE EJECUCIÓN (Open Code)
+
+**F0:** `pnpm dev` (Next.js) → `npm run lint/typecheck/test:unit/e2e`
+
+**F1:** `pnpm db:seed` (generar datos) → `pnpm db:sync` (Turso) → `pnpm typecheck/test:unit`
+
+**F2:** `pnpm db:seed` (generar más tracks) → `pnpm build` → `pnpm start` → `/renderizar_epk` → `validar-null-safety`
+
+**F3:** `pnpm dev` + `pnpm build` + `pnpm test:e2e`
+
+**F4:** `pnpm db:sync` (después de F3) + `pnpm build` + `pnpm test:unit/e2e`
+
+**F5:** `pnpm test:e2e` (full suite) + `auditar-mcp` + `validar-null-safety`
+
+**F6:** `pnpm build` + `pnpm start` + `vercel deploy` + docs finales
+
+---
+
+**Documento actualizado: `MASTER_PLAN.md` | Listo para continuar F2-F3**
