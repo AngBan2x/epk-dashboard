@@ -4,18 +4,20 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { safeString } from "@/lib/null-safe";
+import { cn } from "@/lib/utils";
 
 interface LyricsModalProps {
   lyrics: string | null;
   title: string;
+  className?: string;
 }
 
-export function LyricsModal({ lyrics, title }: LyricsModalProps) {
+export function LyricsModal({ lyrics, title, className }: LyricsModalProps) {
   const [open, setOpen] = useState(false);
   const hasLyrics = lyrics != null && lyrics.length > 0;
 
   return (
-    <>
+    <div className={cn(className)}>
       <Button
         variant="secondary"
         size="sm"
@@ -34,6 +36,6 @@ export function LyricsModal({ lyrics, title }: LyricsModalProps) {
           <p className="text-dark-400">Letra no disponible.</p>
         )}
       </Modal>
-    </>
+    </div>
   );
 }
