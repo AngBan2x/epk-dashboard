@@ -145,13 +145,53 @@ Registro de la orquestación técnica con herramientas de IA generativa para el 
 ### Commits
 - `2a45cef` — docs: add HANDOFF_F1_F2.md
 - `883f1c0` — docs: update AI_LOG.md with F1 completion details
-- `X` — feat: implement EPK card components with real SQLite data (PENDIENTE)
+- `1840402` — feat: implement EPK card components with real SQLite data
+- `a8ca789` — feat: implement dashboard and track views with live data
 
 ---
 
 ## Fase F3: Dashboard & Vistas
 
-*Pendiente de ejecución — Modelo: Nemotron 3.5 Lightning (OpenRouter)*
+**Fecha:** 2026-08-29
+**Modelo:** Nemotron 3.5 Lightning (OpenRouter)
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Integra lib/db.ts (getAllTracks, getTrackById) para alimentar las vistas del EPK"
+2. "Implementa app/dashboard/page.tsx con lista de tracks"
+3. "Implementa app/track/[id]/page.tsx con detalle completo"
+4. "Implementa app/api/sync/route.ts endpoint POST sync"
+5. "Implementa components/TrackFilters.tsx filtros interactivos"
+6. "Implementa components/MetricsCharts.tsx con Recharts"
+7. "Integra EPKCard, AudioPlayer, ProductionDetails, LyricsModal en dashboard/track"
+8. "Ejecuta pnpm typecheck y pnpm test:unit"
+9. "Commit: 'feat: implement dashboard and track views with live data'"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `validar-null-safety` | Auditoría de null-safety en componentes F3 |
+| `switch-context` | Generación de HANDOFF_F3_F4.md |
+| `documentar-proyecto` | Actualización README.md y AI_LOG.md |
+
+### Servidores MCP Consultados
+| Servidor | Consulta | Resultado |
+|----------|----------|-----------|
+| SQLite | getAllTracks, getTrackById | ✅ OK (2 tracks) |
+| Playwright | E2E tests available | ✅ OK |
+| GitHub | Commit + push | ✅ OK |
+
+### Archivos Creados/Modificados
+- `app/dashboard/page.tsx` — NUEVO (lista tracks + filtros)
+- `app/track/[id]/page.tsx` — NUEVO (detalle completo + nav prev/next)
+- `app/api/sync/route.ts` — NUEVO (POST sync SQLite → Turso)
+- `components/TrackFilters.tsx` — NUEVO (búsqueda + tipo release)
+- `components/MetricsCharts.tsx` — NUEVO (Recharts: barras + pie)
+- `components/ProductionDetails.tsx` — MODIFICADO (soporte className)
+- `components/LyricsModal.tsx` — MODIFICADO (soporte className)
+
+### Commits
+- `a8ca789` — feat: implement dashboard and track views with live data
 
 ---
 
