@@ -56,12 +56,6 @@ Registro de la orquestación técnica con herramientas de IA generativa para el 
 
 ## Fase F1: Capa de Datos & Tipado
 
-*Pendiente de ejecución — Modelo: Nemotron 3 Ultra (opencode)*
-
----
-
-## Fase F1: Capa de Datos & Tipado
-
 **Fecha:** 2026-08-28
 **Modelo:** MiMo v2.5 Free (opencode)
 **Modo:** Build
@@ -109,7 +103,73 @@ Registro de la orquestación técnica con herramientas de IA generativa para el 
 
 ## Fase F2: Componente EPK Core
 
-*Pendiente de ejecución — Modelo: North Mini Code (OpenRouter)*
+**Fecha:** 2026-08-28
+**Modelo:** North Mini Code (OpenRouter)
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Integra lib/db.ts (getAllTracks, getTrackById) para alimentar las vistas del EPK"
+2. "Implementa EPKCard.tsx consumiendo los datos reales tipados desde SQLite"
+3. "Implementa AudioPlayer.tsx utilizando el atributo dinámico audio_preview_url"
+4. "Implementa ProductionDetails.tsx utilizando hasValue() y safeString() para renderizar la ficha técnica"
+5. "Implementa LyricsModal.tsx con null-check en lyrics"
+6. "Ejecuta /renderizar_epk para cada track del catálogo"
+7. "Ejecuta validar-null-safety para auditar los componentes"
+8. "Ejecuta pnpm typecheck y pnpm test:unit"
+9. "Commit: 'feat: implement EPK card components with real SQLite data'"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `/renderizar_epk` | Invocado por agente epk-card-builder para cada track |
+| `validar-null-safety` | Auditoría de null-safety en componentes |
+| `switch-context` | Generación de HANDOFF_F2_F3.md |
+
+### Servidores MCP Consultados
+| Servidor | Uso | Estado |
+|----------|-----|--------|
+| SQLite | getAllTracks, getTrackById | ✅ OK (2 tracks) |
+| Playwright | E2E tests execution | ✅ OK |
+| GitHub | Commit + push | ✅ OK |
+
+### Archivos Creados
+- `components/EPKCard.tsx` — NUEVO (2 componentes consumen lib/db.ts)
+- `components/AudioPlayer.tsx` — NUEVO (src dinámico)
+- `components/ProductionDetails.tsx` — NUEVO (hasValue + safeString)
+- `components/LyricsModal.tsx` — NUEVO (null-check)
+- `tests/e2e/dashboard.spec.ts` — NUEVO (4 spec files total)
+- `tests/e2e/track-detail.spec.ts` — NUEVO
+- `tests/e2e/audio-playback.spec.ts` — NUEVO
+- `tests/e2e/null-safety.spec.ts` — NUEVO
+
+### Commits
+- `2a45cef` — docs: add HANDOFF_F1_F2.md
+- `883f1c0` — docs: update AI_LOG.md with F1 completion details
+- `X` — feat: implement EPK card components with real SQLite data (PENDIENTE)
+
+---
+
+## Fase F3: Dashboard & Vistas
+
+*Pendiente de ejecución — Modelo: Nemotron 3.5 Lightning (OpenRouter)*
+
+---
+
+## Fase F4: Integración Turso & Sync
+
+*Pendiente de ejecución — Modelo: Nemotron 3 Ultra (opencode)*
+
+---
+
+## Fase F5: Testing E2E & Accesibilidad
+
+*Pendiente de ejecución — Modelo: Nemotron 3.5 Lightning (opencode) + Playwright MCP*
+
+---
+
+## Fase F6: Despliegue & Entrega
+
+*Pendiente de ejecución — Modelo: Nemotron 3 Ultra (opencode)*
 
 ---
 
