@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/Card";
 import type { Track } from "@/types/music";
 import { safeString, formatDuration, formatNumber } from "@/lib/null-safe";
+import { AudioPlayer } from "@/components/AudioPlayer";
 
 interface EPKCardProps {
   track: Track;
@@ -23,6 +24,7 @@ export function EPKCard({ track }: EPKCardProps) {
         <p className="text-sm text-dark-500 mb-2">
           {track.release_type} · {duration}
         </p>
+        <AudioPlayer src={track.audio_preview_url} title={track.title} />
         <div className="flex items-center gap-2 text-xs text-dark-400">
           <span>▶ {streams} streams</span>
           <span>·</span>
