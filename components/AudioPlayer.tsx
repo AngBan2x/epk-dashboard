@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { safeString } from "@/lib/null-safe";
+import { safeString, hasValue } from "@/lib/null-safe";
 
 interface AudioPlayerProps {
-  src: string;
-  title: string;
+  src: string | undefined;
+  title: string | null;
 }
 
 export function AudioPlayer({ src, title }: AudioPlayerProps) {
@@ -23,6 +23,8 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
     setIsPlaying(!isPlaying);
   };
 
+  const safeSrc = hasValue(src, "src") ? src : null;
+
   return (
     <div className="flex items-center gap-3 p-3 bg-dark-50 dark:bg-dark-800 rounded-lg">
       <button
@@ -33,8 +35,18 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
         {isPlaying ? "⏸" : "▶"}
       </button>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{safeString(title)}</p>
-        <audio ref={audioRef} src={src} onEnded={() => setIsPlaying(false)} />
+        <p className="text-sm font-medium truncate">
+          {safeString(title)}
+        </p>
+        {hasValue(src, "src") ? (
+          <audio
+            ref={audioRef}
+            src={src}
+            onEnded={() => setIsPlaying(false)}
+          />
+        ) : (
+          <p className="text-xs text-dark-400">No hay audio disponible</p>
+        )}
       </div>
     </div>
   );
