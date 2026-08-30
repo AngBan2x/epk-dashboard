@@ -6,6 +6,10 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { ProductionDetails } from "@/components/ProductionDetails";
 import { LyricsModal } from "@/components/LyricsModal";
 import { MetricsCharts } from "@/components/MetricsCharts";
+import { ImageGallery } from "@/components/ImageGallery";
+import { DownloadCenter } from "@/components/DownloadCenter";
+import { VideoShowcase } from "@/components/VideoShowcase";
+import { StemsPlayer } from "@/components/StemsPlayer";
 import { getTrackById, getAllTracks } from "@/lib/db";
 import { safeString, formatNumber } from "@/lib/null-safe";
 
@@ -104,6 +108,27 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
               </div>
             </div>
           </section>
+        </div>
+
+        <div className="mt-12 space-y-8">
+          <VideoShowcase
+            title={`Videoclip Oficial - ${safeString(track.title)}`}
+            youtubeVideoId={track.youtube_video_id}
+            videoEmbedUrl={track.video_embed_url}
+            coverImage={track.cover_image}
+          />
+
+          <StemsPlayer
+            title={`Stems & Mezcla Multitrack - ${safeString(track.title)}`}
+            stems={track.stems_urls}
+            mainAudioUrl={track.audio_preview_url}
+          />
+
+          <ImageGallery
+            title={`Galería & Assets - ${safeString(track.title)}`}
+            images={track.gallery_images?.length ? track.gallery_images : track.cover_image && track.cover_image !== "—" ? [track.cover_image] : []}
+          />
+          <DownloadCenter artistName="Artista EPK" />
         </div>
 
         <div className="mt-8 flex items-center justify-between">

@@ -377,6 +377,84 @@ GitHub Secrets: TURSO_DATABASE_URL, TURSO_AUTH_TOKEN ✅
 
 ---
 
+## Fase F7: Engine Multimedia, iTunes API & Assets
+
+**Fecha:** 2026-08-30T00:14:06-04:00
+**Modelo:** Gemini 3.1 Pro High
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Implementar las Fases F7, F8 y F9 manteniendo una estrategia Null-Safe rigurosa"
+2. "Crea un cliente/servicio en lib/itunes.ts para buscar artistas y canciones en la API de iTunes"
+3. "Motor Web Audio & Reproductor Global: Crea lib/web-audio.ts y components/GlobalAudioPlayer.tsx"
+4. "Galería & Assets de Prensa: Implementa ImageGallery.tsx y DownloadCenter.tsx"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `auditar-mcp` | Verificación del proyecto post-F7 |
+| `git-workflow` | Commit de cambios F7 en repositorio local |
+
+### Archivos Creados/Modificados
+- `lib/itunes.ts` — NUEVO (iTunes Search API, portadas HD y caché)
+- `lib/web-audio.ts` — NUEVO (Motor Web Audio API, AnalyserNode, frecuencias)
+- `context/AudioPlayerContext.tsx` — NUEVO (Estado global del reproductor)
+- `components/GlobalAudioPlayer.tsx` — NUEVO (Reproductor persistente)
+- `components/AudioVisualizer.tsx` — NUEVO (Renderizado de espectro)
+- `components/ImageGallery.tsx` — NUEVO (Galería lightbox null-safe)
+- `components/DownloadCenter.tsx` — NUEVO (Assets descargables para prensa)
+- `components/AudioPlayer.tsx` — MODIFICADO (Integración con contexto global)
+- `app/layout.tsx` — MODIFICADO (Agregado wrapper `Providers`)
+- `tests/unit/itunes.test.ts` — NUEVO (Suite de pruebas para cliente iTunes)
+
+### Tests Results (F7)
+```
+E2E, Unit & Typecheck ejecutados.
+Result: exit code 0
+Todos los tests (incluyendo 29 unitarios) han pasado exitosamente.
+```
+
+---
+
+## Fase F8: Pipeline Audiovisual & Multi-Track Stems
+
+**Fecha:** 2026-08-30T00:35:00-04:00
+**Modelo:** Gemini 3.1 Pro High
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Modifica types/music.ts y lib/validations.ts para extender la interfaz con los campos opcionales: itunes_track_id, stems_urls, video_embed_url, gallery_images"
+2. "Actualiza los helpers de parsing en lib/db.ts para garantizar lecturas/escrituras null-safe con SQLite"
+3. "Showcase & Modal de Video: Implementa VideoShowcase.tsx y VideoPlayerModal.tsx con patrón fachada"
+4. "Reproductor de Stems Multicanal: Construye StemsPlayer.tsx con Web Audio API, Mute, Solo y faders de volumen"
+5. "Crea tests unitarios en tests/unit/stems.test.ts y tests/unit/video.test.ts y ejecuta pnpm typecheck && pnpm test:unit"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `validar-null-safety` | Auditoría de campos multimedia opcionales (stems_urls, video_embed_url, gallery_images) |
+| `git-workflow` | Commit y push de la Fase F8 a GitHub |
+
+### Archivos Creados/Modificados
+- `types/music.ts` — MODIFICADO (Agregadas interfaces `StemsUrls` y campos multimedia en `Track` y `RawTrackRow`)
+- `lib/validations.ts` — MODIFICADO (Agregado `StemsUrlsSchema` y validación opcional en `TrackSchema`)
+- `lib/db.ts` — MODIFICADO (Parsers `parseStemsUrls` y `parseGalleryImages` null-safe)
+- `components/VideoPlayerModal.tsx` — NUEVO (Modal de video con resolución inteligente de YouTube/Vimeo/MP4)
+- `components/VideoShowcase.tsx` — NUEVO (Fachada ultraligera para carga diferida de videos)
+- `components/StemsPlayer.tsx` — NUEVO (Consola mezcladora de 4 canales sincronizada con Web Audio API)
+- `app/track/[id]/page.tsx` — MODIFICADO (Integración de `VideoShowcase` y `StemsPlayer`)
+- `tests/unit/stems.test.ts` — NUEVO (5 tests unitarios para Stems)
+- `tests/unit/video.test.ts` — NUEVO (Tests unitarios para video y null-safety)
+
+### Tests Results (F8)
+```
+pnpm typecheck: 0 errores
+pnpm test:unit: 38/38 tests pasando (5 test suites)
+Result: exit code 0
+```
+
+---
+
 ## Resumen Técnico del Proyecto
 
 ### Métricas Finales

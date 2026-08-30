@@ -20,6 +20,17 @@ export const ProductionDetailsSchema = z.object({
   key: z.string().nullable(),
 });
 
+export const StemsUrlsSchema = z
+  .object({
+    drums: z.string().optional(),
+    bass: z.string().optional(),
+    guitars: z.string().optional(),
+    vocals: z.string().optional(),
+    other: z.string().optional(),
+  })
+  .nullable()
+  .optional();
+
 export const TrackSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -33,6 +44,11 @@ export const TrackSchema = z.object({
   metrics: MetricsSchema,
   production_details: ProductionDetailsSchema,
   lyrics: z.string().nullable(),
+  // Campos multimedia F8
+  itunes_track_id: z.string().nullable().optional(),
+  stems_urls: StemsUrlsSchema,
+  video_embed_url: z.string().url().nullable().optional(),
+  gallery_images: z.array(z.string()).nullable().optional(),
 });
 
 export const ArtistSchema = z.object({
@@ -46,6 +62,7 @@ export const ArtistSchema = z.object({
 export type ValidatedTrack = z.infer<typeof TrackSchema>;
 export type ValidatedMetrics = z.infer<typeof MetricsSchema>;
 export type ValidatedProductionDetails = z.infer<typeof ProductionDetailsSchema>;
+export type ValidatedStemsUrls = z.infer<typeof StemsUrlsSchema>;
 
 export function validateTrack(data: unknown): ValidatedTrack {
   return TrackSchema.parse(data);
