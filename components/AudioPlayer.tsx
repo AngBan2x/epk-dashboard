@@ -1,33 +1,61 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { safeString, hasValue } from "@/lib/null-safe";
+import { useRef, useState, useContext } from "react";
+import { safeString } from "@/lib/null-safe";
+import { AudioPlayerContext } from "@/context/AudioPlayerContext";
 
 interface AudioPlayerProps {
   src: string | undefined;
   title: string | null;
+  id?: string;
+  artist?: string;
+  coverImage?: string;
 }
 
-export function AudioPlayer({ src, title }: AudioPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+export function AudioPlayer({ src, title, id, artist, coverImage }: AudioPlayerProps) {
+  const localAudioRef = useRef<HTMLAudioElement>(null);
+  const [localPlaying, setLocalPlaying] = useState(false);
+  const globalPlayer = useContext(AudioPlayerContext);
+
+  const isCurrentGlobal =
+    globalPlayer?.activeTrack?.audioUrl === src ||
+    (Boolean(id) && globalPlayer?.activeTrack?.id === id);
+
+  const isPlaying = globalPlayer ? isCurrentGlobal && globalPlayer.isPlaying : localPlaying;
 
   const togglePlay = () => {
-    const audio = audioRef.current;
+    if (!src) return;
+
+    if (globalPlayer) {
+      if (isCurrentGlobal) {
+        globalPlayer.togglePlay();
+      } else {
+        globalPlayer.playTrack({
+          id: id || src,
+          title: safeString(title),
+          artist: safeString(artist, "Artista EPK"),
+          audioUrl: src,
+          coverImage,
+        });
+      }
+      return;
+    }
+
+    const audio = localAudioRef.current;
     if (!audio) return;
-    if (isPlaying) {
+    if (localPlaying) {
       audio.pause();
     } else {
       audio.play();
     }
-    setIsPlaying(!isPlaying);
+    setLocalPlaying(!localPlaying);
   };
 
   return (
     <div className="flex items-center gap-3 p-3 bg-dark-50 dark:bg-dark-800 rounded-lg">
       <button
         onClick={togglePlay}
-        className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition"
+        className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0"
         aria-label={isPlaying ? "Pausar" : "Reproducir"}
       >
         {isPlaying ? "⏸" : "▶"}
@@ -36,12 +64,19 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
         <p className="text-sm font-medium truncate">
           {safeString(title)}
         </p>
-        {hasValue(src, "src") ? (
-          <audio
-            ref={audioRef}
-            src={src}
-            onEnded={() => setIsPlaying(false)}
-          />
+        {src ? (
+          <>
+            {!globalPlayer && (
+              <audio
+                ref={localAudioRef}
+                src={src}
+                onEnded={() => setLocalPlaying(false)}
+              />
+            )}
+            <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">
+              {isPlaying ? "Reproduciendo..." : "Listo para reproducir"}
+            </p>
+          </>
         ) : (
           <p className="text-xs text-dark-400">No hay audio disponible</p>
         )}

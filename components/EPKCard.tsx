@@ -14,18 +14,32 @@ export function EPKCard({ track }: EPKCardProps) {
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="aspect-square bg-dark-100 dark:bg-dark-700 relative">
-        <div className="absolute inset-0 flex items-center justify-center text-dark-400">
-          🎵
-        </div>
+      <div className="aspect-square bg-dark-100 dark:bg-dark-700 relative overflow-hidden">
+        {track.cover_image && track.cover_image !== "—" ? (
+          <img
+            src={track.cover_image}
+            alt={title}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-dark-400 text-3xl">
+            🎵
+          </div>
+        )}
       </div>
       <CardContent>
-        <h3 className="font-semibold text-lg mb-1">{title}</h3>
+        <h3 className="font-semibold text-lg mb-1 truncate">{title}</h3>
         <p className="text-sm text-dark-500 mb-2">
           {track.release_type} · {duration}
         </p>
-        <AudioPlayer src={track.audio_preview_url} title={track.title} />
-        <div className="flex items-center gap-2 text-xs text-dark-400">
+        <AudioPlayer
+          id={track.id}
+          src={track.audio_preview_url}
+          title={track.title}
+          coverImage={track.cover_image}
+        />
+        <div className="flex items-center gap-2 text-xs text-dark-400 mt-2">
           <span>▶ {streams} streams</span>
           <span>·</span>
           <span>♥ {formatNumber(track.metrics?.saves ?? 0)}</span>
