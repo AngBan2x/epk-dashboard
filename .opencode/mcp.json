@@ -15,13 +15,6 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     },
-    "turso": {
-      "command": "npx",
-      "args": ["-y", "@turso/mcp-server"],
-      "env": {
-        "TURSO_API_TOKEN": "${TURSO_API_TOKEN}"
-      }
-    },
     "playwright": {
       "command": "npx",
       "args": [
