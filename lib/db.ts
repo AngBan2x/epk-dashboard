@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls } from "@/types/music";
-import { safeString, safeNumber, safeArray } from "@/lib/null-safe";
+import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
 
@@ -15,64 +15,59 @@ function getDb(): Database.Database {
 }
 
 function parseMetrics(raw: string | null): Metrics {
-  if (!raw) {
-    return { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
-  }
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      streams: safeNumber(parsed.streams),
-      saves: safeNumber(parsed.saves),
-      playlist_additions: safeNumber(parsed.playlist_additions),
-      top_countries: safeArray<{ country: string; pct: number }>(parsed.top_countries),
-    };
-  } catch {
-    return { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
-  }
+  const fallback: Metrics = { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
+  if (!raw) return fallback;
+
+  const parsed = safeParseJSON<Record<string, unknown> | null>(raw, null);
+  if (!parsed) return fallback;
+
+  return {
+    streams: safeNumber(parsed.streams),
+    saves: safeNumber(parsed.saves),
+    playlist_additions: safeNumber(parsed.playlist_additions),
+    top_countries: safeArray<{ country: string; pct: number }>(parsed.top_countries),
+  };
 }
 
 function parseProductionDetails(raw: string | null): ProductionDetails {
-  if (!raw) {
-    return { daw: null, guitars: null, effects_chain: null, tuning: null, key: null };
-  }
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      daw: typeof parsed.daw === "string" ? parsed.daw : null,
-      guitars: typeof parsed.guitars === "string" ? parsed.guitars : null,
-      effects_chain: typeof parsed.effects_chain === "string" ? parsed.effects_chain : null,
-      tuning: typeof parsed.tuning === "string" ? parsed.tuning : null,
-      key: typeof parsed.key === "string" ? parsed.key : null,
-    };
-  } catch {
-    return { daw: null, guitars: null, effects_chain: null, tuning: null, key: null };
-  }
+  const fallback: ProductionDetails = { daw: null, guitars: null, effects_chain: null, tuning: null, key: null };
+  if (!raw) return fallback;
+
+  const parsed = safeParseJSON<Record<string, unknown> | null>(raw, null);
+  if (!parsed) return fallback;
+
+  return {
+    daw: typeof parsed.daw === "string" ? parsed.daw : null,
+    guitars: typeof parsed.guitars === "string" ? parsed.guitars : null,
+    effects_chain: typeof parsed.effects_chain === "string" ? parsed.effects_chain : null,
+    tuning: typeof parsed.tuning === "string" ? parsed.tuning : null,
+    key: typeof parsed.key === "string" ? parsed.key : null,
+  };
 }
 
 function parseStemsUrls(raw: string | null): StemsUrls | null {
   if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      drums: typeof parsed.drums === "string" ? parsed.drums : undefined,
-      bass: typeof parsed.bass === "string" ? parsed.bass : undefined,
-      guitars: typeof parsed.guitars === "string" ? parsed.guitars : undefined,
-      vocals: typeof parsed.vocals === "string" ? parsed.vocals : undefined,
-      other: typeof parsed.other === "string" ? parsed.other : undefined,
-    };
-  } catch {
-    return null;
-  }
+
+  const parsed = safeParseJSON<Record<string, unknown> | null>(raw, null);
+  if (!parsed) return null;
+
+  return {
+    drums: typeof parsed.drums === "string" ? parsed.drums : undefined,
+    bass: typeof parsed.bass === "string" ? parsed.bass : undefined,
+    guitars: typeof parsed.guitars === "string" ? parsed.guitars : undefined,
+    vocals: typeof parsed.vocals === "string" ? parsed.vocals : undefined,
+    other: typeof parsed.other === "string" ? parsed.other : undefined,
+  };
 }
 
 function parseGalleryImages(raw: string | null): string[] | null {
   if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed.filter((item): item is string => typeof item === "string")) : null;
-  } catch {
-    return null;
-  }
+
+  const parsed = safeParseJSON<unknown>(raw, null);
+  if (!Array.isArray(parsed)) return null;
+
+  const filtered = parsed.filter((item): item is string => typeof item === "string");
+  return filtered.length > 0 ? filtered : null;
 }
 
 function parseTrack(row: RawTrackRow): Track {

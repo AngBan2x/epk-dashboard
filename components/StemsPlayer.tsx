@@ -26,7 +26,6 @@ export function StemsPlayer({
   mainAudioUrl,
   className = "",
 }: StemsPlayerProps) {
-  // Canales configurados o sintetizados desde mainAudioUrl si no hay stems aislados
   const fallbackUrl = mainAudioUrl || "/audio/preview-default.mp3";
 
   const channels: StemChannel[] = [
@@ -64,7 +63,6 @@ export function StemsPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(30);
 
-  // Estados independientes por canal
   const [volumes, setVolumes] = useState<Record<string, number>>({
     vocals: 0.85,
     guitars: 0.8,
@@ -88,7 +86,6 @@ export function StemsPlayer({
 
   const hasAnySolo = Object.values(soloed).some(Boolean);
 
-  // Sincronización de Play / Pause
   const toggleMasterPlay = () => {
     getAudioContext();
     const nextPlaying = !isPlaying;
@@ -106,7 +103,6 @@ export function StemsPlayer({
     });
   };
 
-  // Sincronización de Seek
   const handleSeek = (time: number) => {
     setCurrentTime(time);
     channels.forEach((ch) => {
@@ -117,7 +113,6 @@ export function StemsPlayer({
     });
   };
 
-  // Ajuste de Volumen
   const handleVolumeChange = (key: string, val: number) => {
     setVolumes((prev) => ({ ...prev, [key]: val }));
     const el = audioRefs.current[key];
@@ -126,7 +121,6 @@ export function StemsPlayer({
     }
   };
 
-  // Toggle Mute
   const toggleMute = (key: string) => {
     const nextMuted = !muted[key];
     setMuted((prev) => ({ ...prev, [key]: nextMuted }));
@@ -136,7 +130,6 @@ export function StemsPlayer({
     }
   };
 
-  // Toggle Solo
   const toggleSolo = (key: string) => {
     const nextSoloedState = {
       ...soloed,
@@ -172,7 +165,6 @@ export function StemsPlayer({
     return isMuted ? 0 : vol;
   };
 
-  // Efecto para sincronizar evento timeupdate en el canal principal
   useEffect(() => {
     const primary = audioRefs.current["vocals"];
     if (!primary) return;
@@ -204,19 +196,18 @@ export function StemsPlayer({
   };
 
   return (
-    <section className={`p-6 bg-dark-900 text-white rounded-2xl border border-dark-700 shadow-xl ${className}`}>
+    <section className={`p-6 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl ${className}`}>
       {/* Header del Mixer */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-dark-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
             <span>🎚️</span> {safeString(title)}
           </h2>
-          <p className="text-xs text-dark-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Consola de mezcla interactiva multicanal con Web Audio API
           </p>
         </div>
 
-        {/* Master Controls */}
         <div className="flex items-center gap-3">
           <button
             onClick={toggleMasterPlay}
@@ -230,7 +221,7 @@ export function StemsPlayer({
       </div>
 
       {/* Master Progress Bar */}
-      <div className="mb-6 bg-dark-950/80 p-3 rounded-xl border border-dark-800 flex items-center gap-3 text-xs text-dark-400">
+      <div className="mb-6 bg-slate-100 dark:bg-slate-950/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
         <span className="w-10 font-mono text-right">{formatSeconds(currentTime)}</span>
         <input
           type="range"
@@ -239,13 +230,13 @@ export function StemsPlayer({
           step={0.1}
           value={currentTime}
           onChange={(e) => handleSeek(parseFloat(e.target.value))}
-          className="flex-1 h-2 bg-dark-800 rounded-lg appearance-none cursor-pointer accent-primary-500 hover:h-2.5 transition-all"
+          className="flex-1 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary-500 hover:h-2.5 transition-all"
           aria-label="Línea de tiempo de stems"
         />
         <span className="w-10 font-mono">{formatSeconds(duration)}</span>
       </div>
 
-      {/* Canales de Mezcla (Grid de Faders) */}
+      {/* Canales de Mezcla */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {channels.map((ch) => {
           const isMuted = muted[ch.key];
@@ -257,10 +248,10 @@ export function StemsPlayer({
               key={ch.key}
               className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
                 isSoloed
-                  ? "bg-dark-800/90 border-amber-500/80 shadow-lg shadow-amber-500/10"
+                  ? "bg-white dark:bg-slate-800/90 border-amber-500/80 shadow-lg shadow-amber-500/10"
                   : isMuted
-                  ? "bg-dark-950/40 border-dark-800 opacity-60"
-                  : "bg-dark-800/50 border-dark-700 hover:border-dark-600"
+                  ? "bg-slate-100 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 opacity-60"
+                  : "bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
               {/* Info Canal */}
@@ -268,8 +259,8 @@ export function StemsPlayer({
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{ch.icon}</span>
                   <div>
-                    <p className="text-sm font-semibold text-white truncate">{ch.label}</p>
-                    <span className="text-[10px] uppercase font-mono text-dark-400">Canal {ch.key}</span>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{ch.label}</p>
+                    <span className="text-[10px] uppercase font-mono text-slate-500 dark:text-slate-400">Canal {ch.key}</span>
                   </div>
                 </div>
 
@@ -279,7 +270,7 @@ export function StemsPlayer({
                     <div
                       key={i}
                       className={`w-0.5 rounded-full transition-all duration-150 ${
-                        isAudible ? "bg-emerald-400" : "bg-dark-700"
+                        isAudible ? "bg-emerald-400" : "bg-slate-300 dark:bg-slate-700"
                       }`}
                       style={{
                         height: isAudible ? `${Math.random() * 80 + 20}%` : "15%",
@@ -289,9 +280,9 @@ export function StemsPlayer({
                 </div>
               </div>
 
-              {/* Fader de Volumen Vertical / Horizontal */}
+              {/* Fader de Volumen */}
               <div className="my-3">
-                <div className="flex justify-between text-xs text-dark-400 mb-1">
+                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
                   <span>Nivel</span>
                   <span className="font-mono">{Math.round(volumes[ch.key] * 100)}%</span>
                 </div>
@@ -302,19 +293,19 @@ export function StemsPlayer({
                   step={0.01}
                   value={volumes[ch.key]}
                   onChange={(e) => handleVolumeChange(ch.key, parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
                   aria-label={`Volumen de ${ch.label}`}
                 />
               </div>
 
               {/* Controles Mute / Solo */}
-              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-dark-700/60">
+              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700/60">
                 <button
                   onClick={() => toggleMute(ch.key)}
                   className={`py-1 rounded text-xs font-bold transition ${
                     isMuted
                       ? "bg-red-600 text-white shadow"
-                      : "bg-dark-700/80 hover:bg-dark-700 text-dark-300 hover:text-white"
+                      : "bg-slate-100 dark:bg-slate-700/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   MUTE
@@ -323,8 +314,8 @@ export function StemsPlayer({
                   onClick={() => toggleSolo(ch.key)}
                   className={`py-1 rounded text-xs font-bold transition ${
                     isSoloed
-                      ? "bg-amber-500 text-dark-950 shadow font-black"
-                      : "bg-dark-700/80 hover:bg-dark-700 text-dark-300 hover:text-white"
+                      ? "bg-amber-500 text-slate-950 shadow font-black"
+                      : "bg-slate-100 dark:bg-slate-700/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   SOLO
