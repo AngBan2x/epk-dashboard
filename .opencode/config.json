@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "edit_files": "auto",
+    "run_commands": "auto",
+    "mcp_tools": "auto"
+  }
+}
