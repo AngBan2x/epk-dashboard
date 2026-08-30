@@ -18,6 +18,14 @@ export interface ProductionDetails {
   key: string | null;
 }
 
+export interface StemsUrls {
+  drums?: string;
+  bass?: string;
+  guitars?: string;
+  vocals?: string;
+  other?: string;
+}
+
 export interface Track {
   id: string;
   title: string;
@@ -31,6 +39,11 @@ export interface Track {
   metrics: Metrics;
   production_details: ProductionDetails;
   lyrics: string | null;
+  // Campos multimedia F8
+  itunes_track_id?: string | null;
+  stems_urls?: StemsUrls | null;
+  video_embed_url?: string | null;
+  gallery_images?: string[] | null;
 }
 
 export interface Artist {
@@ -59,6 +72,11 @@ export interface RawTrackRow {
   metrics: string | null;
   production_details: string | null;
   lyrics: string | null;
+  // Campos multimedia F8
+  itunes_track_id?: string | null;
+  stems_urls?: string | null;
+  video_embed_url?: string | null;
+  gallery_images?: string | null;
 }
 
 export interface SyncResult {

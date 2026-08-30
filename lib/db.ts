@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track, RawTrackRow, Metrics, ProductionDetails } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls } from "@/types/music";
 import { safeString, safeNumber, safeArray } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
@@ -49,6 +49,32 @@ function parseProductionDetails(raw: string | null): ProductionDetails {
   }
 }
 
+function parseStemsUrls(raw: string | null): StemsUrls | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      drums: typeof parsed.drums === "string" ? parsed.drums : undefined,
+      bass: typeof parsed.bass === "string" ? parsed.bass : undefined,
+      guitars: typeof parsed.guitars === "string" ? parsed.guitars : undefined,
+      vocals: typeof parsed.vocals === "string" ? parsed.vocals : undefined,
+      other: typeof parsed.other === "string" ? parsed.other : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseGalleryImages(raw: string | null): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed.filter((item): item is string => typeof item === "string")) : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseTrack(row: RawTrackRow): Track {
   return {
     id: row.id,
@@ -63,6 +89,11 @@ function parseTrack(row: RawTrackRow): Track {
     metrics: parseMetrics(row.metrics),
     production_details: parseProductionDetails(row.production_details),
     lyrics: row.lyrics ?? null,
+    // Multimedia F8
+    itunes_track_id: row.itunes_track_id ?? null,
+    stems_urls: parseStemsUrls(row.stems_urls ?? null),
+    video_embed_url: row.video_embed_url ?? null,
+    gallery_images: parseGalleryImages(row.gallery_images ?? null),
   };
 }
 
