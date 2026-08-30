@@ -12,12 +12,10 @@ interface EPKExporterProps {
 }
 
 export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporterProps) {
-  const [isExporting, setIsExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [format, setFormat] = useState<"json" | "html">("json");
 
   const handleExport = async () => {
-    setIsExporting(true);
     setExportStatus("loading");
 
     try {
@@ -43,17 +41,15 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
 
       setExportStatus("success");
       setTimeout(() => setExportStatus("idle"), 3000);
-    } catch (_err) {
+    } catch {
       setExportStatus("error");
       setTimeout(() => setExportStatus("idle"), 3000);
-    } finally {
-      setIsExporting(false);
     }
   };
 
   const statusConfig = {
     idle: { icon: "📥", label: "Exportar Dossier EPK", color: "bg-primary-600 hover:bg-primary-500" },
-    loading: { icon: "⏳", label: "Generando dossier...", color: "bg-dark-600 cursor-wait" },
+    loading: { icon: "⏳", label: "Generando dossier...", color: "bg-slate-600 cursor-wait" },
     success: { icon: "✅", label: "¡Descargado!", color: "bg-emerald-600" },
     error: { icon: "⚠️", label: "Error al exportar", color: "bg-red-600" },
   };
@@ -61,13 +57,13 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
   const current = statusConfig[exportStatus];
 
   return (
-    <section className={`p-6 bg-white dark:bg-dark-800 rounded-2xl border border-dark-200 dark:border-dark-700 ${className}`}>
+    <section className={`p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 ${className}`}>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-dark-900 dark:text-dark-100 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <span>📄</span> Exportar Dossier EPK
           </h2>
-          <p className="text-xs text-dark-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Genera y descarga la ficha técnica completa del catálogo para prensa o promotores.
           </p>
         </div>
@@ -76,13 +72,13 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
         </span>
       </div>
 
-      {/* Vista previa de los datos */}
+      {/* Vista previa */}
       {artist && (
-        <div className="mb-6 p-4 rounded-xl bg-dark-50 dark:bg-dark-900/60 border border-dark-200 dark:border-dark-700 text-sm space-y-1.5">
-          <p><span className="text-dark-400">Artista:</span> <strong className="text-dark-900 dark:text-dark-100">{safeString(artist.name)}</strong></p>
-          <p><span className="text-dark-400">Género:</span> {safeString(artist.genre)}</p>
-          <p><span className="text-dark-400">Sede:</span> {safeString(artist.location)}</p>
-          <p><span className="text-dark-400">Tracks en catálogo:</span> {tracks.length}</p>
+        <div className="mb-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-sm space-y-1.5">
+          <p><span className="text-slate-500 dark:text-slate-400">Artista:</span> <strong className="text-slate-900 dark:text-slate-100">{safeString(artist.name)}</strong></p>
+          <p><span className="text-slate-500 dark:text-slate-400">Género:</span> {safeString(artist.genre)}</p>
+          <p><span className="text-slate-500 dark:text-slate-400">Sede:</span> {safeString(artist.location)}</p>
+          <p><span className="text-slate-500 dark:text-slate-400">Tracks en catálogo:</span> {tracks.length}</p>
         </div>
       )}
 
@@ -95,7 +91,7 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
             className={`px-4 py-2 rounded-lg border text-sm font-semibold transition ${
               format === f
                 ? "bg-primary-600 text-white border-primary-500 shadow-md"
-                : "bg-dark-100 dark:bg-dark-900 text-dark-600 dark:text-dark-400 border-dark-300 dark:border-dark-700 hover:border-primary-500/50"
+                : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700 hover:border-primary-500/50"
             }`}
           >
             {f.toUpperCase()}
@@ -103,12 +99,12 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
         ))}
       </div>
 
-      {/* Botón de exportación con animación */}
+      {/* Botón de exportación */}
       <motion.button
         onClick={handleExport}
-        disabled={isExporting}
-        whileHover={{ scale: isExporting ? 1 : 1.02 }}
-        whileTap={{ scale: isExporting ? 1 : 0.98 }}
+        disabled={exportStatus === "loading"}
+        whileHover={{ scale: exportStatus === "loading" ? 1 : 1.02 }}
+        whileTap={{ scale: exportStatus === "loading" ? 1 : 0.98 }}
         className={`w-full py-3 rounded-xl text-white font-bold text-base transition-all duration-200 flex items-center justify-center gap-2 ${current.color} disabled:opacity-70`}
         aria-label={current.label}
       >

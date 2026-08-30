@@ -529,39 +529,135 @@ Lint: ✅ 0 errors
 
 ---
 
+## Refactorización Integral UI/UX & Nuevos Módulos Profesionales
+
+**Fecha:** 2026-08-30
+**Modelo:** MiMo V2.5 Free
+**Proveedor:** OpenCode Zen
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Refactorización integral de UI/UX, corrección de bugs críticos y adición de módulos profesionales"
+2. "Purga de catálogo: eliminar canciones ficticias con enlaces rotos, mantener solo reales verificadas"
+3. "Fix Error 500: envolver JSON.parse en safeParseJSON() de lib/null-safe.ts"
+4. "Corrección de tema claro/oscuro en StemsPlayer y componentes con clases hardcodeadas"
+5. "Reparación del Centro de Descargas con generación de HTML válido para Rider y Dossier"
+6. "Nuevas secciones: BioSection, BookingModule, SocialBar, Admin panel"
+
+### Cambios Realizados
+
+#### 1. Limpieza de Datos & Corrección Error 500
+- **`scripts/seed-f9-catalog.ts`**: Purga completa del catálogo. Eliminados 4 tracks ficticios (Sueños de Voltaje, Periferia Digital, Neon Caracas, Cactus en el Concreto). Mantenidos 6 tracks reales con portadas iTunes HD verificadas
+- **`lib/db.ts`**: Refactorizado para usar `safeParseJSON()` de null-safe.ts en todos los parsers (parseMetrics, parseProductionDetails, parseStemsUrls, parseGalleryImages). Eliminados 4 try/catch duplicados
+- **`components/Header.tsx`**: Agregado ícono SVG de Spotify. Corregido mapeo de navegación con links a Dashboard, Tracks y Admin
+
+#### 2. UI/UX & Tema Claro/Oscuro
+- **`components/StemsPlayer.tsx`**: Eliminadas 15+ clases hardcodeadas `bg-dark-900`, `text-white`, `border-dark-700`. Reemplazadas con variantes `dark:` adaptativas (`bg-slate-50 dark:bg-slate-900`, `text-slate-900 dark:text-white`, etc.)
+- **`components/DownloadCenter.tsx`**: Fix dark mode completo. Clases `bg-dark-50` → `bg-slate-50 dark:bg-slate-900/60`, `text-dark-900` → `text-slate-900 dark:text-slate-100`
+- **`app/track/[id]/page.tsx`**: Rediseño Hero horizontal responsivo (`flex-col md:flex-row`). Cover image tamaño fijo `w-48 h-48 md:w-64 md:h-64`. Stats cards con contraste correcto
+- **`app/dashboard/page.tsx`**: Dark mode completo para todas las secciones
+
+#### 3. Centro de Descargas (Assets Reales)
+- **`components/DownloadCenter.tsx`**: Generación de HTML válido con `Blob` + `text/html` MIME type
+  - Rider Técnico: HTML imprimible con secciones de equipo, backline, catering
+  - Dossier de Prensa: HTML profesional con biografía, contacto, layout Georgia serif
+  - Eliminada generación corrupta de texto plano como "descarga"
+
+#### 4. Nuevas Secciones EPK Profesionales
+- **`components/BioSection.tsx`** (NUEVO): Biografía expandible con stats del artista, highlights, botón imprimir hoja de prensa
+- **`components/BookingModule.tsx`** (NUEVO): Lista de próximas fechas con estados (Disponible/Agotado/Próximamente/VIP), formulario interactivo de contratación
+- **`components/SocialBar.tsx`** (NUEVO): Barra de accesos directos con íconos oficiales SVG para Spotify, YouTube, Instagram
+- **`components/EPKExporter.tsx`**: Fix TypeScript, eliminado `useState` no usado, fix label dinámico
+- **`app/admin/page.tsx`** (NUEVO): Panel CRUD con tabla de tracks, formulario de edición/creación, endpoints API
+
+#### 5. Correcciones de Tests
+- **`tests/e2e/track-detail.spec.ts`**: h1 ahora muestra título del track (no "Detalle de Track")
+- **`tests/e2e/multimedia.spec.ts`**: Actualizado count de tracks (12 → 6 reales), fix h1 assertion
+
+### Errores Corregidos (Regla 5)
+1. **SocialBar TS18047** — `link` posiblemente null tras filter → Reescrito con push condicional ✅
+2. **SocialBar unused import** — `safeString` importado pero no usado → Eliminado ✅
+3. **E2E h1 assertion** — Tests esperaban "Detalle de Track" pero h1 ahora muestra título real → Tests actualizados ✅
+4. **Catalog count** — Test esperaba ≥12 tracks pero ahora hay 6 reales → Test actualizado a ≥6 ✅
+
+### Tests Results (Refactoring)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+  - dashboard.spec.ts: 2/2
+  - audio-playback.spec.ts: 1/1
+  - multimedia.spec.ts: 6/6
+  - null-safety.spec.ts: 2/2
+  - track-detail.spec.ts: 2/2
+Build: ✅ Compiled successfully
+Lint: ✅ 0 errors
+```
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `scripts/seed-f9-catalog.ts` | MODIFICADO | Purga: 6 tracks reales verificados |
+| `lib/db.ts` | MODIFICADO | safeParseJSON en todos los parsers |
+| `components/Header.tsx` | MODIFICADO | Spotify icon SVG + nav Admin |
+| `components/StemsPlayer.tsx` | MODIFICADO | Dark mode completo (15+ clases) |
+| `components/DownloadCenter.tsx` | MODIFICADO | HTML válido, dark mode |
+| `components/EPKExporter.tsx` | MODIFICADO | Fix TS, label dinámico |
+| `components/BioSection.tsx` | NUEVO | Biografía + hoja de prensa |
+| `components/BookingModule.tsx` | NUEVO | Shows + formulario booking |
+| `components/SocialBar.tsx` | NUEVO | Barra redes sociales |
+| `app/track/[id]/page.tsx` | MODIFICADO | Hero horizontal + BioSection |
+| `app/dashboard/page.tsx` | MODIFICADO | Bio, Booking, Social integrados |
+| `app/admin/page.tsx` | NUEVO | Panel CRUD administración |
+| `tests/e2e/track-detail.spec.ts` | MODIFICADO | Fix h1 assertion |
+| `tests/e2e/multimedia.spec.ts` | MODIFICADO | Fix count + h1 assertion |
+
+### Commits
+- "refactor: UI/UX integral, dark mode, catalog cleanup, new EPK modules (Bio, Booking, Social, Admin)"
+
+---
+
 ## Resumen Técnico del Proyecto
 
 ### Métricas Finales
-- **Archivos TypeScript/TSX**: ~60+
-- **Líneas de código**: ~8,000+
+- **Archivos TypeScript/TSX**: ~65+
+- **Líneas de código**: ~9,500+
 - **Tests Unitarios**: 41/41 passing
 - **Tests E2E**: 13/13 passing
 - **TypeScript Errors**: 0
 - **ESLint Errors**: 0
-- **Bundle Size**: 208 KB first load JS
+- **Build**: Compiled successfully
 - **MCP Servers**: 4/4 active
-- **Tracks en DB**: 12 (2 originales + 10 F9 seed con metadatos completos)
+- **Tracks en DB**: 6 (tracks reales verificados con portadas iTunes HD)
 
 ### Stack de Calidad Verificado
 - Next.js 14 App Router con Server/Client Components correctos
 - TypeScript 5 strict mode sin `any` casts
-- Null-safety 100% en campos opcionales (11 campos auditados)
+- Null-safety 100% en campos opcionales (safeParseJSON, safeString, safeNumber, safeArray)
 - Playwright E2E coverage: dashboard, track-detail, audio, null-safety, multimedia, export
 - GitHub Actions CI/CD: typecheck → lint → unit → build → deploy
 - Turso sync bidireccional con cron cada 6h
 - Web Audio API para stems multicanal y visualizador
+- Dark mode completo con clases `dark:` adaptativas (no hardcodeadas)
+- Blob API para generación de HTML válido en descargas
 
 ### Entregables Finales
 - ✅ URL pública Vercel (deploy automático)
 - ✅ README.md completo con arquitectura, componentes, métricas, instrucciones
-- ✅ AI_LOG.md bitácora completa F0-F9
-- ✅ Handoffs F0→F1→F2→F3→F4→F5→F6→F7→F8→F9
+- ✅ AI_LOG.md bitácora completa F0-F9 + Refactorización
+- ✅ Handoffs F0→F1→F2→F3→F4→F5→F6→F7→F8→F9→Refactoring
 - ✅ GitHub Release v1.0.0 con changelog
-- ✅ Catálogo 12 tracks con metadatos multimedia completos (portadas HD iTunes, stems, video embed, gallery)
+- ✅ Catálogo 6 tracks reales verificados (portadas iTunes HD, audio preview funcionales)
 - ✅ Animaciones Pitch Deck (SlideIn, PageTransition, LiftCard, PitchHeading)
 - ✅ Exportador Dossier EPK (JSON/HTML) con preview y animaciones
 - ✅ Reproductor global persistente + Visualizador espectro
 - ✅ Mezclador Stems 4 canales (Web Audio API)
 - ✅ VideoShowcase façade pattern + Modal reproductor
 - ✅ Theme Toggle sin hydration mismatch
-- ✅ ImageGallery lightbox + DownloadCenter
+- ✅ ImageGallery lightbox + DownloadCenter con HTML válido
+- ✅ BioSection con hoja de prensa imprimible
+- ✅ BookingModule con fechas y formulario de contratación
+- ✅ SocialBar con íconos oficiales Spotify, YouTube, Instagram
+- ✅ Admin Panel CRUD para gestión de tracks
+- ✅ Dark mode completo en todos los componentes (StemsPlayer, DownloadCenter, etc.)
+- ✅ safeParseJSON en todos los parsers de DB (prevención error 500)
