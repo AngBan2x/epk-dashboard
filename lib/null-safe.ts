@@ -1,5 +1,5 @@
-export const safeString = (v: unknown): string =>
-  typeof v === "string" && v.length > 0 ? v : "—";
+export const safeString = (v: unknown, fallback = "—"): string =>
+  typeof v === "string" && v.length > 0 ? v : fallback;
 
 export const hasValue = (obj: unknown, key: string): boolean => {
   if (obj == null || typeof obj !== "object") return false;

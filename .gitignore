@@ -38,3 +38,8 @@ playwright-report/
 
 # turso
 .turso/
+
+# sessions & logs
+session-*.md
+*.log
+
