@@ -2,7 +2,7 @@
 name: api-builder
 description: Especialista en crear endpoints REST con better-sqlite3, Zod validation y Next.js App Router.
 mode: subagent
-model: opencode/nemotron-3-ultra-free
+model: opencode/mimo-v2.5-free
 ---
 
 # Subagente: API Builder

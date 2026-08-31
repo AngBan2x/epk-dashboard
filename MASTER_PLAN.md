@@ -388,10 +388,12 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | C1 | Schema DB: tabla `track_submissions` | `lib/db.ts` | Nemotron 3 Ultra |
 | C2 | API `/api/itunes-search` (proxy CORS) | `app/api/itunes-search/route.ts` (NUEVO) | MiMo V2.5 |
 | C3 | API `/api/submissions` — CRUD submits | `app/api/submissions/route.ts` (NUEVO) | MiMo V2.5 |
-| C4 | UploadTrackForm con autocomplete | `components/UploadTrackForm.tsx` (NUEVO) | Nemotron 3 Ultra |
+| C4 | UploadTrackForm con autocomplete | `components/UploadTrackForm.tsx` (NUEVO) | Nemotron 3.5 Lightning |
 | C5 | Página `/upload` | `app/upload/page.tsx` (NUEVO) | MiMo V2.5 |
 | C6 | Admin panel: aceptar/rechazar | `app/admin/page.tsx` (MODIFICADO) | MiMo V2.5 |
 | **Cierre** | quality gates + AI_LOG + commit + **release v2.2.0** | — | crear-release |
+
+> **Ejecutar Fase C:** `/fase C` — alterna entre MiMo V2.5, Nemotron 3.5 Lightning y Nemotron 3 Ultra según tipo de tarea (ver estrategia de alternancia en sección 15.2).
 
 ### 13.5 Fase D — Likes + Notificaciones (Resend)
 
@@ -455,7 +457,7 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | **epk-card-builder** | Nemotron 3 Ultra | agent | Genera EPKCard por track con null-safety |
 | **quality-auditor** | Gemma 4 31B | subagent | Playwright E2E, a11y, verificación visual |
 | **fase-orchestrator** (NUEVO) | MiMo V2.5 Free | agent | Orquestador: ejecuta fases completas automáticamente |
-| **api-builder** (NUEVO) | Nemotron 3 Ultra | subagent | Endpoints REST + Zod validation + better-sqlite3 |
+| **api-builder** (NUEVO) | MiMo V2.5 Free | subagent | Endpoints REST + Zod validation + better-sqlite3 |
 | **auth-builder** (NUEVO) | Nemotron 3 Ultra | subagent | Auth: register, login, middleware, context, bcryptjs |
 | **release-manager** (NUEVO) | Nemotron 3.5 Lightning | subagent | Git tags + GitHub releases + changelogs via `gh` |
 
@@ -485,7 +487,7 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | Command | Descripción |
 |---------|-------------|
 | `/renderizar_epk` | Genera componente EPKCard para un track específico |
-| **`/fase`** (NUEVO) | Ejecuta una fase completa con el modelo asignado |
+| **`/fase`** (NUEVO) | Ejecuta una fase completa con el modelo asignado. Alterna entre MiMo V2.5, Nemotron 3.5 Lightning y Nemotron 3 Ultra según tipo de tarea |
 
 ---
 
