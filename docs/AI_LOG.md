@@ -661,3 +661,110 @@ Lint: ✅ 0 errors
 - ✅ Admin Panel CRUD para gestión de tracks
 - ✅ Dark mode completo en todos los componentes (StemsPlayer, DownloadCenter, etc.)
 - ✅ safeParseJSON en todos los parsers de DB (prevención error 500)
+
+---
+
+## Reorganización Documental + Plan Extendido Fases A-G
+
+**Fecha:** 2026-08-30
+**Modelo:** MiMo V2.5 Free
+**Proveedor:** OpenCode Zen
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Reorganiza toda la documentación en carpeta docs/, actualiza MASTER_PLAN.md con el plan extendido"
+2. "Corrige MCP SQLite path y re-ejecuta seed para purgar DB"
+3. "Crea 4 agentes nuevos y 3 skills nuevos para automatización de fases"
+4. "Actualiza README.md con la nueva estructura"
+
+### Cambios Realizados
+
+#### 1. Eliminación de Archivos Basura
+- Eliminado `Directrices del Proyecto Final.md:Zone.Identifier` (metadata Windows)
+- Eliminado `mcp.json:Zone.Identifier` (metadata Windows)
+- Eliminado `tree.txt` (generado automáticamente)
+
+#### 2. Reorganización Documentación
+- Creada carpeta `docs/` y `docs/handoffs/`
+- Movidos 12 archivos de documentación a `docs/`:
+  - `AI_LOG.md`, `RELEASE_NOTES.md`, `PLAN_DIRECTOR_EPK_DASHBOARD.md`, `PLAN_MULTIMEDIA_F7_F9.md`, `modelos gratuitos disponibles.txt`
+  - 7 archivos HANDOFF → `docs/handoffs/`
+- Renombrado `Directrices del Proyecto Final.md` → `docs/DIRECTRICES.md`
+
+#### 3. Correcciones Técnicas
+- **`.mcp.json`** (raíz): Fix SQLite path `./db/local.db` → `./data/music_catalog.db`
+- **`.opencode/mcp.json`**: Fix SQLite path `./db/local.db` → `./data/music_catalog.db`
+- **`data/music_catalog.db`**: DB purgada y re-sembrada con 6 tracks reales verificados (Bohemian Rhapsody, Smells Like Teen Spirit, Blinding Lights, Hotel California, Shape of You, Running Up That Hill)
+
+#### 4. Actualización MASTER_PLAN.md (+266 líneas)
+- Sección 12: Fases Multimedia F7-F9 (Completadas)
+- Sección 13: Plan Extendido Fases A-G (53 tareas, 7 fases, 7 releases)
+- Sección 14: Agentes Personalizados (7 agentes)
+- Sección 15: Skills y Comandos (10 skills + 2 commands)
+- Sección 16: Variables de Entorno
+- Sección 17: Tabla de Releases (v2.0.0 → v3.0.0)
+
+#### 5. Agentes Creados (4 nuevos)
+| Agente | Modelo | Descripción |
+|--------|--------|-------------|
+| `fase-orchestrator` | Nemotron 3 Ultra Free | Orquestador de fases completas |
+| `api-builder` | Nemotron 3 Ultra Free | Endpoints REST + Zod validation |
+| `auth-builder` | Nemotron 3 Ultra Free | Auth completo: register, login, middleware |
+| `release-manager` | Nemotron 3.5 Lightning Free | Git tags + GitHub releases |
+
+#### 6. Skills Creados (3 nuevos)
+| Skill | Descripción |
+|-------|-------------|
+| `fase-completa` | Ciclo completo: code → test → docs → commit → release |
+| `crear-release` | GitHub Release con changelog automático |
+| `handoff-automatico` | Genera HANDOFF + actualiza AI_LOG |
+
+#### 7. README.md Actualizado
+- Nueva sección Documentación (carpeta `docs/`)
+- Nueva sección Agentes y Skills Personalizados (7 agentes, 10 skills, 2 commands)
+- Actualizada descripción de datos y seed
+
+### Errores Corregidos (Regla 5)
+1. **MCP SQLite path** — Ambos `.mcp.json` apuntaban a `./db/local.db` (no existe) → Corregido a `./data/music_catalog.db` ✅
+2. **DB stale** — 12 tracks (6 ficticios + 6 reales) → Re-ejecutado seed, DB limpia con 6 tracks reales ✅
+
+### Tests Results (Reorganización)
+```
+TypeScript: 0 errores (no hubo cambios de código fuente)
+Unit Tests: 41/41 passing (no hubo cambios de código fuente)
+E2E Tests: 13/13 passing (no hubo cambios de código fuente)
+Build: ✅ Compiled successfully
+```
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `.mcp.json` | MODIFICADO | Fix SQLite path |
+| `.opencode/mcp.json` | MODIFICADO | Fix SQLite path |
+| `data/music_catalog.db` | MODIFICADO | DB purgada: 6 tracks reales |
+| `MASTER_PLAN.md` | MODIFICADO | +266 líneas (F7-F9 + A-G + agentes + skills) |
+| `README.md` | MODIFICADO | Nueva estructura docs/ + agentes/skills |
+| `session-ses_fb76.md` | MODIFICADO | Contexto de sesión actualizado |
+| `.opencode/agents/fase-orchestrator.md` | NUEVO | Orquestador de fases |
+| `.opencode/agents/api-builder.md` | NUEVO | Constructor de APIs |
+| `.opencode/agents/auth-builder.md` | NUEVO | Constructor de auth |
+| `.opencode/agents/release-manager.md` | NUEVO | Gestor de releases |
+| `.opencode/skills/fase-completa/SKILL.md` | NUEVO | Ejecución completa de fases |
+| `.opencode/skills/crear-release/SKILL.md` | NUEVO | Creación de releases |
+| `.opencode/skills/handoff-automatico/SKILL.md` | NUEVO | Handoff automático |
+| `docs/AI_LOG.md` | MOVIDO | Desde raíz |
+| `docs/RELEASE_NOTES.md` | MOVIDO | Desde raíz |
+| `docs/DIRECTRICES.md` | RENOMBRADO | Desde "Directrices del Proyecto Final.md" |
+| `docs/PLAN_DIRECTOR_EPK_DASHBOARD.md` | MOVIDO | Desde raíz |
+| `docs/PLAN_MULTIMEDIA_F7_F9.md` | MOVIDO | Desde raíz |
+| `docs/modelos gratuitos disponibles.txt` | MOVIDO | Desde raíz |
+| `docs/handoffs/HANDOFF_F0_F1.md` | MOVIDO | Desde raíz |
+| `docs/handoffs/HANDOFF_F1_F2.md` | MOVIDO | Desde raíz |
+| `docs/handoffs/HANDOFF_F2_F3.md` | MOVIDO | Desde raíz |
+| `docs/handoffs/HANDOFF_F3_F4.md` | MOVIDO | Desde raíz |
+| `docs/handoffs/HANDOFF_F4_F5.md` | MOVIDO | Desde raíz |
+| `docs/handoffs/HANDOFF_F5_F6.md` | MOVIDO | Desde raíz |
+| `docs/handoffs/HANDOFF_FINAL.md` | MOVIDO | Desde raíz |
+
+### Commits
+- `6952683` — chore: reorganización documental + plan extendido Fases A-G
