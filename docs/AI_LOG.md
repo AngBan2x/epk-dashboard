@@ -973,3 +973,68 @@ Build: ✅ Compiled successfully
 
 ### Commits
 - Pendiente: commit + push de cambios
+
+---
+
+## Fase C: Upload de Artistas + Autocomplete
+
+**Fecha:** 2026-08-30
+**Modelo:** MiMo V2.5 Free / Nemotron 3.5 Lightning (OpenCode)
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Ejecuta Fase C: Upload + Autocomplete"
+2. "Schema DB track_submissions + APIs itunes-search + submissions"
+3. "UploadTrackForm con autocomplete iTunes"
+4. "Página /upload + Admin panel aprobar/rechazar"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `run-quality-gates` | typecheck + test:unit + test:e2e al cierre |
+| `git-workflow` | Commit + push + release |
+| `fase-completa` | Ejecución completa Fase C |
+| `crear-release` | GitHub Release v2.2.0 |
+
+### Servidores MCP Consultados
+| Servidor | Consulta | Resultado |
+|----------|----------|-----------|
+| SQLite | `SELECT * FROM track_submissions` | ✅ Tabla creada |
+| GitHub | `git push`, `gh release create` | ✅ v2.2.0 |
+| Playwright | test execution | ✅ 13/13 passing |
+
+### Errores Corregidos (Regla 5)
+1. **TypeScript: artworkUrl100 replace** — `item.artworkUrl100?.replace()` falla por tipo unknown → `typeof item.artworkUrl100 === "string" ? item.artworkUrl100.replace(...) : ""` ✅
+2. **TypeScript: getTrackSubmissionsByStatus** — Función no exportada → Agregada a import en submissions/route.ts ✅
+3. **TypeScript: EventListener types** — React.MouseEvent incompatible con addEventListener → Cambiado a MouseEvent nativo ✅
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `types/music.ts` | MODIFICADO | +TrackSubmission, RawTrackSubmissionRow, SubmissionStatus |
+| `lib/db.ts` | MODIFICADO | +track_submissions table, CRUD functions |
+| `app/api/itunes-search/route.ts` | NUEVO | Proxy CORS iTunes Search API |
+| `app/api/submissions/route.ts` | NUEVO | CRUD submissions (GET/POST/PATCH) |
+| `components/UploadTrackForm.tsx` | NUEVO | Formulario con autocomplete iTunes |
+| `app/upload/page.tsx` | NUEVO | Página de upload |
+| `app/admin/page.tsx` | MODIFICADO | Tabs Tracks/Submissions + approve/reject |
+
+### Tests Results (Fase C)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+Build: ✅ Compiled successfully
+```
+
+### Resumen Técnico Fase C
+- **Schema DB**: tabla `track_submissions` con FK a users, índices en user_id y status
+- **iTunes Proxy**: `/api/itunes-search` con Zod validation, cache 1h, transforma resultados
+- **Submissions API**: CRUD completo, auth via x-user-id header, status transitions
+- **UploadTrackForm**: Autocomplete debounced (300ms), selección rellena formulario, producción opcional
+- **Admin Panel**: Tabs Tracks/Submissions, modal detalle, approve/reject con notas
+- **Commits**: 1 commit único para Fase C completa + release v2.2.0
+
+### Commits
+- Pendiente: commit + push Fase C
+- Release: `v2.2.0` — GitHub Release a crear

@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
@@ -38,6 +38,26 @@ function initUsersTable(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
 }
 initUsersTable();
+
+// Initialize track_submissions table
+function initTrackSubmissionsTable(): void {
+  const db = getDbWrite();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS track_submissions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      track_data TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      admin_notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_submissions_user ON track_submissions(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_submissions_status ON track_submissions(status)`);
+}
+initTrackSubmissionsTable();
 
 function parseUser(row: RawUserRow): User {
   return {
@@ -78,6 +98,64 @@ export function verifyUserPassword(email: string, password: string): User | null
   if (!user) return null;
   // Password verification will be done with bcrypt in auth API
   return user;
+}
+
+function parseTrackSubmission(row: RawTrackSubmissionRow): TrackSubmission {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    track_data: row.track_data,
+    status: row.status as SubmissionStatus,
+    admin_notes: row.admin_notes,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function createTrackSubmission(submission: Omit<TrackSubmission, "id" | "created_at" | "updated_at"> & { id: string }): TrackSubmission {
+  const db = getDbWrite();
+  db.prepare(`
+    INSERT INTO track_submissions (id, user_id, track_data, status, admin_notes)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(submission.id, submission.user_id, submission.track_data, submission.status, submission.admin_notes);
+  const created = getTrackSubmissionById(submission.id);
+  if (!created) throw new Error("Failed to create track submission");
+  return created;
+}
+
+export function getTrackSubmissionById(id: string): TrackSubmission | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM track_submissions WHERE id = ?").get(id) as RawTrackSubmissionRow | undefined;
+  return row !== undefined ? parseTrackSubmission(row) : null;
+}
+
+export function getTrackSubmissionsByUser(userId: string): TrackSubmission[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM track_submissions WHERE user_id = ? ORDER BY created_at DESC").all(userId) as RawTrackSubmissionRow[];
+  return rows.map(parseTrackSubmission);
+}
+
+export function getAllTrackSubmissions(): TrackSubmission[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM track_submissions ORDER BY created_at DESC").all() as RawTrackSubmissionRow[];
+  return rows.map(parseTrackSubmission);
+}
+
+export function getTrackSubmissionsByStatus(status: SubmissionStatus): TrackSubmission[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM track_submissions WHERE status = ? ORDER BY created_at DESC").all(status) as RawTrackSubmissionRow[];
+  return rows.map(parseTrackSubmission);
+}
+
+export function updateTrackSubmissionStatus(id: string, status: SubmissionStatus, adminNotes?: string): TrackSubmission | null {
+  const db = getDbWrite();
+  const now = new Date().toISOString();
+  if (adminNotes !== undefined) {
+    db.prepare("UPDATE track_submissions SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?").run(status, adminNotes, now, id);
+  } else {
+    db.prepare("UPDATE track_submissions SET status = ?, updated_at = ? WHERE id = ?").run(status, now, id);
+  }
+  return getTrackSubmissionById(id);
 }
 
 // Export getDbWrite for direct queries if needed

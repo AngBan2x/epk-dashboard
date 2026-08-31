@@ -1,0 +1,189 @@
+.
+├── MASTER_PLAN.md
+├── README.md
+├── app
+│   ├── admin
+│   │   └── page.tsx
+│   ├── api
+│   │   ├── auth
+│   │   │   ├── login
+│   │   │   │   └── route.ts
+│   │   │   ├── logout
+│   │   │   │   └── route.ts
+│   │   │   ├── me
+│   │   │   │   └── route.ts
+│   │   │   └── register
+│   │   │       └── route.ts
+│   │   ├── export
+│   │   │   └── route.ts
+│   │   ├── itunes-search
+│   │   │   └── route.ts
+│   │   ├── submissions
+│   │   │   └── route.ts
+│   │   ├── sync
+│   │   │   └── route.ts
+│   │   └── tracks
+│   │       └── route.ts
+│   ├── dashboard
+│   │   ├── loading.tsx
+│   │   └── page.tsx
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── login
+│   │   └── page.tsx
+│   ├── page.tsx
+│   ├── register
+│   │   └── page.tsx
+│   └── track
+│       └── [id]
+│           ├── not-found.tsx
+│           └── page.tsx
+├── components
+│   ├── AudioPlayer.tsx
+│   ├── AudioVisualizer.tsx
+│   ├── BioSection.tsx
+│   ├── BookingModule.tsx
+│   ├── DownloadCenter.tsx
+│   ├── EPKCard.tsx
+│   ├── EPKExporter.tsx
+│   ├── GlobalAudioPlayer.tsx
+│   ├── Header.tsx
+│   ├── ImageGallery.tsx
+│   ├── LoginModal.tsx
+│   ├── LyricsModal.tsx
+│   ├── MetricsCharts.tsx
+│   ├── MotionWrappers.tsx
+│   ├── ProductionDetails.tsx
+│   ├── Providers.tsx
+│   ├── SocialBar.tsx
+│   ├── StemsPlayer.tsx
+│   ├── ThemeToggle.tsx
+│   ├── TrackFilters.tsx
+│   ├── VideoPlayerModal.tsx
+│   ├── VideoShowcase.tsx
+│   └── ui
+│       ├── Button.tsx
+│       ├── Card.tsx
+│       ├── Modal.tsx
+│       └── Skeleton.tsx
+├── context
+│   ├── AudioPlayerContext.tsx
+│   └── AuthContext.tsx
+├── data
+│   ├── catalog.json
+│   ├── music_catalog.db
+│   └── seed
+├── docs
+│   ├── AI_LOG.md
+│   ├── DIRECTRICES.md
+│   ├── PLAN_DIRECTOR_EPK_DASHBOARD.md
+│   ├── PLAN_MULTIMEDIA_F7_F9.md
+│   ├── RELEASE_NOTES.md
+│   ├── handoffs
+│   │   ├── HANDOFF_F0_F1.md
+│   │   ├── HANDOFF_F1_F2.md
+│   │   ├── HANDOFF_F2_F3.md
+│   │   ├── HANDOFF_F3_F4.md
+│   │   ├── HANDOFF_F4_F5.md
+│   │   ├── HANDOFF_F5_F6.md
+│   │   └── HANDOFF_FINAL.md
+│   └── modelos gratuitos disponibles.txt
+├── eslint.config.js
+├── lib
+│   ├── db.ts
+│   ├── itunes.ts
+│   ├── null-safe.ts
+│   ├── turso.ts
+│   ├── utils.ts
+│   ├── validations.ts
+│   └── web-audio.ts
+├── middleware.ts
+├── next-env.d.ts
+├── next.config.js
+├── node_modules
+│   ├── @eslint
+│   │   └── js -> ../.pnpm/@eslint+js@10.0.1_eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0_/node_modules/@eslint/js
+│   ├── @libsql
+│   │   └── client -> ../.pnpm/@libsql+client@0.14.0/node_modules/@libsql/client
+│   ├── @next
+│   │   └── eslint-plugin-next -> ../.pnpm/@next+eslint-plugin-next@16.3.3_eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0_/node_modules/@next/eslint-plugin-next
+│   ├── @playwright
+│   │   └── test -> ../.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test
+│   ├── @testing-library
+│   │   ├── jest-dom -> ../.pnpm/@testing-library+jest-dom@6.10.0_@testing-library+dom@10.4.1/node_modules/@testing-library/jest-dom
+│   │   └── react -> ../.pnpm/@testing-library+react@16.3.2_@testing-library+dom@10.4.1_@types+react-dom@19.2.5_@type_c46ddea47b2126c5aeb48521c5c66e45/node_modules/@testing-library/react
+│   ├── @types
+│   │   ├── bcryptjs -> ../.pnpm/@types+bcryptjs@3.0.0/node_modules/@types/bcryptjs
+│   │   ├── better-sqlite3 -> ../.pnpm/@types+better-sqlite3@7.6.13/node_modules/@types/better-sqlite3
+│   │   ├── node -> ../.pnpm/@types+node@22.20.1/node_modules/@types/node
+│   │   ├── react -> ../.pnpm/@types+react@19.2.18/node_modules/@types/react
+│   │   └── react-dom -> ../.pnpm/@types+react-dom@19.2.5_@types+react@19.2.18/node_modules/@types/react-dom
+│   ├── @typescript-eslint
+│   │   ├── eslint-plugin -> ../.pnpm/@typescript-eslint+eslint-plugin@8.68.0_@typescript-eslint+parser@8.68.0_eslint@9.39.5__5a670a9ee4b20023d769dcf06b85ccb2/node_modules/@typescript-eslint/eslint-plugin
+│   │   └── parser -> ../.pnpm/@typescript-eslint+parser@8.68.0_eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0__supports-color@7.2.0_typescript@5.9.3/node_modules/@typescript-eslint/parser
+│   ├── autoprefixer -> .pnpm/autoprefixer@10.5.4_postcss@8.5.26/node_modules/autoprefixer
+│   ├── bcryptjs -> .pnpm/bcryptjs@3.0.3/node_modules/bcryptjs
+│   ├── better-sqlite3 -> .pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3
+│   ├── clsx -> .pnpm/clsx@2.1.1/node_modules/clsx
+│   ├── date-fns -> .pnpm/date-fns@4.4.0/node_modules/date-fns
+│   ├── dotenv -> .pnpm/dotenv@17.4.2/node_modules/dotenv
+│   ├── eslint -> .pnpm/eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0/node_modules/eslint
+│   ├── eslint-config-next -> .pnpm/eslint-config-next@15.5.24_eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0__supports-color@7.2.0_typescript@5.9.3/node_modules/eslint-config-next
+│   ├── eslint-plugin-react -> .pnpm/eslint-plugin-react@7.37.5_eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0_/node_modules/eslint-plugin-react
+│   ├── framer-motion -> .pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion
+│   ├── jsdom -> .pnpm/jsdom@26.1.0_supports-color@7.2.0/node_modules/jsdom
+│   ├── next -> .pnpm/next@14.2.21_@playwright+test@1.62.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next
+│   ├── postcss -> .pnpm/postcss@8.5.26/node_modules/postcss
+│   ├── prettier -> .pnpm/prettier@3.9.6/node_modules/prettier
+│   ├── react -> .pnpm/react@18.3.1/node_modules/react
+│   ├── react-dom -> .pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom
+│   ├── recharts -> .pnpm/recharts@2.15.4_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/recharts
+│   ├── resend -> .pnpm/resend@6.25.0/node_modules/resend
+│   ├── tailwind-merge -> .pnpm/tailwind-merge@3.6.0/node_modules/tailwind-merge
+│   ├── tailwindcss -> .pnpm/tailwindcss@3.4.19_tsx@4.23.12/node_modules/tailwindcss
+│   ├── tsx -> .pnpm/tsx@4.23.12/node_modules/tsx
+│   ├── typescript -> .pnpm/typescript@5.9.3/node_modules/typescript
+│   ├── typescript-eslint -> .pnpm/typescript-eslint@8.68.0_eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0__supports-color@7.2.0_typescript@5.9.3/node_modules/typescript-eslint
+│   ├── vitest -> .pnpm/vitest@3.2.7_@types+node@22.20.1_jiti@1.21.7_jsdom@26.1.0_supports-color@7.2.0__supports-color@7.2.0_tsx@4.23.12/node_modules/vitest
+│   └── zod -> .pnpm/zod@3.25.76/node_modules/zod
+├── package.json
+├── playwright-report
+│   └── index.html
+├── playwright.config.ts
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── postcss.config.js
+├── public
+│   ├── audio
+│   └── images
+│       └── covers
+├── scripts
+│   ├── generate-more-data.ts
+│   ├── seed-admin.ts
+│   ├── seed-f9-catalog.ts
+│   └── sync-to-turso.ts
+├── session-ses_fb76.md
+├── tailwind.config.ts
+├── test-results
+├── tests
+│   ├── e2e
+│   │   ├── audio-playback.spec.ts
+│   │   ├── dashboard.spec.ts
+│   │   ├── multimedia.spec.ts
+│   │   ├── null-safety.spec.ts
+│   │   └── track-detail.spec.ts
+│   └── unit
+│       ├── db.test.ts
+│       ├── f9-catalog.test.ts
+│       ├── itunes.test.ts
+│       ├── null-safe.test.ts
+│       ├── stems.test.ts
+│       └── video.test.ts
+├── tree.txt
+├── tsconfig.json
+├── tsconfig.tsbuildinfo
+├── types
+│   └── music.ts
+└── vitest.config.ts
+
+84 directories, 103 files
