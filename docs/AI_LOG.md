@@ -1102,3 +1102,57 @@ Build: ✅ Compiled successfully
 ### Commits
 - `b7a0f2d` — feat: Fase D completa - Likes + Notificaciones Resend + Toast system + badge Nuevo Lanzamiento
 - Release: `v2.3.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v2.3.0
+
+---
+
+## Fase E: Métricas + Webhooks
+
+**Fecha:** 2026-08-30
+**Modelo:** Nemotron 3 Ultra Free (OpenCode) — Orchestrator
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Ejecuta Fase E: Métricas + Webhooks"
+2. "Schema DB tabla metrics_history + API webhook"
+3. "MetricsCharts en tiempo real con Recharts"
+4. "Badge Stems + artist_name en EPKCard"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `run-quality-gates` | typecheck + test:unit + test:e2e al cierre |
+| `git-workflow` | Commit + push + release |
+| `fase-completa` | Ejecución completa Fase E |
+| `crear-release` | GitHub Release v2.4.0 |
+
+### Errores Corregidos (Regla 5)
+1. **Recharts Legend import** — `Legend` no importado en MetricsCharts.tsx → Agregado import ✅
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `types/music.ts` | MODIFICADO | +MetricsHistory, RawMetricsHistoryRow, TopCountry |
+| `lib/db.ts` | MODIFICADO | +metrics_history table, CRUD + upsert |
+| `app/api/webhooks/metrics/route.ts` | NUEVO | Webhook POST/GET métricas externas |
+| `app/api/metrics/history/route.ts` | NUEVO | GET historial métricas por track |
+| `components/MetricsCharts.tsx` | MODIFICADO | Tiempo real + tendencias históricas + LineChart |
+| `components/EPKCard.tsx` | MODIFICADO | +badge Stems Disponibles + artist_name |
+
+### Tests Results (Fase E)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+Build: ✅ Compiled successfully
+```
+
+### Resumen Técnico Fase E
+- **Schema DB**: tabla `metrics_history` con UNIQUE (track_id, date) + índices
+- **Webhook API**: `/api/webhooks/metrics` recibe métricas externas (Spotify, Apple Music)
+- **MetricsCharts**: LineChart histórico 30 días + PieChart + BarChart en tiempo real
+- **EPKCard**: Badge "🎚️ Stems" para tracks con stems_urls + artist_name visible
+- **Commits**: 1 commit único para Fase E completa + release v2.4.0
+
+### Commits
+- Pendiente: commit + push Fase E
+- Release: `v2.4.0` — GitHub Release a crear

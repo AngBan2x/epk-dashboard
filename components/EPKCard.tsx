@@ -14,6 +14,7 @@ interface EPKCardProps {
 
 export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: EPKCardProps) {
   const title = safeString(track.title);
+  const artistName = safeString(track.artist_name);
   const duration = formatDuration(track.duration);
   const streams = formatNumber(track.metrics?.streams ?? 0);
   const [liked, setLiked] = useState(initialLiked);
@@ -29,6 +30,17 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
     const diffMs = now.getTime() - releaseDate.getTime();
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
     return diffDays >= 0 && diffDays <= 7;
+  })();
+
+  // Badge "Stems Disponibles" — track has stems_urls
+  const hasStems = (() => {
+    return track.stems_urls && (
+      track.stems_urls.drums ||
+      track.stems_urls.bass ||
+      track.stems_urls.guitars ||
+      track.stems_urls.vocals ||
+      track.stems_urls.other
+    );
   })();
 
   useEffect(() => {
@@ -117,9 +129,16 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
             ✨ Nuevo
           </div>
         )}
+        {/* Badge "Stems Disponibles" */}
+        {hasStems && (
+          <div className="absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
+            🎚️ Stems
+          </div>
+        )}
       </div>
       <CardContent>
         <h3 className="font-semibold text-lg mb-1 truncate">{title}</h3>
+        <p className="text-sm text-slate-500 mb-1">{artistName}</p>
         <p className="text-sm text-slate-500 mb-2">
           {track.release_type} · {duration}
         </p>
