@@ -1350,3 +1350,41 @@ Build: ✅ Compiled successfully
 
 ### Stack Completo
 Next.js 14, TypeScript 5, Tailwind CSS, Recharts, Framer Motion, better-sqlite3, Turso, bcryptjs, Resend, Zod, Vitest, Playwright
+
+---
+
+## Fase I: Skills + Agents para Fixes Críticos
+
+**Fecha:** 2026-08-31
+**Modelo:** MiMo V2.5 Free (OpenCode) — Orchestrator
+**Modo:** Build
+
+### Objetivo
+Crear herramientas (skills y agents) que aceleren las correcciones de 5 problemas críticos identificados en auditoría.
+
+### Tareas Completadas
+| # | Tipo | Nombre | Archivo |
+|---|------|--------|---------|
+| I1 | Agent | `security-auditor` | `.opencode/agents/security-auditor.md` |
+| I2 | Agent | `db-builder` | `.opencode/agents/db-builder.md` |
+| I3 | Agent | `brand-fixer` | `.opencode/agents/brand-fixer.md` |
+| I4 | Skill | `fix-security` | `.opencode/skills/fix-security/SKILL.md` |
+| I5 | Skill | `fix-branding` | `.opencode/skills/fix-branding/SKILL.md` |
+| I6 | Skill | `db-migration` | `.opencode/skills/db-migration/SKILL.md` |
+
+### Agentes Creados
+| Agente | Modelo | Propósito |
+|--------|--------|-----------|
+| `security-auditor` | `openrouter/nemotron-3-ultra` | Auditar protecciones de rutas y API |
+| `db-builder` | `opencode/nemotron-3-ultra-free` | Diseñar tablas, crear migraciones |
+| `brand-fixer` | `opencode/mimo-v2.5-free` | Buscar/reemplazar logos inconsistentes |
+
+### Skills Creadas
+| Skill | Propósito |
+|-------|-----------|
+| `fix-security` | Checklist de protección de rutas |
+| `fix-branding` | Workflow de reemplazo de marcas |
+| `db-migration` | Workflow de creación de tablas |
+
+### Commits
+- Pendiente: commit + push Fase I
