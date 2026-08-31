@@ -517,7 +517,52 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v2.5.0 | Fase F: UI/UX Final | minor | ✅ Completado |
 | v3.0.0 | Fase G: Branding PressPlay + Fix Crítico | **STABLE** | ✅ Completado |
 | v3.1.0 | Fase H: Verificación Final | **STABLE** | ✅ Completado |
+| v3.2.0 | Fase I: Skills + Agents para Fixes | minor | ⏳ En progreso |
 
 ---
 
-**Documento actualizado: `MASTER_PLAN.md` v3.0 | Plan completo F0-G | Listo para ejecución**
+## 18. FASE I — Skills + Agents para Fixes Críticos
+
+> **Objetivo:** Crear herramientas (skills y agents) que aceleren las correcciones de 5 problemas críticos identificados en auditoría.
+
+### 18.1 Problemas Identificados
+
+| # | Problema | Severidad |
+|---|----------|-----------|
+| 1 | Logo Spotify aparece en Header, Footer, Register, SocialBar | ALTA |
+| 2 | Error al crear cuenta (API retorna HTML en vez de JSON) | CRÍTICA |
+| 3 | Barra blanca al fondo de la página (pb-24 en body) | MEDIA |
+| 4 | Biografía & Prensa es global, no per-artist | ALTA |
+| 5 | Admin/upload accesible sin auth, APIs sin protección | CRÍTICA |
+
+### 18.2 Tareas de la Fase I
+
+| # | Tipo | Nombre | Modelo | Archivo | Descripción |
+|---|------|--------|--------|---------|-------------|
+| I1 | Agent | `security-auditor` | `openrouter/nemotron-3-ultra` | `.opencode/agents/security-auditor.md` | Audita protecciones de rutas, API auth, vulnerabilidades |
+| I2 | Agent | `db-builder` | `opencode/nemotron-3-ultra-free` | `.opencode/agents/db-builder.md` | Diseña tablas, crea migraciones, seed data |
+| I3 | Agent | `brand-fixer` | `opencode/mimo-v2.5-free` | `.opencode/agents/brand-fixer.md` | Busca y reemplaza logos/marcas inconsistentes |
+| I4 | Skill | `fix-security` | — | `.opencode/skills/fix-security/SKILL.md` | Checklist de protección de rutas y APIs |
+| I5 | Skill | `fix-branding` | — | `.opencode/skills/fix-branding/SKILL.md` | Workflow de búsqueda y reemplazo de marcas |
+| I6 | Skill | `db-migration` | — | `.opencode/skills/db-migration/SKILL.md` | Workflow de creación de tablas + sync Turso |
+
+### 18.3 Criterios de Aprobación
+
+| Check | Resultado Esperado |
+|-------|-------------------|
+| 3 agentes creados | `.opencode/agents/security-auditor.md`, `db-builder.md`, `brand-fixer.md` |
+| 3 skills creados | `.opencode/skills/fix-security/`, `fix-branding/`, `db-migration/` |
+| Agents configurados | mode: subagent, modelo asignado, descripción clara |
+| Skills documentados | Workflow paso a paso, triggers, archivos relevantes |
+
+### 18.4 Uso Post-Creación
+
+| Fix | Agente/Skill que lo ejecuta |
+|-----|------------------------------|
+| FIX 5: Protección de rutas | `security-auditor` + skill `fix-security` |
+| FIX 2: Error de registro | `api-builder` (existente) |
+| FIX 1: Logo Spotify → PressPlay | `brand-fixer` + skill `fix-branding` |
+| FIX 3: Barra blanca | `dashboard-builder` (existente) |
+| FIX 4: BioSection per-artist | `db-builder` + skill `db-migration` |
+
+**Documento actualizado: `MASTER_PLAN.md` v3.1 | Plan completo F0-I | Listo para ejecución**
