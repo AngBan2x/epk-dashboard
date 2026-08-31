@@ -2,7 +2,7 @@
 name: quality-auditor
 description: Audita pruebas E2E con Playwright, verificación de tipos TypeScript y cumplimiento de normas WCAG/a11y.
 mode: subagent
-model: Gemma 4 31B
+model: openrouter/gemma-4-31b
 ---
 
 # Subagente: Quality Auditor
