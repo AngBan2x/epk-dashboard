@@ -1100,5 +1100,5 @@ Build: ✅ Compiled successfully
 - **Commits**: 1 commit único para Fase D completa + release v2.3.0
 
 ### Commits
-- Pendiente: commit + push Fase D
-- Release: `v2.3.0` — GitHub Release a crear
+- `b7a0f2d` — feat: Fase D completa - Likes + Notificaciones Resend + Toast system + badge Nuevo Lanzamiento
+- Release: `v2.3.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v2.3.0
