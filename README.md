@@ -154,16 +154,16 @@ pnpm build
 pnpm start
 
 # DB & Sync
-pnpm db:seed        # Genera datos sintéticos (16-20 tracks)
+pnpm db:seed        # Genera 6 tracks reales verificados (iTunes)
 pnpm db:sync        # Sync SQLite → Turso
 ```
 
 ## Datos
 
-- `data/music_catalog.db` — SQLite con tracks (fuente de verdad F0-F3, expandido F8-F9)
+- `data/music_catalog.db` — SQLite con tracks (fuente de verdad, 6 tracks reales verificados)
 - `data/catalog.json` — Backup JSON
-- `scripts/generate-more-data.ts` — Genera 16-20 tracks sintéticos de 4 artistas
-- `scripts/seed-f9-catalog.ts` — F9 seed: 10 tracks con metadatos multimedia completos (iTunes covers HD, stems, video embed, gallery)
+- `scripts/seed-f9-catalog.ts` — Seed: 6 tracks reales con metadatos iTunes verificados (portadas HD, audio preview)
+- `scripts/generate-more-data.ts` — Genera tracks sintéticos adicionales (legacy)
 - `scripts/sync-to-turso.ts` — Sync bidireccional SQLite ↔ Turso
 
 ## Despliegue
@@ -179,18 +179,55 @@ Variables de entorno requeridas:
 - `TURSO_AUTH_TOKEN`
 - `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (para deploy)
 
-## Handoffs Técnicos
+## Documentación
 
-- `HANDOFF_F0_F1.md` — Setup → Data Layer
-- `HANDOFF_F1_F2.md` — Data Layer → EPK Components
-- `HANDOFF_F2_F3.md` — EPK Components → Dashboard/Views
-- `HANDOFF_F3_F4.md` — Views → Turso Integration
-- `HANDOFF_F4_F5.md` — Turso → E2E Testing
-- `HANDOFF_F5_F6.md` — E2E → Deployment
+Toda la documentación del proyecto se encuentra en la carpeta `docs/`:
 
-## Bitácora IA
+| Archivo | Descripción |
+|---------|-------------|
+| `docs/AI_LOG.md` | Bitácora técnica completa (prompts, skills, errores corregidos) |
+| `docs/RELEASE_NOTES.md` | Notas de liberación v1.0.0 |
+| `docs/DIRECTRICES.md` | Directrices del proyecto final |
+| `docs/MODELOS_DISPONIBLES.txt` | Modelos gratuitos disponibles (OpenCode + OpenRouter) |
+| `docs/PLAN_MULTIMEDIA_F7_F9.md` | Plan de fases multimedia F7-F9 |
+| `docs/PLAN_DIRECTOR_EPK_DASHBOARD.md` | Plan director original |
+| `docs/handoffs/` | Handoffs entre fases (F0→F1, F1→F2, ..., FINAL) |
 
-Ver `AI_LOG.md` para registro completo de prompts, skills, errores corregidos y decisiones por fase.
+## Agentes y Skills Personalizados
+
+### Agentes (7)
+
+| Agente | Modelo | Modo | Descripción |
+|--------|--------|------|-------------|
+| dashboard-builder | Nemotron 3.5 Lightning | subagent | Server/Client Components, Recharts |
+| epk-card-builder | Nemotron 3 Ultra | agent | Genera EPKCard por track |
+| quality-auditor | Gemma 4 31B | subagent | Playwright E2E, a11y |
+| fase-orchestrator | MiMo V2.5 Free | agent | Orquestador de fases completas |
+| api-builder | Nemotron 3 Ultra | subagent | Endpoints REST + Zod |
+| auth-builder | Nemotron 3 Ultra | subagent | Auth completo |
+| release-manager | Nemotron 3.5 Lightning | subagent | Git tags + releases |
+
+### Skills (10)
+
+| Skill | Descripción |
+|-------|-------------|
+| git-workflow | Commit + push automático |
+| documentar-proyecto | Actualiza README + AI_LOG |
+| validar-null-safety | Checklist campos opcionales |
+| auditar-mcp | Verifica 4/4 MCP servers |
+| switch-context | Genera HANDOFF entre fases |
+| optimizar-lighthouse | Bundle < 250KB, lazy loading |
+| run-quality-gates | typecheck + test:unit + test:e2e |
+| fase-completa | Ciclo completo: code → test → docs → commit → release |
+| crear-release | GitHub Release con changelog |
+| handoff-automatico | HANDOFF + AI_LOG automático |
+
+### Commands (2)
+
+| Command | Descripción |
+|---------|-------------|
+| /renderizar_epk | Genera EPKCard para un track |
+| /fase | Ejecuta una fase completa |
 
 ## Licencia
 
