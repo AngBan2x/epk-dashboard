@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus, Like, RawLikeRow, Notification, RawNotificationRow, NotificationType } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus, Like, RawLikeRow, Notification, RawNotificationRow, NotificationType, MetricsHistory, RawMetricsHistoryRow, TopCountry } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
@@ -99,6 +99,29 @@ function initNotificationsTable(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)`);
 }
 initNotificationsTable();
+
+// Initialize metrics_history table
+function initMetricsHistoryTable(): void {
+  const db = getDbWrite();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS metrics_history (
+      id TEXT PRIMARY KEY,
+      track_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      streams INTEGER DEFAULT 0,
+      saves INTEGER DEFAULT 0,
+      playlist_additions INTEGER DEFAULT 0,
+      top_countries TEXT, -- JSON
+      source TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (track_id) REFERENCES tracks(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_metrics_history_track ON metrics_history(track_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_metrics_history_date ON metrics_history(date)`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_history_track_date ON metrics_history(track_id, date)`);
+}
+initMetricsHistoryTable();
 
 function parseUser(row: RawUserRow): User {
   return {
@@ -307,6 +330,64 @@ export function getUnreadNotificationCount(userId: string): number {
   const db = getDb();
   const result = db.prepare("SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0").get(userId) as { count: number };
   return result.count;
+}
+
+function parseMetricsHistory(row: RawMetricsHistoryRow): MetricsHistory {
+  return {
+    id: row.id,
+    track_id: row.track_id,
+    date: row.date,
+    streams: row.streams,
+    saves: row.saves,
+    playlist_additions: row.playlist_additions,
+    top_countries: safeParseJSON<TopCountry[]>(row.top_countries, []),
+    source: row.source,
+    created_at: row.created_at,
+  };
+}
+
+export function createMetricsHistory(metrics: Omit<MetricsHistory, "id" | "created_at"> & { id: string }): MetricsHistory {
+  const db = getDbWrite();
+  db.prepare(`
+    INSERT INTO metrics_history (id, track_id, date, streams, saves, playlist_additions, top_countries, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(metrics.id, metrics.track_id, metrics.date, metrics.streams, metrics.saves, metrics.playlist_additions, JSON.stringify(metrics.top_countries), metrics.source);
+  const created = getMetricsHistoryById(metrics.id);
+  if (!created) throw new Error("Failed to create metrics history");
+  return created;
+}
+
+export function getMetricsHistoryById(id: string): MetricsHistory | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM metrics_history WHERE id = ?").get(id) as RawMetricsHistoryRow | undefined;
+  return row !== undefined ? parseMetricsHistory(row) : null;
+}
+
+export function getMetricsHistoryByTrack(trackId: string): MetricsHistory[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM metrics_history WHERE track_id = ? ORDER BY date DESC").all(trackId) as RawMetricsHistoryRow[];
+  return rows.map(parseMetricsHistory);
+}
+
+export function getMetricsHistoryByTrackAndDate(trackId: string, date: string): MetricsHistory | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM metrics_history WHERE track_id = ? AND date = ?").get(trackId, date) as RawMetricsHistoryRow | undefined;
+  return row !== undefined ? parseMetricsHistory(row) : null;
+}
+
+export function upsertMetricsHistory(metrics: Omit<MetricsHistory, "id" | "created_at"> & { id: string }): MetricsHistory {
+  const db = getDbWrite();
+  const existing = getMetricsHistoryByTrackAndDate(metrics.track_id, metrics.date);
+  if (existing) {
+    db.prepare(`
+      UPDATE metrics_history 
+      SET streams = ?, saves = ?, playlist_additions = ?, top_countries = ?, source = ?, created_at = ?
+      WHERE id = ?
+    `).run(metrics.streams, metrics.saves, metrics.playlist_additions, JSON.stringify(metrics.top_countries), metrics.source, new Date().toISOString(), existing.id);
+    return getMetricsHistoryById(existing.id)!;
+  } else {
+    return createMetricsHistory(metrics);
+  }
 }
 
 // Export getDbWrite for direct queries if needed

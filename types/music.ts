@@ -164,3 +164,27 @@ export interface RawNotificationRow {
   read: number; // 0 or 1
   created_at: string;
 }
+
+export interface MetricsHistory {
+  id: string;
+  track_id: string;
+  date: string; // ISO date string
+  streams: number;
+  saves: number;
+  playlist_additions: number;
+  top_countries: TopCountry[];
+  source: string; // e.g., "spotify", "apple_music", "webhook"
+  created_at: string;
+}
+
+export interface RawMetricsHistoryRow {
+  id: string;
+  track_id: string;
+  date: string;
+  streams: number;
+  saves: number;
+  playlist_additions: number;
+  top_countries: string; // JSON
+  source: string;
+  created_at: string;
+}
