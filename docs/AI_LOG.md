@@ -849,3 +849,81 @@ Build: ✅ Compiled successfully
 
 ### Commits
 - `b8c9d2e` — feat: Fase A completa - artist_name, CRUD tracks, dark mode migration
+- `947b92b` — feat: Fase B completa - Auth system (register/login/me), AuthContext, LoginModal, middleware, admin seed
+
+---
+
+## Fase B: Auth + Usuarios
+
+**Fecha:** 2026-08-30
+**Modelo:** Nemotron 3 Ultra Free (OpenCode)
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Ejecuta Fase B: Auth system completo con register, login, logout, me"
+2. "Crea AuthContext + AuthProvider + LoginModal en Header"
+3. "Middleware protegiendo /admin solo para role admin"
+4. "Seed admin user + login/register pages"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `run-quality-gates` | typecheck + test:unit + test:e2e al cierre |
+| `git-workflow` | Commit + push + release |
+| `fase-completa` | Ejecución completa Fase B |
+| `crear-release` | GitHub Release v2.1.0 |
+
+### Servidores MCP Consultados
+| Servidor | Consulta | Resultado |
+|----------|----------|-----------|
+| SQLite | `SELECT * FROM users` | ✅ 1 admin user |
+| GitHub | `git push`, `gh release create` | ✅ v2.1.0 |
+| Playwright | test execution | ✅ 13/13 passing |
+
+### Errores Corregidos (Regla 5)
+1. **AuthProvider missing** — Header usaba useAuth sin provider → Agregado AuthProvider en Providers.tsx ✅
+2. **crypto.randomUUID import** — `import { crypto } from "crypto"` incorrecto → `import { randomUUID } from "crypto"` ✅
+3. **TS null checks** — `session` possibly null en middleware y auth/me → Guards de null agregados ✅
+4. **Users table missing** — Seed script fallaba sin tabla → CREATE TABLE en seed-admin.ts ✅
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `types/music.ts` | MODIFICADO | +User, RawUserRow interfaces |
+| `lib/db.ts` | MODIFICADO | +users table, getUserByEmail, getUserById, createUser, initUsersTable |
+| `app/api/auth/register/route.ts` | NUEVO | POST register con bcrypt + Zod |
+| `app/api/auth/login/route.ts` | NUEVO | POST login + session cookie |
+| `app/api/auth/me/route.ts` | NUEVO | GET current user desde cookie |
+| `app/api/auth/logout/route.ts` | NUEVO | POST logout limpia cookie |
+| `app/api/tracks/route.ts` | NUEVO | CRUD completo (ya en Fase A) |
+| `context/AuthContext.tsx` | NUEVO | AuthProvider + useAuth hook |
+| `components/Providers.tsx` | MODIFICADO | Envuelve con AuthProvider |
+| `components/LoginModal.tsx` | NUEVO | Modal login/register unificado |
+| `components/Header.tsx` | MODIFICADO | +LoginModal, user menu, hamburger mobile |
+| `middleware.ts` | NUEVO | Protege /admin (role admin), redirect login/register |
+| `scripts/seed-admin.ts` | NUEVO | Crea admin@epk.local / admin123 |
+| `app/login/page.tsx` | NUEVO | Página login completa |
+| `app/register/page.tsx` | NUEVO | Página register completa |
+| `package.json` | MODIFICADO | +resend, bcryptjs, @types/bcryptjs |
+
+### Tests Results (Fase B)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+Build: ✅ Compiled successfully
+```
+
+### Resumen Técnico Fase B
+- **Auth System**: register, login, logout, me endpoints completos
+- **Session**: Cookie httpOnly + base64 JSON (7 días)
+- **Passwords**: bcryptjs 10 rounds
+- **Roles**: artist (default) / admin
+- **Middleware**: Protege /admin, redirect login/register si autenticado
+- **Admin user**: admin@epk.local / admin123 (role: admin)
+- **UI**: LoginModal unificado, hamburger menu mobile, user menu en Header
+- **Commits**: 1 commit único para Fase B completa + release v2.1.0
+
+### Commits
+- `947b92b` — feat: Fase B completa - Auth system (register/login/me), AuthContext, LoginModal, middleware, admin seed
+- Release: `v2.1.0` — GitHub Release creado
