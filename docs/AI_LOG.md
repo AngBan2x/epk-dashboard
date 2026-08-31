@@ -1036,5 +1036,69 @@ Build: ✅ Compiled successfully
 - **Commits**: 1 commit único para Fase C completa + release v2.2.0
 
 ### Commits
-- Pendiente: commit + push Fase C
-- Release: `v2.2.0` — GitHub Release a crear
+- `3b7e71b` — feat: Fase C completa - Upload artistas + autocomplete iTunes + submissions CRUD + admin panel
+- Release: `v2.2.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v2.2.0
+
+---
+
+## Fase D: Likes + Notificaciones
+
+**Fecha:** 2026-08-30
+**Modelo:** MiMo V2.5 Free (OpenCode) — Orchestrator
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Ejecuta Fase D: Likes + Notificaciones Resend"
+2. "Schema DB tabla likes + API toggle + count"
+3. "Botón like animado en EPKCard"
+4. "Configurar Resend + templates email + notificaciones"
+5. "Toast system + badge Nuevo Lanzamiento"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `run-quality-gates` | typecheck + test:unit + test:e2e al cierre |
+| `git-workflow` | Commit + push + release |
+| `fase-completa` | Ejecución completa Fase D |
+| `crear-release` | GitHub Release v2.3.0 |
+
+### Errores Corregidos (Regla 5)
+1. **Notificaciones endpoints faltantes** — Admin page usaba `/api/notifications/read` y `/api/notifications/read-all` sin crear → Creados ambos endpoints ✅
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `types/music.ts` | MODIFICADO | +Like, RawLikeRow, Notification, RawNotificationRow, NotificationType |
+| `lib/db.ts` | MODIFICADO | +tablas likes/notifications, CRUD completo |
+| `app/api/likes/route.ts` | NUEVO | GET/POST toggle like + count |
+| `lib/resend.ts` | NUEVO | Configuración Resend client |
+| `lib/email-templates.ts` | NUEVO | Templates: approved, rejected, new_release, track_liked |
+| `app/api/notifications/send/route.ts` | NUEVO | Enviar notificación + email |
+| `app/api/notifications/read/route.ts` | NUEVO | Marcar como leída |
+| `app/api/notifications/read-all/route.ts` | NUEVO | Marcar todas como leídas |
+| `components/Toast.tsx` | NUEVO | ToastProvider + useToast + useToastHelpers |
+| `components/Providers.tsx` | MODIFICADO | +ToastProvider wrapper |
+| `components/EPKCard.tsx` | MODIFICADO | +like button animado + badge Nuevo Lanzamiento |
+| `app/admin/page.tsx` | MODIFICADO | +Notifications tab + mark read |
+
+### Tests Results (Fase D)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+Build: ✅ Compiled successfully
+```
+
+### Resumen Técnico Fase D
+- **Schema DB**: tablas `likes` (UNIQUE user_id+track_id) y `notifications` con índices
+- **Likes API**: toggle like con conteo en tiempo real, verifica auth
+- **Resend**: Client configurado, templates HTML profesionales para 4 tipos
+- **Notificaciones**: CRUD completo + email transaccional
+- **Toast**: Sistema de notificaciones visuales con tipos success/error/warning/info
+- **EPKCard**: Like button con animación heartbeat, badge "✨ Nuevo" para tracks < 7 días
+- **Admin Panel**: Tab Notifications con mark read, mark all read
+- **Commits**: 1 commit único para Fase D completa + release v2.3.0
+
+### Commits
+- Pendiente: commit + push Fase D
+- Release: `v2.3.0` — GitHub Release a crear

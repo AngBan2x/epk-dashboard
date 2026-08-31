@@ -126,3 +126,41 @@ export interface RawTrackSubmissionRow {
   created_at: string;
   updated_at: string;
 }
+
+export interface Like {
+  id: string;
+  user_id: string;
+  track_id: string;
+  created_at: string;
+}
+
+export interface RawLikeRow {
+  id: string;
+  user_id: string;
+  track_id: string;
+  created_at: string;
+}
+
+export type NotificationType = "submission_approved" | "submission_rejected" | "new_release" | "track_liked" | "system";
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  data: string | null; // JSON
+  read: boolean;
+  created_at: string;
+}
+
+export interface RawNotificationRow {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: string | null;
+  read: number; // 0 or 1
+  created_at: string;
+}

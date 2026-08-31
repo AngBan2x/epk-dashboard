@@ -2,7 +2,7 @@
 name: fase-orchestrator
 description: Orquestador que ejecuta fases completas del proyecto automáticamente: code → test → docs → commit → release.
 mode: primary
-model: opencode/nemotron-3-ultra-free
+model: opencode/mimo-v2.5-free
 ---
 
 # Agente: Fase Orchestrator
