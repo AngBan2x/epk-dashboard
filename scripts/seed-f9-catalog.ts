@@ -11,6 +11,7 @@ const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
 interface SeedTrack {
   id: string;
   title: string;
+  artist_name: string;
   release_type: string;
   release_date: string;
   duration: string;
@@ -32,6 +33,7 @@ const cleanTracks: SeedTrack[] = [
   {
     id: "trk-001",
     title: "Bohemian Rhapsody",
+    artist_name: "Queen",
     release_type: "Single",
     release_date: "1975-10-31",
     duration: "05:55",
@@ -50,6 +52,7 @@ const cleanTracks: SeedTrack[] = [
   {
     id: "trk-002",
     title: "Smells Like Teen Spirit",
+    artist_name: "Nirvana",
     release_type: "Single",
     release_date: "1991-09-10",
     duration: "05:01",
@@ -68,6 +71,7 @@ const cleanTracks: SeedTrack[] = [
   {
     id: "trk-003",
     title: "Blinding Lights",
+    artist_name: "The Weeknd",
     release_type: "Single",
     release_date: "2019-11-29",
     duration: "03:20",
@@ -86,6 +90,7 @@ const cleanTracks: SeedTrack[] = [
   {
     id: "trk-004",
     title: "Hotel California",
+    artist_name: "Eagles",
     release_type: "Album",
     release_date: "1977-02-22",
     duration: "06:30",
@@ -104,6 +109,7 @@ const cleanTracks: SeedTrack[] = [
   {
     id: "trk-005",
     title: "Shape of You",
+    artist_name: "Ed Sheeran",
     release_type: "Single",
     release_date: "2017-01-06",
     duration: "03:53",
@@ -122,6 +128,7 @@ const cleanTracks: SeedTrack[] = [
   {
     id: "trk-006",
     title: "Running Up That Hill",
+    artist_name: "Kate Bush",
     release_type: "Album",
     release_date: "1985-08-05",
     duration: "05:02",
@@ -144,16 +151,24 @@ function main() {
 
   const db = new Database(DB_PATH);
 
+  // Agregar columna artist_name si no existe
+  const columns = db.prepare("PRAGMA table_info(tracks)").all() as { name: string }[];
+  const hasArtistName = columns.some((c) => c.name === "artist_name");
+  if (!hasArtistName) {
+    db.exec("ALTER TABLE tracks ADD COLUMN artist_name TEXT DEFAULT 'Artista EPK'");
+    console.log("➕ Columna artist_name agregada");
+  }
+
   // Eliminar todos los tracks existentes
   db.exec("DELETE FROM tracks");
   console.log("🗑️  Tabla tracks vaciada");
 
   const upsertTrack = db.prepare(`
     INSERT OR REPLACE INTO tracks (
-      id, title, release_type, release_date, duration, cover_image,
+      id, title, artist_name, release_type, release_date, duration, cover_image,
       audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
       metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertAll = db.transaction(() => {
@@ -161,6 +176,7 @@ function main() {
       upsertTrack.run(
         track.id,
         track.title,
+        track.artist_name,
         track.release_type,
         track.release_date,
         track.duration,

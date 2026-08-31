@@ -28,7 +28,7 @@ export function TrackFilters({ onFilterChange }: TrackFiltersProps) {
         placeholder="Buscar tracks..."
         value={search}
         onChange={(e) => handleSearch(e.target.value)}
-        className="px-4 py-2 border border-dark-200 rounded-lg text-sm dark:border-dark-700 dark:bg-dark-800"
+        className="px-4 py-2 border border-slate-200 rounded-lg text-sm dark:border-dark-700 dark:bg-dark-800"
       />
       <div className="flex gap-2">
         {["", "Single", "EP", "Album"].map((type) => (

@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     const localTracks = tracks.map((track) => ({
       id: track.id,
       title: track.title,
+      artist_name: track.artist_name,
       release_type: track.release_type,
       release_date: track.release_date,
       duration: track.duration,
