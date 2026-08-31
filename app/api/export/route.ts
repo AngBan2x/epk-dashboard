@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   </style>
 </head>
 <body>
-  <h1>🎵 EPK Dashboard — Dossier de Prensa</h1>
+  <h1>🎵 PressPlay — Dossier de Prensa</h1>
   <p class="meta">Generado el ${new Date().toLocaleDateString("es-VE", { year: "numeric", month: "long", day: "numeric" })}</p>
   <p class="meta">Total de tracks en catálogo: <strong>${tracks.length}</strong></p>
 

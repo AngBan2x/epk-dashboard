@@ -9,7 +9,7 @@ import { getAllTracks } from "@/lib/db";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
 
 export const metadata: Metadata = {
-  title: "Dashboard | EPK Dashboard Musical",
+  title: "Dashboard | PressPlay",
   description: "Dashboard de métricas y catálogo de tracks",
 };
 
@@ -24,7 +24,7 @@ export default function DashboardPage() {
           <section className="mb-10">
             <PitchHeading>
               <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                EPK Dashboard
+                PressPlay
               </h1>
               <p className="text-slate-600 dark:text-slate-400 text-base">
                 Catálogo completo · <strong className="text-primary-600 dark:text-primary-400">{tracks.length} tracks</strong>

@@ -1206,3 +1206,70 @@ Build: ✅ Compiled successfully
 ### Commits
 - `c35f456` — feat: Fase F completa - Footer + GlobalAudioPlayer auto-hide + Logo SVG + metadata
 - Release: `v2.5.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v2.5.0
+
+---
+
+## Fase G: Fix Crítico + Branding PressPlay
+
+**Fecha:** 2026-08-31
+**Modelo:** MiMo V2.5 Free (OpenCode) — Orchestrator
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Ejecuta Fase G: Fix Crítico + Branding PressPlay"
+2. "Reemplazar URLs caducadas de iTunes CDN con URLs frescas de la API"
+3. "Logo PressPlay: play button + documento con esquina doblada"
+4. "Renombrar EPK Dashboard → PressPlay en todo el proyecto"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `run-quality-gates` | typecheck + test:unit + test:e2e al cierre |
+| `git-workflow` | Commit + push |
+| `fase-completa` | Ejecución completa Fase G |
+| `crear-release` | GitHub Release v3.0.0 |
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `public/logo.svg` | REEMPLAZADO | Logo PressPlay: documento con play button + esquina doblada |
+| `components/Header.tsx` | MODIFICADO | Logo PressPlay propio (no Spotify) + nombre "PressPlay" |
+| `components/Footer.tsx` | MODIFICADO | Brand "PressPlay" + copyright |
+| `components/LoginModal.tsx` | MODIFICADO | Logo PressPlay + texto "PressPlay" |
+| `components/DownloadCenter.tsx` | MODIFICADO | Solo assets reales (Rider + Dossier), tamaños reales, nombre PressPlay |
+| `components/EPKCard.tsx` | MODIFICADO | Contraste texto dark mode mejorado |
+| `app/layout.tsx` | MODIFICADO | Metadata "PressPlay" |
+| `app/dashboard/page.tsx` | MODIFICADO | h1 "PressPlay" |
+| `app/track/[id]/page.tsx` | MODIFICADO | Metadata + Stems condicional + artist_name |
+| `app/register/page.tsx` | MODIFICADO | "Únete a PressPlay" |
+| `app/api/export/route.ts` | MODIFICADO | Dossier "PressPlay" |
+| `lib/email-templates.ts` | MODIFICADO | 6 ocurrencias → "PressPlay" |
+| `lib/resend.ts` | MODIFICADO | FROM_EMAIL "PressPlay" |
+| `package.json` | MODIFICADO | description + db:seed:fresh script |
+| `context/AudioPlayerContext.tsx` | MODIFICADO | Removido crossOrigin="anonymous" |
+| `scripts/seed-itunes-fresh.ts` | NUEVO | Seed con URLs frescas de iTunes Search API |
+| `tests/e2e/dashboard.spec.ts` | MODIFICADO | expect "PressPlay" |
+| `tests/e2e/multimedia.spec.ts` | MODIFICADO | Fix strict mode violation |
+| `.opencode/agents/*.md` | MODIFICADO | 4 agentes → "PressPlay" |
+
+### Tests Results (Fase G)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+Build: ✅ Compiled successfully
+```
+
+### Resumen Técnico Fase G
+- **Branding**: "PressPlay" — "Donde la música se presenta"
+- **Logo**: SVG documento con play button + esquina doblada (#10b981)
+- **iTunes API**: Seed script obtiene URLs frescas de `itunes.apple.com/search` (HTTP 200)
+- **Audio**: Removido `crossOrigin="anonymous"` para evitar CORS con CDN Apple
+- **Stems**: Condicional — muestra "Próximamente" cuando stems_urls es null
+- **Downloads**: Solo assets reales (Rider HTML + Dossier HTML), sin mock
+- **Contraste**: Texto legible en dark mode (slate-300/400 en vez de slate-500)
+- **Commits**: 1 commit único para Fase G completa + release v3.0.0
+
+### Commits
+- Pendiente: commit + push Fase G
+- Release: `v3.0.0` — GitHub Release a crear

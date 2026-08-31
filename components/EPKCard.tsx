@@ -117,7 +117,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
           <span
             className={`inline-block transition-all duration-300 ${
               animating ? "animate-heartbeat" : ""
-            } ${liked ? "text-red-500" : "text-slate-500 hover:text-red-500"}`}
+            } ${liked ? "text-red-500" : "text-slate-400 dark:text-slate-500 hover:text-red-500"}`}
             style={{ fontSize: "1.5rem", lineHeight: 1 }}
           >
             {liked ? "❤️" : "🤍"}
@@ -137,9 +137,9 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
         )}
       </div>
       <CardContent>
-        <h3 className="font-semibold text-lg mb-1 truncate">{title}</h3>
-        <p className="text-sm text-slate-500 mb-1">{artistName}</p>
-        <p className="text-sm text-slate-500 mb-2">
+        <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-slate-100">{title}</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{artistName}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
           {track.release_type} · {duration}
         </p>
         <AudioPlayer
@@ -148,12 +148,12 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
           title={track.title}
           coverImage={track.cover_image}
         />
-        <div className="flex items-center gap-2 text-xs text-slate-400 mt-2">
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-2">
           <span>▶ {streams} streams</span>
           <span>·</span>
           <span>♥ {formatNumber(track.metrics?.saves ?? 0)}</span>
           <span>·</span>
-          <span className={liked ? "text-red-500" : "text-slate-400"}>
+          <span className={liked ? "text-red-500" : "text-slate-500 dark:text-slate-400"}>
             🤍 {likeCount}
           </span>
         </div>

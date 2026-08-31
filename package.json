@@ -2,7 +2,7 @@
   "name": "epk-dashboard",
   "version": "1.0.0",
   "private": true,
-  "description": "EPK Dashboard Musical - Electronic Press Kit para artistas",
+  "description": "PressPlay - Donde la música se presenta",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,6 +12,7 @@
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed-f9-catalog.ts",
+    "db:seed:fresh": "tsx scripts/seed-itunes-fresh.ts",
     "db:seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {

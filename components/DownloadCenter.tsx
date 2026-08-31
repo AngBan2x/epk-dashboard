@@ -30,29 +30,15 @@ export function DownloadCenter({
       id: "asset-1",
       name: `Rider Técnico & Stage Plot - ${artistName} 2026`,
       category: "Tech Rider",
-      size: "2.4 MB",
-      format: "PDF",
-    },
-    {
-      id: "asset-2",
-      name: `Pack Oficial de Logos e Isotipos (Alta Resolución)`,
-      category: "Logos & Vectores",
-      size: "14.8 MB",
-      format: "ZIP",
+      size: "~15 KB",
+      format: "HTML",
     },
     {
       id: "asset-3",
       name: `Dossier de Prensa & Biografía Oficial`,
       category: "Ficha EPK",
-      size: "1.1 MB",
-      format: "PDF",
-    },
-    {
-      id: "asset-4",
-      name: `Sesión Fotográfica Oficial (300 DPI para Impresión)`,
-      category: "Fotos HD",
-      size: "48.2 MB",
-      format: "ZIP",
+      size: "~12 KB",
+      format: "HTML",
     },
   ];
 
@@ -109,7 +95,7 @@ export function DownloadCenter({
   </div>
 
   <div class="footer">
-    <p>Generado por EPK Dashboard Musical · ${new Date().getFullYear()}</p>
+    <p>Generado por PressPlay · ${new Date().getFullYear()}</p>
   </div>
 </body>
 </html>`;
@@ -136,7 +122,7 @@ export function DownloadCenter({
   </style>
 </head>
 <body>
-  <h1>🎵 EPK Dashboard — Dossier de Prensa</h1>
+  <h1>🎵 PressPlay — Dossier de Prensa</h1>
   <p class="meta">Generado el ${new Date().toLocaleDateString("es-VE", { year: "numeric", month: "long", day: "numeric" })}</p>
 
   <h2>Biografía</h2>
@@ -144,10 +130,10 @@ export function DownloadCenter({
 
   <h2>Contacto</h2>
   <p class="meta"><strong>Email:</strong> booking@epk-dashboard.com</p>
-  <p class="meta"><strong>Management:</strong> EPK Dashboard Records</p>
+  <p class="meta"><strong>Management:</strong> PressPlay Records</p>
 
   <div class="footer" style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 0.85rem; text-align: center;">
-    <p>Generado por EPK Dashboard Musical · ${new Date().getFullYear()}</p>
+    <p>Generado por PressPlay · ${new Date().getFullYear()}</p>
   </div>
 </body>
 </html>`;
@@ -163,10 +149,10 @@ export function DownloadCenter({
 
         if (asset.category === "Tech Rider") {
           htmlContent = generateRiderHTML();
-          filename = "Rider_Tecnico_EPK_Dashboard.html";
+          filename = "Rider_Tecnico_PressPlay.html";
         } else if (asset.category === "Ficha EPK") {
           htmlContent = generateDossierHTML();
-          filename = "Dossier_Prensa_EPK_Dashboard.html";
+          filename = "Dossier_Prensa_PressPlay.html";
         } else {
           const content = `EPK ASSET: ${asset.name}\nArtista: ${artistName}\nCategoría: ${asset.category}\nGenerado el: ${new Date().toISOString()}`;
           const blob = new Blob([content], { type: "text/plain" });

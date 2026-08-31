@@ -8,10 +8,10 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    default: "EPK Dashboard Musical",
-    template: "%s | EPK Dashboard Musical",
+    default: "PressPlay",
+    template: "%s | PressPlay",
   },
-  description: "Electronic Press Kit para artistas musicales. Comparte tu música, gestiona tu catálogo y conecta con tu audiencia.",
+  description: "Donde la música se presenta. Electronic Press Kit para artistas musicales.",
   icons: {
     icon: "/logo.svg",
   },
