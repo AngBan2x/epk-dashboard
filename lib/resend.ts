@@ -8,4 +8,4 @@ if (!resendApiKey) {
 
 export const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
-export const FROM_EMAIL = process.env.FROM_EMAIL || "EPK Dashboard <noreply@epk-dashboard.local>";
+export const FROM_EMAIL = process.env.FROM_EMAIL || "PressPlay <noreply@pressplay.local>";

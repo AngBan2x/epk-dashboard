@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: TrackDetailPageProps): Promis
     return { title: "Track no encontrado" };
   }
   return {
-    title: `${track.title} | EPK Dashboard Musical`,
+    title: `${track.title} | PressPlay`,
     description: `${track.release_type} - ${track.duration} - ${formatNumber(track.metrics.streams)} streams`,
   };
 }
@@ -183,11 +183,31 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
             coverImage={track.cover_image}
           />
 
-          <StemsPlayer
-            title={`Stems & Mezcla Multitrack - ${safeString(track.title)}`}
-            stems={track.stems_urls}
-            mainAudioUrl={track.audio_preview_url}
-          />
+          {track.stems_urls ? (
+            <StemsPlayer
+              title={`Stems & Mezcla Multitrack - ${safeString(track.title)}`}
+              stems={track.stems_urls}
+              mainAudioUrl={track.audio_preview_url}
+            />
+          ) : (
+            <section className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                🎚️ Stems & Multitrack
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Separación de pistas por inteligencia artificial
+              </p>
+              <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-lg">
+                  🔒
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Próximamente</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Los stems estarán disponibles pronto</p>
+                </div>
+              </div>
+            </section>
+          )}
 
           <ImageGallery
             title={`Galería & Assets - ${safeString(track.title)}`}
@@ -195,7 +215,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
           />
 
           <DownloadCenter
-            artistName="Artista EPK"
+            artistName={track.artist_name || "Artista"}
             trackTitle={track.title}
           />
         </div>

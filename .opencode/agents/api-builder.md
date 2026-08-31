@@ -7,7 +7,7 @@ model: opencode/mimo-v2.5-free
 
 # Subagente: API Builder
 
-Tu objetivo es construir endpoints REST completos y seguros para el proyecto EPK Dashboard.
+Tu objetivo es construir endpoints REST completos y seguros para el proyecto PressPlay.
 
 ## Responsabilidades
 1. Crear archivos de ruta en `app/api/*/route.ts`

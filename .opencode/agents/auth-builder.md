@@ -7,7 +7,7 @@ model: opencode/nemotron-3-ultra-free
 
 # Subagente: Auth Builder
 
-Tu objetivo es implementar un sistema de autenticación completo y seguro para el proyecto EPK Dashboard.
+Tu objetivo es implementar un sistema de autenticación completo y seguro para el proyecto PressPlay.
 
 ## Responsabilidades
 1. Crear tabla `users` en SQLite (id, name, email, password_hash, role, created_at)

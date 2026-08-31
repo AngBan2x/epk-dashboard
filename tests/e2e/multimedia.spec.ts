@@ -45,8 +45,8 @@ test.describe("F9 Multimedia & Catálogo Expandido", () => {
 
     // Verificar que el VideoShowcase está presente (buscar heading h2 con el texto)
     await expect(page.locator("h2:has-text('Videoclip Oficial')")).toBeVisible({ timeout: 10000 });
-    // Verificar que el StemsPlayer está presente (buscar cualquier elemento con "Mezcla" o "Stems")
-    await expect(page.locator("text=Mezcla Multitrack").or(page.locator("text=Stems"))).toBeVisible({ timeout: 15000 });
+    // Verificar que el StemsPlayer o "Próximamente" está presente
+    await expect(page.locator("h2:has-text('Stems')")).toBeVisible({ timeout: 15000 });
   });
 
   test("EPK Exporter section is visible on dashboard", async ({ page }) => {

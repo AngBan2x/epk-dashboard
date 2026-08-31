@@ -90,7 +90,7 @@ function randomDate(start: Date, end: Date): string {
 }
 
 function main() {
-  console.log("🎵 Generando datos sintéticos para EPK Dashboard...\n");
+  console.log("🎵 Generando datos sintéticos para PressPlay...\n");
 
   const db = new Database(DB_PATH);
 
