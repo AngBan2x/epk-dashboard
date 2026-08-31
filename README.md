@@ -1,66 +1,82 @@
-# EPK Dashboard Musical
+# PressPlay
 
-Electronic Press Kit (EPK) Dashboard para artistas musicales. Interfaz web interactiva que muestra catálogo de tracks, métricas de streaming, fichas de producción y reproductor de audio.
+**Donde la música se presenta.**
+
+Electronic Press Kit (EPK) para artistas musicales. Interfaz web interactiva que muestra catálogo de tracks, métricas de streaming, fichas de producción y reproductor de audio.
 
 ## Estado del Proyecto
 
-| Fase | Nombre | Estado | Commit |
-|------|--------|--------|--------|
-| F0 | Setup & Auditoría Inicial | ✅ Completada | `f92d377` |
-| F1 | Capa de Datos & Tipado | ✅ Completada | `112a191` |
-| F2 | Componente EPK Core | ✅ Completada | `1840402` |
-| F3 | Dashboard & Vistas | ✅ Completada | `a8ca789` |
-| F4 | Integración Turso & Sync | ✅ Completada | `500c866` |
-| F5 | Testing E2E & Accesibilidad | ✅ Completada | `500c866` |
-| F6 | Despliegue & Entrega | ✅ Completada | (actual) |
-| F7 | Multimedia Core (iTunes, Stems, Video) | ✅ Completada | (actual) |
-| F8 | Catálogo Expandido & Assets HD | ✅ Completada | (actual) |
-| F9 | Animaciones Pitch Deck & Exportación | ✅ Completada | (actual) |
+| Versión | Fase | Estado |
+|---------|------|--------|
+| v1.0.0 | Setup inicial | ✅ Completado |
+| v2.0.0 | Refactoring UI/UX | ✅ Completado |
+| v2.0.1 - v2.5.0 | Fases A-F | ✅ Completado |
+| v3.0.0 | Branding PressPlay + Fix Crítico | ✅ Completado |
+| v3.1.0 | Verificación Final | ✅ Completado |
 
 ## Arquitectura
 
 ```
-epk-dashboard/
+pressplay/
 ├── app/                    # Next.js App Router
 │   ├── dashboard/          # Vista principal con lista de tracks
 │   ├── track/[id]/         # Detalle completo por track
+│   ├── upload/             # Subida de tracks por artistas
+│   ├── admin/              # Panel de administración
+│   ├── login/              # Inicio de sesión
+│   ├── register/           # Registro de usuarios
 │   └── api/
-│       ├── sync/           # Endpoint sync Turso
-│       └── export/         # Endpoint export EPK dossier
+│       ├── tracks/         # CRUD tracks
+│       ├── auth/           # Autenticación (register, login, me, logout)
+│       ├── submissions/    # Gestión de submissions
+│       ├── likes/          # Sistema de likes
+│       ├── notifications/  # Notificaciones + email
+│       ├── webhooks/       # Webhooks métricas externas
+│       ├── metrics/        # Historial métricas
+│       ├── itunes-search/  # Proxy iTunes API
+│       └── export/         # Export EPK dossier
 ├── components/             # UI components React
 │   ├── ui/                 # Primitivas: Button, Card, Modal, Skeleton
 │   ├── EPKCard.tsx         # Tarjeta principal por track
 │   ├── AudioPlayer.tsx     # Reproductor de audio
 │   ├── AudioVisualizer.tsx # Visualizador de forma de onda
-│   ├── GlobalAudioPlayer.tsx # Reproductor global persistente
+│   ├── GlobalAudioPlayer.tsx # Reproductor global con auto-hide
 │   ├── ProductionDetails.tsx # Ficha técnica de producción
 │   ├── LyricsModal.tsx     # Modal null-safe para letra
-│   ├── MetricsCharts.tsx   # Gráficos Recharts (países, métricas)
+│   ├── MetricsCharts.tsx   # Gráficos Recharts (tiempo real)
 │   ├── TrackFilters.tsx    # Filtros de búsqueda
-│   ├── Header.tsx          # Navegación sticky
+│   ├── Header.tsx          # Navegación sticky con logo PressPlay
+│   ├── Footer.tsx          # Footer con info + redes
 │   ├── ThemeToggle.tsx     # Toggle Dark/Light mode
-│   ├── MotionWrappers.tsx  # Animaciones Pitch Deck (SlideIn, PageTransition, LiftCard, PitchHeading)
-│   ├── EPKExporter.tsx     # Exportador de dossier EPK (JSON/HTML)
+│   ├── LoginModal.tsx      # Modal de login/registro
+│   ├── UploadTrackForm.tsx # Formulario de subida
+│   ├── MotionWrappers.tsx  # Animaciones Framer Motion
+│   ├── EPKExporter.tsx     # Exportador dossier EPK
 │   ├── DownloadCenter.tsx  # Centro de descargas
-│   ├── ImageGallery.tsx    # Galería de imágenes responsive
-│   ├── VideoShowcase.tsx   # Fachada de videoclip con modal
+│   ├── ImageGallery.tsx    # Galería de imágenes
+│   ├── VideoShowcase.tsx   # Fachada de videoclip
 │   ├── VideoPlayerModal.tsx # Modal reproductor video
-│   ├── StemsPlayer.tsx     # Mezclador multicanal Web Audio API
-│   └── VideoPlayer.tsx     # Reproductor video
+│   ├── StemsPlayer.tsx     # Mezclador multicanal
+│   ├── Toast.tsx           # Sistema de notificaciones
+│   └── Providers.tsx       # Providers globales
 ├── context/                # React Context providers
-│   └── GlobalAudioContext.tsx # Estado global de audio
+│   ├── AudioPlayerContext.tsx # Estado global de audio
+│   └── AuthContext.tsx     # Estado de autenticación
 ├── lib/                    # Utilidades y acceso a datos
 │   ├── null-safe.ts        # Helpers tipados para null-safety
 │   ├── db.ts               # Cliente SQLite (better-sqlite3)
-│   ├── turso.ts            # Cliente Turso remoto
+│   ├── itunes.ts           # API de iTunes Search
+│   ├── resend.ts           # Cliente Resend (email)
+│   ├── email-templates.ts  # Templates HTML email
 │   ├── validations.ts      # Esquemas Zod
 │   ├── utils.ts            # cn(), formatDate()
 │   └── web-audio.ts        # Web Audio API context
 ├── types/                  # TypeScript interfaces
-│   └── music.ts            # Track, Artist, Metrics, ProductionDetails, StemsUrls
+│   └── music.ts            # Track, User, Metrics, etc.
+├── middleware.ts            # Protección de rutas
 ├── tests/                  # Unit + E2E tests
-├── scripts/                # Seed data, sync Turso
-├── data/                   # SQLite DB + JSON backup
+├── scripts/                # Seed data, sync, screenshots
+├── data/                   # SQLite DB
 └── .opencode/              # Skills, agents, commands
 ```
 
@@ -72,63 +88,51 @@ epk-dashboard/
 | Language | TypeScript 5 (strict) |
 | Styling | Tailwind CSS 3 |
 | Charts | Recharts 2 |
-| Animation | Framer Motion 11 |
+| Animation | Framer Motion 12 |
 | DB Local | better-sqlite3 |
 | DB Remoto | Turso (@libsql/client) |
+| Auth | bcryptjs + httpOnly cookies |
+| Email | Resend |
 | Validation | Zod 3 |
 | Testing | Vitest + Playwright |
 | Deploy | Vercel |
-| CI/CD | GitHub Actions |
-| Audio | Web Audio API |
 
-## Componentes UI
+## Funcionalidades
 
-- **EPKCard** — Tarjeta responsiva con portada, título, duración, streams, saves, AudioPlayer integrado
-- **AudioPlayer** — Controles play/pause con estado visual y null-safety en `src`
-- **AudioVisualizer** — Visualizador de forma de onda en tiempo real (Canvas + Web Audio API)
-- **GlobalAudioPlayer** — Reproductor persistente en header con estado global
-- **ProductionDetails** — Grid con DAW, guitarras, efectos, afinación, tonalidad (null-safe via `hasValue`/`safeString`)
-- **LyricsModal** — Modal animado Framer Motion con null-check para letras opcionales
-- **MetricsCharts** — Gráfico de barras (top países) + pie chart (streams/saves/playlists)
-- **TrackFilters** — Búsqueda por texto + filtro por tipo de release
-- **Header** — Navegación sticky con blur backdrop + ThemeToggle + GlobalAudioPlayer
-- **ThemeToggle** — Toggle Dark/Light mode sin dependencias externas (evita hydration mismatch)
-- **MotionWrappers** — Animaciones Pitch Deck: SlideIn (stagger), PageTransition, LiftCard (hover), PitchHeading
-- **EPKExporter** — Exportador dossier EPK en JSON/HTML con preview y animaciones Framer Motion
-- **DownloadCenter** — Centro de descargas con stems, assets, PDF
-- **ImageGallery** — Galería responsive con lightbox, lazy load
-- **VideoShowcase** — Fachada ligera de videoclip con thumbnail YouTube + modal
-- **VideoPlayerModal** — Modal reproductor YouTube/embed iframe
-- **StemsPlayer** — Mezclador multicanal 4 canales (Voz, Guitarras, Bajo, Batería) con Mute/Solo/Volume sync
-- **VideoPlayer** — Reproductor video embebido
+### Core
+- **Catálogo de Tracks** — 6 tracks reales con portadas y audio de iTunes
+- **Reproductor de Audio** — Preview 30s con auto-hide 5s
+- **Dark/Light Mode** — Toggle con persistencia
+- **Responsive** — Mobile-first con menú hamburguesa
 
-## Null-Safety
+### Artistas
+- **Upload de Tracks** — Formulario con autocomplete iTunes
+- **Dashboard del Artista** — Métricas y gestión de tracks
+- **Sistema de Likes** — Toggle like con animación
 
-Campos protegidos contra `TypeError: Cannot read properties of undefined` (auditados con skill `validar-null-safety`):
+### Admin
+- **Panel de Administración** — Gestión de tracks y submissions
+- **Aprobar/Rechazar** — Workflow de submissions
+- **Notificaciones** — Email transaccional via Resend
 
-| Campo | Tipo | Protección | Componente |
-|-------|------|------------|------------|
-| `youtube_video_id` | `string \| null` | Renderizado condicional | EPKCard, TrackDetail, VideoShowcase |
-| `effects_chain` | `string \| null` | Fallback "—" via `safeString()` | ProductionDetails |
-| `lyrics` | `string \| null` | Botón deshabilitado si null | LyricsModal |
-| `metrics.top_countries` | `Array<{country, pct}>` | `safeArray()` con fallback [] | MetricsCharts |
-| `production_details.*` | `string \| null` | `hasValue()` por propiedad | ProductionDetails |
-| `audio_preview_url` | `string` | Validación Zod + fallback silencioso | AudioPlayer, StemsPlayer |
-| `itunes_track_id` | `string \| null` | Optional chaining | TrackDetail, EPKExporter |
-| `stems_urls` | `StemsUrls \| null` | Null-check + fallback a main audio | StemsPlayer |
-| `video_embed_url` | `string \| null` | Renderizado condicional | VideoShowcase |
-| `gallery_images` | `string[] \| null` | `safeArray()` + fallback a cover | ImageGallery, EPKExporter |
+### EPK
+- **Ficha de Producción** — DAW, guitarras, efectos, tonalidad
+- **Letras** — Modal animado con null-safety
+- **Métricas** — Gráficos en tiempo real (streams, países)
+- **Video** — Embed de YouTube con modal
+- **Galería** — Imágenes responsive con lightbox
+- **Descargas** — Rider Técnico + Dossier de Prensa (HTML)
+- **Exportación** — Dossier EPK en JSON/HTML
 
-## Quality Gates (cumplidos)
+### Branding
+- **PressPlay** — "Donde la música se presenta"
+- **Logo** — Documento con play button + esquina doblada (#10b981)
 
-| Check | Herramienta | Umbral | Resultado |
-|-------|-------------|--------|-----------|
-| TypeScript Strict | `tsc --noEmit` | 0 errores | ✅ |
-| Null-Safety UI | `validar-null-safety` skill | 100% campos opcionales | ✅ |
-| MCP Health | `auditar-mcp` skill | 4/4 servidores | ✅ |
-| E2E Pass Rate | Playwright | 13/13 passing | ✅ |
-| Bundle Size | `next build` | < 250 KB JS | ✅ (208 KB) |
-| Unit Tests | Vitest | 41/41 passing | ✅ |
+## Credenciales
+
+| Rol | Email | Password |
+|-----|-------|----------|
+| Admin | admin@epk.local | admin123 |
 
 ## Ejecución Local
 
@@ -140,94 +144,56 @@ pnpm install
 pnpm dev
 
 # Tests
-pnpm test:unit      # Vitest (41 tests passing)
-pnpm test:e2e       # Playwright (13 tests passing)
+pnpm test:unit      # Vitest (41 tests)
+pnpm test:e2e       # Playwright (13 tests)
 
 # Typecheck
 pnpm typecheck
 
-# Lint
-pnpm lint
-
 # Build
-pnpm build
-pnpm start
+pnpm build && pnpm start
 
-# DB & Sync
-pnpm db:seed        # Genera 6 tracks reales verificados (iTunes)
-pnpm db:sync        # Sync SQLite → Turso
+# DB
+pnpm db:seed        # Seed con URLs frescas de iTunes
+pnpm db:seed:fresh  # Re-obtener URLs de iTunes API
+pnpm db:seed:admin  # Crear usuario admin
 ```
 
-## Datos
+## Quality Gates
 
-- `data/music_catalog.db` — SQLite con tracks (fuente de verdad, 6 tracks reales verificados)
-- `data/catalog.json` — Backup JSON
-- `scripts/seed-f9-catalog.ts` — Seed: 6 tracks reales con metadatos iTunes verificados (portadas HD, audio preview)
-- `scripts/generate-more-data.ts` — Genera tracks sintéticos adicionales (legacy)
-- `scripts/sync-to-turso.ts` — Sync bidireccional SQLite ↔ Turso
-
-## Despliegue
-
-Automático via GitHub Actions al hacer push a `main`:
-- **CI Pipeline**: Typecheck + Lint + Unit Tests + Build
-- **Deploy**: Vercel (preview en PRs, producción en main)
-- **Data Sync**: Turso cron `0 */6 * * *` (cada 6 horas)
-- **Export API**: `/api/export` genera dossier EPK en JSON/HTML
-
-Variables de entorno requeridas:
-- `TURSO_DATABASE_URL`
-- `TURSO_AUTH_TOKEN`
-- `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (para deploy)
+| Check | Resultado |
+|-------|-----------|
+| TypeScript Strict | ✅ 0 errores |
+| Unit Tests | ✅ 41/41 passing |
+| E2E Tests | ✅ 13/13 passing |
+| Null-Safety | ✅ Todos los campos opcionales protegidos |
 
 ## Documentación
 
-Toda la documentación del proyecto se encuentra en la carpeta `docs/`:
-
 | Archivo | Descripción |
 |---------|-------------|
-| `docs/AI_LOG.md` | Bitácora técnica completa (prompts, skills, errores corregidos) |
-| `docs/RELEASE_NOTES.md` | Notas de liberación v1.0.0 |
-| `docs/DIRECTRICES.md` | Directrices del proyecto final |
-| `docs/MODELOS_DISPONIBLES.txt` | Modelos gratuitos disponibles (OpenCode + OpenRouter) |
-| `docs/PLAN_MULTIMEDIA_F7_F9.md` | Plan de fases multimedia F7-F9 |
-| `docs/PLAN_DIRECTOR_EPK_DASHBOARD.md` | Plan director original |
-| `docs/handoffs/` | Handoffs entre fases (F0→F1, F1→F2, ..., FINAL) |
+| `docs/AI_LOG.md` | Bitácora técnica completa |
+| `docs/handoffs/` | Handoffs entre fases |
+| `MASTER_PLAN.md` | Plan maestro del proyecto |
 
-## Agentes y Skills Personalizados
+## Agentes y Skills
 
 ### Agentes (7)
-
-| Agente | Modelo | Modo | Descripción |
-|--------|--------|------|-------------|
-| dashboard-builder | Nemotron 3.5 Lightning | subagent | Server/Client Components, Recharts |
-| epk-card-builder | Nemotron 3 Ultra | agent | Genera EPKCard por track |
-| quality-auditor | Gemma 4 31B | subagent | Playwright E2E, a11y |
-| fase-orchestrator | MiMo V2.5 Free | agent | Orquestador de fases completas |
-| api-builder | Nemotron 3 Ultra | subagent | Endpoints REST + Zod |
-| auth-builder | Nemotron 3 Ultra | subagent | Auth completo |
-| release-manager | Nemotron 3.5 Lightning | subagent | Git tags + releases |
+- **fase-orchestrator** — Orquestador de fases (MiMo V2.5)
+- **api-builder** — Endpoints REST (MiMo V2.5)
+- **dashboard-builder** — UI/Components (Nemotron 3.5 Lightning)
+- **auth-builder** — Autenticación (Nemotron 3 Ultra)
+- **quality-auditor** — Tests E2E (Gemma 4 31B)
+- **release-manager** — Git tags + releases (Nemotron 3.5 Lightning)
 
 ### Skills (10)
+- `git-workflow`, `documentar-proyecto`, `validar-null-safety`, `auditar-mcp`
+- `switch-context`, `optimizar-lighthouse`, `run-quality-gates`
+- `fase-completa`, `crear-release`, `handoff-automatico`
 
-| Skill | Descripción |
-|-------|-------------|
-| git-workflow | Commit + push automático |
-| documentar-proyecto | Actualiza README + AI_LOG |
-| validar-null-safety | Checklist campos opcionales |
-| auditar-mcp | Verifica 4/4 MCP servers |
-| switch-context | Genera HANDOFF entre fases |
-| optimizar-lighthouse | Bundle < 250KB, lazy loading |
-| run-quality-gates | typecheck + test:unit + test:e2e |
-| fase-completa | Ciclo completo: code → test → docs → commit → release |
-| crear-release | GitHub Release con changelog |
-| handoff-automatico | HANDOFF + AI_LOG automático |
-
-### Commands (2)
-
-| Command | Descripción |
-|---------|-------------|
-| /renderizar_epk | Genera EPKCard para un track |
-| /fase | Ejecuta una fase completa |
+### Commands
+- `/fase <letra>` — Ejecuta una fase completa
+- `/renderizar_epk` — Genera EPKCard para un track
 
 ## Licencia
 
