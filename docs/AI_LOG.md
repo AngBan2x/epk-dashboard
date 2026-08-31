@@ -1154,5 +1154,5 @@ Build: ✅ Compiled successfully
 - **Commits**: 1 commit único para Fase E completa + release v2.4.0
 
 ### Commits
-- Pendiente: commit + push Fase E
-- Release: `v2.4.0` — GitHub Release a crear
+- `5942d25` — feat: Fase E completa - Métricas + Webhooks + MetricsCharts real-time + badges EPKCard
+- Release: `v2.4.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v2.4.0

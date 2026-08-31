@@ -513,7 +513,7 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v2.1.0 | Fase B: Auth + Usuarios | minor | ✅ Completado |
 | v2.2.0 | Fase C: Upload + Autocomplete | minor | ✅ Completado |
 | v2.3.0 | Fase D: Likes + Notificaciones | minor | ✅ Completado |
-| v2.4.0 | Fase E: Métricas + Webhooks | minor | ⏳ Pendiente |
+| v2.4.0 | Fase E: Métricas + Webhooks | minor | ✅ Completado |
 | v2.5.0 | Fase F: UI/UX Final | minor | ⏳ Pendiente |
 | v3.0.0 | Fase G: Verificación Final | **STABLE** | ⏳ Pendiente |
 
