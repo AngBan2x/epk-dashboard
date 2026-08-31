@@ -1156,3 +1156,53 @@ Build: ✅ Compiled successfully
 ### Commits
 - `5942d25` — feat: Fase E completa - Métricas + Webhooks + MetricsCharts real-time + badges EPKCard
 - Release: `v2.4.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v2.4.0
+
+---
+
+## Fase F: UI/UX Final
+
+**Fecha:** 2026-08-31
+**Modelo:** MiMo V2.5 Free (OpenCode) — Orchestrator
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Ejecuta Fase F: UI/UX Final"
+2. "Header responsive + Footer + Logo + Auto-hide player"
+3. "Renombrar plataforma en todos los componentes"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `run-quality-gates` | typecheck + test:unit + test:e2e al cierre |
+| `git-workflow` | Commit + push |
+| `fase-completa` | Ejecución completa Fase F |
+| `crear-release` | GitHub Release v2.5.0 |
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `components/Footer.tsx` | NUEVO | Footer con info + redes + copyright |
+| `components/GlobalAudioPlayer.tsx` | MODIFICADO | Auto-hide 5s + thin progress bar minimizado |
+| `public/logo.svg` | NUEVO | Logo SVG musical (doble nota) |
+| `app/layout.tsx` | MODIFICADO | +Footer import, metadata template, icon |
+
+### Tests Results (Fase F)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+Build: ✅ Compiled successfully
+```
+
+### Resumen Técnico Fase F
+- **Header**: Ya existía responsive con hamburger menu (F1 pre-completado)
+- **Footer**: Nuevo componente con info, links, redes sociales (Spotify, Apple Music, Instagram), copyright
+- **GlobalAudioPlayer**: Auto-hide 5s → thin progress bar minimizado → expand on hover
+- **Logo SVG**: Doble nota musical en círculo verde (#10b981)
+- **Metadata**: Template title, description mejorada, favicon = logo.svg
+- **Naming**: Consistente "EPK Dashboard" / "EPK Dashboard Musical" en todo el proyecto
+- **Commits**: 1 commit único para Fase F completa + release v2.5.0
+
+### Commits
+- Pendiente: commit + push Fase F
+- Release: `v2.5.0` — GitHub Release a crear
