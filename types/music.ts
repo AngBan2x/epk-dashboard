@@ -104,3 +104,25 @@ export interface RawUserRow {
   role: string;
   created_at: string;
 }
+
+export type SubmissionStatus = "pending" | "approved" | "rejected";
+
+export interface TrackSubmission {
+  id: string;
+  user_id: string;
+  track_data: string; // JSON string of track data
+  status: SubmissionStatus;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RawTrackSubmissionRow {
+  id: string;
+  user_id: string;
+  track_data: string;
+  status: string;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
