@@ -1326,8 +1326,8 @@ Build: ✅ Compiled successfully
 - **Release**: v3.1.0 STABLE — último release del proyecto
 
 ### Commits
-- Pendiente: commit + push Fase H
-- Release: `v3.1.0` — GitHub Release a crear
+- `fa4a748` — docs: Fase H completa - Verificación final + README PressPlay + screenshots
+- Release: `v3.1.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.1.0
 
 ---
 
