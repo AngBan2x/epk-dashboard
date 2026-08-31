@@ -927,3 +927,49 @@ Build: ✅ Compiled successfully
 ### Commits
 - `947b92b` — feat: Fase B completa - Auth system (register/login/me), AuthContext, LoginModal, middleware, admin seed
 - Release: `v2.1.0` — GitHub Release creado
+
+---
+
+## Comando /fase + Diversificación de Modelos
+
+**Fecha:** 2026-08-30
+**Modelo:** MiMo V2.5 Free (OpenCode)
+**Modo:** Build
+
+### Cambios Realizados
+
+1. **Nuevo comando `/fase`** (`.opencode/commands/fase.md`)
+   - Ejecuta una fase completa del MASTER_PLAN.md: code → test → docs → commit → release
+   - Delega a subagentes según tipo de tarea y modelo asignado
+   - Skills invocadas: run-quality-gates, documentar-proyecto, crear-release, handoff-automatico, auditar-mcp
+
+2. **Modelo api-builder cambiado** (`.opencode/agents/api-builder.md`)
+   - De: `opencode/nemotron-3-ultra-free` → A: `opencode/mimo-v2.5-free`
+   - Justificación: Endpoints REST rutinarios → velocidad MiMo
+
+3. **MASTER_PLAN.md actualizado**
+   - Fase C (sección 13.4): C4 asignado a Nemotron 3.5 Lightning (dashboard-builder)
+   - Sección 14 (agentes): api-builder modelo actualizado a MiMo V2.5 Free
+   - Sección 15.2 (/fase): Añadida descripción de alternancia de modelos
+   - Nota bajo tabla Fase C: instrucción de ejecución con `/fase C`
+
+### Estrategia de Alternancia de Modelos
+
+| Tipo de Tarea | Modelo | Agente |
+|---------------|--------|--------|
+| Schema/DB complejo | Nemotron 3 Ultra | api-builder, auth-builder |
+| Endpoints REST rutinarios | MiMo V2.5 Free | api-builder |
+| UI/Components interactivos | Nemotron 3.5 Lightning | dashboard-builder |
+| Páginas simples / Paneles CRUD | MiMo V2.5 Free | dashboard-builder |
+| Tests E2E / Auditoría | Gemma 4 31B | quality-auditor |
+| Orquestación / Releases | Nemotron 3 Ultra / 3.5 Lightning | fase-orchestrator, release-manager |
+
+### Archivos Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `.opencode/commands/fase.md` | NUEVO | Comando /fase para ejecución autónoma de fases |
+| `.opencode/agents/api-builder.md` | MODIFICADO | Modelo: MiMo V2.5 Free |
+| `MASTER_PLAN.md` | MODIFICADO | Fase C tabla + sección 14 + sección 15.2 |
+
+### Commits
+- Pendiente: commit + push de cambios
