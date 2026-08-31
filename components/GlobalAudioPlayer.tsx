@@ -1,9 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAudioPlayer } from "@/context/AudioPlayerContext";
-import { safeString, formatDuration } from "@/lib/null-safe";
+import { safeString } from "@/lib/null-safe";
 import { AudioVisualizer } from "./AudioVisualizer";
+
+const AUTO_HIDE_DELAY = 5000; // 5 seconds
 
 export function GlobalAudioPlayer() {
   const {
@@ -18,6 +20,53 @@ export function GlobalAudioPlayer() {
     setVolume,
     toggleVisualizer,
   } = useAudioPlayer();
+
+  const [isHovered, setIsHovered] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const startHideTimer = useCallback(() => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      if (!isPlaying) {
+        setIsMinimized(true);
+      }
+    }, AUTO_HIDE_DELAY);
+  }, [clearHideTimer, isPlaying]);
+
+  // Auto-hide when playing and no interaction
+  useEffect(() => {
+    if (isPlaying && !isHovered) {
+      startHideTimer();
+    } else {
+      clearHideTimer();
+    }
+    return clearHideTimer;
+  }, [isPlaying, isHovered, startHideTimer, clearHideTimer]);
+
+  // Show player when track starts
+  useEffect(() => {
+    if (activeTrack) {
+      setIsMinimized(false);
+    }
+  }, [activeTrack]);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    setIsMinimized(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
 
   if (!activeTrack) return null;
 
@@ -38,8 +87,36 @@ export function GlobalAudioPlayer() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  // Minimized state: show thin progress bar
+  if (isMinimized && !isHovered) {
+    return (
+      <div
+        ref={containerRef}
+        className="fixed bottom-0 left-0 right-0 z-50"
+        onMouseEnter={handleMouseEnter}
+        onTouchStart={() => setIsMinimized(false)}
+      >
+        {/* Thin progress bar */}
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full player
   return (
-    <aside aria-label="Reproductor global de audio" className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4">
+    <div
+      ref={containerRef}
+      className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       {isVisualizerOpen && (
         <div className="max-w-4xl mx-auto mb-3">
           <AudioVisualizer height={80} />
@@ -135,6 +212,6 @@ export function GlobalAudioPlayer() {
           </div>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }
