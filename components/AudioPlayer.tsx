@@ -23,7 +23,9 @@ export function AudioPlayer({ src, title, id, artist, coverImage }: AudioPlayerP
 
   const isPlaying = globalPlayer ? isCurrentGlobal && globalPlayer.isPlaying : localPlaying;
 
-  const togglePlay = () => {
+  const togglePlay = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!src) return;
 
     if (globalPlayer) {
@@ -52,7 +54,7 @@ export function AudioPlayer({ src, title, id, artist, coverImage }: AudioPlayerP
   };
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-dark-50 dark:bg-dark-800 rounded-lg">
+    <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-dark-800 rounded-lg">
       <button
         onClick={togglePlay}
         className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0"
@@ -78,7 +80,7 @@ export function AudioPlayer({ src, title, id, artist, coverImage }: AudioPlayerP
             </p>
           </>
         ) : (
-          <p className="text-xs text-dark-400">No hay audio disponible</p>
+          <p className="text-xs text-slate-400">No hay audio disponible</p>
         )}
       </div>
     </div>

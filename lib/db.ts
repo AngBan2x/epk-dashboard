@@ -1,11 +1,12 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
 
 let _db: Database.Database | null = null;
+let _dbWrite: Database.Database | null = null;
 
 function getDb(): Database.Database {
   if (!_db) {
@@ -13,6 +14,74 @@ function getDb(): Database.Database {
   }
   return _db;
 }
+
+function getDbWrite(): Database.Database {
+  if (!_dbWrite) {
+    _dbWrite = new Database(DB_PATH);
+  }
+  return _dbWrite;
+}
+
+// Initialize users table
+function initUsersTable(): void {
+  const db = getDbWrite();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'artist',
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+}
+initUsersTable();
+
+function parseUser(row: RawUserRow): User {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    password_hash: row.password_hash,
+    role: row.role as "admin" | "artist",
+    created_at: row.created_at,
+  };
+}
+
+export function getUserByEmail(email: string): User | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as RawUserRow | undefined;
+  return row !== undefined ? parseUser(row) : null;
+}
+
+export function getUserById(id: string): User | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as RawUserRow | undefined;
+  return row !== undefined ? parseUser(row) : null;
+}
+
+export function createUser(user: Omit<User, "id" | "created_at"> & { id: string }): User {
+  const db = getDbWrite();
+  db.prepare(`
+    INSERT INTO users (id, name, email, password_hash, role)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(user.id, user.name, user.email, user.password_hash, user.role);
+  const created = getUserById(user.id);
+  if (!created) throw new Error("Failed to create user");
+  return created;
+}
+
+export function verifyUserPassword(email: string, password: string): User | null {
+  const user = getUserByEmail(email);
+  if (!user) return null;
+  // Password verification will be done with bcrypt in auth API
+  return user;
+}
+
+// Export getDbWrite for direct queries if needed
+export { getDbWrite };
 
 function parseMetrics(raw: string | null): Metrics {
   const fallback: Metrics = { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
@@ -74,6 +143,7 @@ function parseTrack(row: RawTrackRow): Track {
   return {
     id: row.id,
     title: row.title,
+    artist_name: safeString(row.artist_name, "Artista EPK"),
     release_type: safeString(row.release_type),
     release_date: safeString(row.release_date),
     duration: safeString(row.duration),
@@ -120,7 +190,7 @@ export function searchTracks(query: string): Track[] {
   const db = getDb();
   const pattern = `%${query}%`;
   const rows = db
-    .prepare("SELECT * FROM tracks WHERE title LIKE ? OR release_type LIKE ? OR lyrics LIKE ?")
-    .all(pattern, pattern, pattern) as RawTrackRow[];
+    .prepare("SELECT * FROM tracks WHERE title LIKE ? OR artist_name LIKE ? OR release_type LIKE ? OR lyrics LIKE ?")
+    .all(pattern, pattern, pattern, pattern) as RawTrackRow[];
   return rows.map(parseTrack);
 }

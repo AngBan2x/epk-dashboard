@@ -19,8 +19,8 @@ export function Button({
         "disabled:pointer-events-none disabled:opacity-50",
         {
           "bg-primary-600 text-white hover:bg-primary-700": variant === "primary",
-          "bg-dark-200 text-dark-900 hover:bg-dark-300": variant === "secondary",
-          "hover:bg-dark-100 text-dark-700": variant === "ghost",
+          "bg-slate-200 dark:bg-dark-200 text-slate-900 dark:text-dark-900 hover:bg-slate-300 dark:hover:bg-dark-300": variant === "secondary",
+          "hover:bg-slate-100 dark:hover:bg-dark-100 text-slate-700 dark:text-dark-700": variant === "ghost",
         },
         {
           "h-8 px-3 text-sm": size === "sm",

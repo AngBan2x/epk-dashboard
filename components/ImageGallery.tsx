@@ -64,11 +64,11 @@ export function ImageGallery({
         ];
 
   return (
-    <section className="p-6 bg-white dark:bg-dark-800 rounded-2xl border border-dark-200 dark:border-dark-700">
+    <section className="p-6 bg-white dark:bg-dark-800 rounded-2xl border border-slate-200 dark:border-dark-700">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-dark-900 dark:text-dark-100">{title}</h2>
-          <p className="text-xs text-dark-500 mt-0.5">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-dark-100">{title}</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
             Recursos gráficos en alta resolución para prensa y promotores
           </p>
         </div>
@@ -82,7 +82,7 @@ export function ImageGallery({
           <div
             key={item.id}
             onClick={() => setSelectedImage(item.url)}
-            className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-dark-100 dark:bg-dark-700 border border-dark-200 dark:border-dark-600 transition-all hover:scale-[1.02] hover:shadow-xl"
+            className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-slate-100 dark:bg-dark-700 border border-slate-200 dark:border-dark-600 transition-all hover:scale-[1.02] hover:shadow-xl"
           >
             <img
               src={item.url}
@@ -119,7 +119,7 @@ export function ImageGallery({
           <div className="relative max-w-4xl max-h-[85vh] flex flex-col items-center">
             <button
               onClick={() => setSelectedImage(null)}
-              className="absolute -top-10 right-0 text-white text-sm bg-dark-800 px-3 py-1 rounded-full border border-dark-600 hover:bg-dark-700 transition"
+              className="absolute -top-10 right-0 text-white text-sm bg-slate-800 px-3 py-1 rounded-full border border-slate-600 hover:bg-slate-700 transition"
               aria-label="Cerrar modal"
             >
               ✕ Cerrar

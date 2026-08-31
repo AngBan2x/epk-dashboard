@@ -33,7 +33,7 @@ export function LyricsModal({ lyrics, title, className }: LyricsModalProps) {
             {lyrics}
           </pre>
         ) : (
-          <p className="text-dark-400">Letra no disponible.</p>
+          <p className="text-slate-400 dark:text-slate-500">Letra no disponible.</p>
         )}
       </Modal>
     </div>

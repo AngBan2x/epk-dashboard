@@ -768,3 +768,84 @@ Build: ✅ Compiled successfully
 
 ### Commits
 - `6952683` — chore: reorganización documental + plan extendido Fases A-G
+- `a7eb00b` — fix: fase-orchestrator model → Nemotron 3 Ultra Free + AI_LOG entry
+- `b8c9d2e` — feat: Fase A completa - artist_name, CRUD tracks, dark mode migration
+
+---
+
+## Fase A: Cimientos (Corregir lo roto)
+
+**Fecha:** 2026-08-30
+**Modelo:** Nemotron 3 Ultra Free (OpenCode)
+**Modo:** Build
+
+### Prompts Clave Utilizados
+1. "Ejecuta Fase A: artist_name, CRUD API tracks, fix play button, dark mode migration"
+2. "Agrega campo artist_name a Track type + DB schema + seed"
+3. "Crea /api/tracks/route.ts con CRUD completo GET/POST/PUT/DELETE"
+4. "Fix AudioPlayer togglePlay con e.preventDefault() + e.stopPropagation()"
+5. "Migra bg-dark-* a dark: en 14 archivos (UI + main components)"
+
+### Skills Employadas
+| Skill | Momento de Uso |
+|-------|---------------|
+| `run-quality-gates` | typecheck + test:unit + test:e2e al cierre |
+| `git-workflow` | Commit + push |
+| `fase-completa` | Ejecución completa Fase A |
+
+### Servidores MCP Consultados
+| Servidor | Consulta | Resultado |
+|----------|----------|-----------|
+| SQLite | `SELECT * FROM tracks` | ✅ 6 tracks con artist_name |
+| GitHub | `git push` | ✅ b8c9d2e |
+| Playwright | test execution | ✅ 13/13 passing |
+
+### Errores Corregidos (Regla 5)
+1. **Play button interceptado por `<a>`** — `app/dashboard/page.tsx` envolvía EPKCard en `<a>` → `e.preventDefault() + e.stopPropagation()` en `AudioPlayer.tsx` ✅
+2. **Dark mode clases hardcodeadas** — 29 ocurrencias `bg-dark-*` sin `dark:` prefix en 14 archivos → Migrado a `bg-slate-*` + `dark:bg-dark-*` ✅
+3. **Test unitario desactualizado** — Esperaba "Ecos en el Garaje" pero DB tiene "Bohemian Rhapsody" → Test actualizado + agregado test artist_name ✅
+4. **Sync route TS error** — Falta `artist_name` en mapeo → Agregado ✅
+5. **TS strict** — 0 errores tras correcciones ✅
+
+### Archivos Creados/Modificados
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `types/music.ts` | MODIFICADO | +`artist_name` en Track + RawTrackRow |
+| `lib/db.ts` | MODIFICADO | parseTrack incluye artist_name, searchTracks busca en artist_name |
+| `scripts/seed-f9-catalog.ts` | MODIFICADO | +artist_name en SeedTrack + 6 tracks + ALTER TABLE |
+| `app/api/tracks/route.ts` | NUEVO | CRUD completo GET/POST/PUT/DELETE |
+| `components/AudioPlayer.tsx` | MODIFICADO | togglePlay con e.preventDefault/stopPropagation |
+| `components/ui/Card.tsx` | MODIFICADO | border-slate-200 dark:border-dark-200 |
+| `components/ui/Button.tsx` | MODIFICADO | secondary/ghost variants con dark mode |
+| `components/ui/Skeleton.tsx` | MODIFICADO | bg-slate-200 dark:bg-dark-200 |
+| `components/ui/Modal.tsx` | MODIFICADO | border-slate-200 + text-slate-400 |
+| `components/ThemeToggle.tsx` | MODIFICADO | bg-slate-100 + border-slate-300 |
+| `components/TrackFilters.tsx` | MODIFICADO | border-slate-200 |
+| `components/MetricsCharts.tsx` | MODIFICADO | border-slate-200 + text-slate-400 |
+| `components/EPKCard.tsx` | MODIFICADO | bg-slate-100 + text-slate-400/500 |
+| `components/AudioPlayer.tsx` | MODIFICADO | bg-slate-50 + text-slate-400 |
+| `components/AudioVisualizer.tsx` | MODIFICADO | bg-slate-900/60 + border-slate-700/50 |
+| `components/VideoShowcase.tsx` | MODIFICADO | 7 clases migradas a slate + dark |
+| `components/ImageGallery.tsx` | MODIFICADO | 7 clases migradas a slate + dark |
+| `components/LyricsModal.tsx` | MODIFICADO | text-slate-400 dark:text-slate-500 |
+| `components/ProductionDetails.tsx` | MODIFICADO | text-slate-500/300 dark variants |
+| `app/api/sync/route.ts` | MODIFICADO | Incluye artist_name en mapeo |
+| `tests/unit/db.test.ts` | MODIFICADO | Test actualizado + test artist_name |
+
+### Tests Results (Fase A)
+```
+TypeScript: 0 errores
+Unit Tests: 41/41 passing (6 suites)
+E2E Tests: 13/13 passing (Playwright)
+Build: ✅ Compiled successfully
+```
+
+### Resumen Técnico Fase A
+- **Tracks en DB**: 6 (reales, con artist_name)
+- **API CRUD**: `/api/tracks` funcional (GET/POST/PUT/DELETE)
+- **Play button**: Fix stopPropagation en AudioPlayer
+- **Dark mode**: 14 archivos migrados, 29 ocurrencias → 0 bare dark-* classes
+- **Commits**: 1 commit único para Fase A completa
+
+### Commits
+- `b8c9d2e` — feat: Fase A completa - artist_name, CRUD tracks, dark mode migration

@@ -10,7 +10,8 @@ describe("Database", () => {
   it("getTrackById returns specific track", () => {
     const track = getTrackById("trk-001");
     expect(track).not.toBeNull();
-    expect(track?.title).toBe("Ecos en el Garaje");
+    expect(track?.title).toBe("Bohemian Rhapsody");
+    expect(track?.artist_name).toBe("Queen");
   });
 
   it("getTrackById returns null for unknown id", () => {

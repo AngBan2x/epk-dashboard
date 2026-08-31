@@ -23,7 +23,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="bg-white dark:bg-dark-800 rounded-xl p-4 border border-dark-200 dark:border-dark-700">
+      <div className="bg-white dark:bg-dark-800 rounded-xl p-4 border border-slate-200 dark:border-dark-700">
         <h3 className="font-semibold mb-4">Top Países</h3>
         {countries.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
@@ -36,11 +36,11 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-dark-400 text-sm">Sin datos</p>
+          <p className="text-slate-400 text-sm">Sin datos</p>
         )}
       </div>
 
-      <div className="bg-white dark:bg-dark-800 rounded-xl p-4 border border-dark-200 dark:border-dark-700">
+      <div className="bg-white dark:bg-dark-800 rounded-xl p-4 border border-slate-200 dark:border-dark-700">
         <h3 className="font-semibold mb-4">Métricas</h3>
         {pieData.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
@@ -54,7 +54,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
             </PieChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-dark-400 text-sm">Sin datos</p>
+          <p className="text-slate-400 text-sm">Sin datos</p>
         )}
       </div>
     </div>

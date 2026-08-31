@@ -48,8 +48,8 @@ export function ThemeToggle() {
     <button
       onClick={toggleTheme}
       className="w-10 h-10 rounded-xl border transition-all duration-200 flex items-center justify-center text-lg
-        bg-dark-100 dark:bg-dark-800 border-dark-300 dark:border-dark-600
-        hover:bg-dark-200 dark:hover:bg-dark-700
+        bg-slate-100 dark:bg-dark-800 border-slate-300 dark:border-dark-600
+        hover:bg-slate-200 dark:hover:bg-dark-700
         hover:scale-105 active:scale-95
         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
       aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}

@@ -29,6 +29,7 @@ export interface StemsUrls {
 export interface Track {
   id: string;
   title: string;
+  artist_name: string;
   release_type: string;
   release_date: string;
   duration: string;
@@ -62,6 +63,7 @@ export interface CatalogData {
 export interface RawTrackRow {
   id: string;
   title: string;
+  artist_name: string | null;
   release_type: string | null;
   release_date: string | null;
   duration: string | null;
@@ -83,4 +85,22 @@ export interface SyncResult {
   synced: number;
   failed: number;
   errors: string[];
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password_hash: string;
+  role: "admin" | "artist";
+  created_at: string;
+}
+
+export interface RawUserRow {
+  id: string;
+  name: string;
+  email: string;
+  password_hash: string;
+  role: string;
+  created_at: string;
 }

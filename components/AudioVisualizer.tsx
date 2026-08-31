@@ -89,12 +89,12 @@ export function AudioVisualizer({
   }, [isPlaying, audioRef, barCount]);
 
   return (
-    <div className={`w-full overflow-hidden rounded-xl bg-dark-900/60 p-4 border border-dark-700/50 backdrop-blur-md ${className}`}>
+    <div className={`w-full overflow-hidden rounded-xl bg-slate-900/60 dark:bg-dark-900/60 p-4 border border-slate-700/50 dark:border-dark-700/50 backdrop-blur-md ${className}`}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-purple-400">
           Audio Frequency Visualizer
         </span>
-        <span className="text-xs text-dark-400">
+        <span className="text-xs text-slate-400">
           {isPlaying ? "Live Spectrum" : "Paused"}
         </span>
       </div>

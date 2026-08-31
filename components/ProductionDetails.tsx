@@ -22,9 +22,9 @@ export function ProductionDetails({ details, className }: ProductionDetailsProps
       <dl className="grid grid-cols-2 gap-2">
         {fields.map(({ label, key }) => (
           <div key={key}>
-            <dt className="text-xs text-dark-500 uppercase">{label}</dt>
+            <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase">{label}</dt>
             <dd className="text-sm font-medium">
-              {hasValue(details, key) ? safeString(details[key]) : <span className="text-dark-300">—</span>}
+              {hasValue(details, key) ? safeString(details[key]) : <span className="text-slate-300 dark:text-slate-600">—</span>}
             </dd>
           </div>
         ))}
