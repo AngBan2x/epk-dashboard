@@ -517,7 +517,7 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v2.5.0 | Fase F: UI/UX Final | minor | ✅ Completado |
 | v3.0.0 | Fase G: Branding PressPlay + Fix Crítico | **STABLE** | ✅ Completado |
 | v3.1.0 | Fase H: Verificación Final | **STABLE** | ✅ Completado |
-| v3.2.0 | Fase I: Skills + Agents para Fixes | minor | ⏳ En progreso |
+| v3.2.0 | Fase I: Skills + Agents para Fixes | minor | ✅ Completado |
 
 ---
 
