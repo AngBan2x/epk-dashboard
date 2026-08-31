@@ -1204,5 +1204,5 @@ Build: ✅ Compiled successfully
 - **Commits**: 1 commit único para Fase F completa + release v2.5.0
 
 ### Commits
-- Pendiente: commit + push Fase F
-- Release: `v2.5.0` — GitHub Release a crear
+- `c35f456` — feat: Fase F completa - Footer + GlobalAudioPlayer auto-hide + Logo SVG + metadata
+- Release: `v2.5.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v2.5.0
