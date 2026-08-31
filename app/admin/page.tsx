@@ -48,10 +48,22 @@ interface SubmissionTrackData {
   };
 }
 
+interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: string | null;
+  read: boolean;
+  created_at: string;
+}
+
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"tracks" | "submissions">("tracks");
+  const [activeTab, setActiveTab] = useState<"tracks" | "submissions" | "notifications">("tracks");
   const [tracks, setTracks] = useState<AdminTrack[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingTrack, setEditingTrack] = useState<AdminTrack | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -73,6 +85,7 @@ export default function AdminPage() {
   useEffect(() => {
     fetchTracks();
     fetchSubmissions();
+    fetchNotifications();
   }, []);
 
   const fetchTracks = async () => {
@@ -98,6 +111,18 @@ export default function AdminPage() {
       }
     } catch {
       console.error("Failed to fetch submissions");
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+      }
+    } catch {
+      console.error("Failed to fetch notifications");
     }
   };
 
@@ -271,6 +296,16 @@ export default function AdminPage() {
               }`}
             >
               Envíos ({submissions.filter(s => s.status === "pending").length} pendientes)
+            </button>
+            <button
+              onClick={() => setActiveTab("notifications")}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
+                activeTab === "notifications"
+                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+            >
+              Notificaciones ({notifications.filter(n => !n.read).length} sin leer)
             </button>
           </nav>
         </div>
@@ -567,6 +602,118 @@ export default function AdminPage() {
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Notifications Table */}
+        {activeTab === "notifications" && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="font-semibold text-slate-900 dark:text-slate-100">
+                Notificaciones ({notifications.length} total)
+              </h2>
+              {notifications.some(n => !n.read) && (
+                <button
+                  onClick={async () => {
+                    // Mark all as read
+                    try {
+                      const res = await fetch("/api/notifications/read-all", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                      });
+                      if (res.ok) {
+                        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                        setMessage({ type: "success", text: "Todas marcadas como leídas" });
+                      }
+                    } catch {
+                      setMessage({ type: "error", text: "Error al marcar como leídas" });
+                    }
+                  }}
+                  className="px-3 py-1 rounded text-xs font-semibold bg-slate-600 hover:bg-slate-500 text-white transition"
+                >
+                  Marcar todas como leídas
+                </button>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="p-8 text-center text-slate-400">Cargando notificaciones...</div>
+            ) : notifications.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <p>No hay notificaciones.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800">
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Tipo</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Título</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Mensaje</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Usuario</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Estado</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Fecha</th>
+                      <th className="text-right p-3 font-semibold text-slate-700 dark:text-slate-300">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {notifications.map((notif) => (
+                      <tr key={notif.id} className={`border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition ${!notif.read ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
+                        <td className="p-3">
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700">
+                            {notif.type}
+                          </span>
+                        </td>
+                        <td className="p-3 font-medium text-slate-900 dark:text-slate-100">{notif.title}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400 max-w-[300px] truncate">{notif.message}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400 font-mono text-xs">{notif.user_id.slice(0, 8)}...</td>
+                        <td className="p-3">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${!notif.read 
+                            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700"}`}>
+                            {!notif.read ? "🔵 Sin leer" : "✅ Leída"}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400 text-xs">
+                          {new Date(notif.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {!notif.read && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/notifications/read?id=${notif.id}`, { method: "POST" });
+                                    if (res.ok) {
+                                      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                                    }
+                                  } catch {
+                                    // silent fail
+                                  }
+                                }}
+                                className="px-2 py-1 rounded text-xs font-semibold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950 transition"
+                              >
+                                ✅ Leer
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                if (confirm("¿Eliminar esta notificación?")) {
+                                  // Could add delete API later
+                                }
+                              }}
+                              className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

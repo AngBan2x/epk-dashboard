@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus, Like, RawLikeRow, Notification, RawNotificationRow, NotificationType } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
@@ -58,6 +58,47 @@ function initTrackSubmissionsTable(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_submissions_status ON track_submissions(status)`);
 }
 initTrackSubmissionsTable();
+
+// Initialize likes table
+function initLikesTable(): void {
+  const db = getDbWrite();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS likes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      track_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (track_id) REFERENCES tracks(id),
+      UNIQUE(user_id, track_id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_likes_user ON likes(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_likes_track ON likes(track_id)`);
+}
+initLikesTable();
+
+// Initialize notifications table
+function initNotificationsTable(): void {
+  const db = getDbWrite();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      data TEXT,
+      read INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)`);
+}
+initNotificationsTable();
 
 function parseUser(row: RawUserRow): User {
   return {
@@ -156,6 +197,116 @@ export function updateTrackSubmissionStatus(id: string, status: SubmissionStatus
     db.prepare("UPDATE track_submissions SET status = ?, updated_at = ? WHERE id = ?").run(status, now, id);
   }
   return getTrackSubmissionById(id);
+}
+
+function parseLike(row: RawLikeRow): Like {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    track_id: row.track_id,
+    created_at: row.created_at,
+  };
+}
+
+export function toggleLike(userId: string, trackId: string): { liked: boolean; count: number } {
+  const db = getDbWrite();
+  const existing = db.prepare("SELECT * FROM likes WHERE user_id = ? AND track_id = ?").get(userId, trackId) as RawLikeRow | undefined;
+  
+  if (existing) {
+    // Unlike
+    db.prepare("DELETE FROM likes WHERE user_id = ? AND track_id = ?").run(userId, trackId);
+  } else {
+    // Like
+    const id = crypto.randomUUID();
+    db.prepare("INSERT INTO likes (id, user_id, track_id) VALUES (?, ?, ?)").run(id, userId, trackId);
+  }
+  
+  const count = db.prepare("SELECT COUNT(*) as count FROM likes WHERE track_id = ?").get(trackId) as { count: number };
+  return { liked: !existing, count: count.count };
+}
+
+export function getLikeCount(trackId: string): number {
+  const db = getDb();
+  const result = db.prepare("SELECT COUNT(*) as count FROM likes WHERE track_id = ?").get(trackId) as { count: number };
+  return result.count;
+}
+
+export function getUserLikes(userId: string): Like[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM likes WHERE user_id = ? ORDER BY created_at DESC").all(userId) as RawLikeRow[];
+  return rows.map(parseLike);
+}
+
+export function hasUserLikedTrack(userId: string, trackId: string): boolean {
+  const db = getDb();
+  const row = db.prepare("SELECT 1 FROM likes WHERE user_id = ? AND track_id = ?").get(userId, trackId);
+  return row !== undefined;
+}
+
+function parseNotification(row: RawNotificationRow): Notification {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    type: row.type as NotificationType,
+    title: row.title,
+    message: row.message,
+    data: row.data,
+    read: row.read === 1,
+    created_at: row.created_at,
+  };
+}
+
+export function createNotification(notification: Omit<Notification, "id" | "created_at"> & { id: string }): Notification {
+  const db = getDbWrite();
+  db.prepare(`
+    INSERT INTO notifications (id, user_id, type, title, message, data, read)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    notification.id,
+    notification.user_id,
+    notification.type,
+    notification.title,
+    notification.message,
+    notification.data,
+    notification.read ? 1 : 0
+  );
+  const created = getNotificationById(notification.id);
+  if (!created) throw new Error("Failed to create notification");
+  return created;
+}
+
+export function getNotificationById(id: string): Notification | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM notifications WHERE id = ?").get(id) as RawNotificationRow | undefined;
+  return row !== undefined ? parseNotification(row) : null;
+}
+
+export function getUserNotifications(userId: string, unreadOnly = false): Notification[] {
+  const db = getDb();
+  let query = "SELECT * FROM notifications WHERE user_id = ?";
+  if (unreadOnly) {
+    query += " AND read = 0";
+  }
+  query += " ORDER BY created_at DESC";
+  const rows = db.prepare(query).all(userId) as RawNotificationRow[];
+  return rows.map(parseNotification);
+}
+
+export function markNotificationAsRead(id: string): Notification | null {
+  const db = getDbWrite();
+  db.prepare("UPDATE notifications SET read = 1 WHERE id = ?").run(id);
+  return getNotificationById(id);
+}
+
+export function markAllNotificationsAsRead(userId: string): void {
+  const db = getDbWrite();
+  db.prepare("UPDATE notifications SET read = 1 WHERE user_id = ?").run(userId);
+}
+
+export function getUnreadNotificationCount(userId: string): number {
+  const db = getDb();
+  const result = db.prepare("SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0").get(userId) as { count: number };
+  return result.count;
 }
 
 // Export getDbWrite for direct queries if needed
