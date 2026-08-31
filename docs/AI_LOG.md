@@ -1271,5 +1271,5 @@ Build: ✅ Compiled successfully
 - **Commits**: 1 commit único para Fase G completa + release v3.0.0
 
 ### Commits
-- Pendiente: commit + push Fase G
-- Release: `v3.0.0` — GitHub Release a crear
+- `a536588` — feat: Fase G completa - Branding PressPlay + Fix crítico (imágenes, audio, stems, downloads)
+- Release: `v3.0.0` — GitHub Release creado: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.0.0
