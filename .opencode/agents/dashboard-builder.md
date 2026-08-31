@@ -2,7 +2,7 @@
 name: dashboard-builder
 description: Especialista en Server/Client Components de Next.js App Router, vistas de dashboard y gráficos con Recharts.
 mode: subagent
-model: Nemotron 3.5 Lightning
+model: opencode/nemotron-3.5-lightning-free
 ---
 
 # Subagente: Dashboard Builder
