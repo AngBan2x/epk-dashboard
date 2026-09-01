@@ -16,7 +16,7 @@ Ejemplos:
 ```
 /fase A
 /fase B
-/fase C
+/fase M
 ```
 
 ## Flujo de Ejecución
@@ -30,26 +30,44 @@ Ejemplos:
 7. **Release** → git tag + GitHub Release (stable/prerelease según tests)
 8. **Reporte** → resumen de tareas, tests, release creado
 
-## Delegación a Subagentes
+## Delegación Directa a Subagentes
 
-El comando `/fase` usa el agente `fase-orchestrator` que a su vez delega:
-- **Schema/DB** → `api-builder` (Nemotron 3 Ultra para casos complejos, MiMo V2.5 para rutinarios)
-- **Endpoints REST** → `api-builder` (MiMo V2.5)
-- **UI/Components** → `dashboard-builder` (Nemotron 3.5 Lightning / MiMo V2.5)
-- **Auth** → `auth-builder` (Nemotron 3 Ultra)
-- **Tests E2E** → `quality-auditor` (Gemma 4 31B)
-- **Release** → `release-manager` (Nemotron 3.5 Lightning)
+El comando `/fase` se ejecuta directamente desde el agente principal, invocando subagentes con `task`:
+
+```
+/fase M → yo leo MASTER_PLAN
+        → task(api-builder, "M1: fix next.config.js")
+        → task(db-builder, "M2: Turso schema")
+        → task(api-builder, "M3: dual-mode db.ts")
+        → pnpm typecheck && pnpm test:unit
+        → git commit + release
+```
+
+### Subagentes Disponibles
+
+| Agente | Modelo | Uso |
+|--------|--------|-----|
+| `api-builder` | `opencode/mimo-v2.5-free` | Endpoints REST, fixes rutinarios |
+| `auth-builder` | `opencode/nemotron-3-ultra-free` | Sistema de autenticación |
+| `dashboard-builder` | `opencode/nemotron-3.5-lightning-free` | UI/Components, páginas |
+| `db-builder` | `opencode/nemotron-3-ultra-free` | Schema DB, migraciones |
+| `quality-auditor` | `openrouter/gemma-4-31b` | Tests E2E, auditoría |
+| `release-manager` | `opencode/nemotron-3.5-lightning-free` | Git tags, releases |
+| `security-auditor` | `nvidia/nemotron-3-ultra-550b-a55b:free` | Seguridad, rutas |
+| `brand-fixer` | `opencode/mimo-v2.5-free` | Logos, marcas |
+| `visual-tester` | `opencode/mimo-v2.5-free` | Screenshots, DOM, a11y |
 
 ## Estrategia de Alternancia de Modelos
 
 | Tipo de Tarea | Modelo | Agente |
 |---------------|--------|--------|
-| Schema/DB complejo | Nemotron 3 Ultra | api-builder, auth-builder |
-| Endpoints REST rutinarios | MiMo V2.5 Free | api-builder |
-| UI/Components interactivos | Nemotron 3.5 Lightning | dashboard-builder |
-| Páginas simples / Paneles CRUD | MiMo V2.5 Free | dashboard-builder |
-| Tests E2E / Auditoría | Gemma 4 31B | quality-auditor |
-| Orquestación / Releases | Nemotron 3 Ultra / 3.5 Lightning | fase-orchestrator, release-manager |
+| Schema/DB complejo | Nemotron 3 Ultra | `db-builder`, `auth-builder` |
+| Endpoints REST rutinarios | MiMo V2.5 Free | `api-builder` |
+| UI/Components interactivos | Nemotron 3.5 Lightning | `dashboard-builder` |
+| Páginas simples / Paneles CRUD | MiMo V2.5 Free | `dashboard-builder` |
+| Tests E2E / Auditoría | Gemma 4 31B | `quality-auditor` |
+| Testing Visual | MiMo V2.5 Free | `visual-tester` |
+| Releases | Nemotron 3.5 Lightning | `release-manager` |
 
 ## Skills Invocadas
 - `run-quality-gates` → typecheck + unit + e2e
@@ -57,3 +75,4 @@ El comando `/fase` usa el agente `fase-orchestrator` que a su vez delega:
 - `crear-release` → git tag + gh release
 - `handoff-automatico` → HANDOFF + AI_LOG
 - `auditar-mcp` → verificación 4/4 servidores
+- `qa-visual` → testing visual con Playwright

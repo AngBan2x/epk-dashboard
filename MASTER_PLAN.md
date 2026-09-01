@@ -456,10 +456,28 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | **dashboard-builder** | Nemotron 3.5 Lightning | subagent | Server/Client Components, Recharts, vistas dashboard |
 | **epk-card-builder** | Nemotron 3 Ultra | agent | Genera EPKCard por track con null-safety |
 | **quality-auditor** | Gemma 4 31B | subagent | Playwright E2E, a11y, verificación visual |
-| **fase-orchestrator** (NUEVO) | MiMo V2.5 Free | agent | Orquestador: ejecuta fases completas automáticamente |
-| **api-builder** (NUEVO) | MiMo V2.5 Free | subagent | Endpoints REST + Zod validation + better-sqlite3 |
-| **auth-builder** (NUEVO) | Nemotron 3 Ultra | subagent | Auth: register, login, middleware, context, bcryptjs |
-| **release-manager** (NUEVO) | Nemotron 3.5 Lightning | subagent | Git tags + GitHub releases + changelogs via `gh` |
+| **api-builder** | MiMo V2.5 Free | subagent | Endpoints REST + Zod validation + better-sqlite3 |
+| **auth-builder** | Nemotron 3 Ultra | subagent | Auth: register, login, middleware, context, bcryptjs |
+| **release-manager** | Nemotron 3.5 Lightning | subagent | Git tags + GitHub releases + changelogs via `gh` |
+| **db-builder** | Nemotron 3 Ultra | subagent | Schema DB, migraciones, Turso |
+| **security-auditor** | Nemotron 3 Ultra | subagent | Seguridad: rutas, API auth, vulnerabilidades |
+| **brand-fixer** | MiMo V2.5 Free | subagent | Logos, marcas, branding consistente |
+| **visual-tester** | MiMo V2.5 Free | subagent | Screenshots, DOM inspection, visual regression, a11y |
+
+### 14.1 Arquitectura de Orquestación
+
+El comando `/fase` se ejecuta desde el agente principal, invocando subagentes directamente con `task`:
+
+```
+/fase M → yo leo MASTER_PLAN
+        → task(api-builder, "M1: fix next.config.js")
+        → task(db-builder, "M2: Turso schema")
+        → task(api-builder, "M3: dual-mode db.ts")
+        → pnpm typecheck && pnpm test:unit
+        → git commit + release
+```
+
+**Nota:** `fase-orchestrator` existe como documentación de referencia pero tiene `mode: primary` — la orquestación real la hace el agente principal.
 
 > **Fallback universal:** Si cualquier modelo falla → Nemotron 3 Ultra asume control.
 
@@ -467,7 +485,7 @@ pnpm db:seed          # scripts/generate-more-data.ts
 
 ## 15. SKILLS Y COMANDOS
 
-### 15.1 Skills (10)
+### 15.1 Skills (12)
 
 | Skill | Fases | Descripción |
 |-------|-------|-------------|
@@ -478,9 +496,13 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | `switch-context` | Transiciones | Genera HANDOFF.md para siguiente modelo |
 | `optimizar-lighthouse` | F6 | Bundle < 250KB, lazy loading, facade pattern |
 | `run-quality-gates` | Cierre de fase | typecheck + test:unit + test:e2e |
-| **`fase-completa`** (NUEVO) | A-G | Ejecuta ciclo completo: code → test → docs → commit → release |
-| **`crear-release`** (NUEVO) | Cierre de fase | Crea git tag + GitHub Release con changelog |
-| **`handoff-automatico`** (NUEVO) | Transiciones | Genera HANDOFF + actualiza AI_LOG + prepara siguiente fase |
+| `fase-completa` | A-G | Ejecuta ciclo completo: code → test → docs → commit → release |
+| `crear-release` | Cierre de fase | Crea git tag + GitHub Release con changelog |
+| `handoff-automatico` | Transiciones | Genera HANDOFF + actualiza AI_LOG + prepara siguiente fase |
+| `fix-security` | Fixes | Checklist de protección de rutas y APIs |
+| `fix-branding` | Fixes | Workflow de búsqueda y reemplazo de logos/marcas |
+| `db-migration` | DB | Workflow de creación de tablas SQLite/Turso |
+| `qa-visual` | QA | Testing visual con Playwright: screenshots, DOM, a11y |
 
 ### 15.2 Commands (2)
 
