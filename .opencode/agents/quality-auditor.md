@@ -5,7 +5,7 @@ mode: subagent
 model: openrouter/gemma-4-31b
 permission:
   task:
-    "*": "deny"
+    "*": "allow"
 ---
 
 # Subagente: Quality Auditor

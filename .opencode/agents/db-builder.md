@@ -5,7 +5,7 @@ mode: subagent
 model: opencode/nemotron-3-ultra-free
 permission:
   task:
-    "*": "deny"
+    "*": "allow"
 ---
 
 # Agente: DB Builder

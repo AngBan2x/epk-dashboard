@@ -77,15 +77,47 @@ Orchestrator (Nivel 1):
 | Agente | Modelo | Uso | Permission Task |
 |--------|--------|-----|-----------------|
 | `orchestrator` | Nemotron 3 Ultra | Coordinación | `allow` |
-| `api-builder` | MiMo V2.5 | Endpoints REST | `deny` |
-| `auth-builder` | Nemotron 3 Ultra | Auth | `deny` |
-| `dashboard-builder` | Nemotron 3.5 Lightning | UI | `deny` |
-| `db-builder` | Nemotron 3 Ultra | DB | `deny` |
-| `quality-auditor` | Gemma 4 31B | Tests | `deny` |
-| `visual-tester` | MiMo V2.5 | Visual QA | `deny` |
-| `brand-fixer` | MiMo V2.5 | Branding | `deny` |
-| `security-auditor` | Nemotron 3 Ultra | Security | `deny` |
-| `release-manager` | Nemotron 3.5 Lightning | Releases | `deny` |
+| `api-builder` | MiMo V2.5 | Endpoints REST | `allow` |
+| `auth-builder` | Nemotron 3 Ultra | Auth | `allow` |
+| `dashboard-builder` | Nemotron 3.5 Lightning | UI | `allow` |
+| `db-builder` | Nemotron 3 Ultra | DB | `allow` |
+| `quality-auditor` | Gemma 4 31B | Tests | `allow` |
+| `visual-tester` | MiMo V2.5 | Visual QA | `allow` |
+| `brand-fixer` | MiMo V2.5 | Branding | `allow` |
+| `security-auditor` | Nemotron 3 Ultra | Security | `allow` |
+| `release-manager` | Nemotron 3.5 Lightning | Releases | `allow` |
+
+## Cómo Invocar el Orchestrator
+
+### Desde el agente principal (yo)
+```
+task(orchestrator, "Ejecuta Fase O: tareas O1-O10")
+```
+
+### Desde otro subagente
+```
+task(orchestrator, "Coordinar corrección de bugs en auth y dashboard")
+```
+
+### Ejemplo real de uso
+```
+# Yo invoco al orchestrator
+task(orchestrator, """
+Ejecuta la Fase O del MASTER_PLAN.md:
+- O4: Fix auto-login (auth-builder)
+- O5: Fix /api/tracks (api-builder)
+- O6: Eliminar mensaje pnpm seed (dashboard-builder)
+- O7: Agregar deleteArtist (db-builder)
+- O8: DELETE /api/artists endpoint (api-builder)
+- O9: Botón eliminar en admin (dashboard-builder)
+- O10: Limpiar artists de prueba (db-builder)
+
+Usa paralelo cuando sea posible.
+""")
+
+# El orchestrator ejecuta y reporta
+return { tareas: [...], resultados: [...], qualityGates: {...} }
+```
 
 ## Skills Invocadas
 - `run-quality-gates` → typecheck + unit + e2e

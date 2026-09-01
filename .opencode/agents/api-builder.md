@@ -5,7 +5,7 @@ mode: subagent
 model: opencode/mimo-v2.5-free
 permission:
   task:
-    "*": "deny"
+    "*": "allow"
 ---
 
 # Subagente: API Builder
