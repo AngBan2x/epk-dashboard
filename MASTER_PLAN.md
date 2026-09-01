@@ -547,6 +547,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.7.0 | Fase N: QA Visual + E2E Flows | minor | ✅ Completada |
 | v3.8.0 | Fase O: Orchestrator + UI Fixes + Cleanup | minor | ✅ Completada |
 | v3.9.0 | Fase P1: Critical Fixes + UI Core | minor | ✅ Completada |
+| v3.9.1 | Fase P1.5: 7 Corrections Post-Release | patch | ✅ Completada |
 
 ---
 
