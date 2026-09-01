@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed-f9-catalog.ts",
     "db:seed:fresh": "tsx scripts/seed-itunes-fresh.ts",
-    "db:seed:admin": "tsx scripts/seed-admin.ts"
+    "db:seed:admin": "tsx scripts/seed-admin.ts",
+    "db:seed:artists": "tsx scripts/seed-artists.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

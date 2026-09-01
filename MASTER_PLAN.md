@@ -566,3 +566,29 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | FIX 4: BioSection per-artist | `db-builder` + skill `db-migration` |
 
 **Documento actualizado: `MASTER_PLAN.md` v3.1 | Plan completo F0-I | Listo para ejecución**
+
+---
+
+## 19. FASE J — Fixes Críticos
+
+> **Objetivo:** Corregir 5 problemas críticos usando los agents y skills creados en Fase I.
+
+### 19.1 Tareas de la Fase J
+
+| # | Fix | Agente | Archivos | Modelo |
+|---|-----|--------|----------|--------|
+| J1 | FIX 5: Protección de rutas | `security-auditor` | `middleware.ts`, `app/api/tracks/route.ts`, `app/api/submissions/route.ts`, `components/UploadTrackForm.tsx`, `app/admin/page.tsx` | `openrouter/nemotron-3-ultra` |
+| J2 | FIX 2: Error de registro | `api-builder` | `context/AuthContext.tsx` | `opencode/mimo-v2.5-free` |
+| J3 | FIX 1: Logo Spotify → PressPlay | `brand-fixer` | `components/Header.tsx`, `components/Footer.tsx`, `app/register/page.tsx`, `components/SocialBar.tsx` | `opencode/mimo-v2.5-free` |
+| J4 | FIX 3: Barra blanca | `dashboard-builder` | `app/layout.tsx`, `components/GlobalAudioPlayer.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| J5 | FIX 4: BioSection per-artist | `db-builder` | `lib/db.ts`, `types/music.ts`, `components/BioSection.tsx`, `app/track/[id]/page.tsx`, `app/dashboard/page.tsx` | `opencode/nemotron-3-ultra-free` |
+
+### 19.2 Criterios de Aprobación
+
+| Check | Resultado Esperado |
+|-------|-------------------|
+| Protección rutas | `/upload` en middleware, API routes con auth |
+| Registro funcional | `res.json()` con try/catch, API retorna JSON |
+| Branding correcto | Solo logos PressPlay en Header/Footer/Register |
+| Sin barra blanca | `pb-24` condicional o en wrapper correcto |
+| BioSection per-artist | Tabla `artists`, BioSection con props dinámicas |

@@ -188,3 +188,25 @@ export interface RawMetricsHistoryRow {
   source: string;
   created_at: string;
 }
+
+export interface ArtistProfile {
+  id: string;
+  name: string;
+  biography: string | null;
+  press_text: string | null;
+  press_highlights: string[] | null;
+  genre: string | null;
+  location: string | null;
+  monthly_listeners: number;
+  created_at: string;
+}
+
+export interface CreateArtistInput {
+  name: string;
+  biography?: string;
+  pressText?: string;
+  pressHighlights?: string[];
+  genre?: string;
+  location?: string;
+  monthly_listeners?: number;
+}

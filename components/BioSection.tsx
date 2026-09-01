@@ -2,17 +2,20 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { safeString } from "@/lib/null-safe";
+import { safeString, safeArray } from "@/lib/null-safe";
 
 interface BioSectionProps {
   artistName?: string;
   genre?: string;
   location?: string;
   monthlyListeners?: number;
+  biography?: string | null;
+  pressText?: string | null;
+  pressHighlights?: string[] | null;
   className?: string;
 }
 
-const defaultBio = {
+const fallbackBio = {
   short: "Artista multidisciplinario con trayectoria en producción musical, composición y performance en vivo. Catálogo que abarca desde rock clásico hasta producción electrónica contemporánea.",
   full: `Con más de una década de experiencia en la industria musical, este artista ha construido un catálogo que refleja versatilidad y autenticidad. Desde sus primeras grabaciones en estudios caseros hasta producciones de alta fidelidad, cada track cuenta una historia única.
 
@@ -32,10 +35,18 @@ export function BioSection({
   genre = "Multi-género",
   location = "Latinoamérica",
   monthlyListeners = 0,
+  biography = null,
+  pressText = null,
+  pressHighlights = null,
   className = "",
 }: BioSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+
+  // Use dynamic data if available, fallback to defaults
+  const bioShort = biography || pressText || fallbackBio.short;
+  const bioFull = pressText || biography || fallbackBio.full;
+  const highlights = pressHighlights?.length ? pressHighlights : fallbackBio.highlights;
 
   const handlePrint = () => {
     setShowPrintPreview(true);
@@ -89,7 +100,7 @@ export function BioSection({
       {/* Bio Short */}
       <div className="mb-4">
         <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
-          {defaultBio.short}
+          {bioShort}
         </p>
       </div>
 
@@ -104,7 +115,7 @@ export function BioSection({
           >
             <div className="mb-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
-                {defaultBio.full}
+                {bioFull}
               </p>
             </div>
 
@@ -112,7 +123,7 @@ export function BioSection({
             <div className="mb-4">
               <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Destacados</h4>
               <ul className="space-y-1.5">
-                {defaultBio.highlights.map((item, i) => (
+                {highlights.map((item, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary-500 flex-shrink-0" />
                     {item}

@@ -11,7 +11,7 @@ import { VideoShowcase } from "@/components/VideoShowcase";
 import { StemsPlayer } from "@/components/StemsPlayer";
 import { BioSection } from "@/components/BioSection";
 import { SocialBar } from "@/components/SocialBar";
-import { getTrackById, getAllTracks } from "@/lib/db";
+import { getTrackById, getAllTracks, getArtistByName } from "@/lib/db";
 import { safeString, formatNumber } from "@/lib/null-safe";
 
 interface TrackDetailPageProps {
@@ -38,6 +38,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
     notFound();
   }
 
+  const artist = track.artist_name ? getArtistByName(track.artist_name) : null;
   const allTracks = getAllTracks();
   const currentIndex = allTracks.findIndex((t) => t.id === track.id);
   const prevTrack = currentIndex > 0 ? allTracks[currentIndex - 1] : null;
@@ -223,9 +224,13 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
         {/* Bio & Social */}
         <div className="mt-8 space-y-8">
           <BioSection
-            artistName="Artista EPK"
-            genre="Multi-género"
-            location="Latinoamérica"
+            artistName={track.artist_name || "Artista EPK"}
+            genre={artist?.genre || "Multi-género"}
+            location={artist?.location || "Latinoamérica"}
+            monthlyListeners={artist?.monthly_listeners || 0}
+            biography={artist?.biography}
+            pressText={artist?.press_text}
+            pressHighlights={artist?.press_highlights}
           />
           <SocialBar
             spotifyUrl={track.spotify_url}

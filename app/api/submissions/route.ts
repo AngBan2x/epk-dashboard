@@ -4,6 +4,20 @@ import { getDbWrite } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getTrackSubmissionsByUser, createTrackSubmission, getAllTrackSubmissions, updateTrackSubmissionStatus, getTrackSubmissionById, getTrackSubmissionsByStatus } from "@/lib/db";
 
+function validateSession(req: NextRequest): { userId: string; role: string } | null {
+  const sessionCookie = req.cookies.get("auth_session");
+  if (!sessionCookie) return null;
+
+  try {
+    const decoded = atob(sessionCookie.value);
+    const session = JSON.parse(decoded) as { userId: string; exp: number; role?: string };
+    if (!session.exp || session.exp < Date.now()) return null;
+    return { userId: session.userId, role: session.role || "artist" };
+  } catch {
+    return null;
+  }
+}
+
 // Schema for creating a submission
 const CreateSubmissionSchema = z.object({
   track_data: z.object({
@@ -84,15 +98,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
     const body = await req.json();
     const validated = CreateSubmissionSchema.parse(body);
 
-    // Get user from session cookie (simplified - in real app use auth context)
-    // For now, we'll require user_id in the request or use a header
-    const userId = req.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
-    }
+    // Usar userId de la sesión en vez de header spoofable
+    const userId = session.userId;
 
     const id = randomUUID();
     const submission = createTrackSubmission({
@@ -115,6 +130,11 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const session = validateSession(req);
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 

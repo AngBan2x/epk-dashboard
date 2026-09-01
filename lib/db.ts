@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus, Like, RawLikeRow, Notification, RawNotificationRow, NotificationType, MetricsHistory, RawMetricsHistoryRow, TopCountry } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus, Like, RawLikeRow, Notification, RawNotificationRow, NotificationType, MetricsHistory, RawMetricsHistoryRow, TopCountry, ArtistProfile, CreateArtistInput } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
@@ -122,6 +122,26 @@ function initMetricsHistoryTable(): void {
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_history_track_date ON metrics_history(track_id, date)`);
 }
 initMetricsHistoryTable();
+
+// Initialize artists table
+function initArtistsTable(): void {
+  const db = getDbWrite();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS artists (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      biography TEXT,
+      press_text TEXT,
+      press_highlights TEXT,
+      genre TEXT,
+      location TEXT,
+      monthly_listeners INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_artists_name ON artists(name)`);
+}
+initArtistsTable();
 
 function parseUser(row: RawUserRow): User {
   return {
@@ -388,6 +408,70 @@ export function upsertMetricsHistory(metrics: Omit<MetricsHistory, "id" | "creat
   } else {
     return createMetricsHistory(metrics);
   }
+}
+
+// Artist CRUD functions
+function parseArtist(row: any): ArtistProfile {
+  return {
+    id: row.id,
+    name: row.name,
+    biography: row.biography,
+    press_text: row.press_text,
+    press_highlights: safeParseJSON<string[]>(row.press_highlights, []),
+    genre: row.genre,
+    location: row.location,
+    monthly_listeners: row.monthly_listeners || 0,
+    created_at: row.created_at,
+  };
+}
+
+export function getArtistByName(name: string): ArtistProfile | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM artists WHERE name = ?").get(name);
+  return row ? parseArtist(row) : null;
+}
+
+export function getArtistById(id: string): ArtistProfile | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM artists WHERE id = ?").get(id);
+  return row ? parseArtist(row) : null;
+}
+
+export function createArtist(data: CreateArtistInput): ArtistProfile {
+  const db = getDbWrite();
+  const id = `art-${Date.now()}`;
+  const pressHighlights = data.pressHighlights ? JSON.stringify(data.pressHighlights) : "[]";
+  db.prepare(`
+    INSERT INTO artists (id, name, biography, press_text, press_highlights, genre, location, monthly_listeners)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, data.name, data.biography || null, data.pressText || null, pressHighlights, data.genre || null, data.location || null, data.monthly_listeners || 0);
+  const created = getArtistById(id);
+  if (!created) throw new Error("Failed to create artist");
+  return created;
+}
+
+export function updateArtist(id: string, data: Partial<CreateArtistInput>): ArtistProfile | null {
+  const db = getDbWrite();
+  const updates: string[] = [];
+  const values: any[] = [];
+  
+  if (data.biography !== undefined) { updates.push("biography = ?"); values.push(data.biography); }
+  if (data.pressText !== undefined) { updates.push("press_text = ?"); values.push(data.pressText); }
+  if (data.pressHighlights !== undefined) { updates.push("press_highlights = ?"); values.push(JSON.stringify(data.pressHighlights)); }
+  if (data.genre !== undefined) { updates.push("genre = ?"); values.push(data.genre); }
+  if (data.location !== undefined) { updates.push("location = ?"); values.push(data.location); }
+  
+  if (updates.length === 0) return getArtistById(id);
+  
+  values.push(id);
+  db.prepare(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  return getArtistById(id);
+}
+
+export function getAllArtists(): ArtistProfile[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM artists ORDER BY name").all();
+  return rows.map(parseArtist);
 }
 
 // Export getDbWrite for direct queries if needed
