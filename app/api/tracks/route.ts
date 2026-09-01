@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
-
-const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
-
-function getDb() {
-  return new Database(DB_PATH);
-}
+import { getAllTracks, createTrack, updateTrack, deleteTrack } from "@/lib/db";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
   const sessionCookie = req.cookies.get("auth_session");
@@ -14,8 +7,7 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
 
   try {
     const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; exp: number; role?: string };
-    if (!session.exp || session.exp < Date.now()) return null;
+    const session = JSON.parse(decoded) as { userId: string; role?: string };
     return { userId: session.userId, role: session.role || "artist" };
   } catch {
     return null;
@@ -25,9 +17,7 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
 // GET /api/tracks — Listar todos los tracks (público)
 export async function GET() {
   try {
-    const db = getDb();
-    const tracks = db.prepare("SELECT * FROM tracks").all();
-    db.close();
+    const tracks = await getAllTracks();
     return NextResponse.json({ tracks });
   } catch (error) {
     console.error("[API/tracks] Error GET:", error);
@@ -44,59 +34,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const {
-      id,
-      title,
-      artist_name = "Artista EPK",
-      release_type = "Single",
-      release_date = "",
-      duration = "00:00",
-      cover_image = "",
-      audio_preview_url = "",
-      spotify_url = null,
-      youtube_video_id = null,
-      itunes_track_id = null,
-      metrics = {},
-      production_details = {},
-      lyrics = null,
-      stems_urls = null,
-      video_embed_url = null,
-      gallery_images = null,
-    } = body;
+    const { id, title, ...rest } = body;
 
     if (!id || !title) {
       return NextResponse.json({ error: "id y title son requeridos" }, { status: 400 });
     }
 
-    const db = getDb();
-    db.prepare(`
-      INSERT OR REPLACE INTO tracks (
-        id, title, artist_name, release_type, release_date, duration, cover_image,
-        audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
-        metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      title,
-      artist_name,
-      release_type,
-      release_date,
-      duration,
-      cover_image,
-      audio_preview_url,
-      spotify_url,
-      youtube_video_id,
-      itunes_track_id,
-      JSON.stringify(metrics),
-      JSON.stringify(production_details),
-      lyrics,
-      stems_urls ? JSON.stringify(stems_urls) : null,
-      video_embed_url,
-      gallery_images ? JSON.stringify(gallery_images) : null
-    );
-    db.close();
-
-    return NextResponse.json({ id, title, artist_name }, { status: 201 });
+    const track = await createTrack({ id, title, ...rest });
+    return NextResponse.json({ id: track.id, title: track.title, artist_name: track.artist_name }, { status: 201 });
   } catch (error) {
     console.error("[API/tracks] Error POST:", error);
     return NextResponse.json({ error: "Error al crear track" }, { status: 500 });
@@ -118,31 +63,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "id es requerido" }, { status: 400 });
     }
 
-    const db = getDb();
-    const existing = db.prepare("SELECT * FROM tracks WHERE id = ?").get(id);
-    if (!existing) {
-      db.close();
+    const updated = await updateTrack(id, updates);
+    if (!updated) {
       return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
     }
 
-    const fields = Object.keys(updates)
-      .filter((k) => k !== "id")
-      .map((k) => `${k} = ?`)
-      .join(", ");
-    const values = Object.keys(updates)
-      .filter((k) => k !== "id")
-      .map((k) => {
-        const v = updates[k];
-        if (typeof v === "object" && v !== null) return JSON.stringify(v);
-        return v;
-      });
-
-    if (fields.length > 0) {
-      db.prepare(`UPDATE tracks SET ${fields} WHERE id = ?`).run(...values, id);
-    }
-    db.close();
-
-    return NextResponse.json({ id, ...updates });
+    return NextResponse.json({ id: updated.id, ...updates });
   } catch (error) {
     console.error("[API/tracks] Error PUT:", error);
     return NextResponse.json({ error: "Error al actualizar track" }, { status: 500 });
@@ -164,11 +90,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "id es requerido" }, { status: 400 });
     }
 
-    const db = getDb();
-    const result = db.prepare("DELETE FROM tracks WHERE id = ?").run(id);
-    db.close();
-
-    if (result.changes === 0) {
+    const deleted = await deleteTrack(id);
+    if (!deleted) {
       return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
     }
 

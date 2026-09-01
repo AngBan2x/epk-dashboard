@@ -865,3 +865,70 @@ CREATE TABLE IF NOT EXISTS shows (
 | Turso schema completo | ✅ 8 tablas |
 | DELETE /api/auth/me | ✅ Funcional |
 | Screenshots capturados | ✅ light/dark/mobile |
+
+---
+
+## 24. FASE O — Orchestrator Setup + UI Fixes + Cleanup (v3.8.0)
+
+> **Objetivo:** Configurar orchestrator Nemotron 3 Ultra, corregir problemas de UI, limpiar datos de prueba, y liberar v3.8.0.
+
+### 24.1 Arquitectura de Orquestación (v3.8.0)
+
+| Nivel | Agente | Modelo | Responsabilidad |
+|-------|--------|--------|-----------------|
+| 0 | Agente Principal | MiMo V2.5 | Orquesta, ejecuta quality gates, commit, release |
+| 1 | Orchestrator | Nemotron 3 Ultra | Coordina tareas complejas, delega a subagentes |
+| 2 | Subagentes | Varios | Ejecutan tareas específicas (api-builder, db-builder, etc.) |
+
+**Reglas de permission.task:**
+- Orchestrator: `allow` (puede invocar cualquier subagente)
+- Todos los subagentes: `allow` (pueden anidar entre sí si es necesario)
+
+### 24.2 Tareas de la Fase O
+
+#### Bloque 1: Orchestrator Setup ✅ COMPLETADO
+
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| O1 | Crear orchestrator agent con permission.task allow | `.opencode/agents/orchestrator.md` | ✅ |
+| O2 | Actualizar subagentes con permission.task allow | 9 archivos `.opencode/agents/*.md` | ✅ |
+| O3 | Documentar uso del orchestrator en commands/fase.md | `.opencode/commands/fase.md` | ✅ |
+
+#### Bloque 2: UI Fixes (pendiente)
+
+| # | Fix | Agente | Archivos | Modelo |
+|---|-----|--------|----------|--------|
+| O4 | Fix auto-login: cookie persiste 7 días, no hay session-only | `auth-builder` | `app/api/auth/login/route.ts` | nemotron-3-ultra |
+| O5 | Fix admin tracks: `/api/tracks` usa better-sqlite3 directo | `api-builder` | `app/api/tracks/route.ts` | mimo-v2.5 |
+| O6 | Fix mensaje pnpm seed: eliminar línea ~514 de admin | `dashboard-builder` | `app/admin/page.tsx` | nemotron-3.5-lightning |
+
+#### Bloque 3: Delete Artists + Cleanup (pendiente)
+
+| # | Tarea | Agente | Archivos | Modelo |
+|---|-------|--------|----------|--------|
+| O7 | Agregar función `deleteArtist()` a lib/db.ts | `db-builder` | `lib/db.ts` | nemotron-3-ultra |
+| O8 | Crear endpoint `DELETE /api/artists/[id]` | `api-builder` | `app/api/artists/[id]/route.ts` | mimo-v2.5 |
+| O9 | Agregar botón "Eliminar" en admin Artists tab | `dashboard-builder` | `app/admin/page.tsx` | nemotron-3.5-lightning |
+| O10 | Eliminar artists de prueba (Login Test, Login Test User, Test Phase N User) | `api-builder` | `scripts/seed-artists.ts` | mimo-v2.5 |
+
+#### Bloque 4: Quality + Release (pendiente)
+
+| # | Tarea | Agente | Archivos | Modelo |
+|---|-------|--------|----------|--------|
+| O11 | Ejecutar quality gates (typecheck + unit tests) | `quality-auditor` | — | gemma-4-31b |
+| O12 | Commit + push | Direct | — | mimo-v2.5 |
+| O13 | Release v3.8.0 | `release-manager` | — | nemotron-3.5-lightning |
+
+### 24.3 Criterios de Aprobación
+
+| Check | Resultado Esperado |
+|-------|-------------------|
+| Orchestrator configurado | `orchestrator.md` con `permission.task: allow` |
+| Subagentes actualizados | Todos con `permission.task: allow` |
+| Auto-login arreglado | Cookie session-only o con opción configurable |
+| Admin tracks arreglado | `/api/tracks` usa `lib/db.ts` en vez de better-sqlite3 directo |
+| Mensaje pnpm seed eliminado | No aparece en producción |
+| deleteArtist funcional | Endpoint DELETE funciona, artists de prueba eliminados |
+| Typecheck | 0 errores |
+| Unit tests | Todos passing |
+| Release | v3.8.0 publicado en GitHub |

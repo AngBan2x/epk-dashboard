@@ -511,7 +511,7 @@ export default function AdminPage() {
             ) : tracks.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
                 <p>No hay tracks en el catálogo.</p>
-                <p className="text-sm mt-2">Ejecuta <code className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">pnpm seed</code> para agregar tracks de ejemplo.</p>
+                <p className="text-sm mt-2">Agrega tracks desde la API o usa el formulario de envío.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -822,6 +822,24 @@ export default function AdminPage() {
                       className="px-3 py-1 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition"
                     >
                       Editar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm(`¿Eliminar artista "${artist.name}"?`)) {
+                          try {
+                            const res = await fetch(`/api/artists/${artist.id}`, { method: "DELETE" });
+                            if (res.ok) {
+                              fetchArtists();
+                              setMessage({ type: "success", text: "Artista eliminado" });
+                            }
+                          } catch {
+                            setMessage({ type: "error", text: "Error al eliminar" });
+                          }
+                        }
+                      }}
+                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
+                    >
+                      Eliminar
                     </button>
                   </div>
                 ))}

@@ -915,6 +915,18 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput>)
   return getArtistById(id);
 }
 
+export async function deleteArtist(id: string): Promise<{ success: boolean }> {
+  if (USE_TURSO) {
+    await tursoExec("DELETE FROM shows WHERE artist_id = ?", [id]);
+    await tursoExec("DELETE FROM artists WHERE id = ?", [id]);
+    return { success: true };
+  }
+  const db = getLocalDbWrite();
+  db.prepare("DELETE FROM shows WHERE artist_id = ?").run(id);
+  const result = db.prepare("DELETE FROM artists WHERE id = ?").run(id);
+  return { success: result.changes > 0 };
+}
+
 export async function getAllArtists(): Promise<ArtistProfile[]> {
   if (USE_TURSO) {
     const rows = await tursoExec("SELECT * FROM artists ORDER BY name");
@@ -1086,6 +1098,135 @@ export async function searchTracks(query: string): Promise<Track[]> {
     .prepare("SELECT * FROM tracks WHERE title LIKE ? OR artist_name LIKE ? OR release_type LIKE ? OR lyrics LIKE ?")
     .all(pattern, pattern, pattern, pattern) as Record<string, unknown>[];
   return rows.map(parseTrack);
+}
+
+export async function createTrack(data: {
+  id: string;
+  title: string;
+  artist_name?: string;
+  release_type?: string;
+  release_date?: string;
+  duration?: string;
+  cover_image?: string;
+  audio_preview_url?: string;
+  spotify_url?: string | null;
+  youtube_video_id?: string | null;
+  itunes_track_id?: string | null;
+  metrics?: Partial<import("@/types/music").Metrics>;
+  production_details?: Partial<import("@/types/music").ProductionDetails>;
+  lyrics?: string | null;
+  stems_urls?: Partial<import("@/types/music").StemsUrls> | null;
+  video_embed_url?: string | null;
+  gallery_images?: string[] | null;
+}): Promise<Track> {
+  const track = {
+    id: data.id,
+    title: data.title,
+    artist_name: data.artist_name || "Artista EPK",
+    release_type: data.release_type || "Single",
+    release_date: data.release_date || "",
+    duration: data.duration || "00:00",
+    cover_image: data.cover_image || "",
+    audio_preview_url: data.audio_preview_url || "",
+    spotify_url: data.spotify_url || null,
+    youtube_video_id: data.youtube_video_id || null,
+    itunes_track_id: data.itunes_track_id || null,
+    metrics: { streams: 0, saves: 0, playlist_additions: 0, top_countries: [], ...data.metrics },
+    production_details: { daw: null, guitars: null, effects_chain: null, tuning: null, key: null, ...data.production_details },
+    lyrics: data.lyrics || null,
+    stems_urls: data.stems_urls || null,
+    video_embed_url: data.video_embed_url || null,
+    gallery_images: data.gallery_images || null,
+  };
+
+  if (USE_TURSO) {
+    await tursoExec(
+      `INSERT OR REPLACE INTO tracks (
+        id, title, artist_name, release_type, release_date, duration, cover_image,
+        audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
+        metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        track.id, track.title, track.artist_name, track.release_type, track.release_date,
+        track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
+        track.youtube_video_id, track.itunes_track_id, JSON.stringify(track.metrics),
+        JSON.stringify(track.production_details), track.lyrics,
+        track.stems_urls ? JSON.stringify(track.stems_urls) : null,
+        track.video_embed_url,
+        track.gallery_images ? JSON.stringify(track.gallery_images) : null,
+      ]
+    );
+  } else {
+    const db = getLocalDbWrite();
+    db.prepare(`
+      INSERT OR REPLACE INTO tracks (
+        id, title, artist_name, release_type, release_date, duration, cover_image,
+        audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
+        metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      track.id, track.title, track.artist_name, track.release_type, track.release_date,
+      track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
+      track.youtube_video_id, track.itunes_track_id, JSON.stringify(track.metrics),
+      JSON.stringify(track.production_details), track.lyrics,
+      track.stems_urls ? JSON.stringify(track.stems_urls) : null,
+      track.video_embed_url,
+      track.gallery_images ? JSON.stringify(track.gallery_images) : null
+    );
+  }
+
+  return track as Track;
+}
+
+export async function updateTrack(id: string, updates: Partial<{
+  title: string;
+  artist_name: string;
+  release_type: string;
+  release_date: string;
+  duration: string;
+  cover_image: string;
+  audio_preview_url: string;
+  spotify_url: string | null;
+  youtube_video_id: string | null;
+  itunes_track_id: string | null;
+  metrics: Partial<import("@/types/music").Metrics>;
+  production_details: Partial<import("@/types/music").ProductionDetails>;
+  lyrics: string | null;
+  stems_urls: Partial<import("@/types/music").StemsUrls> | null;
+  video_embed_url: string | null;
+  gallery_images: string[] | null;
+}>): Promise<Track | null> {
+  const existing = await getTrackById(id);
+  if (!existing) return null;
+
+  const fields = Object.keys(updates).filter((k) => k !== "id");
+  if (fields.length === 0) return existing;
+
+  const setClause = fields.map((k) => `${k} = ?`).join(", ");
+  const values = fields.map((k) => {
+    const v = (updates as Record<string, unknown>)[k];
+    if (typeof v === "object" && v !== null) return JSON.stringify(v);
+    return v;
+  });
+
+  if (USE_TURSO) {
+    await tursoExec(`UPDATE tracks SET ${setClause} WHERE id = ?`, [...values, id]);
+  } else {
+    const db = getLocalDbWrite();
+    db.prepare(`UPDATE tracks SET ${setClause} WHERE id = ?`).run(...values, id);
+  }
+
+  return getTrackById(id);
+}
+
+export async function deleteTrack(id: string): Promise<boolean> {
+  if (USE_TURSO) {
+    const result = await tursoExec("DELETE FROM tracks WHERE id = ?", [id]);
+    return result.length > 0 || true;
+  }
+  const db = getLocalDbWrite();
+  const result = db.prepare("DELETE FROM tracks WHERE id = ?").run(id);
+  return result.changes > 0;
 }
 
 // ─── Sync all tables to Turso ───────────────────────────────────────────────

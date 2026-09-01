@@ -1619,3 +1619,39 @@ Import trace: ./lib/db.ts → ./app/dashboard/page.tsx
 
 ### Commits
 - Pendiente: commit + push + release
+
+---
+
+## Fix: Vercel Prerender Error — useAuth SSR-safe
+
+**Fecha:** 2026-09-01
+**Modelo:** MiMo V2.5 Free (OpenCode)
+**Modo:** Build
+
+### Problema
+Deploy a Vercel fallaba con:
+```
+Error: useAuth must be used within an AuthProvider
+Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
+```
+
+### Causa Raíz
+`Footer` (en root layout) usa `useAuth()`. Durante el prerender estático de Vercel, el `AuthProvider` context no está disponible, causando que `useAuth()` lance un error.
+
+### Solución
+`useAuth()` ahora retorna valores por defecto seguros en vez de lanzar error cuando no hay `AuthProvider` context. Las páginas se prerender correctamente con estado de loading, y se hidratan correctamente en runtime.
+
+### Archivos Modificados
+| Archivo | Acción |
+|---------|--------|
+| `context/AuthContext.tsx` | `useAuth` retorna defaults en vez de throw |
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Unit Tests | ✅ 41/41 passing |
+
+### Commits
+- `ae04de5` — fix: make useAuth SSR-safe to prevent prerender errors
+- Release: `v3.5.2` — https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.5.2

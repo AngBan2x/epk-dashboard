@@ -31,13 +31,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Crear sesión (simplificada: solo guardamos user_id en localStorage via cookie)
-    // En producción usaríamos JWT o sesiones más robustas
+    // Crear sesión (simplificada: solo guardamos user_id en cookie httpOnly)
     const sessionToken = btoa(JSON.stringify({
       userId: user.id,
       email: user.email,
       role: user.role,
-      exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 días
     }));
 
     const response = NextResponse.json({
@@ -49,12 +47,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Set httpOnly cookie
+    // Set httpOnly cookie — session-only (sin maxAge, se borra al cerrar navegador)
     response.cookies.set("auth_session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 días
       path: "/",
     });
 
