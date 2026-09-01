@@ -1387,4 +1387,51 @@ Crear herramientas (skills y agents) que aceleren las correcciones de 5 problema
 | `db-migration` | Workflow de creación de tablas |
 
 ### Commits
-- Pendiente: commit + push Fase I
+- `b45dc35` — feat: Fase I completa - 3 agents + 3 skills para fixes críticos
+- `6f73362` — fix: corregir estructura de skills (frontmatter + headings) y typo en db-builder
+
+---
+
+## Fase J: Fixes Críticos
+
+**Fecha:** 2026-08-31
+**Modelo:** MiMo V2.5 Free (OpenCode) — Orchestrator
+**Modo:** Build
+
+### Tareas Completadas
+| Fix | Descripción | Agent | Estado |
+|-----|-------------|-------|--------|
+| FIX 5 | Protección de rutas | `security-auditor` (falló modelo) → ejecutado directamente | ✅ |
+| FIX 2 | Error de registro | `api-builder` | ✅ |
+| FIX 1 | Logo Spotify → PressPlay | `brand-fixer` | ✅ |
+| FIX 3 | Barra blanca | `dashboard-builder` | ✅ |
+| FIX 4 | BioSection per-artist | `db-builder` | ✅ |
+
+### Archivos Modificados (23)
+- `middleware.ts` — /upload agregado al matcher
+- `app/api/tracks/route.ts` — Auth en POST/PUT/DELETE
+- `app/api/submissions/route.ts` — Auth en POST/PATCH
+- `app/admin/page.tsx` — Client-side auth guard
+- `app/upload/page.tsx` — Client-side auth guard
+- `context/AuthContext.tsx` — try/catch defensivo
+- `components/Header.tsx` — Logo PressPlay
+- `components/Footer.tsx` — Logo PressPlay
+- `app/register/page.tsx` — Logo PressPlay
+- `app/login/page.tsx` — Logo PressPlay
+- `app/layout.tsx` — pb-24 movido a wrapper
+- `lib/db.ts` — Tabla artists + CRUD
+- `types/music.ts` — ArtistProfile interface
+- `components/BioSection.tsx` — Props dinámicas
+- `app/track/[id]/page.tsx` — Datos artista real
+- `app/dashboard/page.tsx` — Datos artista real
+- `scripts/seed-artists.ts` — 6 artistas seed
+- `.opencode/agents/security-auditor.md` — Modelo corregido
+
+### Quality Gates
+- TypeScript: ✅ 0 errores
+- Unit Tests: ✅ 41/41 passing
+- E2E Tests: ✅ 13/13 passing
+
+### Commits
+- `d41f989` — feat: Fase J completa - 5 fixes críticos
+- Release: `v3.3.0` — https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.3.0
