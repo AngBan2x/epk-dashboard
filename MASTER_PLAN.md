@@ -518,6 +518,7 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v3.0.0 | Fase G: Branding PressPlay + Fix Crítico | **STABLE** | ✅ Completado |
 | v3.1.0 | Fase H: Verificación Final | **STABLE** | ✅ Completado |
 | v3.2.0 | Fase I: Skills + Agents para Fixes | minor | ✅ Completado |
+| v3.3.0 | Fase J: 5 Fixes Críticos | minor | ✅ Completado |
 
 ---
 
