@@ -6,6 +6,7 @@ import { getUserByEmail, getDbWrite } from "@/lib/db";
 const LoginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(1, "Contraseña requerida"),
+  rememberMe: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -47,12 +48,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Set httpOnly cookie — session-only (sin maxAge, se borra al cerrar navegador)
+    // Set httpOnly cookie — session-only by default, 30 days if rememberMe
+    const maxAge = validated.rememberMe ? 30 * 24 * 60 * 60 : undefined; // 30 days in seconds
     response.cookies.set("auth_session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
+      ...(maxAge ? { maxAge } : {}),
     });
 
     return response;

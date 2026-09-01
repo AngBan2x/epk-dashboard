@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { safeString } from "@/lib/null-safe";
 import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
@@ -70,6 +70,7 @@ export default function AdminPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [editingArtist, setEditingArtist] = useState<ArtistProfile | null>(null);
+  const editFormRef = useRef<HTMLDivElement>(null);
   const [shows, setShows] = useState<Show[]>([]);
   const [editingShow, setEditingShow] = useState<Show | null>(null);
   const [showForm, setShowForm] = useState({
@@ -794,19 +795,23 @@ export default function AdminPage() {
                 No hay artistas registrados.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {artists.map((artist) => (
                   <div
                     key={artist.id}
-                    className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800"
+                    className="sm:p-6 sm:space-y-2 lg:p-8 lg:space-y-3"
                   >
-                    <div>
-                      <h4 className="font-medium text-slate-900 dark:text-slate-100">{artist.name}</h4>
-                      <p className="text-sm text-slate-500">
-                        {artist.genre || "Sin género"} • {artist.location || "Sin ubicación"}
-                      </p>
-                    </div>
-                    <button
+                    <div className="sm:flex sm:items-center sm:justify-between">
+                      <div className="sm:w-2/3">
+                        <h4 className="sm:text-lg font-medium text-slate-900 dark:text-slate-100 mb-1">
+                          {artist.name}
+                        </h4>
+                        <p className="sm:text-sm text-slate-500/8 leading-relaxed">
+                          {artist.genre || "Sin género"} • {artist.location || "Sin ubicación"}
+                        </p>
+                      </div>
+                      <div className="sm:flex sm:items-center sm:gap-2">
+<button
                       onClick={() => {
                         setEditingArtist(artist);
                         setArtistForm({
@@ -818,29 +823,32 @@ export default function AdminPage() {
                           location: artist.location || "",
                           monthly_listeners: artist.monthly_listeners,
                         });
+                        editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                       }}
                       className="px-3 py-1 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition"
                     >
                       Editar
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (confirm(`¿Eliminar artista "${artist.name}"?`)) {
-                          try {
-                            const res = await fetch(`/api/artists/${artist.id}`, { method: "DELETE" });
-                            if (res.ok) {
-                              fetchArtists();
-                              setMessage({ type: "success", text: "Artista eliminado" });
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm(`¿Eliminar artista "${artist.name}"?`)) {
+                              try {
+                                const res = await fetch(`/api/artists/${artist.id}`, { method: "DELETE" });
+                                if (res.ok) {
+                                  fetchArtists();
+                                  setMessage({ type: "success", text: "Artista eliminado" });
+                                }
+                              } catch {
+                                setMessage({ type: "error", text: "Error al eliminar" });
+                              }
                             }
-                          } catch {
-                            setMessage({ type: "error", text: "Error al eliminar" });
-                          }
-                        }
-                      }}
-                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
-                    >
-                      Eliminar
-                    </button>
+                          }}
+                          className="sm px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -848,7 +856,7 @@ export default function AdminPage() {
 
             {/* Formulario de edición de artista */}
             {editingArtist && (
-              <div className="mt-6 p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div className="mt-6 p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800" ref={editFormRef}>
                 <h3 className="text-lg font-semibold mb-4">Editar Artista: {editingArtist.name}</h3>
                 <form
                   onSubmit={async (e) => {

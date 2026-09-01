@@ -19,6 +19,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +30,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     try {
       if (isLogin) {
-        await login(email, password);
+        await login(email, password, rememberMe);
       } else {
         if (password.length < 8) {
           setError("La contraseña debe tener al menos 8 caracteres");
@@ -157,6 +158,18 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 placeholder="Repite tu contraseña"
               />
             </div>
+          )}
+
+          {isLogin && (
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="rounded border-slate-300 dark:border-slate-600"
+              />
+              Recordar mi sesión
+            </label>
           )}
 
           <Button type="submit" className="w-full py-3" disabled={loading}>

@@ -3,7 +3,6 @@ import { chromium } from "@playwright/test";
 const routes = [
   { path: "/dashboard", name: "dashboard" },
   { path: "/track/trk-001", name: "track-detail" },
-  { path: "/upload", name: "upload" },
   { path: "/admin", name: "admin" },
   { path: "/login", name: "login" },
 ];

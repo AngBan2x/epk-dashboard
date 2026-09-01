@@ -31,8 +31,8 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="/upload" className="hover:text-emerald-500 transition-colors">
-                  Subir Música
+                <a href="/dashboard" className="hover:text-emerald-500 transition-colors">
+                  Agregar Música
                 </a>
               </li>
               {user?.role === "admin" && (
