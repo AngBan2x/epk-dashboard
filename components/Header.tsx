@@ -30,21 +30,16 @@ export function Header() {
               href="/dashboard"
               className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
             >
-              Tracks
+              Dashboard
             </Link>
-            <Link
-              href="/admin"
-              className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
-            >
-              Admin
-            </Link>
-            <Link
-              href="/"
-              className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
-              aria-label="PressPlay"
-            >
-              <img src="/logo.svg" alt="PressPlay" className="w-8 h-8" />
-            </Link>
+            {user?.role === "admin" && (
+              <Link
+                href="/admin"
+                className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+              >
+                Admin
+              </Link>
+            )}
             <ThemeToggle />
             {user ? (
               <div className="flex items-center gap-3">
@@ -94,23 +89,17 @@ export function Header() {
               className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Tracks
+              Dashboard
             </Link>
-            <Link
-              href="/admin"
-              className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Admin
-            </Link>
-            <Link
-              href="/"
-              className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-              onClick={() => setMobileMenuOpen(false)}
-              aria-label="PressPlay"
-            >
-              <img src="/logo.svg" alt="PressPlay" className="w-8 h-8" />
-            </Link>
+            {user?.role === "admin" && (
+              <Link
+                href="/admin"
+                className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Admin
+              </Link>
+            )}
             <ThemeToggle />
             {user ? (
               <div className="flex flex-col gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">

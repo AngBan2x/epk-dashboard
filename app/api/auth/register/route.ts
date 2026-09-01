@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { createUser, getUserByEmail } from "@/lib/db";
+import { createUser, getUserByEmail, createArtist } from "@/lib/db";
 import { randomUUID } from "crypto";
 
 const RegisterSchema = z.object({
@@ -36,6 +36,19 @@ export async function POST(req: NextRequest) {
       password_hash: passwordHash,
       role: "artist", // Por defecto artist, admin se asigna manualmente
     });
+
+    // Auto-create artist profile for artists
+    if (user.role === "artist") {
+      createArtist({
+        name: user.name,
+        userId: user.id,
+        biography: undefined,
+        pressText: undefined,
+        pressHighlights: [],
+        genre: undefined,
+        location: undefined,
+      });
+    }
 
     // Devolver usuario sin password_hash
     const { password_hash, ...userWithoutPassword } = user;

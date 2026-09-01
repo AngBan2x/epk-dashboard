@@ -270,11 +270,12 @@ turso db shell epk-dashboard "SELECT * FROM tracks;" → 2 tracks confirmados �
 | Playwright | test execution | ✅ v1.62.1 |
 
 ### Errores Corregidos (Regla 5)
-1. **Dashboard "window is not defined"** — `use client` + metadata export incompatible → Eliminado `use client`, Server Component con metadata export ✅
+1. **Dashboard "window is not defined"** — `use client` + metadata export incompatible → `use client` eliminado, Server Component con metadata export ✅
 2. **AudioPlayer button not visible** — EPKCard no integraba AudioPlayer → Integración completa con src/title props ✅
 3. **Track detail h1 not found** — Conditional return JSX malformado → Refactor con early return + notFound() ✅
 4. **ESLint deprecated options** — ESLint 9 removed `useEslintrc`, `extensions` → Flat config `eslint.config.js` con typescript-eslint ✅
 5. **Unused vars** — 5 variables no usadas → Prefijo `_` o eslint-disable ✅
+6. **Footer fuera del wrapper pb-24** — `<Footer />` estaba fuera del div `pb-24`, creando gap de 96px → Movido dentro del wrapper ✅
 
 ### Archivos Creados/Modificados
 - `app/dashboard/page.tsx` — MODIFICADO (Server Component, metadata compatible)
@@ -1435,3 +1436,59 @@ Crear herramientas (skills y agents) que aceleren las correcciones de 5 problema
 ### Commits
 - `d41f989` — feat: Fase J completa - 5 fixes críticos
 - Release: `v3.3.0` — https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.3.0
+
+---
+
+## Fase K — Fixes UI/UX + BioSection Per-Artist
+
+> **Objetivo:** Corregir problemas de UI/UX identificados por el usuario + implementar BioSection per-artist con browse de artistas.
+
+### 20.1 Tareas de la Fase K
+
+| # | Fix | Agente | Archivos | Modelo |
+|---|-----|--------|----------|--------|
+| K1 | Error registro (dual connection) | `api-builder` | `lib/db.ts` | `opencode/mimo-v2.5-free` |
+| K2 | Barra blanca (Footer) | `dashboard-builder` | `app/layout.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| K3 | Admin link sin auth | `brand-fixer` | `components/Header.tsx` | `opencode/mimo-v2.5-free` |
+| K4 | Tracks no aparecen en admin | `api-builder` | `app/api/tracks/route.ts` | `opencode/mimo-v2.5-free` |
+| K5 | Logo redundante | `brand-fixer` | `components/Header.tsx` | `opencode/mimo-v2.5-free` |
+| K6 | "+ Nuevo Track" en admin | `dashboard-builder` | `app/admin/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| K8a | Link users↔artists (DB) | `db-builder` | `lib/db.ts`, `types/music.ts` | `opencode/nemotron-3-ultra-free` |
+| K8b | Auto-create artist on register | `api-builder` | `app/api/auth/register/route.ts` | `opencode/mimo-v2.5-free` |
+| **K8c** | **Browse artists (página)** | **`dashboard-builder`** | **NUEVO `app/artists/page.tsx`** | **`opencode/nemotron-3.5-lightning-free`** |
+| **K8d** | **Artist detail (página)** | **`dashboard-builder`** | **NUEVO `app/artists/[id]/page.tsx`** | **`opencode/nemotron-3.5-lightning-free`** |
+| K8e | API artists | `api-builder` | NUEVO `app/api/artists/route.ts` | `opencode/mimo-v2.5-free` |
+| K8f | Admin manage artists | `dashboard-builder` | `app/admin/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+
+### 20.2 Resultados (K8c/K8d completados)
+
+| Check | Resultado |
+|-------|-----------|
+| `app/artists/page.tsx` | Página browse de artists creada con grid responsive, tarjetas con nombre, género, ubicación, biografía y oyentes mensuales |
+| `app/artists/[id]/page.tsx` | Página detalle de artist creado con `getArtistById`, `notFound()` para IDs inexistentes y componente `<BioSection>` integrado |
+| TypeScript | 0 errores nuevos en ambos archivos |
+| Null-safety | Campos opcionales (genre, location, biography, monthly_listeners) manejados con && condicionales y valores por defecto |
+| Integración | Header componente reutilizado, BioSection componente integrado en detail page |
+
+### 20.3 Criterios de Aprobación
+
+| Check | Resultado Esperado |
+|-------|-------------------|
+| Browse artists | Grid 1-2-3 columnas, enlaces a `/artists/${id}`, estado vacío manejado |
+| Artist detail | `notFound()` para IDs inexistentes, BioSection con datos dinámicos, layout consistente |
+| Calidad | TypeScript strict: 0 errores, null-safety 100% en campos opcionales |
+
+### 20.4 Próximos K8e-K8f (API + Admin)
+
+| Tarea | Agente | Próximo modelo |
+|-------|--------|----------------|
+| K8e: API artists endpoint | `api-builder` | `opencode/mimo-v2.5-free` |
+| K8f: Admin manage artists | `dashboard-builder` | `opencode/nemotron-3.5-lightning-free` |
+
+### 20.5 Calidad y Quality Gates
+
+| Check | Herramienta | Umbral | Resultado |
+|-------|-------------|--------|-----------|
+| TypeScript Strict | `npx tsc --noEmit` | 0 errores | ✅ 0 errores nuevos |
+| Null-Safety UI | `validar-null-safety` skill | 100% campos opcionales cubiertos | ✅ Campos opcionales protegidos |
+| MCP Health | `auditar-mcp` skill | 4/4 servidores respondiendo | ✅ 4/4 activos |
