@@ -1582,3 +1582,40 @@ Corregir problemas de auth/UI + implementar RBAC por rol + sistema de Shows & Bo
 ### Commits
 - `feat(phase-l): auth fixes + UI + RBAC + Shows & Booking`
 - Release: `v3.5.0`
+
+---
+
+## Fix: Vercel Deploy Error — better-sqlite3 bundled for client
+
+**Fecha:** 2026-09-01
+**Modelo:** MiMo V2.5 Free (OpenCode)
+**Modo:** Build
+
+### Problema
+Deploy a Vercel fallaba con:
+```
+Module not found: Can't resolve 'fs'
+Import trace: ./lib/db.ts → ./app/dashboard/page.tsx
+```
+
+### Causa Raíz
+`app/dashboard/page.tsx` tenía `"use client"` pero importaba directamente `lib/db.ts` que usa `better-sqlite3` (requiere `fs`). Los Client Components no pueden importar módulos que usan Node.js core modules, incluso con `serverComponentsExternalPackages` configurado.
+
+### Solución
+1. **NUEVO `app/api/dashboard/route.ts`** — Endpoint que retorna tracks, artists, artistProfile y showsByArtist
+2. **`app/dashboard/page.tsx`** — Eliminados imports directos de `lib/db.ts`, reemplazados con `fetch("/api/dashboard")` en `useEffect`
+
+### Archivos Modificados
+| Archivo | Acción |
+|---------|--------|
+| `app/api/dashboard/route.ts` | NUEVO — API route para datos del dashboard |
+| `app/dashboard/page.tsx` | MODIFICADO — usa fetch() en vez de imports de db |
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Unit Tests | ✅ 41/41 passing |
+
+### Commits
+- Pendiente: commit + push + release

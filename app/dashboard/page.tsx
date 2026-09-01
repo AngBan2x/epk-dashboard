@@ -1,37 +1,56 @@
 "use client";
 
-import { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { EPKCard } from "@/components/EPKCard";
 import { EPKExporter } from "@/components/EPKExporter";
 import { BioSection } from "@/components/BioSection";
-import { BookingModule } from "@/components/BookingModule";
 import { SocialBar } from "@/components/SocialBar";
 import { ShowsBooking } from "@/components/ShowsBooking";
 import { LoginModal } from "@/components/LoginModal";
-import { getAllTracks, getArtistByName, getArtistByUserId, getShowsByArtist, getAllArtists } from "@/lib/db";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
 import type { Track, ArtistProfile, Show } from "@/types/music";
 
+interface DashboardData {
+  tracks: Track[];
+  artists: ArtistProfile[];
+  artistProfile: ArtistProfile | null;
+  artistShows: Show[];
+  showsByArtist: Record<string, Show[]>;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [data, setData] = useState<DashboardData>({ tracks: [], artists: [], artistProfile: null, artistShows: [], showsByArtist: {} });
+  const [loading, setLoading] = useState(true);
 
-  // Guest view: show all artists' bios + shows
-  const allArtists = getAllArtists();
-  const tracks = getAllTracks();
+  useEffect(() => {
+    const url = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
+    fetch(url)
+      .then((res) => res.json())
+      .then((json) => {
+        setData(json);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [user?.id]);
 
-  // Artist view: get their own artist profile
-  const artistProfile = user?.role === "artist" && user ? getArtistByUserId(user.id) : null;
-  const artistShows = artistProfile ? getShowsByArtist(artistProfile.id) : [];
-  const artistTracks = artistProfile
-    ? tracks.filter((t) => t.artist_name === artistProfile.name)
-    : tracks;
-
-  // Admin view: link to admin panel (no BioSection in dashboard)
+  const { tracks, artists, artistProfile, artistShows } = data;
+  const artistTracks = artistProfile ? tracks.filter((t) => t.artist_name === artistProfile.name) : tracks;
   const isAdmin = user?.role === "admin";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <div className="text-center py-20 text-slate-400">Cargando...</div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -173,12 +192,12 @@ export default function DashboardPage() {
               </section>
 
               {/* Carousel of all artists' Bio + Shows */}
-              {allArtists.length > 0 && (
+              {artists.length > 0 && (
                 <section className="mb-12">
                   <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Artistas</h2>
                   <div className="space-y-8">
-                    {allArtists.map((art, i) => {
-                      const artShows = getShowsByArtist(art.id);
+                    {artists.map((art, i) => {
+                      const artShows = data.showsByArtist[art.id] || [];
                       return (
                         <SlideIn key={art.id} index={tracks.length + i}>
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -200,7 +219,7 @@ export default function DashboardPage() {
                 </section>
               )}
 
-              <SlideIn index={tracks.length + allArtists.length}>
+              <SlideIn index={tracks.length + artists.length}>
                 <EPKExporter tracks={tracks} />
               </SlideIn>
             </>
