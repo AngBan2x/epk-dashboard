@@ -3,6 +3,9 @@ name: security-auditor
 description: Audita protecciones de rutas, API auth, vulnerabilidades de seguridad y roles de usuario.
 mode: subagent
 model: nvidia/nemotron-3-ultra-550b-a55b:free
+permission:
+  task:
+    "*": "deny"
 ---
 
 # Agente: Security Auditor

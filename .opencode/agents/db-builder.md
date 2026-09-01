@@ -3,6 +3,9 @@ name: db-builder
 description: Diseña esquemas de base de datos, crea migraciones, tablas SQLite/Turso, y gestiona seed data.
 mode: subagent
 model: opencode/nemotron-3-ultra-free
+permission:
+  task:
+    "*": "deny"
 ---
 
 # Agente: DB Builder

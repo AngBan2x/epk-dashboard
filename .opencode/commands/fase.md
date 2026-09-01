@@ -1,11 +1,11 @@
 ---
 name: fase
-description: Ejecuta una fase completa del plan maestro: code → test → docs → commit → release
+description: Ejecuta una fase completa del plan maestro usando orchestrator con subagentes anidados
 ---
 
 # Comando: /fase
 
-Ejecuta una fase completa del MASTER_PLAN.md de forma autónoma.
+Ejecuta una fase completa del MASTER_PLAN.md usando orchestrator Nemotron 3 Ultra con subagentes anidados.
 
 ## Uso
 ```
@@ -17,57 +17,75 @@ Ejemplos:
 /fase A
 /fase B
 /fase M
+/fase O
 ```
 
 ## Flujo de Ejecución
 
-1. **Leer MASTER_PLAN.md** → obtener tareas de la fase especificada
-2. **Verificar precondiciones** → git status limpio, MCP servers activos
-3. **Ejecutar tareas secuencialmente** → delegando a subagentes según modelo asignado
-4. **Quality Gates** → `pnpm typecheck && pnpm test:unit && pnpm test:e2e`
-5. **Documentación** → AI_LOG.md + HANDOFF + README.md
-6. **Git** → commit convencional + push
-7. **Release** → git tag + GitHub Release (stable/prerelease según tests)
-8. **Reporte** → resumen de tareas, tests, release creado
+### Nivel 0: Agente Principal (Mimo V2.5)
+1. Leer MASTER_PLAN.md → obtener tareas de la fase
+2. Invocar orchestrator con las tareas
+3. Recibir reporte del orchestrator
+4. Ejecutar quality gates finales
+5. Commit + release
 
-## Delegación Directa a Subagentes
+### Nivel 1: Orchestrator (Nemotron 3 Ultra)
+1. Recibir tareas del agente principal
+2. Analizar dependencias entre tareas
+3. Ejecutar tareas independientes en paralelo
+4. Ejecutar tareas dependientes secuencialmente
+5. Recopilar resultados
+6. Reportar al agente principal
 
-El comando `/fase` se ejecuta directamente desde el agente principal, invocando subagentes con `task`:
+### Nivel 2: Subagentes Especializados
+- `api-builder` → Endpoints REST
+- `auth-builder` → Autenticación
+- `dashboard-builder` → UI/Components
+- `db-builder` → Schema DB
+- `quality-auditor` → Tests E2E
+- `visual-tester` → Screenshots/DOM
+- `brand-fixer` → Branding
+- `security-auditor` → Seguridad
+- `release-manager` → Releases
+
+## Ejemplo de Ejecución Paralela
 
 ```
-/fase M → yo leo MASTER_PLAN
-        → task(api-builder, "M1: fix next.config.js")
-        → task(db-builder, "M2: Turso schema")
-        → task(api-builder, "M3: dual-mode db.ts")
-        → pnpm typecheck && pnpm test:unit
-        → git commit + release
+Yo (Nivel 0):
+  task(orchestrator, "Ejecuta Fase O: O1-O10")
+
+Orchestrator (Nivel 1):
+  // Ronda 1 - paralelo
+  task(auth-builder, "O4: fix session cookie")
+  task(api-builder, "O5: fix /api/tracks")
+  task(dashboard-builder, "O6: eliminar mensaje")
+  task(db-builder, "O7: deleteArtist + O10: limpiar")
+
+  // Ronda 2 - depende de O7
+  task(api-builder, "O8: DELETE /api/artists")
+  task(dashboard-builder, "O9: botón eliminar")
+
+  // Ronda 3 - quality gates
+  bash("pnpm typecheck && pnpm test:unit")
+
+  // Reportar al agente principal
+  return { tareas, resultados, qualityGates }
 ```
 
-### Subagentes Disponibles
+## Subagentes y Modelos
 
-| Agente | Modelo | Uso |
-|--------|--------|-----|
-| `api-builder` | `opencode/mimo-v2.5-free` | Endpoints REST, fixes rutinarios |
-| `auth-builder` | `opencode/nemotron-3-ultra-free` | Sistema de autenticación |
-| `dashboard-builder` | `opencode/nemotron-3.5-lightning-free` | UI/Components, páginas |
-| `db-builder` | `opencode/nemotron-3-ultra-free` | Schema DB, migraciones |
-| `quality-auditor` | `openrouter/gemma-4-31b` | Tests E2E, auditoría |
-| `release-manager` | `opencode/nemotron-3.5-lightning-free` | Git tags, releases |
-| `security-auditor` | `nvidia/nemotron-3-ultra-550b-a55b:free` | Seguridad, rutas |
-| `brand-fixer` | `opencode/mimo-v2.5-free` | Logos, marcas |
-| `visual-tester` | `opencode/mimo-v2.5-free` | Screenshots, DOM, a11y |
-
-## Estrategia de Alternancia de Modelos
-
-| Tipo de Tarea | Modelo | Agente |
-|---------------|--------|--------|
-| Schema/DB complejo | Nemotron 3 Ultra | `db-builder`, `auth-builder` |
-| Endpoints REST rutinarios | MiMo V2.5 Free | `api-builder` |
-| UI/Components interactivos | Nemotron 3.5 Lightning | `dashboard-builder` |
-| Páginas simples / Paneles CRUD | MiMo V2.5 Free | `dashboard-builder` |
-| Tests E2E / Auditoría | Gemma 4 31B | `quality-auditor` |
-| Testing Visual | MiMo V2.5 Free | `visual-tester` |
-| Releases | Nemotron 3.5 Lightning | `release-manager` |
+| Agente | Modelo | Uso | Permission Task |
+|--------|--------|-----|-----------------|
+| `orchestrator` | Nemotron 3 Ultra | Coordinación | `allow` |
+| `api-builder` | MiMo V2.5 | Endpoints REST | `deny` |
+| `auth-builder` | Nemotron 3 Ultra | Auth | `deny` |
+| `dashboard-builder` | Nemotron 3.5 Lightning | UI | `deny` |
+| `db-builder` | Nemotron 3 Ultra | DB | `deny` |
+| `quality-auditor` | Gemma 4 31B | Tests | `deny` |
+| `visual-tester` | MiMo V2.5 | Visual QA | `deny` |
+| `brand-fixer` | MiMo V2.5 | Branding | `deny` |
+| `security-auditor` | Nemotron 3 Ultra | Security | `deny` |
+| `release-manager` | Nemotron 3.5 Lightning | Releases | `deny` |
 
 ## Skills Invocadas
 - `run-quality-gates` → typecheck + unit + e2e
