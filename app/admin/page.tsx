@@ -109,6 +109,7 @@ export default function AdminPage() {
     lyrics: "",
   });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Auth guard — redirect if not admin
@@ -870,32 +871,38 @@ onClick={() => {
               <div className="mt-6 p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800" ref={editFormRef}>
                 <h3 className="text-lg font-semibold mb-4">Editar Artista: {editingArtist.name}</h3>
                 <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    try {
-                      const res = await fetch(`/api/artists?id=${editingArtist.id}`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          name: artistForm.name,
-                          biography: artistForm.biography || null,
-                          press_text: artistForm.press_text || null,
-                          press_highlights:
-                            artistForm.press_highlights?.split("\n").filter((h) => h.trim()) || [],
-                          genre: artistForm.genre || null,
-                          location: artistForm.location || null,
-                          monthly_listeners: artistForm.monthly_listeners,
-                        }),
-                      });
-                      if (res.ok) {
-                        setEditingArtist(null);
-                        fetchArtists();
-                        setMessage({ type: "success", text: "Artista actualizado correctamente" });
-                      }
-                    } catch {
-                      setMessage({ type: "error", text: "Error al actualizar artista" });
+onSubmit={async (e) => {
+                  e.preventDefault();
+                  setSaving(true);
+                  try {
+                    const res = await fetch(`/api/artists?id=${editingArtist.id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        name: artistForm.name,
+                        biography: artistForm.biography || null,
+                        press_text: artistForm.press_text || null,
+                        press_highlights:
+                          artistForm.press_highlights?.split("\n").filter((h) => h.trim()) || [],
+                        genre: artistForm.genre || null,
+                        location: artistForm.location || null,
+                        monthly_listeners: artistForm.monthly_listeners,
+                      }),
+                    });
+                    if (res.ok) {
+                      setEditingArtist(null);
+                      fetchArtists();
+                      setMessage({ type: "success", text: "Artista actualizado correctamente" });
+                    } else {
+                      const error = await res.json();
+                      setMessage({ type: "error", text: error.error || "Error al guardar" });
                     }
-                  }}
+                  } catch {
+                    setMessage({ type: "error", text: "Error de conexión" });
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
                   className="space-y-4"
                 >
                   <div>
@@ -966,7 +973,7 @@ onClick={() => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Orejas Mensuales</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Oyentes Mensuales</label>
                     <input
                       type="number"
                       value={artistForm.monthly_listeners}
@@ -979,9 +986,9 @@ onClick={() => {
                   <div className="flex gap-3">
                     <button
                       type="submit"
-                      className="px-6 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                    >
-                      Guardar
+                      disabled={saving}
+                      className={`px-6 py-2 rounded-lg text-sm font-semibold text-white transition ${saving ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500"}`}>
+                      {saving ? "Guardando..." : "Guardar"}
                     </button>
                     <button
                       type="button"
