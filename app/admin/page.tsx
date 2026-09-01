@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { safeString } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface AdminTrack {
   id: string;
@@ -60,6 +62,8 @@ interface Notification {
 }
 
 export default function AdminPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"tracks" | "submissions" | "notifications">("tracks");
   const [tracks, setTracks] = useState<AdminTrack[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -81,6 +85,13 @@ export default function AdminPage() {
   });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Auth guard — redirect if not admin
+  useEffect(() => {
+    if (!authLoading && (!user || user.role !== "admin")) {
+      router.push("/dashboard");
+    }
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     fetchTracks();

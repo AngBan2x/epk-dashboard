@@ -46,8 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || "Error al iniciar sesión");
+      let message = "Error al iniciar sesión";
+      try {
+        const error = await res.json();
+        message = error.error || message;
+      } catch {
+        // Response was not JSON
+      }
+      throw new Error(message);
     }
 
     await fetchUser();
@@ -61,8 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || "Error al registrar");
+      let message = "Error al registrar";
+      try {
+        const error = await res.json();
+        message = error.error || message;
+      } catch {
+        // Response was not JSON (e.g., HTML error page from Next.js)
+      }
+      throw new Error(message);
     }
 
     // Auto-login after register

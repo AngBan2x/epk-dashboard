@@ -8,7 +8,21 @@ function getDb() {
   return new Database(DB_PATH);
 }
 
-// GET /api/tracks — Listar todos los tracks
+function validateSession(req: NextRequest): { userId: string; role: string } | null {
+  const sessionCookie = req.cookies.get("auth_session");
+  if (!sessionCookie) return null;
+
+  try {
+    const decoded = atob(sessionCookie.value);
+    const session = JSON.parse(decoded) as { userId: string; exp: number; role?: string };
+    if (!session.exp || session.exp < Date.now()) return null;
+    return { userId: session.userId, role: session.role || "artist" };
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/tracks — Listar todos los tracks (público)
 export async function GET() {
   try {
     const db = getDb();
@@ -21,9 +35,14 @@ export async function GET() {
   }
 }
 
-// POST /api/tracks — Crear un track nuevo
+// POST /api/tracks — Crear un track nuevo (solo admin)
 export async function POST(req: NextRequest) {
   try {
+    const session = validateSession(req);
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const body = await req.json();
     const {
       id,
@@ -84,9 +103,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT /api/tracks — Actualizar un track existente
+// PUT /api/tracks — Actualizar un track existente (solo admin)
 export async function PUT(req: NextRequest) {
   try {
+    const session = validateSession(req);
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { id, ...updates } = body;
 
@@ -125,9 +149,14 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// DELETE /api/tracks?id=xxx — Eliminar un track
+// DELETE /api/tracks?id=xxx — Eliminar un track (solo admin)
 export async function DELETE(req: NextRequest) {
   try {
+    const session = validateSession(req);
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 

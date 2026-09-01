@@ -2,7 +2,7 @@
 name: security-auditor
 description: Audita protecciones de rutas, API auth, vulnerabilidades de seguridad y roles de usuario.
 mode: subagent
-model: openrouter/nemotron-3-ultra
+model: nvidia/nemotron-3-ultra-550b-a55b:free
 ---
 
 # Agente: Security Auditor

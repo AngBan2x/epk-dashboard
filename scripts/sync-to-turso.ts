@@ -38,6 +38,20 @@ async function main() {
     )
   `);
 
+  await turso.execute(`
+    CREATE TABLE IF NOT EXISTS artists (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      biography TEXT,
+      press_text TEXT,
+      press_highlights TEXT,
+      genre TEXT,
+      location TEXT,
+      monthly_listeners INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   const tracks = localDb.prepare("SELECT * FROM tracks").all();
   console.log(`📦 ${tracks.length} tracks encontrados en SQLite local`);
 
@@ -52,7 +66,22 @@ async function main() {
     console.log(`  ✅ ${t.id}: ${t.title}`);
   }
 
-  console.log(`\n📊 ${synced} tracks sincronizados a Turso`);
+  // Sync artists
+  const artists = localDb.prepare("SELECT * FROM artists").all();
+  console.log(`\n👤 ${artists.length} artistas encontrados en SQLite local`);
+
+  let artistSynced = 0;
+  for (const artist of artists) {
+    const a = artist as Record<string, unknown>;
+    await turso.execute({
+      sql: "INSERT OR REPLACE INTO artists (id, name, biography, press_text, press_highlights, genre, location, monthly_listeners, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      args: [a.id, a.name, a.biography, a.press_text, a.press_highlights, a.genre, a.location, a.monthly_listeners, a.created_at] as InValue[],
+    });
+    artistSynced++;
+    console.log(`  ✅ ${a.id}: ${a.name}`);
+  }
+
+  console.log(`\n📊 ${synced} tracks y ${artistSynced} artistas sincronizados a Turso`);
   console.log("✅ Sincronización completada");
 
   localDb.close();

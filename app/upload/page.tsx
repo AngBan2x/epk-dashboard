@@ -1,6 +1,32 @@
+"use client";
+
 import { UploadTrackForm } from "@/components/UploadTrackForm";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function UploadPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && (!user || (user.role !== "artist" && user.role !== "admin"))) {
+      router.push("/dashboard");
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-500 dark:text-slate-400">Cargando...</div>
+      </div>
+    );
+  }
+
+  if (!user || (user.role !== "artist" && user.role !== "admin")) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-12 px-4">
       <div className="max-w-4xl mx-auto">

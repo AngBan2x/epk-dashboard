@@ -5,7 +5,7 @@ import { EPKExporter } from "@/components/EPKExporter";
 import { BioSection } from "@/components/BioSection";
 import { BookingModule } from "@/components/BookingModule";
 import { SocialBar } from "@/components/SocialBar";
-import { getAllTracks } from "@/lib/db";
+import { getAllTracks, getArtistByName } from "@/lib/db";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
 
 export const metadata: Metadata = {
@@ -15,6 +15,10 @@ export const metadata: Metadata = {
 
 export default function DashboardPage() {
   const tracks = getAllTracks();
+  
+  // Get the most common artist or first track's artist for bio section
+  const primaryArtistName = tracks.length > 0 ? tracks[0].artist_name : null;
+  const artist = primaryArtistName ? getArtistByName(primaryArtistName) : null;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -60,13 +64,17 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             <SlideIn index={tracks.length}>
               <BioSection
-                artistName="Artista EPK"
-                genre="Multi-género"
-                location="Latinoamérica"
+                artistName={artist?.name || primaryArtistName || "Artista EPK"}
+                genre={artist?.genre || "Multi-género"}
+                location={artist?.location || "Latinoamérica"}
+                monthlyListeners={artist?.monthly_listeners || 0}
+                biography={artist?.biography}
+                pressText={artist?.press_text}
+                pressHighlights={artist?.press_highlights}
               />
             </SlideIn>
             <SlideIn index={tracks.length + 1}>
-              <BookingModule artistName="Artista EPK" />
+              <BookingModule artistName={artist?.name || primaryArtistName || "Artista EPK"} />
             </SlideIn>
           </div>
 

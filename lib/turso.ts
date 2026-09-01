@@ -1,5 +1,5 @@
 import { createClient, type Client } from "@libsql/client";
-import type { RawTrackRow, SyncResult } from "@/types/music";
+import type { RawTrackRow, SyncResult, ArtistProfile } from "@/types/music";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -35,6 +35,20 @@ export async function ensureTursoSchema(): Promise<boolean> {
       metrics TEXT,
       production_details TEXT,
       lyrics TEXT
+    )
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS artists (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      biography TEXT,
+      press_text TEXT,
+      press_highlights TEXT,
+      genre TEXT,
+      location TEXT,
+      monthly_listeners INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
     )
   `);
 

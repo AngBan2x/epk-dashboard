@@ -24,8 +24,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className={`${inter.className} pb-24`}>
-        <Providers>{children}</Providers>
+      <body className={inter.className}>
+        <div className="pb-24">
+          <Providers>{children}</Providers>
+        </div>
         <Footer />
       </body>
     </html>
