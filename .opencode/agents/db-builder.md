@@ -33,7 +33,7 @@ Eres un especialista en diseño de bases de datos SQLite y Turso (@libsql/client
 - `RawTrackRow` para datos crudos de DB
 - `Track` para datos transformados
 
-## Formo de Migración Típica
+## Formato de Migración Típica
 
 ```typescript
 // 1. Agregar a lib/db.ts

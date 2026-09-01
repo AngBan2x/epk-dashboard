@@ -1,3 +1,8 @@
+---
+name: fix-security
+description: Checklist de protección de rutas y APIs para aplicaciones Next.js con auth basada en cookies.
+---
+
 # Skill: fix-security
 
 Checklist de protección de rutas y APIs para aplicaciones Next.js con auth basada en cookies.
