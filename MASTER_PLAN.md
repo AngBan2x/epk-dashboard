@@ -546,6 +546,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.6.0 | Fase M: Turso Dual-Mode para Vercel | minor | ✅ Completada |
 | v3.7.0 | Fase N: QA Visual + E2E Flows | minor | ✅ Completada |
 | v3.8.0 | Fase O: Orchestrator + UI Fixes + Cleanup | minor | ✅ Completada |
+| v3.9.0 | Fase P1: Critical Fixes + UI Core | minor | ✅ Completada |
 
 ---
 
