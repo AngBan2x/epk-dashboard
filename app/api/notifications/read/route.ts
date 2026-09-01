@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const updated = markNotificationAsRead(id);
+    const updated = await markNotificationAsRead(id);
     if (!updated) {
       return NextResponse.json({ error: "Notificación no encontrada" }, { status: 404 });
     }

@@ -28,12 +28,12 @@ export async function GET(req: NextRequest) {
     }
 
     if (trackId) {
-      const count = getLikeCount(trackId);
+      const count = await getLikeCount(trackId);
       return NextResponse.json({ track_id: trackId, count });
     }
 
     if (userId) {
-      const likes = getUserLikes(userId);
+      const likes = await getUserLikes(userId);
       return NextResponse.json(likes);
     }
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
     }
 
-    const result = toggleLike(userId, validated.track_id);
+    const result = await toggleLike(userId, validated.track_id);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {

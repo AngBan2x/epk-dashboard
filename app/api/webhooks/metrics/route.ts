@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     const id = randomUUID();
-    const metrics = upsertMetricsHistory({
+    const metrics = await upsertMetricsHistory({
       id,
       track_id: validated.track_id,
       date: validated.date,
@@ -65,12 +65,12 @@ export async function GET(req: NextRequest) {
 
     if (date) {
       // Query para fecha específica - necesitaríamos agregar esta función
-      const history = getMetricsHistoryByTrack(trackId);
+      const history = await getMetricsHistoryByTrack(trackId);
       const filtered = history.filter(h => h.date === date);
       return NextResponse.json(filtered);
     }
 
-    const history = getMetricsHistoryByTrack(trackId);
+    const history = await getMetricsHistoryByTrack(trackId);
     return NextResponse.json(history.slice(0, limit));
   } catch (error) {
     console.error("GET webhook metrics error:", error);

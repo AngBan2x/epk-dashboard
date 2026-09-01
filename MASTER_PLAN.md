@@ -521,6 +521,69 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v3.3.0 | Fase J: 5 Fixes Críticos | minor | ✅ Completado |
 | v3.4.0 | Fase K: Fixes UI/UX + BioSection Per-Artist | minor | ✅ Completado |
 | v3.5.0 | Fase L: Fixes Auth + UI + RBAC + Shows | minor | ✅ Completada |
+| v3.6.0 | Fase M: Turso Dual-Mode para Vercel | minor | ✅ Completada |
+
+---
+
+## 22. FASE M — Turso Dual-Mode para Vercel
+
+> **Objetivo:** Habilitar deployment en Vercel usando Turso como DB remota con fallback a better-sqlite3 en desarrollo local.
+
+### 22.1 Arquitectura Dual-Mode
+
+| Modo | Backend | Dónde | Condición |
+|------|---------|-------|-----------|
+| **Local** | better-sqlite3 | `data/music_catalog.db` | Sin TURSO env vars |
+| **Vercel/Prod** | @libsql/client | Turso remote | TURSO_DATABASE_URL + TURSO_AUTH_TOKEN definidos |
+
+### 22.2 Tareas de la Fase M
+
+| # | Tarea | Archivos | Modelo |
+|---|-------|----------|--------|
+| M1 | Fix `next.config.js` → `serverExternalPackages` (Next.js 14) | `next.config.js` | api-builder |
+| M2 | Turso Schema completo (8 tablas) + CRUD sync functions | `lib/turso.ts` | db-builder |
+| M3 | `lib/db.ts` Dual-Mode: Turso async + better-sqlite3 sync | `lib/db.ts` | api-builder |
+| M4 | Seed Admin crea en Turso también | `scripts/seed-admin.ts` | api-builder |
+| M5 | Sync Todas las Tablas (8 tablas) a Turso | `scripts/sync-to-turso.ts` | db-builder |
+| M6 | Add `await` a todas las llamadas de DB en API routes y pages | 19 archivos | api-builder |
+| M7 | Fix tests unitarios (async functions) | `tests/unit/db.test.ts` | api-builder |
+| M8 | Fix seed-artists.ts (async) | `scripts/seed-artists.ts` | api-builder |
+
+### 22.3 Tablas Sincronizadas a Turso
+
+| # | Tabla | Columnas |
+|---|-------|----------|
+| 1 | tracks | 17 columnas (incluye artist_name, itunes_track_id, stems_urls, video_embed_url, gallery_images) |
+| 2 | artists | 10 columnas (incluye user_id FK) |
+| 3 | users | 6 columnas |
+| 4 | track_submissions | 7 columnas |
+| 5 | likes | 4 columnas |
+| 6 | notifications | 8 columnas |
+| 7 | metrics_history | 9 columnas |
+| 8 | shows | 11 columnas |
+
+### 22.4 Archivos Modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `next.config.js` | `experimental.serverComponentsExternalPackages` → `serverExternalPackages` |
+| `lib/turso.ts` | Schema 8 tablas + sync functions para todas las tablas |
+| `lib/db.ts` | Dual-mode: detecta TURSO env vars, funge como switcher entre backends |
+| `scripts/seed-admin.ts` | Crea admin tanto en SQLite como en Turso |
+| `scripts/sync-to-turso.ts` | Sincroniza 8 tablas completas |
+| `scripts/seed-artists.ts` | Async/await para funciones de db |
+| `tests/unit/db.test.ts` | Async/await para funciones de db |
+| 19 archivos de API routes y pages | `await` en llamadas a funciones async de db.ts |
+
+### 22.5 Criterios de Aprobación
+
+| Check | Resultado |
+|-------|-----------|
+| TypeScript strict | 0 errores |
+| Tests unitarios | 41/41 passing |
+| Dual-mode funcional | Sin TURSO vars → SQLite; Con TURSO vars → Turso |
+| API routes compatibles | Todas las llamadas con await |
+| Schema completo | 8 tablas en Turso |
 
 ---
 

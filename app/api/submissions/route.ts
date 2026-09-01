@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     const id = searchParams.get("id");
 
     if (id) {
-      const submission = getTrackSubmissionById(id);
+      const submission = await getTrackSubmissionById(id);
       if (!submission) {
         return NextResponse.json({ error: "Submission not found" }, { status: 404 });
       }
@@ -79,16 +79,16 @@ export async function GET(req: NextRequest) {
     }
 
     if (userId) {
-      const submissions = getTrackSubmissionsByUser(userId);
+      const submissions = await getTrackSubmissionsByUser(userId);
       return NextResponse.json(submissions);
     }
 
     if (status && ["pending", "approved", "rejected"].includes(status)) {
-      const submissions = getTrackSubmissionsByStatus(status as "pending" | "approved" | "rejected");
+      const submissions = await getTrackSubmissionsByStatus(status as "pending" | "approved" | "rejected");
       return NextResponse.json(submissions);
     }
 
-    const submissions = getAllTrackSubmissions();
+    const submissions = await getAllTrackSubmissions();
     return NextResponse.json(submissions);
   } catch (error) {
     console.error("GET submissions error:", error);
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     const userId = session.userId;
 
     const id = randomUUID();
-    const submission = createTrackSubmission({
+    const submission = await createTrackSubmission({
       id,
       user_id: userId,
       track_data: JSON.stringify(validated.track_data),
@@ -145,7 +145,7 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const validated = UpdateStatusSchema.parse(body);
 
-    const updated = updateTrackSubmissionStatus(id, validated.status, validated.admin_notes);
+    const updated = await updateTrackSubmissionStatus(id, validated.status, validated.admin_notes);
     if (!updated) {
       return NextResponse.json({ error: "Submission not found" }, { status: 404 });
     }

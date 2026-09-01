@@ -1,27 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtist } from "@/lib/db";
+import type { Show } from "@/types/music";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
 
-    const tracks = getAllTracks();
-    const artists = getAllArtists();
+    const tracks = await getAllTracks();
+    const artists = await getAllArtists();
 
     let artistProfile = null;
-    let artistShows: ReturnType<typeof getShowsByArtist> = [];
+    let artistShows: Show[] = [];
 
     if (userId) {
-      artistProfile = getArtistByUserId(userId);
+      artistProfile = await getArtistByUserId(userId);
       if (artistProfile) {
-        artistShows = getShowsByArtist(artistProfile.id);
+        artistShows = await getShowsByArtist(artistProfile.id);
       }
     }
 
-    const showsByArtist: Record<string, ReturnType<typeof getShowsByArtist>> = {};
+    const showsByArtist: Record<string, Show[]> = {};
     for (const art of artists) {
-      showsByArtist[art.id] = getShowsByArtist(art.id);
+      showsByArtist[art.id] = await getShowsByArtist(art.id);
     }
 
     return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist });

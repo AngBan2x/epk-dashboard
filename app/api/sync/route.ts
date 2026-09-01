@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tracks = getAllTracks();
+    const tracks = await getAllTracks();
     const localTracks = tracks.map((track) => ({
       id: track.id,
       title: track.title,

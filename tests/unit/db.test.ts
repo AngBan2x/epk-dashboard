@@ -2,25 +2,25 @@ import { describe, it, expect } from "vitest";
 import { getAllTracks, getTrackById } from "@/lib/db";
 
 describe("Database", () => {
-  it("getAllTracks returns tracks", () => {
-    const tracks = getAllTracks();
+  it("getAllTracks returns tracks", async () => {
+    const tracks = await getAllTracks();
     expect(tracks.length).toBeGreaterThan(0);
   });
 
-  it("getTrackById returns specific track", () => {
-    const track = getTrackById("trk-001");
+  it("getTrackById returns specific track", async () => {
+    const track = await getTrackById("trk-001");
     expect(track).not.toBeNull();
     expect(track?.title).toBe("Bohemian Rhapsody");
     expect(track?.artist_name).toBe("Queen");
   });
 
-  it("getTrackById returns null for unknown id", () => {
-    const track = getTrackById("unknown-id");
+  it("getTrackById returns null for unknown id", async () => {
+    const track = await getTrackById("unknown-id");
     expect(track).toBeNull();
   });
 
-  it("tracks have parsed metrics", () => {
-    const tracks = getAllTracks();
+  it("tracks have parsed metrics", async () => {
+    const tracks = await getAllTracks();
     const first = tracks[0];
     expect(first.metrics).toHaveProperty("streams");
     expect(first.metrics).toHaveProperty("saves");
@@ -28,8 +28,8 @@ describe("Database", () => {
     expect(Array.isArray(first.metrics.top_countries)).toBe(true);
   });
 
-  it("tracks have parsed production_details", () => {
-    const tracks = getAllTracks();
+  it("tracks have parsed production_details", async () => {
+    const tracks = await getAllTracks();
     const first = tracks[0];
     expect(first.production_details).toHaveProperty("daw");
     expect(first.production_details).toHaveProperty("guitars");

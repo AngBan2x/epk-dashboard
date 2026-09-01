@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as { format?: string };
     const format = body.format === "html" ? "html" : "json";
 
-    const tracks = getAllTracks();
+    const tracks = await getAllTracks();
 
     if (format === "json") {
       const exportData = {

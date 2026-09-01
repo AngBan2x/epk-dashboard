@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["better-sqlite3", "bcryptjs"],
-  },
+  serverExternalPackages: ["better-sqlite3", "bcryptjs"],
 };
 
 module.exports = nextConfig;
