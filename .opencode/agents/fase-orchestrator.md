@@ -1,7 +1,7 @@
 ---
 name: fase-orchestrator
 description: Orquestador que ejecuta fases completas del proyecto automáticamente: code → test → docs → commit → release.
-mode: subagent
+mode: primary
 model: opencode/mimo-v2.5-free
 ---
 
