@@ -67,39 +67,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Proteger /upload — solo artistas autenticados
-  if (path === "/upload") {
-    if (!sessionCookie) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", path);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    let session: { userId: string; exp: number; role?: string } | null = null;
-    try {
-      const decoded = atob(sessionCookie.value);
-      session = JSON.parse(decoded);
-    } catch {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", path);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    if (!session || session.exp < Date.now()) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", path);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // Solo artistas y admin pueden subir música
-    if (session.role !== "artist" && session.role !== "admin") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/upload", "/login", "/register"],
+  matcher: ["/admin/:path*", "/login", "/register"],
 };
