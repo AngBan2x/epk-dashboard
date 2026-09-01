@@ -1,3 +1,8 @@
+---
+name: db-migration
+description: Workflow para crear nuevas tablas SQLite, sincronizar con Turso, y actualizar types TypeScript.
+---
+
 # Skill: db-migration
 
 Workflow para crear nuevas tablas SQLite, sincronizar con Turso, y actualizar types TypeScript.
@@ -7,7 +12,7 @@ Workflow para crear nuevas tablas SQLite, sincronizar con Turso, y actualizar ty
 - Al modificar schema existente
 - Al crear scripts de seed
 
-## Flujo de Trabajo
+## Instrucciones para el Agente:
 
 ### Paso 1: Definir Schema
 ```sql

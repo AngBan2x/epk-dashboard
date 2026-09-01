@@ -1,3 +1,8 @@
+---
+name: fix-branding
+description: Workflow de búsqueda y reemplazo de logos/marcas inconsistentes en el codebase.
+---
+
 # Skill: fix-branding
 
 Workflow de búsqueda y reemplazo de logos/marcas inconsistentes en el codebase.
@@ -7,7 +12,7 @@ Workflow de búsqueda y reemplazo de logos/marcas inconsistentes en el codebase.
 - Al renombrar la marca del proyecto
 - En auditoría de branding
 
-## Flujo de Trabajo
+## Instrucciones para el Agente:
 
 ### Paso 1: Buscar Referencias No Deseadas
 ```bash
