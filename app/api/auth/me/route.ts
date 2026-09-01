@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let session: { userId: string; exp: number } | null = null;
+    let session: { userId: string } | null = null;
     try {
       const decoded = atob(sessionCookie.value);
       session = JSON.parse(decoded);
@@ -25,14 +25,6 @@ export async function GET(req: NextRequest) {
     if (!session) {
       return NextResponse.json(
         { error: "Sesión inválida" },
-        { status: 401 }
-      );
-    }
-
-    // Verificar expiración
-    if (session.exp < Date.now()) {
-      return NextResponse.json(
-        { error: "Sesión expirada" },
         { status: 401 }
       );
     }
@@ -66,7 +58,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    let session: { userId: string; exp: number } | null = null;
+    let session: { userId: string } | null = null;
     try {
       const decoded = atob(sessionCookie.value);
       session = JSON.parse(decoded);
@@ -80,14 +72,6 @@ export async function DELETE(req: NextRequest) {
     if (!session) {
       return NextResponse.json(
         { error: "Sesión inválida" },
-        { status: 401 }
-      );
-    }
-
-    // Verificar expiración
-    if (session.exp < Date.now()) {
-      return NextResponse.json(
-        { error: "Sesión expirada" },
         { status: 401 }
       );
     }
