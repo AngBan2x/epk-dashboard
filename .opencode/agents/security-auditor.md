@@ -5,7 +5,7 @@ mode: subagent
 model: nvidia/nemotron-3-ultra-550b-a55b:free
 permission:
   task:
-    "*": "deny"
+    "*": "allow"
 ---
 
 # Agente: Security Auditor

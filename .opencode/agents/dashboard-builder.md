@@ -5,7 +5,7 @@ mode: subagent
 model: opencode/nemotron-3.5-lightning-free
 permission:
   task:
-    "*": "deny"
+    "*": "allow"
 ---
 
 # Subagente: Dashboard Builder
