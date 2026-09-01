@@ -3,6 +3,9 @@ name: brand-fixer
 description: Busca y reemplaza logos, íconos y marcas inconsistentes en todo el codebase.
 mode: subagent
 model: opencode/mimo-v2.5-free
+permission:
+  task:
+    "*": "deny"
 ---
 
 # Agente: Brand Fixer

@@ -1,8 +1,11 @@
 ---
 name: fase-orchestrator
-description: Orquestador que ejecuta fases completas del proyecto automáticamente: code → test → docs → commit → release.
+description: Orquestador que ejecuta fases completas del proyecto automáticamente: code → test → docs → commit → release. (DOCUMENTACIÓN: usar orchestrator.md)
 mode: primary
 model: opencode/mimo-v2.5-free
+permission:
+  task:
+    "*": "deny"
 ---
 
 # Agente: Fase Orchestrator

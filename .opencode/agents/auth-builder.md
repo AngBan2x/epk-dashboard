@@ -3,6 +3,9 @@ name: auth-builder
 description: Especialista en implementar autenticación completa: register, login, middleware, context, bcryptjs.
 mode: subagent
 model: opencode/nemotron-3-ultra-free
+permission:
+  task:
+    "*": "deny"
 ---
 
 # Subagente: Auth Builder
