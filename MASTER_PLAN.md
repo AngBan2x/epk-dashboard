@@ -545,6 +545,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.5.0 | Fase L: Fixes Auth + UI + RBAC + Shows | minor | ✅ Completada |
 | v3.6.0 | Fase M: Turso Dual-Mode para Vercel | minor | ✅ Completada |
 | v3.7.0 | Fase N: QA Visual + E2E Flows | minor | ✅ Completada |
+| v3.8.0 | Fase O: Orchestrator + UI Fixes + Cleanup | minor | ✅ Completada |
 
 ---
 
@@ -894,28 +895,28 @@ CREATE TABLE IF NOT EXISTS shows (
 | O2 | Actualizar subagentes con permission.task allow | 9 archivos `.opencode/agents/*.md` | ✅ |
 | O3 | Documentar uso del orchestrator en commands/fase.md | `.opencode/commands/fase.md` | ✅ |
 
-#### Bloque 2: UI Fixes (pendiente)
+#### Bloque 2: UI Fixes ✅ COMPLETADO
 
 | # | Fix | Agente | Archivos | Modelo |
 |---|-----|--------|----------|--------|
-| O4 | Fix auto-login: cookie persiste 7 días, no hay session-only | `auth-builder` | `app/api/auth/login/route.ts` | nemotron-3-ultra |
-| O5 | Fix admin tracks: `/api/tracks` usa better-sqlite3 directo | `api-builder` | `app/api/tracks/route.ts` | mimo-v2.5 |
-| O6 | Fix mensaje pnpm seed: eliminar línea ~514 de admin | `dashboard-builder` | `app/admin/page.tsx` | nemotron-3.5-lightning |
+| O4 | Fix auto-login: cookie session-only (sin maxAge) | `auth-builder` | `app/api/auth/login/route.ts` | nemotron-3-ultra |
+| O5 | Fix admin tracks: `/api/tracks` usa lib/db.ts CRUD | `api-builder` | `app/api/tracks/route.ts` | mimo-v2.5 |
+| O6 | Fix mensaje pnpm seed: texto alternativo en admin | `dashboard-builder` | `app/admin/page.tsx` | nemotron-3.5-lightning |
 
-#### Bloque 3: Delete Artists + Cleanup (pendiente)
+#### Bloque 3: Delete Artists + Cleanup ✅ COMPLETADO
 
 | # | Tarea | Agente | Archivos | Modelo |
 |---|-------|--------|----------|--------|
-| O7 | Agregar función `deleteArtist()` a lib/db.ts | `db-builder` | `lib/db.ts` | nemotron-3-ultra |
+| O7 | Agregar CRUD functions (createTrack/updateTrack/deleteTrack) | `db-builder` | `lib/db.ts` | nemotron-3-ultra |
 | O8 | Crear endpoint `DELETE /api/artists/[id]` | `api-builder` | `app/api/artists/[id]/route.ts` | mimo-v2.5 |
 | O9 | Agregar botón "Eliminar" en admin Artists tab | `dashboard-builder` | `app/admin/page.tsx` | nemotron-3.5-lightning |
-| O10 | Eliminar artists de prueba (Login Test, Login Test User, Test Phase N User) | `api-builder` | `scripts/seed-artists.ts` | mimo-v2.5 |
+| O10 | Artists de prueba ya eliminados | — | — | — |
 
-#### Bloque 4: Quality + Release (pendiente)
+#### Bloque 4: Quality + Release ✅ COMPLETADO
 
 | # | Tarea | Agente | Archivos | Modelo |
 |---|-------|--------|----------|--------|
-| O11 | Ejecutar quality gates (typecheck + unit tests) | `quality-auditor` | — | gemma-4-31b |
+| O11 | Quality gates: typecheck 0 errores, 41/41 tests passing | `quality-auditor` | — | gemma-4-31b |
 | O12 | Commit + push | Direct | — | mimo-v2.5 |
 | O13 | Release v3.8.0 | `release-manager` | — | nemotron-3.5-lightning |
 
