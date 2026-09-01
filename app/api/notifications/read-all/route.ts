@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
     }
 
-    markAllNotificationsAsRead(userId);
+    await markAllNotificationsAsRead(userId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("POST notifications read-all error:", error);

@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "track_id requerido" }, { status: 400 });
     }
 
-    const history = getMetricsHistoryByTrack(trackId);
+    const history = await getMetricsHistoryByTrack(trackId);
     return NextResponse.json(history.slice(0, limit));
   } catch (error) {
     console.error("GET metrics history error:", error);

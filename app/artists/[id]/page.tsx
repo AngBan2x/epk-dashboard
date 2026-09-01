@@ -4,7 +4,7 @@ import { BioSection } from "@/components/BioSection";
 import { notFound } from "next/navigation";
 
 export default async function ArtistDetailPage({ params }: { params: { id: string } }) {
-  const artist = getArtistById(params.id);
+  const artist = await getArtistById(params.id);
 
   if (!artist) {
     notFound();

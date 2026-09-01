@@ -98,17 +98,21 @@ const artists = [
   },
 ];
 
-console.log("🌱 Sembrando artistas...\n");
+async function main() {
+  console.log("🌱 Sembrando artistas...\n");
 
-for (const artistData of artists) {
-  const existing = getArtistByName(artistData.name);
-  if (existing) {
-    console.log(`  ⏭️  ${artistData.name} ya existe, saltando...`);
-    continue;
+  for (const artistData of artists) {
+    const existing = await getArtistByName(artistData.name);
+    if (existing) {
+      console.log(`  ⏭️  ${artistData.name} ya existe, saltando...`);
+      continue;
+    }
+
+    const artist = await createArtist(artistData);
+    console.log(`  ✅ Creado: ${artist.name} (${artist.id})`);
   }
-  
-  const artist = createArtist(artistData);
-  console.log(`  ✅ Creado: ${artist.name} (${artist.id})`);
+
+  console.log("\n✅ Seed de artistas completado");
 }
 
-console.log("\n✅ Seed de artistas completado");
+main().catch(console.error);

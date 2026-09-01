@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     const showId = searchParams.get("id");
 
     if (showId) {
-      const show = getShowById(showId);
+      const show = await getShowById(showId);
       if (!show) {
         return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
       }
@@ -42,11 +42,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (artistId) {
-      const shows = getShowsByArtist(artistId);
+      const shows = await getShowsByArtist(artistId);
       return NextResponse.json({ shows });
     }
 
-    const shows = getAllShows();
+    const shows = await getAllShows();
     return NextResponse.json({ shows });
   } catch (error) {
     console.error("GET shows error:", error);
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const validated = CreateShowSchema.parse(body);
-    const show = createShow(validated);
+    const show = await createShow(validated);
     return NextResponse.json(show, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     const validated = UpdateShowSchema.parse(body);
     const { id, ...data } = validated;
-    const show = updateShow(id, data);
+    const show = await updateShow(id, data);
     if (!show) {
       return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }
@@ -95,7 +95,7 @@ export async function DELETE(req: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: "id requerido" }, { status: 400 });
     }
-    const deleted = deleteShow(id);
+    const deleted = await deleteShow(id);
     if (!deleted) {
       return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }

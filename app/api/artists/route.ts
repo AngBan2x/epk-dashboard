@@ -17,7 +17,7 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
 // GET /api/artists — Listar todos los artistas (público)
 export async function GET() {
   try {
-    const artists = getAllArtists();
+    const artists = await getAllArtists();
     return NextResponse.json({ artists });
   } catch (error) {
     console.error("[API/artists] Error GET:", error);
@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const updated = updateArtist(id, body);
+    const updated = await updateArtist(id, body);
     if (!updated) {
       return NextResponse.json({ error: "Artista no encontrado" }, { status: 404 });
     }

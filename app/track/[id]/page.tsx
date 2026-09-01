@@ -20,7 +20,7 @@ interface TrackDetailPageProps {
 
 export async function generateMetadata({ params }: TrackDetailPageProps): Promise<Metadata> {
   const { id } = await params;
-  const track = getTrackById(id);
+  const track = await getTrackById(id);
   if (!track) {
     return { title: "Track no encontrado" };
   }
@@ -32,14 +32,14 @@ export async function generateMetadata({ params }: TrackDetailPageProps): Promis
 
 export default async function TrackDetailPage({ params }: TrackDetailPageProps) {
   const { id } = await params;
-  const track = getTrackById(id);
+  const track = await getTrackById(id);
 
   if (!track) {
     notFound();
   }
 
-  const artist = track.artist_name ? getArtistByName(track.artist_name) : null;
-  const allTracks = getAllTracks();
+  const artist = track.artist_name ? await getArtistByName(track.artist_name) : null;
+  const allTracks = await getAllTracks();
   const currentIndex = allTracks.findIndex((t) => t.id === track.id);
   const prevTrack = currentIndex > 0 ? allTracks[currentIndex - 1] : null;
   const nextTrack = currentIndex < allTracks.length - 1 ? allTracks[currentIndex + 1] : null;

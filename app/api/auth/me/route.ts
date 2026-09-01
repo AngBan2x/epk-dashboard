@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const user = getUserById(session.userId);
+    const user = await getUserById(session.userId);
     if (!user) {
       return NextResponse.json(
         { error: "Usuario no encontrado" },

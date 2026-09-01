@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const validated = LoginSchema.parse(body);
 
     // Buscar usuario
-    const user = getUserByEmail(validated.email);
+    const user = await getUserByEmail(validated.email);
     if (!user) {
       return NextResponse.json(
         { error: "Credenciales inválidas" },

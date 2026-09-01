@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     // Create in-app notification
     const notificationId = randomUUID();
-    const notification = createNotification({
+    const notification = await createNotification({
       id: notificationId,
       user_id: validated.user_id,
       type: validated.type,
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Send email if requested and resend is configured
     let emailSent = false;
     if (validated.send_email && resend) {
-      const user = getUserById(validated.user_id);
+      const user = await getUserById(validated.user_id);
       if (user?.email) {
         try {
           const template = getEmailTemplate(validated.type as NotificationType, {

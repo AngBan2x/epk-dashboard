@@ -2,8 +2,8 @@ import { getAllArtists } from "@/lib/db";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 
-export default function ArtistsPage() {
-  const artists = getAllArtists();
+export default async function ArtistsPage() {
+  const artists = await getAllArtists();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">

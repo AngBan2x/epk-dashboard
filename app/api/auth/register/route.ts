@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const validated = RegisterSchema.parse(body);
 
     // Verificar si el email ya existe
-    const existingUser = getUserByEmail(validated.email);
+    const existingUser = await getUserByEmail(validated.email);
     if (existingUser) {
       return NextResponse.json(
         { error: "Este email ya está registrado" },
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // Crear usuario
     const userId = randomUUID();
-    const user = createUser({
+    const user = await createUser({
       id: userId,
       name: validated.name,
       email: validated.email,
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     // Auto-create artist profile for artists
     if (user.role === "artist") {
-      createArtist({
+      await createArtist({
         name: user.name,
         userId: user.id,
         biography: undefined,
