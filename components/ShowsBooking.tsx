@@ -176,6 +176,13 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                     )}
                   </div>
                 </div>
+                {show.date && new Date(show.date) < new Date() && (
+                  <div className="mt-2 px-3 py-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700">
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      ⚠️ Este show ya pasó. Será eliminado automáticamente en 48 horas.
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })}

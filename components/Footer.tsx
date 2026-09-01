@@ -30,11 +30,6 @@ export function Footer() {
                   Catálogo de Tracks
                 </a>
               </li>
-              <li>
-                <a href="/dashboard" className="hover:text-emerald-500 transition-colors">
-                  Agregar Música
-                </a>
-              </li>
               {user?.role === "admin" && (
                 <li>
                   <a href="/admin" className="hover:text-emerald-500 transition-colors">

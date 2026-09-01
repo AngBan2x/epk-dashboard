@@ -126,6 +126,14 @@ export default function AdminPage() {
     fetchShows();
   }, []);
 
+  useEffect(() => {
+    if (editingArtist && editFormRef.current) {
+      setTimeout(() => {
+        editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [editingArtist]);
+
   const fetchTracks = async () => {
     try {
       const res = await fetch("/api/tracks");
@@ -311,7 +319,6 @@ export default function AdminPage() {
               Gestiona el catálogo y revisa envíos de artistas
             </p>
           </div>
-          //
         </div>
 
         {/* Tabs */}
@@ -806,25 +813,24 @@ export default function AdminPage() {
                         <h4 className="sm:text-lg font-medium text-slate-900 dark:text-slate-100 mb-1">
                           {artist.name}
                         </h4>
-                        <p className="sm:text-sm text-slate-500/8 leading-relaxed">
+                        <p className="sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                           {artist.genre || "Sin género"} • {artist.location || "Sin ubicación"}
                         </p>
                       </div>
                       <div className="sm:flex sm:items-center sm:gap-2">
 <button
-                      onClick={() => {
-                        setEditingArtist(artist);
-                        setArtistForm({
-                          name: artist.name,
-                          biography: artist.biography || "",
-                          press_text: artist.press_text || "",
-                          press_highlights: artist.press_highlights?.join("\n") || "",
-                          genre: artist.genre || "",
-                          location: artist.location || "",
-                          monthly_listeners: artist.monthly_listeners,
-                        });
-                        editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }}
+onClick={() => {
+                          setEditingArtist(artist);
+                          setArtistForm({
+                            name: artist.name,
+                            biography: artist.biography || "",
+                            press_text: artist.press_text || "",
+                            press_highlights: artist.press_highlights?.join("\n") || "",
+                            genre: artist.genre || "",
+                            location: artist.location || "",
+                            monthly_listeners: artist.monthly_listeners,
+                          });
+                        }}
                       className="px-3 py-1 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition"
                     >
                       Editar
@@ -1000,35 +1006,14 @@ export default function AdminPage() {
         {/* Shows Tab */}
         {activeTab === "shows" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Shows ({shows.length})
               </h3>
-              <button
-                onClick={() => {
-                  setEditingShow(null);
-                  setShowForm({
-                    artist_id: artists.length > 0 ? artists[0].id : "",
-                    venue_name: "",
-                    city: "",
-                    country: "",
-                    date: "",
-                    time: "",
-                    price_range: "",
-                    status: "disponible",
-                    ticket_url: "",
-                  });
-                }}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
-              >
-                + Nuevo Show
-              </button>
-            </div>
 
             {/* Show Form */}
-            {(!editingShow && showForm.venue_name === "" && false) || editingShow || showForm.venue_name !== "" ? (
+            {editingShow ? (
               <div className="p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                <h4 className="text-lg font-semibold mb-4">{editingShow ? "Editar Show" : "Nuevo Show"}</h4>
+                <h4 className="text-lg font-semibold mb-4">Editar Show</h4>
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
