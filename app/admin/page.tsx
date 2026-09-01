@@ -894,8 +894,13 @@ onSubmit={async (e) => {
                       fetchArtists();
                       setMessage({ type: "success", text: "Artista actualizado correctamente" });
                     } else {
-                      const error = await res.json();
-                      setMessage({ type: "error", text: error.error || "Error al guardar" });
+                      const text = await res.text();
+                      try {
+                        const error = JSON.parse(text);
+                        setMessage({ type: "error", text: error.error || `Error ${res.status}` });
+                      } catch {
+                        setMessage({ type: "error", text: `Error ${res.status}: ${text.slice(0, 100)}` });
+                      }
                     }
                   } catch {
                     setMessage({ type: "error", text: "Error de conexión" });
