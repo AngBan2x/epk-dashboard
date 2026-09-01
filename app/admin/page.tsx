@@ -134,6 +134,13 @@ export default function AdminPage() {
     }
   }, [editingArtist]);
 
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const fetchTracks = async () => {
     try {
       const res = await fetch("/api/tracks");
@@ -210,8 +217,6 @@ export default function AdminPage() {
       lyrics: track.lyrics || "",
     });
   };
-
-  //
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

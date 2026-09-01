@@ -6,8 +6,7 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
   if (!sessionCookie) return null;
   try {
     const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; exp: number; role?: string };
-    if (!session.exp || session.exp < Date.now()) return null;
+    const session = JSON.parse(decoded) as { userId: string; role?: string };
     return { userId: session.userId, role: session.role || "artist" };
   } catch {
     return null;
