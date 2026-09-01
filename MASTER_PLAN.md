@@ -519,7 +519,91 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v3.1.0 | Fase H: Verificación Final | **STABLE** | ✅ Completado |
 | v3.2.0 | Fase I: Skills + Agents para Fixes | minor | ✅ Completado |
 | v3.3.0 | Fase J: 5 Fixes Críticos | minor | ✅ Completado |
-| v3.4.0 | Fase K: Fixes UI/UX + BioSection Per-Artist | minor | ✅ Completado (K8c/K8d: artist browse + detail pages) |
+| v3.4.0 | Fase K: Fixes UI/UX + BioSection Per-Artist | minor | ✅ Completado |
+| v3.5.0 | Fase L: Fixes Auth + UI + RBAC + Shows | minor | ✅ Completada |
+
+---
+
+## 21. FASE L — Fixes Auth + UI + RBAC + Shows
+
+> **Objetivo:** Corregir problemas de auth/UI + implementar RBAC por rol + sistema de Shows & Booking.
+
+### 21.1 Arquitectura por Rol
+
+| Rol | Dashboard Muestra | Puede Editar |
+|-----|-------------------|--------------|
+| **Invitado** | Carrusel Bio + Shows de TODOS los artistas | Nada |
+| **Artista** | Sus propias secciones Bio + Shows | Solo las suyas |
+| **Admin** | Link a "Panel de admin" | Todo (cualquier artista) |
+
+### 21.2 Tareas de la Fase L
+
+| # | Fix/Feature | Agente | Archivos | Modelo |
+|---|-------------|--------|----------|--------|
+| **Auth Fixes** | | | | |
+| L1 | Fix `createArtist` dual connection | `api-builder` | `lib/db.ts` | `opencode/mimo-v2.5-free` |
+| L2 | Fix `bcryptjs` externalization | `api-builder` | `next.config.js` | `opencode/mimo-v2.5-free` |
+| L3 | LoginModal: confirm password + dead code | `dashboard-builder` | `components/LoginModal.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| **UI Fixes** | | | | |
+| L4 | Fix barra blanca (globals.css gradient) | `dashboard-builder` | `app/globals.css`, `app/layout.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| L5 | Footer: role check + social links (IG + X) | `brand-fixer` | `components/Footer.tsx` | `opencode/mimo-v2.5-free` |
+| L6 | EPKCard: dark mode text `dark:text-white` | `dashboard-builder` | `components/EPKCard.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| **Likes** | | | | |
+| L7 | Likes: session cookie + login prompt | `api-builder` | `app/api/likes/route.ts`, `components/EPKCard.tsx` | `opencode/mimo-v2.5-free` |
+| **RBAC Dashboard** | | | | |
+| L8 | Dashboard por rol (invitado/artista/admin) | `dashboard-builder` | `app/dashboard/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| **Shows & Booking (NUEVO)** | | | | |
+| L9 | DB: tabla `shows` + CRUD | `db-builder` | `lib/db.ts`, `types/music.ts` | `opencode/nemotron-3-ultra-free` |
+| L10 | API: `app/api/shows/route.ts` | `api-builder` | NUEVO `app/api/shows/route.ts` | `opencode/mimo-v2.5-free` |
+| L11 | Componente `ShowsBooking.tsx` | `dashboard-builder` | NUEVO `components/ShowsBooking.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| L12 | Admin: tab "Shows" con CRUD | `dashboard-builder` | `app/admin/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| L13 | Artista: editar sus shows | `dashboard-builder` | `app/dashboard/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+
+### 21.3 DB: Tabla Shows
+
+```sql
+CREATE TABLE IF NOT EXISTS shows (
+  id TEXT PRIMARY KEY,
+  artist_id TEXT NOT NULL,
+  venue_name TEXT NOT NULL,
+  city TEXT,
+  country TEXT,
+  date TEXT,
+  time TEXT,
+  price_range TEXT,
+  status TEXT DEFAULT 'disponible',
+  ticket_url TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (artist_id) REFERENCES artists(id)
+);
+```
+
+### 21.4 Estados de Show
+
+| Estado | Color | Descripción |
+|--------|-------|-------------|
+| `disponible` | Verde | Tickets a la venta |
+| `agotado` | Rojo | Sin tickets |
+| `proximamente` | Amarillo | Próximamente a la venta |
+| `vip` | Púrpura | VIP disponible |
+| `cancelado` | Gris | Evento cancelado |
+| `pausado` | Naranja | Ventas pausadas |
+
+### 21.5 Criterios de Aprobación
+
+| Check | Resultado Esperado |
+|-------|-------------------|
+| Login funcional | Admin y artistas pueden iniciar sesión |
+| Registro funcional | LoginModal registra con confirm password |
+| Sin barra blanca | Footer sin gap |
+| Admin link oculto | Solo visible para admin en nav y footer |
+| Social links | Instagram + X únicamente |
+| Dark mode text | `dark:text-white` en títulos |
+| Likes | Guests ven login prompt, users dan like |
+| Dashboard invitado | Carrusel bio + shows de todos los artistas |
+| Dashboard artista | Edita sus propias secciones |
+| Dashboard admin | Link a panel admin, gestiona todo |
+| Shows CRUD | Tabla `shows` con estados, API, componente |
 
 ---
 

@@ -1496,3 +1496,89 @@ Crear herramientas (skills y agents) que aceleren las correcciones de 5 problema
 ### Commits
 - `0c57c35` — feat: Fase K completa - 13 fixes UI/UX + BioSection Per-Artist
 - Release: `v3.4.0` — https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.4.0
+
+---
+
+## Fase L: Fixes Auth + UI + RBAC + Shows & Booking (v3.5.0)
+
+**Fecha:** 2026-09-01
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Objetivo
+Corregir problemas de auth/UI + implementar RBAC por rol + sistema de Shows & Booking completo.
+
+### Tareas Ejecutadas (13/13)
+
+| # | Tarea | Agente | Archivos | Estado |
+|---|-------|--------|----------|--------|
+| L1 | Fix `createArtist` dual connection | `api-builder` | `lib/db.ts` | ✅ |
+| L2 | Fix `bcryptjs` externalization | `api-builder` | `next.config.js` | ✅ |
+| L3 | LoginModal: confirm password + dead code | `dashboard-builder` | `components/LoginModal.tsx` | ✅ |
+| L4 | Fix barra blanca (globals.css gradient) | `dashboard-builder` | `app/globals.css`, `app/layout.tsx` | ✅ |
+| L5 | Footer: role check + social links (IG + X) | `brand-fixer` | `components/Footer.tsx` | ✅ |
+| L6 | EPKCard: dark mode text `dark:text-white` | `dashboard-builder` | `components/EPKCard.tsx` | ✅ |
+| L7 | Likes: session cookie + login prompt | `api-builder` | `app/api/likes/route.ts`, `components/EPKCard.tsx` | ✅ |
+| L8 | Dashboard por rol (invitado/artista/admin) | `dashboard-builder` | `app/dashboard/page.tsx` | ✅ |
+| L9 | DB: tabla `shows` + CRUD | `db-builder` | `lib/db.ts`, `types/music.ts` | ✅ |
+| L10 | API: `app/api/shows/route.ts` | `api-builder` | NUEVO `app/api/shows/route.ts` | ✅ |
+| L11 | Componente `ShowsBooking.tsx` | `dashboard-builder` | NUEVO `components/ShowsBooking.tsx` | ✅ |
+| L12 | Admin: tab "Shows" con CRUD | `dashboard-builder` | `app/admin/page.tsx` | ✅ |
+| L13 | Artista: editar sus shows | `dashboard-builder` | `app/dashboard/page.tsx` | ✅ |
+
+### Detalle de Cambios
+
+#### Auth Fixes
+- **L1:** `createArtist()` ahora usa `getDbWrite()` para read-back después del INSERT (corrige bug dual connection donde writes no se leían)
+- **L2:** `bcryptjs` añadido a `serverComponentsExternalPackages` en `next.config.js`
+- **L3:** LoginModal ahora incluye campo "Confirmar Contraseña" en registro, con validación de coincidencia. Eliminada función muerta `handleSubmit` duplicada al final del archivo
+
+#### UI Fixes
+- **L4:** Eliminado gradiente CSS que terminaba en `#fff` (causaba barra blanca). `body` ahora usa color sólido. Eliminado `pb-24` del wrapper en `layout.tsx`
+- **L5:** Footer ahora es `"use client"` con `useAuth()`. Link "Panel Admin" solo visible para `role === "admin"`. Red社会ales reemplazadas: solo Instagram + X (Twitter), eliminados PressPlay link y Apple Music
+- **L6:** Título de EPKCard cambiado de `dark:text-slate-100` a `dark:text-white` para mejor contraste
+
+#### Likes
+- **L7:** API de likes ahora lee user ID de session cookie (`session_user_id`) con fallback a `x-user-id` header. EPKCard muestra modal de login para guests al intentar dar like
+
+#### RBAC Dashboard
+- **L8:** Dashboard ahora muestra contenido diferente por rol:
+  - **Invitado:** Carrusel de bio + shows de TODOS los artistas
+  - **Artista:** Edita sus propias secciones Bio + Shows
+  - **Admin:** Link a panel admin + grid de tracks
+
+#### Shows & Booking (NUEVO)
+- **L9:** Tabla `shows` con campos: id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url. CRUD completo: `getAllShows`, `getShowsByArtist`, `getShowById`, `createShow`, `updateShow`, `deleteShow`
+- **L10:** API REST completa: GET (list/filter), POST (create), PUT (update), DELETE con validación Zod
+- **L11:** Componente `ShowsBooking.tsx` con colores por estado (verde/rojo/amarillo/púrpura/gris/naranja), soporte para modo editable con acciones CRUD
+- **L12:** Admin page ahora tiene tab "Shows" con tabla + formulario de creación/edición
+- **L13:** Dashboard de artista ahora incluye `ShowsBooking` editable para gestionar sus shows
+
+### Quality Gates
+
+| Check | Herramienta | Umbral | Resultado |
+|-------|-------------|--------|-----------|
+| TypeScript Strict | `npx tsc --noEmit` | 0 errores | ✅ 0 errores |
+| Unit Tests | Vitest | 41/41 passing | ✅ 41/41 |
+
+### Archivos Modificados/Creados
+
+| Archivo | Acción |
+|---------|--------|
+| `lib/db.ts` | Modificado (L1, L9) |
+| `next.config.js` | Modificado (L2) |
+| `components/LoginModal.tsx` | Modificado (L3) |
+| `app/globals.css` | Modificado (L4) |
+| `app/layout.tsx` | Modificado (L4) |
+| `components/Footer.tsx` | Modificado (L5) |
+| `components/EPKCard.tsx` | Modificado (L6, L7) |
+| `app/api/likes/route.ts` | Modificado (L7) |
+| `app/dashboard/page.tsx` | Modificado (L8, L13) |
+| `types/music.ts` | Modificado (L9) |
+| `app/api/shows/route.ts` | NUEVO (L10) |
+| `components/ShowsBooking.tsx` | NUEVO (L11) |
+| `app/admin/page.tsx` | Modificado (L12) |
+
+### Commits
+- `feat(phase-l): auth fixes + UI + RBAC + Shows & Booking`
+- Release: `v3.5.0`

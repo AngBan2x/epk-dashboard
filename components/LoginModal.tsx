@@ -17,6 +17,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,6 +33,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       } else {
         if (password.length < 8) {
           setError("La contraseña debe tener al menos 8 caracteres");
+          setLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError("Las contraseñas no coinciden");
           setLoading(false);
           return;
         }
@@ -135,6 +141,24 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             />
           </div>
 
+          {!isLogin && (
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Confirmar Contraseña
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required={!isLogin}
+                minLength={8}
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                placeholder="Repite tu contraseña"
+              />
+            </div>
+          )}
+
           <Button type="submit" className="w-full py-3" disabled={loading}>
             {loading ? (isLogin ? "Iniciando..." : "Creando...") : (isLogin ? "Iniciar Sesión" : "Crear Cuenta")}
           </Button>
@@ -155,8 +179,4 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   );
 
   return createPortal(modalContent, document.body);
-}
-
-function handleSubmit(e: React.FormEvent) {
-  e.preventDefault();
 }

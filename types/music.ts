@@ -212,3 +212,46 @@ export interface CreateArtistInput {
   location?: string;
   monthly_listeners?: number;
 }
+
+// Shows & Booking
+export type ShowStatus = "disponible" | "agotado" | "proximamente" | "vip" | "cancelado" | "pausado";
+
+export interface Show {
+  id: string;
+  artist_id: string;
+  venue_name: string;
+  city: string | null;
+  country: string | null;
+  date: string | null;
+  time: string | null;
+  price_range: string | null;
+  status: ShowStatus;
+  ticket_url: string | null;
+  created_at: string;
+}
+
+export interface RawShowRow {
+  id: string;
+  artist_id: string;
+  venue_name: string;
+  city: string | null;
+  country: string | null;
+  date: string | null;
+  time: string | null;
+  price_range: string | null;
+  status: string;
+  ticket_url: string | null;
+  created_at: string;
+}
+
+export interface CreateShowInput {
+  artist_id: string;
+  venue_name: string;
+  city?: string;
+  country?: string;
+  date?: string;
+  time?: string;
+  price_range?: string;
+  status?: ShowStatus;
+  ticket_url?: string;
+}

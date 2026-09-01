@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { safeString } from "@/lib/null-safe";
-import type { Track, ArtistProfile } from "@/types/music";
+import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
@@ -64,12 +64,25 @@ interface Notification {
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"tracks" | "submissions" | "notifications" | "artists">("tracks");
+  const [activeTab, setActiveTab] = useState<"tracks" | "submissions" | "notifications" | "artists" | "shows">("tracks");
   const [tracks, setTracks] = useState<AdminTrack[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [editingArtist, setEditingArtist] = useState<ArtistProfile | null>(null);
+  const [shows, setShows] = useState<Show[]>([]);
+  const [editingShow, setEditingShow] = useState<Show | null>(null);
+  const [showForm, setShowForm] = useState({
+    artist_id: "",
+    venue_name: "",
+    city: "",
+    country: "",
+    date: "",
+    time: "",
+    price_range: "",
+    status: "disponible" as ShowStatus,
+    ticket_url: "",
+  });
   const [artistForm, setArtistForm] = useState({
     name: "",
     biography: "",
@@ -109,6 +122,7 @@ export default function AdminPage() {
     fetchSubmissions();
     fetchNotifications();
     fetchArtists();
+    fetchShows();
   }, []);
 
   const fetchTracks = async () => {
@@ -158,6 +172,18 @@ export default function AdminPage() {
       }
     } catch {
       console.error("Error fetching artists");
+    }
+  };
+
+  const fetchShows = async () => {
+    try {
+      const res = await fetch("/api/shows");
+      if (res.ok) {
+        const data = await res.json();
+        setShows(data.shows || []);
+      }
+    } catch {
+      console.error("Error fetching shows");
     }
   };
 
@@ -329,6 +355,16 @@ export default function AdminPage() {
               }`}
             >
               Artistas ({artists.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("shows")}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
+                activeTab === "shows"
+                  ? "bg-emerald-500 text-white"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              Shows ({shows.length})
             </button>
           </nav>
         </div>
@@ -932,6 +968,277 @@ export default function AdminPage() {
                 </form>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Shows Tab */}
+        {activeTab === "shows" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Shows ({shows.length})
+              </h3>
+              <button
+                onClick={() => {
+                  setEditingShow(null);
+                  setShowForm({
+                    artist_id: artists.length > 0 ? artists[0].id : "",
+                    venue_name: "",
+                    city: "",
+                    country: "",
+                    date: "",
+                    time: "",
+                    price_range: "",
+                    status: "disponible",
+                    ticket_url: "",
+                  });
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+              >
+                + Nuevo Show
+              </button>
+            </div>
+
+            {/* Show Form */}
+            {(!editingShow && showForm.venue_name === "" && false) || editingShow || showForm.venue_name !== "" ? (
+              <div className="p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <h4 className="text-lg font-semibold mb-4">{editingShow ? "Editar Show" : "Nuevo Show"}</h4>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      if (editingShow) {
+                        const res = await fetch("/api/shows", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: editingShow.id, ...showForm }),
+                        });
+                        if (res.ok) {
+                          setEditingShow(null);
+                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "disponible", ticket_url: "" });
+                          fetchShows();
+                          setMessage({ type: "success", text: "Show actualizado" });
+                        }
+                      } else {
+                        const res = await fetch("/api/shows", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(showForm),
+                        });
+                        if (res.ok) {
+                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "disponible", ticket_url: "" });
+                          fetchShows();
+                          setMessage({ type: "success", text: "Show creado" });
+                        }
+                      }
+                    } catch {
+                      setMessage({ type: "error", text: "Error al guardar show" });
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Artista *</label>
+                      <select
+                        required
+                        value={showForm.artist_id}
+                        onChange={(e) => setShowForm({ ...showForm, artist_id: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      >
+                        <option value="">Seleccionar artista</option>
+                        {artists.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Lugar *</label>
+                      <input
+                        type="text"
+                        required
+                        value={showForm.venue_name}
+                        onChange={(e) => setShowForm({ ...showForm, venue_name: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                        placeholder="Nombre del lugar"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ciudad</label>
+                      <input
+                        type="text"
+                        value={showForm.city}
+                        onChange={(e) => setShowForm({ ...showForm, city: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">País</label>
+                      <input
+                        type="text"
+                        value={showForm.country}
+                        onChange={(e) => setShowForm({ ...showForm, country: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha</label>
+                      <input
+                        type="date"
+                        value={showForm.date}
+                        onChange={(e) => setShowForm({ ...showForm, date: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Hora</label>
+                      <input
+                        type="time"
+                        value={showForm.time}
+                        onChange={(e) => setShowForm({ ...showForm, time: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Rango de Precio</label>
+                      <input
+                        type="text"
+                        value={showForm.price_range}
+                        onChange={(e) => setShowForm({ ...showForm, price_range: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                        placeholder="ej: $20-$50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Estado</label>
+                      <select
+                        value={showForm.status}
+                        onChange={(e) => setShowForm({ ...showForm, status: e.target.value as ShowStatus })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      >
+                        <option value="disponible">Disponible</option>
+                        <option value="agotado">Agotado</option>
+                        <option value="proximamente">Próximamente</option>
+                        <option value="vip">VIP</option>
+                        <option value="cancelado">Cancelado</option>
+                        <option value="pausado">Pausado</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">URL Tickets</label>
+                    <input
+                      type="url"
+                      value={showForm.ticket_url}
+                      onChange={(e) => setShowForm({ ...showForm, ticket_url: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      className="px-6 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                    >
+                      {editingShow ? "Guardar Cambios" : "Crear Show"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingShow(null);
+                        setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "disponible", ticket_url: "" });
+                      }}
+                      className="px-6 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : null}
+
+            {/* Shows Table */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+              {shows.length === 0 ? (
+                <div className="p-8 text-center text-slate-400">
+                  <p>No hay shows registrados.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800">
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Lugar</th>
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Artista</th>
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Ciudad</th>
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Fecha</th>
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Estado</th>
+                        <th className="text-right p-3 font-semibold text-slate-700 dark:text-slate-300">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shows.map((show) => {
+                        const artist = artists.find((a) => a.id === show.artist_id);
+                        return (
+                          <tr key={show.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                            <td className="p-3 font-medium text-slate-900 dark:text-slate-100">{show.venue_name}</td>
+                            <td className="p-3 text-slate-600 dark:text-slate-400">{artist?.name || "—"}</td>
+                            <td className="p-3 text-slate-600 dark:text-slate-400">{[show.city, show.country].filter(Boolean).join(", ") || "—"}</td>
+                            <td className="p-3 text-slate-600 dark:text-slate-400">{show.date || "—"}</td>
+                            <td className="p-3">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                show.status === "disponible" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
+                                show.status === "agotado" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
+                                show.status === "proximamente" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" :
+                                show.status === "vip" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
+                                show.status === "cancelado" ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" :
+                                "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                              }`}>
+                                {show.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingShow(show);
+                                    setShowForm({
+                                      artist_id: show.artist_id,
+                                      venue_name: show.venue_name,
+                                      city: show.city || "",
+                                      country: show.country || "",
+                                      date: show.date || "",
+                                      time: show.time || "",
+                                      price_range: show.price_range || "",
+                                      status: show.status,
+                                      ticket_url: show.ticket_url || "",
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
+                                >
+                                  ✏️ Editar
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (confirm("¿Eliminar este show?")) {
+                                      await fetch(`/api/shows?id=${show.id}`, { method: "DELETE" });
+                                      fetchShows();
+                                    }
+                                  }}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
+                                >
+                                  🗑️ Eliminar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
