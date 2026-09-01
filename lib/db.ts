@@ -877,17 +877,29 @@ export async function createArtist(data: CreateArtistInput): Promise<ArtistProfi
   return parseArtist(row);
 }
 
-export async function updateArtist(id: string, data: Partial<CreateArtistInput>): Promise<ArtistProfile | null> {
+export async function updateArtist(id: string, data: Partial<CreateArtistInput> & Record<string, unknown>): Promise<ArtistProfile | null> {
+  // Accept both camelCase and snake_case from forms
+  const name = (data.name ?? data.name) as string | undefined;
+  const biography = (data.biography ?? data.biography) as string | undefined;
+  const pressText = (data.pressText ?? data.press_text) as string | undefined;
+  const pressHighlights = (data.pressHighlights ?? data.press_highlights) as string[] | undefined;
+  const genre = (data.genre ?? data.genre) as string | undefined;
+  const location = (data.location ?? data.location) as string | undefined;
+  const monthlyListeners = (data.monthly_listeners ?? data.monthlyListeners) as number | undefined;
+  const userId = (data.userId ?? data.user_id) as string | undefined;
+
   if (USE_TURSO) {
     const updates: string[] = [];
     const values: unknown[] = [];
 
-    if (data.biography !== undefined) { updates.push("biography = ?"); values.push(data.biography); }
-    if (data.pressText !== undefined) { updates.push("press_text = ?"); values.push(data.pressText); }
-    if (data.pressHighlights !== undefined) { updates.push("press_highlights = ?"); values.push(JSON.stringify(data.pressHighlights)); }
-    if (data.genre !== undefined) { updates.push("genre = ?"); values.push(data.genre); }
-    if (data.location !== undefined) { updates.push("location = ?"); values.push(data.location); }
-    if (data.userId !== undefined) { updates.push("user_id = ?"); values.push(data.userId); }
+    if (name !== undefined) { updates.push("name = ?"); values.push(name); }
+    if (biography !== undefined) { updates.push("biography = ?"); values.push(biography); }
+    if (pressText !== undefined) { updates.push("press_text = ?"); values.push(pressText); }
+    if (pressHighlights !== undefined) { updates.push("press_highlights = ?"); values.push(JSON.stringify(pressHighlights)); }
+    if (genre !== undefined) { updates.push("genre = ?"); values.push(genre); }
+    if (location !== undefined) { updates.push("location = ?"); values.push(location); }
+    if (monthlyListeners !== undefined) { updates.push("monthly_listeners = ?"); values.push(monthlyListeners); }
+    if (userId !== undefined) { updates.push("user_id = ?"); values.push(userId); }
 
     if (updates.length === 0) return getArtistById(id);
 
@@ -901,12 +913,14 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput>)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const values: any[] = [];
 
-  if (data.biography !== undefined) { updates.push("biography = ?"); values.push(data.biography); }
-  if (data.pressText !== undefined) { updates.push("press_text = ?"); values.push(data.pressText); }
-  if (data.pressHighlights !== undefined) { updates.push("press_highlights = ?"); values.push(JSON.stringify(data.pressHighlights)); }
-  if (data.genre !== undefined) { updates.push("genre = ?"); values.push(data.genre); }
-  if (data.location !== undefined) { updates.push("location = ?"); values.push(data.location); }
-  if (data.userId !== undefined) { updates.push("user_id = ?"); values.push(data.userId); }
+  if (name !== undefined) { updates.push("name = ?"); values.push(name); }
+  if (biography !== undefined) { updates.push("biography = ?"); values.push(biography); }
+  if (pressText !== undefined) { updates.push("press_text = ?"); values.push(pressText); }
+  if (pressHighlights !== undefined) { updates.push("press_highlights = ?"); values.push(JSON.stringify(pressHighlights)); }
+  if (genre !== undefined) { updates.push("genre = ?"); values.push(genre); }
+  if (location !== undefined) { updates.push("location = ?"); values.push(location); }
+  if (monthlyListeners !== undefined) { updates.push("monthly_listeners = ?"); values.push(monthlyListeners); }
+  if (userId !== undefined) { updates.push("user_id = ?"); values.push(userId); }
 
   if (updates.length === 0) return getArtistById(id);
 
