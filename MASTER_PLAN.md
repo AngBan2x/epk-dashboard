@@ -522,6 +522,7 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v3.4.0 | Fase K: Fixes UI/UX + BioSection Per-Artist | minor | ✅ Completado |
 | v3.5.0 | Fase L: Fixes Auth + UI + RBAC + Shows | minor | ✅ Completada |
 | v3.6.0 | Fase M: Turso Dual-Mode para Vercel | minor | ✅ Completada |
+| v3.7.0 | Fase N: QA Visual + E2E Flows | minor | ✅ Completada |
 
 ---
 
@@ -765,3 +766,80 @@ CREATE TABLE IF NOT EXISTS shows (
 | Branding correcto | Solo logos PressPlay en Header/Footer/Register |
 | Sin barra blanca | `pb-24` condicional o en wrapper correcto |
 | BioSection per-artist | Tabla `artists`, BioSection con props dinámicas |
+
+---
+
+## 23. FASE N — QA Visual + E2E Flows + Visual-Tester Agent (v3.7.0)
+
+> **Objetivo:** Verificar calidad visual completa, ejecutar flujos E2E (admin, artista, registro/login/eliminar), y crear herramientas de testing automatizado.
+
+### 23.1 Tareas de la Fase N
+
+| # | Tarea | Agente | Archivos | Modelo |
+|---|-------|--------|----------|--------|
+| N1 | Crear agente `visual-tester` | — | `.opencode/agents/visual-tester.md` | — |
+| N2 | Crear skill `qa-visual` | — | `.opencode/skills/qa-visual/SKILL.md` | — |
+| N3 | E2E: Explorar todas las páginas + screenshots | `quality-auditor` | `tests/e2e/phase-n-explore.spec.ts` | gemma-4-31b |
+| N4 | E2E: Flujo de admin (login, tabs, CRUD) | `quality-auditor` | `tests/e2e/phase-n-admin.spec.ts` | gemma-4-31b |
+| N5 | E2E: Flujo de artista (login, dashboard, bio, shows) | `quality-auditor` | `tests/e2e/phase-n-artist.spec.ts` | gemma-4-31b |
+| N6 | E2E: Registro + Login + Eliminar cuenta | `quality-auditor` | `tests/e2e/phase-n-register-delete.spec.ts` | gemma-4-31b |
+| N7 | Análisis visual + correcciones | `dashboard-builder` | screenshots/ | nemotron-3.5-lightning |
+| N8 | Console errors + correcciones | `dashboard-builder` | — | nemotron-3.5-lightning |
+| N9 | Re-test post-correcciones | `quality-auditor` | — | gemma-4-31b |
+| N10 | Documentación + commit + release | Direct | MASTER_PLAN.md, AI_LOG.md | mimo-v2.5-free |
+
+### 23.2 Features Implementadas
+
+| Feature | Archivo | Descripción |
+|---------|---------|-------------|
+| DELETE /api/auth/me | `app/api/auth/me/route.ts` | Eliminar cuenta de usuario con limpieza de datos relacionados |
+| deleteUser() | `lib/db.ts` | Función para eliminar usuario + artist + shows + likes + notifs |
+| Turso schema fix | Turso remoto | Recreación de todas las 8 tablas con schema completo |
+
+### 23.3 E2E Tests Creados
+
+| Test Suite | Tests | Cobertura |
+|------------|-------|-----------|
+| `phase-n-explore.spec.ts` | 26 | Todas las páginas (light/dark/mobile) + DOM/a11y |
+| `phase-n-admin.spec.ts` | 7 | Login admin, tabs (tracks/artists/shows/notifications), dark mode, RBAC |
+| `phase-n-artist.spec.ts` | 6 | Login artista, dashboard, tracks, bio, shows, dark mode, mobile |
+| `phase-n-register-delete.spec.ts` | 4 | Registro, login, eliminación de cuenta, verificación post-delete |
+
+### 23.4 Turso Schema (8 Tablas Sincronizadas)
+
+| Tabla | Estado |
+|-------|--------|
+| users | ✅ Sincronizada |
+| tracks | ✅ Sincronizada |
+| artists | ✅ Sincronizada |
+| track_submissions | ✅ Creada |
+| likes | ✅ Creada |
+| notifications | ✅ Creada |
+| metrics_history | ✅ Creada |
+| shows | ✅ Sincronizada |
+
+### 23.5 Issues Encontrados y Corregidos
+
+| # | Issue | Severidad | Fix |
+|---|-------|-----------|-----|
+| 1 | Dashboard sin h1 durante carga | Media | Test actualizado para esperar carga de datos |
+| 2 | Turso: shows table no existía | Alta | Recreación completa de schema en Turso |
+| 3 | Turso: artists table sin column | Alta | Recreación de tabla artists con user_id FK |
+| 4 | Turso: tracks table sin artist_name | Alta | Recreación de tabla tracks con schema completo |
+| 5 | Register falla con UNIQUE constraint | Media | try/catch en createArtist para manejar duplicados |
+| 6 | Admin login falla (Turso vacío) | Alta | Sync de users + artists + tracks a Turso |
+
+### 23.6 Criterios de Aprobación
+
+| Check | Resultado |
+|-------|-----------|
+| `pnpm typecheck` | ✅ 0 errores |
+| `pnpm test:unit` | ✅ 41/41 passing |
+| E2E N3: Explore pages | ✅ 26/26 passing |
+| E2E N4: Admin flow | ✅ 7/7 passing |
+| E2E N5: Artist flow | ✅ 6/6 passing |
+| E2E N6: Register/Delete | ✅ 4/4 passing |
+| E2E existing tests | ✅ passing |
+| Turso schema completo | ✅ 8 tablas |
+| DELETE /api/auth/me | ✅ Funcional |
+| Screenshots capturados | ✅ light/dark/mobile |

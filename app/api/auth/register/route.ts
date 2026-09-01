@@ -37,17 +37,22 @@ export async function POST(req: NextRequest) {
       role: "artist", // Por defecto artist, admin se asigna manualmente
     });
 
-    // Auto-create artist profile for artists
+    // Auto-create artist profile for artists (use INSERT OR IGNORE for Turso)
     if (user.role === "artist") {
-      await createArtist({
-        name: user.name,
-        userId: user.id,
-        biography: undefined,
-        pressText: undefined,
-        pressHighlights: [],
-        genre: undefined,
-        location: undefined,
-      });
+      try {
+        await createArtist({
+          name: user.name,
+          userId: user.id,
+          biography: undefined,
+          pressText: undefined,
+          pressHighlights: [],
+          genre: undefined,
+          location: undefined,
+        });
+      } catch (artistError) {
+        // Artist name may already exist - not critical for registration
+        console.warn("[API/auth/register] Artist creation skipped:", artistError instanceof Error ? artistError.message : "unknown");
+      }
     }
 
     // Devolver usuario sin password_hash

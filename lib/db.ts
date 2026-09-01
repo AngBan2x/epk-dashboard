@@ -447,6 +447,38 @@ export async function verifyUserPassword(email: string, _password: string): Prom
   return getUserByEmail(email);
 }
 
+export async function deleteUser(userId: string): Promise<boolean> {
+  if (USE_TURSO) {
+    // Delete related data first
+    await tursoExec("DELETE FROM likes WHERE user_id = ?", [userId]);
+    await tursoExec("DELETE FROM notifications WHERE user_id = ?", [userId]);
+    await tursoExec("DELETE FROM track_submissions WHERE user_id = ?", [userId]);
+    // Delete artist profile if exists
+    const artist = await getArtistByUserId(userId);
+    if (artist) {
+      await tursoExec("DELETE FROM shows WHERE artist_id = ?", [artist.id]);
+      await tursoExec("DELETE FROM artists WHERE id = ?", [artist.id]);
+    }
+    // Delete user
+    await tursoExec("DELETE FROM users WHERE id = ?", [userId]);
+    return true;
+  }
+  const db = getLocalDbWrite();
+  // Delete related data first
+  db.prepare("DELETE FROM likes WHERE user_id = ?").run(userId);
+  db.prepare("DELETE FROM notifications WHERE user_id = ?").run(userId);
+  db.prepare("DELETE FROM track_submissions WHERE user_id = ?").run(userId);
+  // Delete artist profile if exists
+  const artist = await getArtistByUserId(userId);
+  if (artist) {
+    db.prepare("DELETE FROM shows WHERE artist_id = ?").run(artist.id);
+    db.prepare("DELETE FROM artists WHERE id = ?").run(artist.id);
+  }
+  // Delete user
+  db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+  return true;
+}
+
 // ─── Track Submissions CRUD ─────────────────────────────────────────────────
 
 export async function createTrackSubmission(
