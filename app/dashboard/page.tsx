@@ -1,5 +1,7 @@
 "use client";
 
+import { Metadata } from "next";
+
 import { Header } from "@/components/Header";
 import { EPKCard } from "@/components/EPKCard";
 import { EPKExporter } from "@/components/EPKExporter";
