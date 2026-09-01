@@ -1489,6 +1489,10 @@ Crear herramientas (skills y agents) que aceleren las correcciones de 5 problema
 
 | Check | Herramienta | Umbral | Resultado |
 |-------|-------------|--------|-----------|
-| TypeScript Strict | `npx tsc --noEmit` | 0 errores | ✅ 0 errores nuevos |
-| Null-Safety UI | `validar-null-safety` skill | 100% campos opcionales cubiertos | ✅ Campos opcionales protegidos |
-| MCP Health | `auditar-mcp` skill | 4/4 servidores respondiendo | ✅ 4/4 activos |
+| TypeScript Strict | `npx tsc --noEmit` | 0 errores | ✅ 0 errores |
+| Unit Tests | Vitest | 41/41 passing | ✅ 41/41 |
+| E2E Tests | Playwright | 13/13 passing | ✅ 13/13 |
+
+### Commits
+- `0c57c35` — feat: Fase K completa - 13 fixes UI/UX + BioSection Per-Artist
+- Release: `v3.4.0` — https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.4.0
