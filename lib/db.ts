@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus, Like, RawLikeRow, Notification, RawNotificationRow, NotificationType, MetricsHistory, RawMetricsHistoryRow, TopCountry, ArtistProfile, CreateArtistInput } from "@/types/music";
+import type { Track, RawTrackRow, Metrics, ProductionDetails, StemsUrls, User, RawUserRow, TrackSubmission, RawTrackSubmissionRow, SubmissionStatus, Like, RawLikeRow, Notification, RawNotificationRow, NotificationType, MetricsHistory, RawMetricsHistoryRow, TopCountry, ArtistProfile, CreateArtistInput, Show, RawShowRow, CreateShowInput, ShowStatus } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
@@ -156,6 +156,31 @@ function initArtistsTable(): void {
   }
 }
 initArtistsTable();
+
+// Initialize shows table
+function initShowsTable(): void {
+  const db = getDbWrite();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS shows (
+      id TEXT PRIMARY KEY,
+      artist_id TEXT NOT NULL,
+      venue_name TEXT NOT NULL,
+      city TEXT,
+      country TEXT,
+      date TEXT,
+      time TEXT,
+      price_range TEXT,
+      status TEXT DEFAULT 'disponible',
+      ticket_url TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (artist_id) REFERENCES artists(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_shows_artist ON shows(artist_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_shows_date ON shows(date)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_shows_status ON shows(status)`);
+}
+initShowsTable();
 
 function parseUser(row: RawUserRow): User {
   return {
@@ -467,9 +492,10 @@ export function createArtist(data: CreateArtistInput): ArtistProfile {
     INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, data.name, data.userId || null, data.biography || null, data.pressText || null, pressHighlights, data.genre || null, data.location || null, data.monthly_listeners || 0);
-  const created = getArtistById(id);
-  if (!created) throw new Error("Failed to create artist");
-  return created;
+  // Read back using same write connection (fixes dual connection bug)
+  const row = db.prepare("SELECT * FROM artists WHERE id = ?").get(id);
+  if (!row) throw new Error("Failed to create artist");
+  return parseArtist(row);
 }
 
 export function updateArtist(id: string, data: Partial<CreateArtistInput>): ArtistProfile | null {
@@ -610,4 +636,89 @@ export function searchTracks(query: string): Track[] {
     .prepare("SELECT * FROM tracks WHERE title LIKE ? OR artist_name LIKE ? OR release_type LIKE ? OR lyrics LIKE ?")
     .all(pattern, pattern, pattern, pattern) as RawTrackRow[];
   return rows.map(parseTrack);
+}
+
+// Shows CRUD functions
+function parseShow(row: RawShowRow): Show {
+  return {
+    id: row.id,
+    artist_id: row.artist_id,
+    venue_name: row.venue_name,
+    city: row.city,
+    country: row.country,
+    date: row.date,
+    time: row.time,
+    price_range: row.price_range,
+    status: row.status as ShowStatus,
+    ticket_url: row.ticket_url,
+    created_at: row.created_at,
+  };
+}
+
+export function getAllShows(): Show[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM shows ORDER BY date ASC").all() as RawShowRow[];
+  return rows.map(parseShow);
+}
+
+export function getShowsByArtist(artistId: string): Show[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM shows WHERE artist_id = ? ORDER BY date ASC").all(artistId) as RawShowRow[];
+  return rows.map(parseShow);
+}
+
+export function getShowById(id: string): Show | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM shows WHERE id = ?").get(id) as RawShowRow | undefined;
+  return row !== undefined ? parseShow(row) : null;
+}
+
+export function createShow(data: CreateShowInput): Show {
+  const db = getDbWrite();
+  const id = `show-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  db.prepare(`
+    INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    data.artist_id,
+    data.venue_name,
+    data.city || null,
+    data.country || null,
+    data.date || null,
+    data.time || null,
+    data.price_range || null,
+    data.status || "disponible",
+    data.ticket_url || null
+  );
+  const created = getShowById(id);
+  if (!created) throw new Error("Failed to create show");
+  return created;
+}
+
+export function updateShow(id: string, data: Partial<CreateShowInput>): Show | null {
+  const db = getDbWrite();
+  const updates: string[] = [];
+  const values: (string | null)[] = [];
+
+  if (data.venue_name !== undefined) { updates.push("venue_name = ?"); values.push(data.venue_name); }
+  if (data.city !== undefined) { updates.push("city = ?"); values.push(data.city || null); }
+  if (data.country !== undefined) { updates.push("country = ?"); values.push(data.country || null); }
+  if (data.date !== undefined) { updates.push("date = ?"); values.push(data.date || null); }
+  if (data.time !== undefined) { updates.push("time = ?"); values.push(data.time || null); }
+  if (data.price_range !== undefined) { updates.push("price_range = ?"); values.push(data.price_range || null); }
+  if (data.status !== undefined) { updates.push("status = ?"); values.push(data.status); }
+  if (data.ticket_url !== undefined) { updates.push("ticket_url = ?"); values.push(data.ticket_url || null); }
+
+  if (updates.length === 0) return getShowById(id);
+
+  values.push(id);
+  db.prepare(`UPDATE shows SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  return getShowById(id);
+}
+
+export function deleteShow(id: string): boolean {
+  const db = getDbWrite();
+  const result = db.prepare("DELETE FROM shows WHERE id = ?").run(id);
+  return result.changes > 0;
 }

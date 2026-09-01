@@ -5,14 +5,17 @@ import type { Track } from "@/types/music";
 import { safeString, formatDuration, formatNumber } from "@/lib/null-safe";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 interface EPKCardProps {
   track: Track;
   initialLiked?: boolean;
   initialLikeCount?: number;
+  onLoginPrompt?: () => void;
 }
 
-export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: EPKCardProps) {
+export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onLoginPrompt }: EPKCardProps) {
+  const { user } = useAuth();
   const title = safeString(track.title);
   const artistName = safeString(track.artist_name);
   const duration = formatDuration(track.duration);
@@ -44,25 +47,32 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
   })();
 
   useEffect(() => {
-    // Fetch initial like count
-    fetch(`/api/likes?track_id=${track.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.count !== undefined) {
-          setLikeCount(data.count);
+    // Fetch initial like count and user's liked state
+    const fetchLikes = async () => {
+      try {
+        const params = new URLSearchParams({ track_id: track.id });
+        const res = await fetch(`/api/likes?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.count !== undefined) setLikeCount(data.count);
+          if (data.liked !== undefined) setLiked(data.liked);
         }
-        if (data.liked !== undefined) {
-          setLiked(data.liked);
-        }
-      })
-      .catch(() => {
+      } catch {
         // Silently fail, use initial values
-      });
+      }
+    };
+    fetchLikes();
   }, [track.id]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Show login prompt for guests
+    if (!user) {
+      onLoginPrompt?.();
+      return;
+    }
 
     if (loading) return;
     setLoading(true);
@@ -86,7 +96,6 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
       console.error("Like error:", error);
     } finally {
       setLoading(false);
-      // Reset animation after it completes
       setTimeout(() => setAnimating(false), 300);
     }
   };
@@ -137,7 +146,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0 }: E
         )}
       </div>
       <CardContent>
-        <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-slate-100">{title}</h3>
+        <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-white">{title}</h3>
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{artistName}</p>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
           {track.release_type} · {duration}

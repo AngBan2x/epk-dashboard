@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { toggleLike, getLikeCount, hasUserLikedTrack, getUserLikes } from "@/lib/db";
+import { toggleLike, getLikeCount, hasUserLikedTrack, getUserLikes, getUserByEmail } from "@/lib/db";
 
 const ToggleLikeSchema = z.object({
   track_id: z.string().min(1, "track_id requerido"),
 });
 
+function getUserIdFromSession(req: NextRequest): string | null {
+  const sessionCookie = req.cookies.get("session_user_id");
+  if (sessionCookie?.value) return sessionCookie.value;
+  // Fallback: check x-user-id header for backwards compatibility
+  return req.headers.get("x-user-id");
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const trackId = searchParams.get("track_id");
-    const userId = searchParams.get("user_id");
+    const userId = searchParams.get("user_id") || getUserIdFromSession(req);
 
     if (trackId && userId) {
       const [count, liked] = await Promise.all([
@@ -42,8 +49,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = ToggleLikeSchema.parse(body);
 
-    // Get user from auth header (simplified - in real app use auth context)
-    const userId = req.headers.get("x-user-id");
+    const userId = getUserIdFromSession(req);
     if (!userId) {
       return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
     }
