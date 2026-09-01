@@ -519,6 +519,31 @@ pnpm db:seed          # scripts/generate-more-data.ts
 | v3.1.0 | Fase H: Verificación Final | **STABLE** | ✅ Completado |
 | v3.2.0 | Fase I: Skills + Agents para Fixes | minor | ✅ Completado |
 | v3.3.0 | Fase J: 5 Fixes Críticos | minor | ✅ Completado |
+| v3.4.0 | Fase K: Fixes UI/UX + BioSection Per-Artist | minor | ✅ Completado (K8c/K8d: artist browse + detail pages) |
+
+---
+
+## 20. FASE K — Fixes UI/UX + BioSection Per-Artist
+
+> **Objetivo:** Corregir problemas de UI/UX identificados por el usuario + implementar BioSection per-artist con browse de artistas.
+
+### 20.1 Tareas de la Fase K
+
+| # | Fix | Agente | Archivos | Modelo |
+|---|-----|--------|----------|--------|
+| K1 | Error registro (dual connection) | `api-builder` | `lib/db.ts` | `opencode/mimo-v2.5-free` |
+| K2 | Barra blanca (Footer) | `dashboard-builder` | `app/layout.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| K3 | Admin link sin auth | `brand-fixer` | `components/Header.tsx` | `opencode/mimo-v2.5-free` |
+| K4 | Tracks no aparecen en admin | `api-builder` | `app/api/tracks/route.ts` | `opencode/mimo-v2.5-free` |
+| K5 | Logo redundante | `brand-fixer` | `components/Header.tsx` | `opencode/mimo-v2.5-free` |
+| K6 | "+ Nuevo Track" en admin | `dashboard-builder` | `app/admin/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| K7 | Rename Tracks → Dashboard | `brand-fixer` | `components/Header.tsx` | `opencode/mimo-v2.5-free` |
+| K8a | Link users↔artists (DB) | `db-builder` | `lib/db.ts`, `types/music.ts` | `opencode/nemotron-3-ultra-free` |
+| K8b | Auto-create artist on register | `api-builder` | `app/api/auth/register/route.ts` | `opencode/mimo-v2.5-free` |
+| K8c | Browse artists (página) | `dashboard-builder` | NUEVO `app/artists/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| K8d | Artist detail (página) | `dashboard-builder` | NUEVO `app/artists/[id]/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
+| K8e | API artists | `api-builder` | NUEVO `app/api/artists/route.ts` | `opencode/mimo-v2.5-free` |
+| K8f | Admin manage artists | `dashboard-builder` | `app/admin/page.tsx` | `opencode/nemotron-3.5-lightning-free` |
 
 ---
 

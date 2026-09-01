@@ -28,7 +28,7 @@ export async function GET() {
     const db = getDb();
     const tracks = db.prepare("SELECT * FROM tracks").all();
     db.close();
-    return NextResponse.json(tracks);
+    return NextResponse.json({ tracks });
   } catch (error) {
     console.error("[API/tracks] Error GET:", error);
     return NextResponse.json({ error: "Error al obtener tracks" }, { status: 500 });

@@ -130,16 +130,30 @@ function initArtistsTable(): void {
     CREATE TABLE IF NOT EXISTS artists (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
+      user_id TEXT,
       biography TEXT,
       press_text TEXT,
       press_highlights TEXT,
       genre TEXT,
       location TEXT,
       monthly_listeners INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_artists_name ON artists(name)`);
+  // Add user_id column if missing (migration for existing tables)
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_artists_user_id ON artists(user_id)`);
+  } catch {
+    // Column doesn't exist yet, try to add it
+    try {
+      db.exec(`ALTER TABLE artists ADD COLUMN user_id TEXT`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_artists_user_id ON artists(user_id)`);
+    } catch {
+      // Column already exists or table is empty, ignore
+    }
+  }
 }
 initArtistsTable();
 
@@ -172,9 +186,10 @@ export function createUser(user: Omit<User, "id" | "created_at"> & { id: string 
     INSERT INTO users (id, name, email, password_hash, role)
     VALUES (?, ?, ?, ?, ?)
   `).run(user.id, user.name, user.email, user.password_hash, user.role);
-  const created = getUserById(user.id);
-  if (!created) throw new Error("Failed to create user");
-  return created;
+  // Usar misma conexión para leer de vuelta (evita dual connection bug)
+  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(user.id) as RawUserRow | undefined;
+  if (!row) throw new Error("Failed to create user");
+  return parseUser(row);
 }
 
 export function verifyUserPassword(email: string, password: string): User | null {
@@ -415,6 +430,7 @@ function parseArtist(row: any): ArtistProfile {
   return {
     id: row.id,
     name: row.name,
+    user_id: row.user_id ?? null,
     biography: row.biography,
     press_text: row.press_text,
     press_highlights: safeParseJSON<string[]>(row.press_highlights, []),
@@ -431,6 +447,12 @@ export function getArtistByName(name: string): ArtistProfile | null {
   return row ? parseArtist(row) : null;
 }
 
+export function getArtistByUserId(userId: string): ArtistProfile | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM artists WHERE user_id = ?").get(userId);
+  return row ? parseArtist(row) : null;
+}
+
 export function getArtistById(id: string): ArtistProfile | null {
   const db = getDb();
   const row = db.prepare("SELECT * FROM artists WHERE id = ?").get(id);
@@ -442,9 +464,9 @@ export function createArtist(data: CreateArtistInput): ArtistProfile {
   const id = `art-${Date.now()}`;
   const pressHighlights = data.pressHighlights ? JSON.stringify(data.pressHighlights) : "[]";
   db.prepare(`
-    INSERT INTO artists (id, name, biography, press_text, press_highlights, genre, location, monthly_listeners)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, data.name, data.biography || null, data.pressText || null, pressHighlights, data.genre || null, data.location || null, data.monthly_listeners || 0);
+    INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, data.name, data.userId || null, data.biography || null, data.pressText || null, pressHighlights, data.genre || null, data.location || null, data.monthly_listeners || 0);
   const created = getArtistById(id);
   if (!created) throw new Error("Failed to create artist");
   return created;
@@ -460,6 +482,7 @@ export function updateArtist(id: string, data: Partial<CreateArtistInput>): Arti
   if (data.pressHighlights !== undefined) { updates.push("press_highlights = ?"); values.push(JSON.stringify(data.pressHighlights)); }
   if (data.genre !== undefined) { updates.push("genre = ?"); values.push(data.genre); }
   if (data.location !== undefined) { updates.push("location = ?"); values.push(data.location); }
+  if (data.userId !== undefined) { updates.push("user_id = ?"); values.push(data.userId); }
   
   if (updates.length === 0) return getArtistById(id);
   

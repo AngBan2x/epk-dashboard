@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { safeString } from "@/lib/null-safe";
-import type { Track } from "@/types/music";
+import type { Track, ArtistProfile } from "@/types/music";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
@@ -64,13 +64,24 @@ interface Notification {
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"tracks" | "submissions" | "notifications">("tracks");
+  const [activeTab, setActiveTab] = useState<"tracks" | "submissions" | "notifications" | "artists">("tracks");
   const [tracks, setTracks] = useState<AdminTrack[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [artists, setArtists] = useState<ArtistProfile[]>([]);
+  const [editingArtist, setEditingArtist] = useState<ArtistProfile | null>(null);
+  const [artistForm, setArtistForm] = useState({
+    name: "",
+    biography: "",
+    press_text: "",
+    press_highlights: "",
+    genre: "",
+    location: "",
+    monthly_listeners: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [editingTrack, setEditingTrack] = useState<AdminTrack | null>(null);
-  const [showNewForm, setShowNewForm] = useState(false);
+  //
   const [viewingSubmission, setViewingSubmission] = useState<Submission | null>(null);
   const [formData, setFormData] = useState({
     title: "",
@@ -97,6 +108,7 @@ export default function AdminPage() {
     fetchTracks();
     fetchSubmissions();
     fetchNotifications();
+    fetchArtists();
   }, []);
 
   const fetchTracks = async () => {
@@ -137,6 +149,18 @@ export default function AdminPage() {
     }
   };
 
+  const fetchArtists = async () => {
+    try {
+      const res = await fetch("/api/artists");
+      if (res.ok) {
+        const data = await res.json();
+        setArtists(data.artists || []);
+      }
+    } catch {
+      console.error("Error fetching artists");
+    }
+  };
+
   const handleEdit = (track: AdminTrack) => {
     setEditingTrack(track);
     setFormData({
@@ -150,32 +174,18 @@ export default function AdminPage() {
       youtube_video_id: track.youtube_video_id || "",
       lyrics: track.lyrics || "",
     });
-    setShowNewForm(false);
   };
 
-  const handleNew = () => {
-    setEditingTrack(null);
-    setFormData({
-      title: "",
-      release_type: "Single",
-      release_date: "",
-      duration: "",
-      cover_image: "",
-      audio_preview_url: "",
-      spotify_url: "",
-      youtube_video_id: "",
-      lyrics: "",
-    });
-    setShowNewForm(true);
-  };
+  //
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
 
     try {
-      const method = editingTrack ? "PUT" : "POST";
-      const body = editingTrack ? { ...formData, id: editingTrack.id } : formData;
+      if (!editingTrack) return;
+      const method = "PUT";
+      const body = { ...formData, id: editingTrack.id };
 
       const res = await fetch("/api/tracks", {
         method,
@@ -184,9 +194,8 @@ export default function AdminPage() {
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: editingTrack ? "Track actualizado exitosamente" : "Track creado exitosamente" });
+        setMessage({ type: "success", text: "Track actualizado exitosamente" });
         setEditingTrack(null);
-        setShowNewForm(false);
         fetchTracks();
       } else {
         setMessage({ type: "error", text: "Error al guardar el track" });
@@ -275,14 +284,7 @@ export default function AdminPage() {
               Gestiona el catálogo y revisa envíos de artistas
             </p>
           </div>
-          {activeTab === "tracks" && (
-            <button
-              onClick={handleNew}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition"
-            >
-              + Nuevo Track
-            </button>
-          )}
+          //
         </div>
 
         {/* Tabs */}
@@ -318,6 +320,16 @@ export default function AdminPage() {
             >
               Notificaciones ({notifications.filter(n => !n.read).length} sin leer)
             </button>
+            <button
+              onClick={() => setActiveTab("artists")}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
+                activeTab === "artists"
+                  ? "bg-emerald-500 text-white"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              Artistas ({artists.length})
+            </button>
           </nav>
         </div>
 
@@ -332,7 +344,7 @@ export default function AdminPage() {
         )}
 
         {/* Track Form */}
-        {activeTab === "tracks" && (showNewForm || editingTrack) && (
+        {activeTab === "tracks" && editingTrack && (
           <div className="mb-8 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">
               {editingTrack ? "Editar Track" : "Nuevo Track"}
@@ -439,7 +451,7 @@ export default function AdminPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setEditingTrack(null); setShowNewForm(false); }}
+                  onClick={() => setEditingTrack(null)}
                   className="px-6 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                 >
                   Cancelar
@@ -727,6 +739,197 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Artists Tab */}
+        {activeTab === "artists" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Artistas ({artists.length})
+              </h3>
+            </div>
+
+            {artists.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                No hay artistas registrados.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {artists.map((artist) => (
+                  <div
+                    key={artist.id}
+                    className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800"
+                  >
+                    <div>
+                      <h4 className="font-medium text-slate-900 dark:text-slate-100">{artist.name}</h4>
+                      <p className="text-sm text-slate-500">
+                        {artist.genre || "Sin género"} • {artist.location || "Sin ubicación"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditingArtist(artist);
+                        setArtistForm({
+                          name: artist.name,
+                          biography: artist.biography || "",
+                          press_text: artist.press_text || "",
+                          press_highlights: artist.press_highlights?.join("\n") || "",
+                          genre: artist.genre || "",
+                          location: artist.location || "",
+                          monthly_listeners: artist.monthly_listeners,
+                        });
+                      }}
+                      className="px-3 py-1 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Formulario de edición de artista */}
+            {editingArtist && (
+              <div className="mt-6 p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <h3 className="text-lg font-semibold mb-4">Editar Artista: {editingArtist.name}</h3>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const res = await fetch(`/api/artists?id=${editingArtist.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          name: artistForm.name,
+                          biography: artistForm.biography || null,
+                          press_text: artistForm.press_text || null,
+                          press_highlights:
+                            artistForm.press_highlights?.split("\n").filter((h) => h.trim()) || [],
+                          genre: artistForm.genre || null,
+                          location: artistForm.location || null,
+                          monthly_listeners: artistForm.monthly_listeners,
+                        }),
+                      });
+                      if (res.ok) {
+                        setEditingArtist(null);
+                        fetchArtists();
+                        setMessage({ type: "success", text: "Artista actualizado correctamente" });
+                      }
+                    } catch {
+                      setMessage({ type: "error", text: "Error al actualizar artista" });
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre *</label>
+                    <input
+                      type="text"
+                      required
+                      value={artistForm.name}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, name: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Género</label>
+                    <input
+                      type="text"
+                      value={artistForm.genre}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, genre: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ubicación</label>
+                    <input
+                      type="text"
+                      value={artistForm.location}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, location: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Biografía</label>
+                    <textarea
+                      value={artistForm.biography}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, biography: e.target.value })
+                      }
+                      rows={4}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Texto de Prensa</label>
+                    <textarea
+                      value={artistForm.press_text}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, press_text: e.target.value })
+                      }
+                      rows={3}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Destacados de Prensa</label>
+                    <textarea
+                      value={artistForm.press_highlights}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, press_highlights: e.target.value })
+                      }
+                      rows={3}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Orejas Mensuales</label>
+                    <input
+                      type="number"
+                      value={artistForm.monthly_listeners}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, monthly_listeners: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      className="px-6 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingArtist(null);
+                        setArtistForm({
+                          name: "",
+                          biography: "",
+                          press_text: "",
+                          press_highlights: "",
+                          genre: "",
+                          location: "",
+                          monthly_listeners: 0,
+                        });
+                      }}
+                      className="px-6 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
           </div>

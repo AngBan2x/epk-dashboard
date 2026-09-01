@@ -192,6 +192,7 @@ export interface RawMetricsHistoryRow {
 export interface ArtistProfile {
   id: string;
   name: string;
+  user_id: string | null;
   biography: string | null;
   press_text: string | null;
   press_highlights: string[] | null;
@@ -203,6 +204,7 @@ export interface ArtistProfile {
 
 export interface CreateArtistInput {
   name: string;
+  userId?: string;
   biography?: string;
   pressText?: string;
   pressHighlights?: string[];
