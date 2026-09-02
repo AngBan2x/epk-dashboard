@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow } from "@/lib/db";
 import type { ShowStatus } from "@/types/music";
 
+export const dynamic = "force-dynamic";
+
 const CreateShowSchema = z.object({
   artist_id: z.string().min(1, "artist_id requerido"),
   venue_name: z.string().min(1, "venue_name requerido"),

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAllArtists } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/artists — Listar todos los artistas (público)
 export async function GET() {
   try {

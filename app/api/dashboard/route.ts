@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtist } from "@/lib/db";
 import type { Show } from "@/types/music";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

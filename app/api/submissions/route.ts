@@ -4,6 +4,8 @@ import { getDbWrite } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getTrackSubmissionsByUser, createTrackSubmission, getAllTrackSubmissions, updateTrackSubmissionStatus, getTrackSubmissionById, getTrackSubmissionsByStatus } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
   const sessionCookie = req.cookies.get("auth_session");
   if (!sessionCookie) return null;
