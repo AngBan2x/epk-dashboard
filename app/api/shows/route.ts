@@ -49,7 +49,13 @@ export async function GET(req: NextRequest) {
     }
 
     const shows = await getAllShows();
-    return NextResponse.json({ shows });
+    return NextResponse.json({ shows }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   } catch (error) {
     console.error("GET shows error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

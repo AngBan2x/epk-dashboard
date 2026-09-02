@@ -40,7 +40,13 @@ export async function GET(req: NextRequest) {
     }
 
     const { password_hash, ...userWithoutPassword } = user;
-    return NextResponse.json(userWithoutPassword);
+    return NextResponse.json(userWithoutPassword, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   } catch (error) {
     console.error("[API/auth/me] Error:", error);
     return NextResponse.json(

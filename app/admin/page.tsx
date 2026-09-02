@@ -812,6 +812,7 @@ export default function AdminPage() {
                 {artists.map((artist) => (
                   <div
                     key={artist.id}
+                    data-artist-id={artist.id}
                     className="sm:p-6 sm:space-y-2 lg:p-8 lg:space-y-3"
                   >
                     <div className="sm:flex sm:items-center sm:justify-between">
@@ -890,9 +891,14 @@ onSubmit={async (e) => {
                       }),
                     });
                     if (res.ok) {
+                      const editedId = editingArtist.id;
                       setEditingArtist(null);
-                      fetchArtists();
+                      await fetchArtists();
                       setMessage({ type: "success", text: "Artista actualizado correctamente" });
+                      setTimeout(() => {
+                        const el = document.querySelector(`[data-artist-id="${editedId}"]`);
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }, 150);
                     } else {
                       const text = await res.text();
                       try {

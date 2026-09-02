@@ -90,7 +90,13 @@ export async function GET(req: NextRequest) {
     }
 
     const submissions = await getAllTrackSubmissions();
-    return NextResponse.json(submissions);
+    return NextResponse.json(submissions, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   } catch (error) {
     console.error("GET submissions error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
