@@ -27,7 +27,13 @@ export async function GET(req: NextRequest) {
       showsByArtist[art.id] = await getShowsByArtist(art.id);
     }
 
-    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist });
+    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   } catch (error) {
     console.error("GET dashboard error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

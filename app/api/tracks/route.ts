@@ -20,7 +20,13 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
 export async function GET() {
   try {
     const tracks = await getAllTracks();
-    return NextResponse.json({ tracks });
+    return NextResponse.json({ tracks }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   } catch (error) {
     console.error("[API/tracks] Error GET:", error);
     return NextResponse.json({ error: "Error al obtener tracks" }, { status: 500 });
