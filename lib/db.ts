@@ -95,6 +95,13 @@ async function tursoExecSingle(sql: string, args?: unknown[]): Promise<Record<st
   return rows[0] as Record<string, unknown> | undefined;
 }
 
+async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
+  const client = getTursoClient();
+  if (!client) throw new Error("Turso client not available");
+  const result = await client.execute({ sql, args: (args ?? []) as import("@libsql/client").InValue[] });
+  return result.rowsAffected;
+}
+
 // ─── Initialize tables (local only; Turso schema via ensureTursoSchema) ─────
 
 function initLocalTables(): void {
@@ -904,7 +911,8 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
     if (updates.length === 0) return getArtistById(id);
 
     values.push(id);
-    await tursoExec(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`, values);
+    const rowsAffected = await tursoExecUpdate(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`, values);
+    if (rowsAffected === 0) return null;
     return getArtistById(id);
   }
 
@@ -925,15 +933,16 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
   if (updates.length === 0) return getArtistById(id);
 
   values.push(id);
-  db.prepare(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  const localResult = db.prepare(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  if (localResult.changes === 0) return null;
   return getArtistById(id);
 }
 
 export async function deleteArtist(id: string): Promise<{ success: boolean }> {
   if (USE_TURSO) {
     await tursoExec("DELETE FROM shows WHERE artist_id = ?", [id]);
-    await tursoExec("DELETE FROM artists WHERE id = ?", [id]);
-    return { success: true };
+    const rowsAffected = await tursoExecUpdate("DELETE FROM artists WHERE id = ?", [id]);
+    return { success: rowsAffected > 0 };
   }
   const db = getLocalDbWrite();
   db.prepare("DELETE FROM shows WHERE artist_id = ?").run(id);
@@ -1022,7 +1031,8 @@ export async function updateShow(id: string, data: Partial<CreateShowInput>): Pr
     if (updates.length === 0) return getShowById(id);
 
     values.push(id);
-    await tursoExec(`UPDATE shows SET ${updates.join(", ")} WHERE id = ?`, values);
+    const rowsAffected = await tursoExecUpdate(`UPDATE shows SET ${updates.join(", ")} WHERE id = ?`, values);
+    if (rowsAffected === 0) return null;
     return getShowById(id);
   }
 
@@ -1042,7 +1052,9 @@ export async function updateShow(id: string, data: Partial<CreateShowInput>): Pr
   if (updates.length === 0) return getShowById(id);
 
   values.push(id);
-  db.prepare(`UPDATE shows SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  const localResult = db.prepare(`UPDATE shows SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  if (localResult.changes === 0) return null;
+  return getShowById(id);
   return getShowById(id);
 }
 
