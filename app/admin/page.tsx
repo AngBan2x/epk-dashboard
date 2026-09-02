@@ -875,7 +875,7 @@ onSubmit={async (e) => {
                   e.preventDefault();
                   setSaving(true);
                   try {
-                    const res = await fetch(`/api/artists?id=${editingArtist.id}`, {
+                    const res = await fetch(`/api/artists/${editingArtist.id}`, {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -899,7 +899,7 @@ onSubmit={async (e) => {
                         const error = JSON.parse(text);
                         setMessage({ type: "error", text: error.error || `Error ${res.status}` });
                       } catch {
-                        setMessage({ type: "error", text: `Error ${res.status}: ${text.slice(0, 100)}` });
+                        setMessage({ type: "error", text: `Error ${res.status} ${res.statusText}: ${text.slice(0, 200) || "(sin respuesta)"}` });
                       }
                     }
                   } catch {
