@@ -15,7 +15,7 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = validateSession(req);
@@ -23,7 +23,7 @@ export async function DELETE(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id } = params;
     const deleted = await deleteArtist(id);
 
     if (!deleted) {
