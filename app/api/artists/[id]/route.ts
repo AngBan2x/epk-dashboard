@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteArtist } from "@/lib/db";
+import { deleteArtist, updateArtist } from "@/lib/db";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
   const sessionCookie = req.cookies.get("auth_session");
@@ -13,6 +13,32 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
   }
 }
 
+// PUT /api/artists/:id — Actualizar artista (solo admin)
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = validateSession(req);
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { id } = params;
+    const body = await req.json();
+    const updated = await updateArtist(id, body);
+    if (!updated) {
+      return NextResponse.json({ error: "Artista no encontrado" }, { status: 404 });
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("[API/artists/[id]] Error PUT:", error);
+    return NextResponse.json({ error: "Error al actualizar artista" }, { status: 500 });
+  }
+}
+
+// DELETE /api/artists/:id — Eliminar artista (solo admin)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
