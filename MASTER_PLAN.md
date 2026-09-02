@@ -548,6 +548,23 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.8.0 | Fase O: Orchestrator + UI Fixes + Cleanup | minor | ✅ Completada |
 | v3.9.0 | Fase P1: Critical Fixes + UI Core | minor | ✅ Completada |
 | v3.9.1 | Fase P1.5: 7 Corrections Post-Release | patch | ✅ Completada |
+| v3.9.2 | Critical Fixes: Turso persistence + CI + caching + route refactor | patch | ✅ Completada |
+
+---
+
+### v3.9.2 — Critical Fixes (Detalle)
+
+**Commits:** `cdc7ef6`, `ee3c700`, `7d95316`, `0daff8e`, `530c636`, `1a0f75f`, `6ec8860`
+
+| Fix | Causa raíz | Cambio |
+|-----|-----------|--------|
+| **Admin artist save fallaba** | `updateArtist` no soportaba `name`, `monthly_listeners`, ni snake_case | `lib/db.ts`: expandir firma de `updateArtist` |
+| **Middleware exp check roto** | `session.exp` ya no existe en el token (expiry via cookie maxAge) | `middleware.ts`: eliminar todos los `session.exp` checks |
+| **CI/CD Turso sync fallaba** | `pnpm/action-setup@v4` corría después de `setup-node@v4` con `cache: "pnpm"` | `.github/workflows/deploy.yml` + `sync-data.yml`: invertir orden de acciones |
+| **PUT 405 Method Not Allowed** | Conflict between `app/api/artists/route.ts` and `[id]/route.ts` + `params: Promise<>` (Next.js 15 syntax en proyecto Next.js 14) | Mover PUT handler a `[id]/route.ts`, fix params type |
+| **PUT retorna 200 pero datos no persisten** | `tursoExec` no verificaba `rowsAffected` — UPDATE ejecutaba 0 rows sin error | `lib/db.ts`: nueva función `tursoExecUpdate()` + check `rowsAffected === 0` |
+| **Admin muestra datos viejos** | Next.js cachea GET routes por defecto — `fetch("/api/artists")` retornaba respuesta cacheada | `export const dynamic = "force-dynamic"` en 6 rutas GET |
+| **Error 405 sin body** | `res.json()` fallaba con HTML → catch mostraba "Error de conexión" | `app/admin/page.tsx`: `res.text()` + `JSON.parse` para mejor error display |
 
 ---
 
