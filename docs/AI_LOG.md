@@ -1722,14 +1722,22 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 | **Enlaces Externos spacing** | Links muy juntos (`space-y-3` sin gap horizontal) | Cambiar a `flex flex-col gap-3` |
 | **Apple Music SVG truncado** | Path del SVG de Apple Music incompleto (508 chars vs 1000+) | Reemplazar con path completo de Simple Icons |
 | **Streams/Saves/Playlists icon colors** | `<div>{icon}</div>` sin color inline — usaba color por defecto del tema | Agregar `style={{ color }}` al div del ícono |
+| **SocialBar Apple Music missing** | `appleMusicUrl` prop definida pero no destruida ni usada en links array | Agregar destrucción + push al array con AppleMusicIcon |
+| **MetricCard emoji icons** | Emojis ▶♥♫ renderizan pequeño e inconsistente | Reemplazar con SVG icons inline (play, heart, music) |
+| **Recharts ResponsiveContainer empty** | Charts no renderizan al capturar antes de hydration | Agregar `minHeight={200}` + `key` al Pie |
+| **Visual-tester model** | Gemma 4 31B rate-limited en OpenRouter | Cambiar a Nemotron 3 Nano Omni (vision-capable, gratuito) |
 
 ### Commits
 - `13748c2` — fix: track page — Apple Music SVG, external links spacing, metric icon colors
+- `2b9b994` — fix: SocialBar Apple Music link + MetricCard SVG icons + track page spacing
+- `e536e64` — fix: Recharts ResponsiveContainer minHeight + pie key to fix empty chart rendering
 
 ### Quality Gates
 | Check | Resultado |
 |-------|-----------|
 | TypeScript | ✅ 0 errores |
+| Unit Tests | ✅ 41/41 passing |
+| Visual QA (Vercel production) | ✅ Charts, icons, spacing, dark mode — all PASS |
 
 ### Release
 - v3.10.1: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.10.1
