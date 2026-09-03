@@ -182,7 +182,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
 function MetricCard({ title, value, icon, color }: { title: string; value: number; icon: string; color: string }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 text-center">
-      <div className="text-3xl mb-1">{icon}</div>
+      <div className="text-3xl mb-1" style={{ color }}>{icon}</div>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{title}</p>
       <p className="text-2xl font-bold" style={{ color }}>{value.toLocaleString()}</p>
     </div>
