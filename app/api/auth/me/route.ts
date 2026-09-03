@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
     const { password_hash, ...userWithoutPassword } = user;
     return NextResponse.json(userWithoutPassword, {
       headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        "Surrogate-Control": "no-store",
         "Pragma": "no-cache",
         "Expires": "0",
       },

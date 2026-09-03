@@ -92,7 +92,8 @@ export async function GET(req: NextRequest) {
     const submissions = await getAllTrackSubmissions();
     return NextResponse.json(submissions, {
       headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        "Surrogate-Control": "no-store",
         "Pragma": "no-cache",
         "Expires": "0",
       },

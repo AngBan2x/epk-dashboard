@@ -43,7 +43,8 @@ export default function DashboardPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
-    const url = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
+    const base = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
+    const url = `${base}${base.includes("?") ? "&" : "?"}_t=${Date.now()}`;
     fetch(url)
       .then((res) => res.json())
       .then((json) => {
