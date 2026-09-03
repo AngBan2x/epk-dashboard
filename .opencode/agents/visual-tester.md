@@ -2,7 +2,7 @@
 name: visual-tester
 description: Especialista en testing visual, regressión visual y análisis de screenshots con Playwright.
 mode: subagent
-model: opencode/mimo-v2.5-free
+model: openrouter/google/gemma-4-31b-it:free
 temperature: 0.3
 permission:
   task:
