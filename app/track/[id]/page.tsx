@@ -82,7 +82,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">
               {safeString(track.title)}
             </h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
+            <p className="text-slate-600 dark:text-slate-300 text-sm mb-4">
               {track.release_date} · {track.duration} · {formatNumber(track.metrics.streams)} streams
             </p>
 
