@@ -63,9 +63,6 @@ export function AudioPlayer({ src, title, id, artist, coverImage }: AudioPlayerP
         {isPlaying ? "⏸" : "▶"}
       </button>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">
-          {safeString(title)}
-        </p>
         {src ? (
           <>
             {!globalPlayer && (
@@ -75,8 +72,8 @@ export function AudioPlayer({ src, title, id, artist, coverImage }: AudioPlayerP
                 onEnded={() => setLocalPlaying(false)}
               />
             )}
-            <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">
-              {isPlaying ? "Reproduciendo..." : "Listo para reproducir"}
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {isPlaying ? "Reproduciendo..." : "Reproducir preview (30 segundos)"}
             </p>
           </>
         ) : (
