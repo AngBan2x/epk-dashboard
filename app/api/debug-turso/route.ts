@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTursoClient } from "@/lib/db";
+import { getTurso } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET() {
   const results: Record<string, unknown> = {};
 
   try {
-    const client = getTursoClient();
+    const client = getTurso();
     if (!client) {
       return NextResponse.json({ error: "Turso not configured" }, { status: 500 });
     }
