@@ -68,17 +68,24 @@ function getLocalDbWrite(): import("better-sqlite3").Database {
 }
 
 // ─── Turso client (remote) ──────────────────────────────────────────────────
+// NOTE: Singleton pattern causes UPDATE writes to not persist on Vercel HTTP
+// transport. The singleton's execute() reports rowsAffected>0 but the write
+// is never committed to Turso. Creating a fresh client per request fixes this.
 
-let _turso: import("@libsql/client").Client | null = null;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+let _tursoLib: typeof import("@libsql/client") | null = null;
+
+function getTursoLib(): typeof import("@libsql/client") {
+  if (!_tursoLib) {
+    _tursoLib = require("@libsql/client") as typeof import("@libsql/client");
+  }
+  return _tursoLib;
+}
 
 function getTursoClient(): import("@libsql/client").Client | null {
   if (!USE_TURSO) return null;
-  if (!_turso) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createClient } = require("@libsql/client") as typeof import("@libsql/client");
-    _turso = createClient({ url: TURSO_URL!, authToken: TURSO_TOKEN! });
-  }
-  return _turso;
+  const lib = getTursoLib();
+  return lib.createClient({ url: TURSO_URL!, authToken: TURSO_TOKEN! });
 }
 
 // ─── Turso: Execute helper ──────────────────────────────────────────────────
