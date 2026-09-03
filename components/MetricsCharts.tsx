@@ -80,14 +80,13 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
         <h3 className="font-semibold mb-4 text-slate-900 dark:text-slate-100">Top Países</h3>
         {countries.length > 0 ? (
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={200} minHeight={200}>
             <BarChart data={countries}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="country" fontSize={12} tick={{ fill: "#64748b" }} />
               <YAxis fontSize={12} tick={{ fill: "#64748b" }} />
               <Tooltip 
                 contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px" }}
-                labelStyle={{ color: "#f8fafc" }}
               />
               <Bar dataKey="pct" fill="#ec4899" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -101,7 +100,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
         <h3 className="font-semibold mb-4 text-slate-900 dark:text-slate-100">Distribución de Métricas</h3>
         {pieData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={200} minHeight={200}>
             <PieChart>
               <Pie 
                 data={pieData} 
@@ -112,6 +111,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
                 dataKey="value" 
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 labelLine={false}
+                key={`pie-${pieData.length}`}
               >
                 {pieData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
