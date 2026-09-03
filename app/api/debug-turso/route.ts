@@ -13,81 +13,144 @@ export async function GET() {
       return NextResponse.json({ error: "Turso not configured" }, { status: 500 });
     }
 
-    // ── Test 1: Same singleton, UPDATE + SELECT ──
-    const testValue1 = `TEST1-${Date.now()}`;
-    const upd1 = await client.execute({
-      sql: "UPDATE artists SET location = ? WHERE id = ?",
-      args: [testValue1, ARTIST_ID],
-    });
-    const sel1 = await client.execute({
-      sql: "SELECT location FROM artists WHERE id = ?",
+    // Read current state first
+    const current = await client.execute({
+      sql: "SELECT * FROM artists WHERE id = ?",
       args: [ARTIST_ID],
     });
-    results.test1_same_singleton = {
-      updateRowsAffected: upd1.rowsAffected,
-      selectedLocation: (sel1.rows[0] as any)?.location,
-      persisted: (sel1.rows[0] as any)?.location === testValue1,
+    const currentRow = current.rows[0] as any;
+    results.current_state = {
+      id: currentRow?.id,
+      name: currentRow?.name,
+      location: currentRow?.location,
+      genre: currentRow?.genre,
+      user_id: currentRow?.user_id,
+      biography: currentRow?.biography?.substring(0, 50),
+      monthly_listeners: currentRow?.monthly_listeners,
     };
 
-    // ── Test 2: New connection, UPDATE + SELECT ──
-    const testValue2 = `TEST2-${Date.now()}`;
-    const upd2 = await client.execute({
-      sql: "UPDATE artists SET location = ? WHERE id = ?",
-      args: [testValue2, ARTIST_ID],
-    });
     const { createClient } = await import("@libsql/client");
     const newClient = createClient({
       url: process.env.TURSO_DATABASE_URL!,
       authToken: process.env.TURSO_AUTH_TOKEN!,
     });
+
+    // ── Test 1: DELETE + INSERT (replaces the row entirely) ──
+    const testVal1 = `DELINS-${Date.now()}`;
+    const del1 = await client.execute({
+      sql: "DELETE FROM artists WHERE id = ?",
+      args: [ARTIST_ID],
+    });
+    const ins1 = await client.execute({
+      sql: `INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        currentRow.id, currentRow.name, currentRow.user_id, currentRow.biography,
+        currentRow.press_text, currentRow.press_highlights, currentRow.genre,
+        testVal1, currentRow.monthly_listeners ?? 0, currentRow.created_at,
+      ],
+    });
+    const sel1 = await newClient.execute({
+      sql: "SELECT location FROM artists WHERE id = ?",
+      args: [ARTIST_ID],
+    });
+    results.test1_delete_insert = {
+      deleteRowsAffected: del1.rowsAffected,
+      insertRowsAffected: ins1.rowsAffected,
+      selectedLocation: (sel1.rows[0] as any)?.location,
+      persisted: (sel1.rows[0] as any)?.location === testVal1,
+    };
+
+    // ── Test 2: INSERT OR REPLACE (full row) ──
+    const testVal2 = `UPSERT-${Date.now()}`;
+    const upsert2 = await client.execute({
+      sql: `INSERT OR REPLACE INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        currentRow.id, currentRow.name, currentRow.user_id, currentRow.biography,
+        currentRow.press_text, currentRow.press_highlights, currentRow.genre,
+        testVal2, currentRow.monthly_listeners ?? 0, currentRow.created_at,
+      ],
+    });
     const sel2 = await newClient.execute({
       sql: "SELECT location FROM artists WHERE id = ?",
       args: [ARTIST_ID],
     });
-    results.test2_new_connection = {
-      updateRowsAffected: upd2.rowsAffected,
+    results.test2_upsert = {
+      rowsAffected: upsert2.rowsAffected,
       selectedLocation: (sel2.rows[0] as any)?.location,
-      persisted: (sel2.rows[0] as any)?.location === testValue2,
+      persisted: (sel2.rows[0] as any)?.location === testVal2,
     };
 
-    // ── Test 3: lib/db.ts singleton UPDATE + lib/turso.ts singleton SELECT ──
-    const testValue3 = `TEST3-${Date.now()}`;
-    const upd3 = await client.execute({
-      sql: "UPDATE artists SET location = ? WHERE id = ?",
-      args: [testValue3, ARTIST_ID],
+    // ── Test 3: batch() with write mode ──
+    const testVal3 = `BATCH-${Date.now()}`;
+    let batchResult: any = null;
+    let batchError: string | null = null;
+    try {
+      batchResult = await client.batch(
+        [{ sql: "UPDATE artists SET location = ? WHERE id = ?", args: [testVal3, ARTIST_ID] }],
+        "write"
+      );
+    } catch (e) {
+      batchError = String(e);
+    }
+    const sel3 = await newClient.execute({
+      sql: "SELECT location FROM artists WHERE id = ?",
+      args: [ARTIST_ID],
     });
-    const { getTursoClient: getTursoClient2 } = await import("@/lib/turso");
-    const client2 = getTursoClient2();
-    const sel3 = client2
-      ? await client2.execute({
-          sql: "SELECT location FROM artists WHERE id = ?",
-          args: [ARTIST_ID],
-        })
-      : null;
-    results.test3_cross_singleton = {
-      updateRowsAffected: upd3.rowsAffected,
-      selectedLocation: (sel3?.rows[0] as any)?.location,
-      persisted: (sel3?.rows[0] as any)?.location === testValue3,
-      client2Available: !!client2,
+    results.test3_batch_write = {
+      batchResult: batchResult,
+      batchError: batchError,
+      selectedLocation: (sel3.rows[0] as any)?.location,
+      persisted: (sel3?.rows[0] as any)?.location === testVal3,
     };
 
-    // ── Test 4: INSERT + SELECT with new connection ──
-    const testId = `debug-${Date.now()}`;
-    const ins4 = await client.execute({
-      sql: "INSERT INTO artists (id, name, genre, location) VALUES (?, ?, ?, ?)",
-      args: [testId, "Debug Test", "Test", `INSERT-${Date.now()}`],
-    });
+    // ── Test 4: transaction() with explicit commit ──
+    const testVal4 = `TXN-${Date.now()}`;
+    let txnError: string | null = null;
+    try {
+      const txn = await client.transaction("write");
+      await txn.execute({
+        sql: "UPDATE artists SET location = ? WHERE id = ?",
+        args: [testVal4, ARTIST_ID],
+      });
+      await txn.commit();
+    } catch (e) {
+      txnError = String(e);
+    }
     const sel4 = await newClient.execute({
       sql: "SELECT location FROM artists WHERE id = ?",
-      args: [testId],
+      args: [ARTIST_ID],
     });
-    results.test4_insert_new_connection = {
-      insertRowsAffected: ins4.rowsAffected,
+    results.test4_transaction = {
+      txnError: txnError,
       selectedLocation: (sel4.rows[0] as any)?.location,
-      persisted: !!(sel4.rows[0] as any)?.location,
+      persisted: (sel4.rows[0] as any)?.location === testVal4,
     };
 
-    // ── Test 5: Final state ──
+    // ── Test 5: Raw SQL via batch (no params) ──
+    const testVal5 = `RAW-${Date.now()}`;
+    let rawResult: any = null;
+    let rawError: string | null = null;
+    try {
+      rawResult = await client.execute(
+        `UPDATE artists SET location = '${testVal5}' WHERE id = '${ARTIST_ID}'`
+      );
+    } catch (e) {
+      rawError = String(e);
+    }
+    const sel5 = await newClient.execute({
+      sql: "SELECT location FROM artists WHERE id = ?",
+      args: [ARTIST_ID],
+    });
+    results.test5_raw_sql = {
+      rawResult: { rowsAffected: rawResult?.rowsAffected },
+      rawError: rawError,
+      selectedLocation: (sel5.rows[0] as any)?.location,
+      persisted: (sel5.rows[0] as any)?.location === testVal5,
+    };
+
+    // ── Final state ──
     const finalSel = await client.execute({
       sql: "SELECT location FROM artists WHERE id = ?",
       args: [ARTIST_ID],
@@ -95,9 +158,6 @@ export async function GET() {
     results.final_state = {
       location: (finalSel.rows[0] as any)?.location,
     };
-
-    // ── Cleanup: remove debug artist ──
-    await client.execute({ sql: "DELETE FROM artists WHERE id = ?", args: [testId] });
 
     return NextResponse.json(results, { status: 200 });
   } catch (error) {
