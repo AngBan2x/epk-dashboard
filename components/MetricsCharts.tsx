@@ -65,7 +65,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
 
       {/* Top Countries */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-        <h3 className="font-semibold mb-4">Top Países</h3>
+        <h3 className="font-semibold mb-4 text-slate-900 dark:text-slate-100">Top Países</h3>
         {countries.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={countries}>
@@ -86,7 +86,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
 
       {/* Metrics Distribution */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-        <h3 className="font-semibold mb-4">Distribución de Métricas</h3>
+        <h3 className="font-semibold mb-4 text-slate-900 dark:text-slate-100">Distribución de Métricas</h3>
         {pieData.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
@@ -118,7 +118,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
       {/* Historical Trends - Real Time */}
       {trackId && (
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <h3 className="font-semibold mb-4">Tendencia Histórica (30 días)</h3>
+          <h3 className="font-semibold mb-4 text-slate-900 dark:text-slate-100">Tendencia Histórica (30 días)</h3>
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-ec4899 border-t-transparent"></div>
