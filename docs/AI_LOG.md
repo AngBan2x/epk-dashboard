@@ -1731,13 +1731,14 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 - `13748c2` — fix: track page — Apple Music SVG, external links spacing, metric icon colors
 - `2b9b994` — fix: SocialBar Apple Music link + MetricCard SVG icons + track page spacing
 - `e536e64` — fix: Recharts ResponsiveContainer minHeight + pie key to fix empty chart rendering
+- `40881df` — fix: AudioPlayer — remove redundant title, 'Reproducir preview (30s)', improve contrast
 
 ### Quality Gates
 | Check | Resultado |
 |-------|-----------|
 | TypeScript | ✅ 0 errores |
 | Unit Tests | ✅ 41/41 passing |
-| Visual QA (Vercel production) | ✅ Charts, icons, spacing, dark mode — all PASS |
+| Visual QA (Vercel production) | ✅ Charts, icons, spacing, dark mode, contrast — all PASS |
 
 ### Release
 - v3.10.1: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.10.1
