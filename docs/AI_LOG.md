@@ -1683,7 +1683,7 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 | Archivo | Acción |
 |---------|--------|
 | `components/ProductionDetails.tsx` | Agregar dark:text-slate-100 y dark:text-slate-200 |
-| `components/LyricsModal.tsx` | text-dark-600 → text-slate-600 |
+| `components/LyricsModal.tsx` | text-dark-600 → text-slate-600 + h2 dark:text-slate-100 |
 | `components/ui/Button.tsx` | secondary + ghost: dark:bg-dark-* → dark:bg-slate-* |
 | `components/ui/Modal.tsx` | border + close button: dark:text-dark-* → dark:text-slate-* |
 | `components/ui/Card.tsx` | Limpiar duplicate dark:border-dark-* |
@@ -1691,14 +1691,21 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 | `components/VideoShowcase.tsx` | bg + border + text: dark:*-dark-* → dark:*-slate-* |
 | `components/ImageGallery.tsx` | bg + border + text: dark:*-dark-* → dark:*-slate-* |
 | `components/AudioVisualizer.tsx` | bg + border: dark:*-dark-* → dark:*-slate-* |
+| `components/MetricsCharts.tsx` | 3 h3 headings: agregar dark:text-slate-100 |
 | `app/track/[id]/page.tsx` | iTunes → Apple Music branding |
+| `.opencode/agents/visual-tester.md` | Modelo → Nemotron 3 Nano Omni (vision-capable) |
 
 ### Quality Gates
 | Check | Resultado |
 |-------|-----------|
 | TypeScript | ✅ 0 errores |
 | Unit Tests | ✅ 41/41 passing |
-| Screenshots | ✅ Capturados (light/dark) — pendiente revisión manual (Gemma rate-limited) |
+| Vision QA (Nemotron 3 Nano Omni) | ✅ 4/4 elementos PASS (Tendencia Histórica N/A — requiere trackId) |
 
 ### Commits
-- Pendiente: commit + push + release v3.10.0
+- `e581525` — fix: dark mode consistency + iTunes→Apple Music branding (v3.10.0)
+- `6975501` — feat: visual-tester with DOM fallback when Gemma rate-limited
+- `b7bde58` — fix: dark mode headings in LyricsModal + MetricsCharts + switch visual-tester to Nemotron 3 Nano Omni
+
+### Release
+- v3.10.0: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.10.0

@@ -555,7 +555,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 
 ### v3.10.0 — Dark Mode Fix + Apple Music Branding (Detalle)
 
-**Commits:** dark mode fixes + iTunes→Apple Music branding
+**Commits:** `e581525`, `6975501`, `b7bde58`
 
 | Fix | Causa raíz | Cambio |
 |-----|-----------|--------|
@@ -563,10 +563,13 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | **Inconsistencia dark palette** | Componentes usaban `dark:text-dark-*` en vez de `dark:text-slate-*` | Reemplazar en LyricsModal, Button, Modal, Card, Skeleton |
 | **Dark mode multimedia** | VideoShowcase, ImageGallery, AudioVisualizer con `dark:*-dark-*` | Reemplazar todos con `dark:*-slate-*` |
 | **iTunes branding obsoleto** | Link decía "Comprar en iTunes" con URL de iTunes | Cambiar a "Escuchar en Apple Music", URL `music.apple.com`, color pink |
+| **LyricsModal title invisible** | `<h2>` sin `dark:text-*` en modal de letras | Agregar `dark:text-slate-100` |
+| **MetricsCharts headings invisible** | 3 `<h3>` sin `dark:text-*` en gráficos | Agregar `dark:text-slate-100` a Top Países, Distribución, Tendencia |
+| **Visual-tester rate-limited** | Gemma 4 31B con rate limit en OpenRouter | Cambiar a Nemotron 3 Nano Omni (vision-capable, gratuito) |
 
 **Archivos modificados:**
 - `components/ProductionDetails.tsx` — dark text heading + values
-- `components/LyricsModal.tsx` — lyrics text dark mode
+- `components/LyricsModal.tsx` — lyrics text + h2 title dark mode
 - `components/ui/Button.tsx` — secondary + ghost variant dark mode
 - `components/ui/Modal.tsx` — border + close button dark mode
 - `components/ui/Card.tsx` — duplicate border cleanup
@@ -574,7 +577,9 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 - `components/VideoShowcase.tsx` — section bg + border + text
 - `components/ImageGallery.tsx` — section bg + border + text
 - `components/AudioVisualizer.tsx` — bg + border dark mode
+- `components/MetricsCharts.tsx` — 3 h3 headings dark mode
 - `app/track/[id]/page.tsx` — iTunes→Apple Music branding
+- `.opencode/agents/visual-tester.md` — modelo Nemotron 3 Nano Omni
 
 ---
 
