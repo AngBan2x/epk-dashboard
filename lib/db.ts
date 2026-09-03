@@ -886,14 +886,16 @@ export async function createArtist(data: CreateArtistInput): Promise<ArtistProfi
 
 export async function updateArtist(id: string, data: Partial<CreateArtistInput> & Record<string, unknown>): Promise<ArtistProfile | null> {
   // Accept both camelCase and snake_case from forms
-  const name = (data.name ?? data.name) as string | undefined;
-  const biography = (data.biography ?? data.biography) as string | undefined;
+  const name = data.name as string | undefined;
+  const biography = data.biography as string | undefined;
   const pressText = (data.pressText ?? data.press_text) as string | undefined;
   const pressHighlights = (data.pressHighlights ?? data.press_highlights) as string[] | undefined;
-  const genre = (data.genre ?? data.genre) as string | undefined;
-  const location = (data.location ?? data.location) as string | undefined;
-  const monthlyListeners = (data.monthly_listeners ?? data.monthlyListeners) as number | undefined;
+  const genre = data.genre as string | undefined;
+  const location = data.location as string | undefined;
+  const monthlyListeners = ((data.monthly_listeners ?? data.monthlyListeners) as number | undefined) ?? 0;
   const userId = (data.userId ?? data.user_id) as string | undefined;
+
+  console.log("[updateArtist] id:", id, "name:", name, "biography:", biography?.substring(0, 30), "genre:", genre, "location:", location, "monthly_listeners:", monthlyListeners);
 
   if (USE_TURSO) {
     const updates: string[] = [];
@@ -912,7 +914,12 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
 
     values.push(id);
     const rowsAffected = await tursoExecUpdate(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`, values);
-    if (rowsAffected === 0) return null;
+    console.log("[updateArtist Turso] rowsAffected:", rowsAffected, "updates:", updates.length);
+    if (rowsAffected === 0) {
+      const existing = await getArtistById(id);
+      console.log("[updateArtist Turso] artist exists:", !!existing);
+      return null;
+    }
     return getArtistById(id);
   }
 
@@ -934,6 +941,7 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
 
   values.push(id);
   const localResult = db.prepare(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  console.log("[updateArtist Local] changes:", localResult.changes);
   if (localResult.changes === 0) return null;
   return getArtistById(id);
 }
