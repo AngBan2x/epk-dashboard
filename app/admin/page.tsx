@@ -891,9 +891,12 @@ onSubmit={async (e) => {
                       }),
                     });
                     if (res.ok) {
+                      const updated = await res.json();
                       const editedId = editingArtist.id;
                       setEditingArtist(null);
-                      await fetchArtists();
+                      // Optimistic update: use PUT response directly instead of re-fetching
+                      // This avoids Turso read replica stale reads
+                      setArtists((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
                       setMessage({ type: "success", text: "Artista actualizado correctamente" });
                       setTimeout(() => {
                         const el = document.querySelector(`[data-artist-id="${editedId}"]`);
