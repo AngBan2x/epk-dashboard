@@ -15,82 +15,108 @@ export async function GET() {
 
     const { createClient } = await import("@libsql/client");
 
-    // Read current state
-    const current = await client.execute({
+    // ── Test A: SELECT * vs SELECT location — is cache keyed by SQL? ──
+    const selStar = await client.execute({
       sql: "SELECT * FROM artists WHERE id = ?",
       args: [ARTIST_ID],
     });
-    const currentRow = current.rows[0] as any;
-    results.current_state = {
-      location: currentRow?.location,
-      name: currentRow?.name,
+    results.testA_select_star = {
+      location: (selStar.rows[0] as any)?.location,
     };
 
-    // ── Test 1: UPDATE + immediate read (fresh client) ──
-    const testVal1 = `IMMEDIATE-${Date.now()}`;
-    await client.execute({
-      sql: "UPDATE artists SET location = ? WHERE id = ?",
-      args: [testVal1, ARTIST_ID],
-    });
-    const immClient = createClient({
-      url: process.env.TURSO_DATABASE_URL!,
-      authToken: process.env.TURSO_AUTH_TOKEN!,
-    });
-    const sel1 = await immClient.execute({
+    const selLoc = await client.execute({
       sql: "SELECT location FROM artists WHERE id = ?",
       args: [ARTIST_ID],
     });
-    results.test1_immediate = {
-      selectedLocation: (sel1.rows[0] as any)?.location,
-      persisted: (sel1.rows[0] as any)?.location === testVal1,
+    results.testB_select_location = {
+      location: (selLoc.rows[0] as any)?.location,
     };
 
-    // ── Test 2: UPDATE + wait 3s + fresh client ──
-    const testVal2 = `WAIT3S-${Date.now()}`;
+    // ── Test C: Update to unique value ──
+    const testValC = `TESTC-${Date.now()}`;
     await client.execute({
       sql: "UPDATE artists SET location = ? WHERE id = ?",
-      args: [testVal2, ARTIST_ID],
+      args: [testValC, ARTIST_ID],
     });
-    await new Promise((r) => setTimeout(r, 3000));
-    const waitClient = createClient({
-      url: process.env.TURSO_DATABASE_URL!,
-      authToken: process.env.TURSO_AUTH_TOKEN!,
+
+    // ── Test D: Read with SAME client using SELECT * ──
+    const selD = await client.execute({
+      sql: "SELECT * FROM artists WHERE id = ?",
+      args: [ARTIST_ID],
     });
-    const sel2 = await waitClient.execute({
+    results.testD_same_client_star = {
+      location: (selD.rows[0] as any)?.location,
+      persisted: (selD.rows[0] as any)?.location === testValC,
+    };
+
+    // ── Test E: Read with SAME client using SELECT location ──
+    const selE = await client.execute({
       sql: "SELECT location FROM artists WHERE id = ?",
       args: [ARTIST_ID],
     });
-    results.test2_wait3s = {
-      selectedLocation: (sel2.rows[0] as any)?.location,
-      persisted: (sel2.rows[0] as any)?.location === testVal2,
+    results.testE_same_client_loc = {
+      location: (selE.rows[0] as any)?.location,
+      persisted: (selE.rows[0] as any)?.location === testValC,
     };
 
-    // ── Test 3: UPDATE + wait 10s + fresh client ──
-    const testVal3 = `WAIT10S-${Date.now()}`;
-    await client.execute({
-      sql: "UPDATE artists SET location = ? WHERE id = ?",
-      args: [testVal3, ARTIST_ID],
-    });
-    await new Promise((r) => setTimeout(r, 10000));
-    const wait10Client = createClient({
+    // ── Test F: Read with FRESH client using SELECT * ──
+    const freshA = createClient({
       url: process.env.TURSO_DATABASE_URL!,
       authToken: process.env.TURSO_AUTH_TOKEN!,
     });
-    const sel3 = await wait10Client.execute({
+    const selF = await freshA.execute({
+      sql: "SELECT * FROM artists WHERE id = ?",
+      args: [ARTIST_ID],
+    });
+    results.testF_fresh_star = {
+      location: (selF.rows[0] as any)?.location,
+      persisted: (selF.rows[0] as any)?.location === testValC,
+    };
+
+    // ── Test G: Read with FRESH client using SELECT location ──
+    const freshB = createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN!,
+    });
+    const selG = await freshB.execute({
       sql: "SELECT location FROM artists WHERE id = ?",
       args: [ARTIST_ID],
     });
-    results.test3_wait10s = {
-      selectedLocation: (sel3.rows[0] as any)?.location,
-      persisted: (sel3.rows[0] as any)?.location === testVal3,
+    results.testG_fresh_loc = {
+      location: (selG.rows[0] as any)?.location,
+      persisted: (selG.rows[0] as any)?.location === testValC,
     };
 
-    // ── Restore original location ──
-    const restoreVal = currentRow?.location || "Naguanagua, Venezuela";
-    await client.execute({
-      sql: "UPDATE artists SET location = ? WHERE id = ?",
-      args: [restoreVal, ARTIST_ID],
+    // ── Test H: Use execute with named params instead of positional ──
+    const freshC = createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN!,
     });
+    const selH = await freshC.execute({
+      sql: "SELECT location FROM artists WHERE id = $id",
+      args: { $id: ARTIST_ID },
+    });
+    results.testH_named_params = {
+      location: (selH.rows[0] as any)?.location,
+      persisted: (selH.rows[0] as any)?.location === testValC,
+    };
+
+    // ── Test I: Different SQL entirely — use a subquery ──
+    const freshD = createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN!,
+    });
+    const selI = await freshD.execute({
+      sql: "SELECT a.location FROM artists a WHERE a.id = ?",
+      args: [ARTIST_ID],
+    });
+    results.testI_subquery = {
+      location: (selI.rows[0] as any)?.location,
+      persisted: (selI.rows[0] as any)?.location === testValC,
+    };
+
+    // ── Restore ──
+    // (Don't restore — let's keep the test value to verify on next run)
 
     return NextResponse.json(results, { status: 200 });
   } catch (error) {
