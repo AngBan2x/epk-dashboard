@@ -913,22 +913,15 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
     if (updates.length === 0) return getArtistById(id);
 
     values.push(id);
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso client not available");
-
-    // Use batch() to combine UPDATE + SELECT in a single HTTP pipeline request.
-    // This guarantees read-after-write consistency with Turso replicas.
-    const results = await client.batch([
-      { sql: `UPDATE artists SET ${updates.join(", ")} WHERE id = ?`, args: values as import("@libsql/client").InValue[] },
-      { sql: "SELECT * FROM artists WHERE id = ?", args: [id] as import("@libsql/client").InValue[] },
-    ], "write");
-    console.log("[updateArtist Turso batch] rowsAffected:", results[0].rowsAffected, "updates:", updates.length);
-    if (results[0].rowsAffected === 0) {
+    // NOTE: Do NOT use client.batch() — it silently fails to commit on Vercel HTTP transport.
+    // Individual execute() calls persist correctly (verified via direct Turso test).
+    const rowsAffected = await tursoExecUpdate(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`, values);
+    console.log("[updateArtist Turso] rowsAffected:", rowsAffected, "updates:", updates.length);
+    if (rowsAffected === 0) {
       console.log("[updateArtist Turso] no rows affected, artist may not exist");
       return null;
     }
-    const row = results[1].rows[0] as Record<string, unknown> | undefined;
-    return row ? parseArtist(row) : null;
+    return getArtistById(id);
   }
 
   const db = getLocalDbWrite();
