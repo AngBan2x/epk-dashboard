@@ -64,10 +64,10 @@ export function ImageGallery({
         ];
 
   return (
-    <section className="p-6 bg-white dark:bg-dark-800 rounded-2xl border border-slate-200 dark:border-dark-700">
+    <section className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-dark-100">{title}</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Recursos gráficos en alta resolución para prensa y promotores
           </p>
@@ -82,7 +82,7 @@ export function ImageGallery({
           <div
             key={item.id}
             onClick={() => setSelectedImage(item.url)}
-            className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-slate-100 dark:bg-dark-700 border border-slate-200 dark:border-dark-600 transition-all hover:scale-[1.02] hover:shadow-xl"
+            className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 transition-all hover:scale-[1.02] hover:shadow-xl"
           >
             <img
               src={item.url}

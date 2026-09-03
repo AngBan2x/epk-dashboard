@@ -32,10 +32,10 @@ export function VideoShowcase({
     : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80";
 
   return (
-    <section className={`p-6 bg-white dark:bg-dark-800 rounded-2xl border border-slate-200 dark:border-dark-700 ${className}`}>
+    <section className={`p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-dark-100 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <span>🎬</span> {resolvedTitle}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -47,7 +47,7 @@ export function VideoShowcase({
             Video Disponible
           </span>
         ) : (
-          <span className="text-xs bg-slate-100 dark:bg-dark-700 text-slate-400 px-2.5 py-1 rounded-full">
+          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-400 px-2.5 py-1 rounded-full">
             Próximamente
           </span>
         )}
@@ -56,7 +56,7 @@ export function VideoShowcase({
       {/* Tarjeta Fachada Ligera (Facade Pattern) */}
       <div
         onClick={() => hasVideo && setIsModalOpen(true)}
-        className={`relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-dark-700 bg-slate-900 group ${
+        className={`relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-900 group ${
           hasVideo ? "cursor-pointer" : "opacity-75 cursor-not-allowed"
         }`}
       >
