@@ -497,12 +497,22 @@ export async function syncShowsToTurso(shows: Show[]): Promise<SyncResult> {
 }
 
 // ─── Fetch helpers ──────────────────────────────────────────────────────────
+// NOTE: Cache busting for SELECT queries (same issue as db.ts)
+
+let _tursoQueryCounter = 0;
+
+function bustSelectCache(sql: string): string {
+  if (sql.trimStart().toUpperCase().startsWith("SELECT")) {
+    return `${sql} /*q${_tursoQueryCounter++}*/`;
+  }
+  return sql;
+}
 
 export async function fetchTursoTracks(): Promise<RawTrackRow[]> {
   const client = getTurso();
   if (!client) return [];
 
-  const result = await client.execute("SELECT * FROM tracks");
+  const result = await client.execute(bustSelectCache("SELECT * FROM tracks"));
   return result.rows as unknown as RawTrackRow[];
 }
 
@@ -518,7 +528,7 @@ export async function getTursoTrackCount(): Promise<number> {
   const client = getTurso();
   if (!client) return 0;
 
-  const result = await client.execute("SELECT COUNT(*) as count FROM tracks");
+  const result = await client.execute(bustSelectCache("SELECT COUNT(*) as count FROM tracks"));
   const row = result.rows[0] as unknown as { count: number } | undefined;
   return row?.count ?? 0;
 }
