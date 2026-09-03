@@ -27,7 +27,7 @@ export function LyricsModal({ lyrics, title, className }: LyricsModalProps) {
         Ver letra
       </Button>
       <Modal open={open} onClose={() => setOpen(false)}>
-        <h2 className="text-xl font-bold mb-4">{safeString(title)}</h2>
+        <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-slate-100">{safeString(title)}</h2>
         {hasLyrics ? (
           <pre className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300 font-sans">
             {lyrics}
