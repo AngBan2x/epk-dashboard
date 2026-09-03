@@ -29,7 +29,7 @@ export function LyricsModal({ lyrics, title, className }: LyricsModalProps) {
       <Modal open={open} onClose={() => setOpen(false)}>
         <h2 className="text-xl font-bold mb-4">{safeString(title)}</h2>
         {hasLyrics ? (
-          <pre className="whitespace-pre-wrap text-sm text-dark-600 dark:text-dark-300 font-sans">
+          <pre className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300 font-sans">
             {lyrics}
           </pre>
         ) : (

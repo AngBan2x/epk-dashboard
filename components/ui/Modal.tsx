@@ -28,8 +28,8 @@ export function Modal({ open, onClose, className, children }: ModalProps) {
       ref={dialogRef}
       onClose={onClose}
       className={cn(
-        "backdrop:bg-dark-950/50 rounded-xl border border-slate-200 dark:border-dark-200 p-0 shadow-xl",
-        "dark:border-dark-700 dark:bg-dark-800",
+        "backdrop:bg-black/50 rounded-xl border border-slate-200 dark:border-slate-700 p-0 shadow-xl",
+        "dark:bg-slate-800",
         className
       )}
     >
@@ -37,7 +37,7 @@ export function Modal({ open, onClose, className, children }: ModalProps) {
         <div className="p-6">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 dark:text-dark-400 hover:text-slate-600 dark:hover:text-dark-600"
+            className="absolute top-4 right-4 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
           >
             ✕
           </button>

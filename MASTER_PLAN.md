@@ -549,6 +549,32 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.9.0 | Fase P1: Critical Fixes + UI Core | minor | ✅ Completada |
 | v3.9.1 | Fase P1.5: 7 Corrections Post-Release | patch | ✅ Completada |
 | v3.9.2 | Critical Fixes: Turso persistence + CI + caching + route refactor | patch | ✅ Completada |
+| v3.10.0 | Dark Mode Fix + iTunes→Apple Music Branding | minor | ✅ Completada |
+
+---
+
+### v3.10.0 — Dark Mode Fix + Apple Music Branding (Detalle)
+
+**Commits:** dark mode fixes + iTunes→Apple Music branding
+
+| Fix | Causa raíz | Cambio |
+|-----|-----------|--------|
+| **Dark mode text ilegible** | `<h3>` y `<dd>` en ProductionDetails sin `dark:text-*` explícito | Agregar `dark:text-slate-100` y `dark:text-slate-200` |
+| **Inconsistencia dark palette** | Componentes usaban `dark:text-dark-*` en vez de `dark:text-slate-*` | Reemplazar en LyricsModal, Button, Modal, Card, Skeleton |
+| **Dark mode multimedia** | VideoShowcase, ImageGallery, AudioVisualizer con `dark:*-dark-*` | Reemplazar todos con `dark:*-slate-*` |
+| **iTunes branding obsoleto** | Link decía "Comprar en iTunes" con URL de iTunes | Cambiar a "Escuchar en Apple Music", URL `music.apple.com`, color pink |
+
+**Archivos modificados:**
+- `components/ProductionDetails.tsx` — dark text heading + values
+- `components/LyricsModal.tsx` — lyrics text dark mode
+- `components/ui/Button.tsx` — secondary + ghost variant dark mode
+- `components/ui/Modal.tsx` — border + close button dark mode
+- `components/ui/Card.tsx` — duplicate border cleanup
+- `components/ui/Skeleton.tsx` — background dark mode
+- `components/VideoShowcase.tsx` — section bg + border + text
+- `components/ImageGallery.tsx` — section bg + border + text
+- `components/AudioVisualizer.tsx` — bg + border dark mode
+- `app/track/[id]/page.tsx` — iTunes→Apple Music branding
 
 ---
 

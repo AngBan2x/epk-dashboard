@@ -1655,3 +1655,50 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 ### Commits
 - `ae04de5` — fix: make useAuth SSR-safe to prevent prerender errors
 - Release: `v3.5.2` — https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.5.2
+
+---
+
+## Fix: Dark Mode Consistency + iTunes→Apple Music Branding (v3.10.0)
+
+**Fecha:** 2026-09-03
+**Modelo:** MiMo V2.5 Free (OpenCode)
+**Modo:** Build
+
+### Problema
+1. **Dark mode text ilegible**: `<h3>` y `<dd>` en ProductionDetails no tenían `dark:text-*` explícito, resultando en texto invisible sobre fondos oscuros
+2. **Inconsistencia de palette**: Varios componentes usaban `dark:text-dark-*` (custom palette) en vez de `dark:text-slate-*` (estándar Tailwind)
+3. **iTunes branding obsoleto**: Link mostraba "Comprar en iTunes" con URL de iTunes y color azul, cuando la plataforma actual es Apple Music
+
+### Causa Raíz
+1. ProductionDetails heredaba colores del padre sin definir los suyos propios para dark mode
+2. La palette `dark` en tailwind.config.ts era idéntica a `slate`, pero su uso creaba confusión semántica (`dark:text-dark-300` = doble token `dark`)
+3. El link nunca se actualizó cuando iTunes fue reemplazado por Apple Music
+
+### Solución
+1. Agregar `dark:text-slate-100` al `<h3>` y `dark:text-slate-200` al `<dd>` en ProductionDetails
+2. Reemplazar todos los `dark:*-dark-*` por `dark:*-slate-*` en 8 archivos: LyricsModal, Button, Modal, Card, Skeleton, VideoShowcase, ImageGallery, AudioVisualizer
+3. Cambiar "Comprar en iTunes" → "Escuchar en Apple Music", URL `itunes.apple.com` → `music.apple.com`, color `blue` → `pink`
+
+### Archivos Modificados
+| Archivo | Acción |
+|---------|--------|
+| `components/ProductionDetails.tsx` | Agregar dark:text-slate-100 y dark:text-slate-200 |
+| `components/LyricsModal.tsx` | text-dark-600 → text-slate-600 |
+| `components/ui/Button.tsx` | secondary + ghost: dark:bg-dark-* → dark:bg-slate-* |
+| `components/ui/Modal.tsx` | border + close button: dark:text-dark-* → dark:text-slate-* |
+| `components/ui/Card.tsx` | Limpiar duplicate dark:border-dark-* |
+| `components/ui/Skeleton.tsx` | dark:bg-dark-* → dark:bg-slate-* |
+| `components/VideoShowcase.tsx` | bg + border + text: dark:*-dark-* → dark:*-slate-* |
+| `components/ImageGallery.tsx` | bg + border + text: dark:*-dark-* → dark:*-slate-* |
+| `components/AudioVisualizer.tsx` | bg + border: dark:*-dark-* → dark:*-slate-* |
+| `app/track/[id]/page.tsx` | iTunes → Apple Music branding |
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Unit Tests | ✅ 41/41 passing |
+| Screenshots | ✅ Capturados (light/dark) — pendiente revisión manual (Gemma rate-limited) |
+
+### Commits
+- Pendiente: commit + push + release v3.10.0

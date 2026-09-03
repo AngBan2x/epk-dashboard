@@ -18,12 +18,12 @@ export function ProductionDetails({ details, className }: ProductionDetailsProps
 
   return (
     <div className={cn("space-y-2", className)}>
-      <h3 className="font-semibold text-lg mb-3">Ficha de Producción</h3>
+      <h3 className="font-semibold text-lg mb-3 text-slate-900 dark:text-slate-100">Ficha de Producción</h3>
       <dl className="grid grid-cols-2 gap-2">
         {fields.map(({ label, key }) => (
           <div key={key}>
             <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase">{label}</dt>
-            <dd className="text-sm font-medium">
+            <dd className="text-sm font-medium text-slate-700 dark:text-slate-200">
               {hasValue(details, key) ? safeString(details[key]) : <span className="text-slate-300 dark:text-slate-600">—</span>}
             </dd>
           </div>
