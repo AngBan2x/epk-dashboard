@@ -1709,3 +1709,27 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 
 ### Release
 - v3.10.0: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.10.0
+
+---
+
+## v3.10.1 — Track Page: SVG + Spacing + Icon Colors
+
+**Fecha:** 2026-09-03
+
+### Fixes
+| Fix | Causa raíz | Cambio |
+|-----|-----------|--------|
+| **Enlaces Externos spacing** | Links muy juntos (`space-y-3` sin gap horizontal) | Cambiar a `flex flex-col gap-3` |
+| **Apple Music SVG truncado** | Path del SVG de Apple Music incompleto (508 chars vs 1000+) | Reemplazar con path completo de Simple Icons |
+| **Streams/Saves/Playlists icon colors** | `<div>{icon}</div>` sin color inline — usaba color por defecto del tema | Agregar `style={{ color }}` al div del ícono |
+
+### Commits
+- `13748c2` — fix: track page — Apple Music SVG, external links spacing, metric icon colors
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+
+### Release
+- v3.10.1: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.10.1
