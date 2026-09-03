@@ -150,13 +150,42 @@ export async function GET() {
       persisted: (sel5.rows[0] as any)?.location === testVal5,
     };
 
-    // ── Final state ──
+    // ── Test 6: Write + wait 3s + read with fresh client ──
+    const testVal6 = `WAIT-${Date.now()}`;
+    await client.execute({
+      sql: "UPDATE artists SET location = ? WHERE id = ?",
+      args: [testVal6, ARTIST_ID],
+    });
+    // Wait 3 seconds for replica sync
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const freshClient = createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN!,
+    });
+    const sel6 = await freshClient.execute({
+      sql: "SELECT location FROM artists WHERE id = ?",
+      args: [ARTIST_ID],
+    });
+    results.test6_write_wait3s_read = {
+      selectedLocation: (sel6.rows[0] as any)?.location,
+      persisted: (sel6.rows[0] as any)?.location === testVal6,
+    };
+
+    // ── Test 7: Restore original location ──
+    const restoreVal = currentRow?.location || "Naguanagua, Venezuela";
+    await client.execute({
+      sql: "UPDATE artists SET location = ? WHERE id = ?",
+      args: [restoreVal, ARTIST_ID],
+    });
+
+    // ── Final state (immediate read — expected stale) ──
     const finalSel = await client.execute({
       sql: "SELECT location FROM artists WHERE id = ?",
       args: [ARTIST_ID],
     });
     results.final_state = {
       location: (finalSel.rows[0] as any)?.location,
+      note: "Stale read expected — replica lag",
     };
 
     return NextResponse.json(results, { status: 200 });
