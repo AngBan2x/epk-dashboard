@@ -50,6 +50,7 @@ const BandcampIcon = () => (
 
 export function SocialBar({
   spotifyUrl,
+  appleMusicUrl,
   youtubeUrl,
   instagramUrl,
   className = "",
@@ -57,6 +58,7 @@ export function SocialBar({
   const links: SocialLink[] = [];
   if (spotifyUrl) links.push({ platform: "Spotify", url: spotifyUrl, icon: <SpotifyIcon />, color: "hover:bg-green-500/10 hover:text-green-500 hover:border-green-500/30" });
   if (youtubeUrl) links.push({ platform: "YouTube", url: youtubeUrl, icon: <YouTubeIcon />, color: "hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/30" });
+  if (appleMusicUrl) links.push({ platform: "Apple Music", url: appleMusicUrl, icon: <AppleMusicIcon />, color: "hover:bg-pink-500/10 hover:text-pink-500 hover:border-pink-500/30" });
   if (instagramUrl) links.push({ platform: "Instagram", url: instagramUrl, icon: <InstagramIcon />, color: "hover:bg-pink-500/10 hover:text-pink-500 hover:border-pink-500/30" });
 
   if (links.length === 0) return null;

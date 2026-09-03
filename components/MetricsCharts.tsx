@@ -58,9 +58,22 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
     <div className="space-y-6">
       {/* Current Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard title="Streams" value={streams} icon="▶" color="#ec4899" />
-        <MetricCard title="Saves" value={saves} icon="♥" color="#8b5cf6" />
-        <MetricCard title="Playlists" value={playlist_additions} icon="♫" color="#06b6d4" />
+        <MetricCard title="Streams" value={streams} icon={
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        } color="#ec4899" />
+        <MetricCard title="Saves" value={saves} icon={
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
+        } color="#8b5cf6" />
+        <MetricCard title="Playlists" value={playlist_additions} icon={
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+        } color="#06b6d4" />
       </div>
 
       {/* Top Countries */}
@@ -179,7 +192,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
   );
 }
 
-function MetricCard({ title, value, icon, color }: { title: string; value: number; icon: string; color: string }) {
+function MetricCard({ title, value, icon, color }: { title: string; value: number; icon: React.ReactNode; color: string }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 text-center">
       <div className="text-3xl mb-1" style={{ color }}>{icon}</div>

@@ -234,6 +234,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
           />
           <SocialBar
             spotifyUrl={track.spotify_url}
+            appleMusicUrl={track.itunes_track_id ? `https://music.apple.com/us/album/${track.itunes_track_id}` : null}
             youtubeUrl={track.youtube_video_id ? `https://www.youtube.com/watch?v=${track.youtube_video_id}` : null}
           />
         </div>
