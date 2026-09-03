@@ -89,11 +89,23 @@ function getTursoClient(): import("@libsql/client").Client | null {
 }
 
 // ─── Turso: Execute helper ──────────────────────────────────────────────────
+// NOTE: The @libsql/client HTTP transport caches query results by exact SQL
+// string. Stale cached reads cause UPDATE writes to appear not to persist.
+// Fix: append a unique counter to SELECT queries to bust the cache.
+
+let _tursoQueryCounter = 0;
+
+function bustSelectCache(sql: string): string {
+  if (sql.trimStart().toUpperCase().startsWith("SELECT")) {
+    return `${sql} /*q${_tursoQueryCounter++}*/`;
+  }
+  return sql;
+}
 
 async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
   const client = getTursoClient();
   if (!client) throw new Error("Turso client not available");
-  const result = await client.execute({ sql, args: (args ?? []) as import("@libsql/client").InValue[] });
+  const result = await client.execute({ sql: bustSelectCache(sql), args: (args ?? []) as import("@libsql/client").InValue[] });
   return result.rows as unknown[];
 }
 
