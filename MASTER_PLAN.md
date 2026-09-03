@@ -550,7 +550,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.9.1 | Fase P1.5: 7 Corrections Post-Release | patch | ✅ Completada |
 | v3.9.2 | Critical Fixes: Turso persistence + CI + caching + route refactor | patch | ✅ Completada |
 | v3.10.0 | Dark Mode Fix + iTunes→Apple Music Branding | minor | ✅ Completada |
-| v3.10.1 | Track Page: Apple Music SVG + spacing + icon colors + SocialBar + Recharts fix | patch | ✅ Completada |
+| v3.10.1 | Track Page: Apple Music SVG + spacing + icon colors + SocialBar + Recharts + contrast fixes | patch | ✅ Completada |
 
 ---
 
