@@ -26,7 +26,9 @@ export async function PUT(
 
     const { id } = params;
     const body = await req.json();
+    console.log("[PUT /api/artists/:id] id:", id, "body:", JSON.stringify(body).substring(0, 200));
     const updated = await updateArtist(id, body);
+    console.log("[PUT /api/artists/:id] result:", updated ? "OK" : "NULL");
     if (!updated) {
       return NextResponse.json({ error: "Artista no encontrado" }, { status: 404 });
     }
