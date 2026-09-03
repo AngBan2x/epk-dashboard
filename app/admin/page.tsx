@@ -182,7 +182,7 @@ export default function AdminPage() {
 
   const fetchArtists = async () => {
     try {
-      const res = await fetch("/api/artists");
+      const res = await fetch(`/api/artists?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setArtists(data.artists || []);
