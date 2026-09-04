@@ -1906,3 +1906,57 @@ Preparar infraestructura para la Fase P (Profesional v4.0.0): crear 12 subagente
 
 ### Release
 - v4.0.0-alpha.1: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-alpha.1
+
+---
+
+## v4.0.0-alpha.2 — P3: Artist Self-Management
+
+**Fecha:** 2026-09-04
+**Modelo:** Mimo v2.5 Free
+**Modo:** Build
+
+### P3.1: Artist Dashboard
+- **Stats cards**: Releases, Shows, Suscriptores, Likes (con iconos SVG)
+- **Quick actions**: Nuevo Release, Nuevo Show, Editar Perfil
+- **Recent activity feed**: Últimos releases y shows del artista
+- **Animations**: Framer Motion para stats cards
+
+### P3.2-P3.4: CRUD Releases
+- **Release types**: Single, EP, Album (con selección visual)
+- **Track list editor**: Agregar/eliminar tracks con duración
+- **External links**: Spotify, Apple Music, YouTube
+- **Cover image**: URL input con preview
+- **API endpoints**: GET/POST/PUT/DELETE `/api/releases`
+
+### P3.6: CRUD Shows
+- **ShowStatus actualizado**: 10 estados (proximamente, activo, pospuesto, hoy, pasado, cancelado, suspendido, confirmado, en_venta, agotado)
+- **Shows API actualizado**: payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes
+- **ShowsBooking actualizado**: Colores para cada estado
+
+### Issues Corregidos
+1. **uuid module** → Usado `crypto.randomUUID()` en lugar de dependencia externa
+2. **ShowStatus values** → Actualizados en admin, dashboard, ShowsBooking
+3. **guest_artists type** → Zod schema actualizado para GuestArtist objects
+4. **payment_methods type** → Zod schema actualizado con tipos específicos
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Build | ✅ Exitoso |
+| Unit Tests | ✅ 41/41 passing |
+
+### Commits
+- `06b3614` — feat(P3): Artist Self-Management — Dashboard + Releases + Shows
+
+### Release
+- v4.0.0-alpha.2: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-alpha.2
+
+### Roadmap Fase P: Profesional (v4.0.0)
+| Fase | Nombre | Tasks | Estado |
+|------|--------|-------|--------|
+| **P1.8** | Setup: subagentes + API Unsplash | 12 subagentes + credenciales Unsplash | ✅ Completada |
+| **P2** | Foundation: DB + Landing + Header | 9 tasks | ✅ Completada |
+| **P3** | Artist Self-Management | 8 tasks (6/8 completadas) | ⏳ Parcial |
+| **P4** | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
+| **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |
