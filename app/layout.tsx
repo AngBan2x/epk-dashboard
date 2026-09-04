@@ -1,19 +1,17 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { Providers } from "@/components/Providers";
-import { Footer } from "@/components/Footer";
+import { Inter } from 'next/font/google';
+import type { Metadata } from 'next';
+import { ClientLayout } from '@/components/ClientLayout';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: {
-    default: "PressPlay",
-    template: "%s | PressPlay",
+    default: 'PressPlay',
+    template: '%s | PressPlay',
   },
-  description: "Donde la música se presenta. Electronic Press Kit para artistas musicales.",
+  description: 'Donde la música se presenta. Electronic Press Kit para artistas musicales.',
   icons: {
-    icon: "/logo.svg",
+    icon: '/logo.svg',
   },
 };
 
@@ -25,8 +23,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        <Providers>{children}</Providers>
-        <Footer />
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

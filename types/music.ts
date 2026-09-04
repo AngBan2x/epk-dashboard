@@ -45,6 +45,24 @@ export interface Track {
   stems_urls?: StemsUrls | null;
   video_embed_url?: string | null;
   gallery_images?: string[] | null;
+  // P2.5: New fields
+  external_links?: ExternalLinks | null;
+  disc_number?: number;
+  is_double_single?: boolean;
+  sides_b?: string[] | null;
+  isrc?: string | null;
+  composers?: string[] | null;
+}
+
+export interface ExternalLinks {
+  spotify?: string;
+  apple_music?: string;
+  youtube?: string;
+  soundcloud?: string;
+  bandcamp?: string;
+  tiktok?: string;
+  instagram?: string;
+  [key: string]: string | undefined;
 }
 
 export interface Artist {
@@ -79,6 +97,13 @@ export interface RawTrackRow {
   stems_urls?: string | null;
   video_embed_url?: string | null;
   gallery_images?: string | null;
+  // P2.5: New fields
+  external_links?: string | null;
+  disc_number?: number | null;
+  is_double_single?: number | null;
+  sides_b?: string | null;
+  isrc?: string | null;
+  composers?: string | null;
 }
 
 export interface SyncResult {
@@ -93,7 +118,21 @@ export interface User {
   email: string;
   password_hash: string;
   role: "admin" | "artist";
+  // P2.2: New fields
+  preferences: UserPreferences | null;
+  avatar: string | null;
+  email_verified: boolean;
+  deleted_at: string | null;
+  last_login: string | null;
   created_at: string;
+}
+
+export interface UserPreferences {
+  email_notifications: boolean;
+  push_notifications: boolean;
+  new_release_alerts: boolean;
+  show_alerts: boolean;
+  marketing_emails: boolean;
 }
 
 export interface RawUserRow {
@@ -102,10 +141,17 @@ export interface RawUserRow {
   email: string;
   password_hash: string;
   role: string;
+  preferences: string | null;
+  avatar: string | null;
+  email_verified: number;
+  deleted_at: string | null;
+  last_login: string | null;
   created_at: string;
 }
 
 export type SubmissionStatus = "pending" | "approved" | "rejected";
+
+export type SubmissionType = "track" | "release" | "show";
 
 export interface TrackSubmission {
   id: string;
@@ -113,6 +159,11 @@ export interface TrackSubmission {
   track_data: string; // JSON string of track data
   status: SubmissionStatus;
   admin_notes: string | null;
+  // P2.6: New fields
+  submission_type: SubmissionType;
+  metadata: string | null; // JSON object for additional metadata
+  admin_id: string | null;
+  reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -123,6 +174,10 @@ export interface RawTrackSubmissionRow {
   track_data: string;
   status: string;
   admin_notes: string | null;
+  submission_type: string;
+  metadata: string | null;
+  admin_id: string | null;
+  reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -199,7 +254,20 @@ export interface ArtistProfile {
   genre: string | null;
   location: string | null;
   monthly_listeners: number;
+  // P2.1: New fields
+  social_links: SocialLink[] | null;
+  profile_image: string | null;
+  banner_image: string | null;
+  slug: string | null;
+  is_active: boolean;
+  deleted_at: string | null;
   created_at: string;
+}
+
+export interface SocialLink {
+  platform: string;
+  url: string;
+  label?: string;
 }
 
 export interface CreateArtistInput {
@@ -211,6 +279,12 @@ export interface CreateArtistInput {
   genre?: string;
   location?: string;
   monthly_listeners?: number;
+  // P2.1: New fields
+  socialLinks?: SocialLink[];
+  profileImage?: string;
+  bannerImage?: string;
+  slug?: string;
+  isActive?: boolean;
 }
 
 // Shows & Booking
@@ -227,7 +301,28 @@ export interface Show {
   price_range: string | null;
   status: ShowStatus;
   ticket_url: string | null;
+  // P2.4: New fields
+  payment_methods: PaymentMethod[] | null;
+  postponement_reason: string | null;
+  flyer_url: string | null;
+  ticket_link: string | null;
+  description: string | null;
+  guest_artists: GuestArtist[] | null;
+  notes: string | null;
+  deleted_at: string | null;
+  updated_at: string | null;
   created_at: string;
+}
+
+export interface PaymentMethod {
+  type: "cash" | "card" | "transfer" | "ticket_platform" | "other";
+  details?: string;
+  platform_url?: string;
+}
+
+export interface GuestArtist {
+  name: string;
+  role?: string;
 }
 
 export interface RawShowRow {
@@ -241,6 +336,15 @@ export interface RawShowRow {
   price_range: string | null;
   status: string;
   ticket_url: string | null;
+  payment_methods: string | null;
+  postponement_reason: string | null;
+  flyer_url: string | null;
+  ticket_link: string | null;
+  description: string | null;
+  guest_artists: string | null;
+  notes: string | null;
+  deleted_at: string | null;
+  updated_at: string | null;
   created_at: string;
 }
 
@@ -254,4 +358,30 @@ export interface CreateShowInput {
   price_range?: string;
   status?: ShowStatus;
   ticket_url?: string;
+  payment_methods?: PaymentMethod[];
+  postponement_reason?: string;
+  flyer_url?: string;
+  ticket_link?: string;
+  description?: string;
+  guest_artists?: GuestArtist[];
+  notes?: string;
+}
+
+// P2.3: Subscriptions
+export interface Subscription {
+  id: string;
+  subscriber_id: string;
+  artist_id: string;
+  notify_releases: boolean;
+  notify_shows: boolean;
+  created_at: string;
+}
+
+export interface RawSubscriptionRow {
+  id: string;
+  subscriber_id: string;
+  artist_id: string;
+  notify_releases: number;
+  notify_shows: number;
+  created_at: string;
 }

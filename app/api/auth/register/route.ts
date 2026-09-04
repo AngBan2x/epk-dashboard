@@ -35,6 +35,17 @@ export async function POST(req: NextRequest) {
       email: validated.email,
       password_hash: passwordHash,
       role: "artist", // Por defecto artist, admin se asigna manualmente
+      preferences: {
+        email_notifications: true,
+        push_notifications: true,
+        new_release_alerts: true,
+        show_alerts: true,
+        marketing_emails: false,
+      },
+      avatar: null,
+      email_verified: false,
+      deleted_at: null,
+      last_login: null,
     });
 
     // Auto-create artist profile for artists (use INSERT OR IGNORE for Turso)

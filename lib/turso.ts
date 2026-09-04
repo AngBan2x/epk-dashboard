@@ -16,6 +16,15 @@ import type {
   Show,
   RawShowRow,
   TopCountry,
+  // P2.1-P2.6: New types
+  SocialLink,
+  PaymentMethod,
+  GuestArtist,
+  ExternalLinks,
+  Subscription,
+  RawSubscriptionRow,
+  SubmissionType,
+  UserPreferences,
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
@@ -37,7 +46,7 @@ function getTurso(): Client | null {
   return getTursoClient();
 }
 
-// ─── Schema: 7 tablas completas ─────────────────────────────────────────────
+// ─── Schema: 7+ tablas completas ─────────────────────────────────────────────
 
 export async function ensureTursoSchema(): Promise<boolean> {
   const client = getTurso();
@@ -46,7 +55,7 @@ export async function ensureTursoSchema(): Promise<boolean> {
     return false;
   }
 
-  // 1. tracks (con columnas multimedia F8)
+  // 1. tracks (con columnas multimedia F8 + P2.5)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
@@ -65,11 +74,17 @@ export async function ensureTursoSchema(): Promise<boolean> {
       itunes_track_id TEXT,
       stems_urls TEXT,
       video_embed_url TEXT,
-      gallery_images TEXT
+      gallery_images TEXT,
+      external_links TEXT,
+      disc_number INTEGER DEFAULT 1,
+      is_double_single INTEGER DEFAULT 0,
+      sides_b TEXT,
+      isrc TEXT,
+      composers TEXT
     )
   `);
 
-  // 2. artists (con user_id FK)
+  // 2. artists (con user_id FK + P2.1)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS artists (
       id TEXT PRIMARY KEY,
@@ -81,12 +96,18 @@ export async function ensureTursoSchema(): Promise<boolean> {
       genre TEXT,
       location TEXT,
       monthly_listeners INTEGER DEFAULT 0,
+      social_links TEXT,
+      profile_image TEXT,
+      banner_image TEXT,
+      slug TEXT,
+      is_active INTEGER DEFAULT 1,
+      deleted_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
 
-  // 3. users
+  // 3. users (P2.2)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -94,11 +115,16 @@ export async function ensureTursoSchema(): Promise<boolean> {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT DEFAULT 'artist',
+      preferences TEXT,
+      avatar TEXT,
+      email_verified INTEGER DEFAULT 0,
+      deleted_at TEXT,
+      last_login TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
 
-  // 4. track_submissions
+  // 4. track_submissions (P2.6)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS track_submissions (
       id TEXT PRIMARY KEY,
@@ -106,6 +132,10 @@ export async function ensureTursoSchema(): Promise<boolean> {
       track_data TEXT NOT NULL,
       status TEXT DEFAULT 'pending',
       admin_notes TEXT,
+      submission_type TEXT DEFAULT 'track',
+      metadata TEXT,
+      admin_id TEXT,
+      reviewed_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -156,7 +186,7 @@ export async function ensureTursoSchema(): Promise<boolean> {
     )
   `);
 
-  // 8. shows
+  // 8. shows (P2.4)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS shows (
       id TEXT PRIMARY KEY,
@@ -169,8 +199,32 @@ export async function ensureTursoSchema(): Promise<boolean> {
       price_range TEXT,
       status TEXT DEFAULT 'disponible',
       ticket_url TEXT,
+      payment_methods TEXT,
+      postponement_reason TEXT,
+      flyer_url TEXT,
+      ticket_link TEXT,
+      description TEXT,
+      guest_artists TEXT,
+      notes TEXT,
+      deleted_at TEXT,
+      updated_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (artist_id) REFERENCES artists(id)
+    )
+  `);
+
+  // 9. subscriptions (P2.3)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY,
+      subscriber_id TEXT NOT NULL,
+      artist_id TEXT NOT NULL,
+      notify_releases INTEGER DEFAULT 1,
+      notify_shows INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (subscriber_id) REFERENCES users(id),
+      FOREIGN KEY (artist_id) REFERENCES artists(id),
+      UNIQUE(subscriber_id, artist_id)
     )
   `);
 
@@ -196,8 +250,9 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
               (id, title, artist_name, release_type, release_date, duration, cover_image,
                audio_preview_url, spotify_url, youtube_video_id, metrics,
                production_details, lyrics, itunes_track_id, stems_urls,
-               video_embed_url, gallery_images)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               video_embed_url, gallery_images, external_links, disc_number, is_double_single,
+               sides_b, isrc, composers)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           track.id,
           track.title,
@@ -216,6 +271,12 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
           track.stems_urls ?? null,
           track.video_embed_url ?? null,
           track.gallery_images ?? null,
+          (track as RawTrackRow & { external_links?: string | null }).external_links ?? null,
+          (track as RawTrackRow & { disc_number?: number | null }).disc_number ?? 1,
+          (track as RawTrackRow & { is_double_single?: number | null }).is_double_single ?? 0,
+          (track as RawTrackRow & { sides_b?: string | null }).sides_b ?? null,
+          (track as RawTrackRow & { isrc?: string | null }).isrc ?? null,
+          (track as RawTrackRow & { composers?: string | null }).composers ?? null,
         ],
       });
       synced++;
@@ -245,8 +306,9 @@ export async function syncArtistsToTurso(artists: ArtistProfile[]): Promise<Sync
       await client.execute({
         sql: `INSERT OR REPLACE INTO artists
               (id, name, user_id, biography, press_text, press_highlights,
-               genre, location, monthly_listeners, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               genre, location, monthly_listeners, social_links, profile_image,
+               banner_image, slug, is_active, deleted_at, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           artist.id,
           artist.name,
@@ -257,6 +319,12 @@ export async function syncArtistsToTurso(artists: ArtistProfile[]): Promise<Sync
           artist.genre ?? null,
           artist.location ?? null,
           artist.monthly_listeners ?? 0,
+          JSON.stringify(artist.social_links ?? []),
+          artist.profile_image ?? null,
+          artist.banner_image ?? null,
+          artist.slug ?? null,
+          artist.is_active ? 1 : 0,
+          artist.deleted_at ?? null,
           artist.created_at,
         ],
       });
@@ -286,14 +354,25 @@ export async function syncUsersToTurso(users: User[]): Promise<SyncResult> {
     try {
       await client.execute({
         sql: `INSERT OR REPLACE INTO users
-              (id, name, email, password_hash, role, created_at)
-              VALUES (?, ?, ?, ?, ?, ?)`,
+              (id, name, email, password_hash, role, preferences, avatar, email_verified, deleted_at, last_login, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           user.id,
           user.name,
           user.email,
           user.password_hash,
           user.role,
+          JSON.stringify(user.preferences ?? {
+            email_notifications: true,
+            push_notifications: true,
+            new_release_alerts: true,
+            show_alerts: true,
+            marketing_emails: false,
+          }),
+          user.avatar ?? null,
+          user.email_verified ? 1 : 0,
+          user.deleted_at ?? null,
+          user.last_login ?? null,
           user.created_at,
         ],
       });
@@ -323,14 +402,18 @@ export async function syncSubmissionsToTurso(submissions: TrackSubmission[]): Pr
     try {
       await client.execute({
         sql: `INSERT OR REPLACE INTO track_submissions
-              (id, user_id, track_data, status, admin_notes, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              (id, user_id, track_data, status, admin_notes, submission_type, metadata, admin_id, reviewed_at, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           sub.id,
           sub.user_id,
           sub.track_data,
           sub.status,
           sub.admin_notes ?? null,
+          sub.submission_type ?? "track",
+          sub.metadata ?? null,
+          sub.admin_id ?? null,
+          sub.reviewed_at ?? null,
           sub.created_at,
           sub.updated_at,
         ],
@@ -470,8 +553,10 @@ export async function syncShowsToTurso(shows: Show[]): Promise<SyncResult> {
     try {
       await client.execute({
         sql: `INSERT OR REPLACE INTO shows
-              (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url,
+               payment_methods, postponement_reason, flyer_url, ticket_link, description,
+               guest_artists, notes, deleted_at, updated_at, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           show.id,
           show.artist_id,
@@ -483,6 +568,15 @@ export async function syncShowsToTurso(shows: Show[]): Promise<SyncResult> {
           show.price_range ?? null,
           show.status,
           show.ticket_url ?? null,
+          JSON.stringify(show.payment_methods ?? []),
+          show.postponement_reason ?? null,
+          show.flyer_url ?? null,
+          show.ticket_link ?? null,
+          show.description ?? null,
+          JSON.stringify(show.guest_artists ?? []),
+          show.notes ?? null,
+          show.deleted_at ?? null,
+          show.updated_at ?? null,
           show.created_at,
         ],
       });
@@ -490,6 +584,43 @@ export async function syncShowsToTurso(shows: Show[]): Promise<SyncResult> {
     } catch (e) {
       failed++;
       errors.push(`Error sync show ${show.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return { synced, failed, errors };
+}
+
+// ─── Sync: Subscriptions (P2.3) ───────────────────────────────────────────────
+
+export async function syncSubscriptionsToTurso(subscriptions: Subscription[]): Promise<SyncResult> {
+  const client = getTurso();
+  if (!client) {
+    return { synced: 0, failed: subscriptions.length, errors: ["Turso no configurado"] };
+  }
+
+  const errors: string[] = [];
+  let synced = 0;
+  let failed = 0;
+
+  for (const sub of subscriptions) {
+    try {
+      await client.execute({
+        sql: `INSERT OR REPLACE INTO subscriptions
+              (id, subscriber_id, artist_id, notify_releases, notify_shows, created_at)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [
+          sub.id,
+          sub.subscriber_id,
+          sub.artist_id,
+          sub.notify_releases ? 1 : 0,
+          sub.notify_shows ? 1 : 0,
+          sub.created_at,
+        ],
+      });
+      synced++;
+    } catch (e) {
+      failed++;
+      errors.push(`Error sync subscription ${sub.id}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 

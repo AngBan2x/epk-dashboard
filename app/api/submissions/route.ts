@@ -124,6 +124,10 @@ export async function POST(req: NextRequest) {
       track_data: JSON.stringify(validated.track_data),
       status: "pending",
       admin_notes: null,
+      submission_type: "track",
+      metadata: null,
+      admin_id: null,
+      reviewed_at: null,
     });
 
     return NextResponse.json(submission, { status: 201 });
