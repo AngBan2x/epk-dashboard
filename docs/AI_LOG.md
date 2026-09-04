@@ -1832,12 +1832,27 @@ Preparar infraestructura para la Fase P (Profesional v4.0.0): crear 12 subagente
 ### MCP Configurado
 | MCP | Estado | Uso |
 |-----|--------|-----|
-| Unsplash | ✅ Agregado a mcp.json | Stock photos para landing page |
+| Unsplash | ❌ No hay MCP oficial | API directa via fetch con `UNSPLASH_ACCESS_KEY` |
+
+### Unsplash API (Configurado)
+| Variable | Valor | Ubicación |
+|----------|-------|-----------|
+| `UNSPLASH_APP_ID` | `1054368` | `.env.local` (gitignored) |
+| `UNSPLASH_ACCESS_KEY` | `3XPRD-...` | `.env.local` (gitignored) |
+| `UNSPLASH_SECRET_KEY` | `vATuK...` | `.env.local` (gitignored) |
+
+### Commits
+- `e1a7baf` — feat(P1.8): setup Phase P Professional — 12 subagents + Unsplash API + roadmap
+- `3560fb1` — fix(P1.8): correct model reference in 4 subagentes
+- `973ca0f` — chore: add Unsplash API credentials to .env.local + update docs
+
+### Release
+- v3.11.0: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.11.0
 
 ### Roadmap Fase P: Profesional (v4.0.0)
 | Fase | Nombre | Tasks | Estado |
 |------|--------|-------|--------|
-| **P1.8** | Setup: subagentes + MCPs | 12 subagentes + MCP Unsplash | ✅ Completada |
+| **P1.8** | Setup: subagentes + API Unsplash | 12 subagentes + credenciales Unsplash | ✅ Completada |
 | **P2** | Foundation: DB + Landing + Header | 9 tasks | ⏳ Pendiente |
 | **P3** | Artist Self-Management | 8 tasks | ⏳ Pendiente |
 | **P4** | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
