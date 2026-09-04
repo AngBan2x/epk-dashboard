@@ -13,8 +13,15 @@ const CreateShowSchema = z.object({
   date: z.string().optional(),
   time: z.string().optional(),
   price_range: z.string().optional(),
-  status: z.enum(["disponible", "agotado", "proximamente", "vip", "cancelado", "pausado"]).optional(),
+  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado"]).optional(),
   ticket_url: z.string().optional(),
+  payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), value: z.string(), isPrimary: z.boolean() })).optional(),
+  postponement_reason: z.string().optional(),
+  flyer_url: z.string().optional(),
+  ticket_link: z.string().optional(),
+  description: z.string().optional(),
+  guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).optional(),
+  notes: z.string().optional(),
 });
 
 const UpdateShowSchema = z.object({
@@ -25,8 +32,15 @@ const UpdateShowSchema = z.object({
   date: z.string().optional(),
   time: z.string().optional(),
   price_range: z.string().optional(),
-  status: z.enum(["disponible", "agotado", "proximamente", "vip", "cancelado", "pausado"]).optional(),
+  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado"]).optional(),
   ticket_url: z.string().optional(),
+  payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), value: z.string(), isPrimary: z.boolean() })).optional(),
+  postponement_reason: z.string().optional(),
+  flyer_url: z.string().optional(),
+  ticket_link: z.string().optional(),
+  description: z.string().optional(),
+  guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).optional(),
+  notes: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
