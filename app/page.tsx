@@ -1,5 +1,13 @@
-import { redirect } from "next/navigation";
+import LandingHero from '@/components/landing/LandingHero';
+import LandingFeatures from '@/components/landing/LandingFeatures';
+import LandingHowItWorks from '@/components/landing/LandingHowItWorks';
 
-export default function Home() {
-  redirect("/dashboard");
+export default function LandingPage() {
+  return (
+    <>
+      <LandingHero />
+      <LandingFeatures />
+      <LandingHowItWorks />
+    </>
+  );
 }

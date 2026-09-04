@@ -26,3 +26,12 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Bounce animation for scroll indicator */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+.animate-bounce {
+  animation: bounce 2s infinite;
+}

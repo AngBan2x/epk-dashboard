@@ -32,6 +32,15 @@ import type {
   CreateShowInput,
   ShowStatus,
   SyncResult,
+  // P2.1-P2.6: New types
+  SocialLink,
+  PaymentMethod,
+  GuestArtist,
+  ExternalLinks,
+  Subscription,
+  RawSubscriptionRow,
+  SubmissionType,
+  UserPreferences,
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
@@ -135,10 +144,21 @@ function initLocalTables(): void {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT DEFAULT 'artist',
+      preferences TEXT,
+      avatar TEXT,
+      email_verified INTEGER DEFAULT 0,
+      deleted_at TEXT,
+      last_login TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+  // P2.2: Add new columns to users (safe ALTER TABLE)
+  try { db.exec(`ALTER TABLE users ADD COLUMN preferences TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN deleted_at TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN last_login TEXT`); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS track_submissions (
@@ -215,6 +235,12 @@ function initLocalTables(): void {
       genre TEXT,
       location TEXT,
       monthly_listeners INTEGER DEFAULT 0,
+      social_links TEXT,
+      profile_image TEXT,
+      banner_image TEXT,
+      slug TEXT,
+      is_active INTEGER DEFAULT 1,
+      deleted_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
@@ -230,6 +256,13 @@ function initLocalTables(): void {
       // Column already exists
     }
   }
+  // P2.1: Add new columns to artists (safe ALTER TABLE)
+  try { db.exec(`ALTER TABLE artists ADD COLUMN social_links TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE artists ADD COLUMN profile_image TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE artists ADD COLUMN banner_image TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE artists ADD COLUMN slug TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE artists ADD COLUMN is_active INTEGER DEFAULT 1`); } catch {}
+  try { db.exec(`ALTER TABLE artists ADD COLUMN deleted_at TEXT`); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS shows (
@@ -243,6 +276,15 @@ function initLocalTables(): void {
       price_range TEXT,
       status TEXT DEFAULT 'disponible',
       ticket_url TEXT,
+      payment_methods TEXT,
+      postponement_reason TEXT,
+      flyer_url TEXT,
+      ticket_link TEXT,
+      description TEXT,
+      guest_artists TEXT,
+      notes TEXT,
+      deleted_at TEXT,
+      updated_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (artist_id) REFERENCES artists(id)
     )
@@ -250,6 +292,48 @@ function initLocalTables(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_shows_artist ON shows(artist_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_shows_date ON shows(date)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_shows_status ON shows(status)`);
+  // P2.4: Add new columns to shows (safe ALTER TABLE)
+  try { db.exec(`ALTER TABLE shows ADD COLUMN payment_methods TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN postponement_reason TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN flyer_url TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN ticket_link TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN description TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN guest_artists TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN notes TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN deleted_at TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE shows ADD COLUMN updated_at TEXT`); } catch {}
+
+  // P2.3: Create subscriptions table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY,
+      subscriber_id TEXT NOT NULL,
+      artist_id TEXT NOT NULL,
+      notify_releases INTEGER DEFAULT 1,
+      notify_shows INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (subscriber_id) REFERENCES users(id),
+      FOREIGN KEY (artist_id) REFERENCES artists(id),
+      UNIQUE(subscriber_id, artist_id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_subscriber ON subscriptions(subscriber_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_artist ON subscriptions(artist_id)`);
+
+  // P2.5: Add new columns to tracks (safe ALTER TABLE)
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN external_links TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN disc_number INTEGER DEFAULT 1`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN is_double_single INTEGER DEFAULT 0`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN sides_b TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN cover_image TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN isrc TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN composers TEXT`); } catch {}
+
+  // P2.6: Add new columns to track_submissions (safe ALTER TABLE)
+  try { db.exec(`ALTER TABLE track_submissions ADD COLUMN submission_type TEXT DEFAULT 'track'`); } catch {}
+  try { db.exec(`ALTER TABLE track_submissions ADD COLUMN metadata TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE track_submissions ADD COLUMN admin_id TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE track_submissions ADD COLUMN reviewed_at TEXT`); } catch {}
 }
 
 // Initialize local tables on module load (only when not using Turso)
@@ -266,6 +350,17 @@ function parseUser(row: Record<string, unknown>): User {
     email: String(row.email),
     password_hash: String(row.password_hash),
     role: String(row.role) as "admin" | "artist",
+    preferences: safeParseJSON<UserPreferences>((row.preferences as string) ?? null, {
+      email_notifications: true,
+      push_notifications: true,
+      new_release_alerts: true,
+      show_alerts: true,
+      marketing_emails: false,
+    }),
+    avatar: (row.avatar as string) ?? null,
+    email_verified: Number(row.email_verified) === 1,
+    deleted_at: (row.deleted_at as string) ?? null,
+    last_login: (row.last_login as string) ?? null,
     created_at: String(row.created_at),
   };
 }
@@ -277,6 +372,10 @@ function parseTrackSubmission(row: Record<string, unknown>): TrackSubmission {
     track_data: String(row.track_data),
     status: String(row.status) as SubmissionStatus,
     admin_notes: (row.admin_notes as string) ?? null,
+    submission_type: (row.submission_type as SubmissionType) ?? "track",
+    metadata: (row.metadata as string) ?? null,
+    admin_id: (row.admin_id as string) ?? null,
+    reviewed_at: (row.reviewed_at as string) ?? null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -329,6 +428,12 @@ function parseArtist(row: Record<string, unknown>): ArtistProfile {
     genre: (row.genre as string) ?? null,
     location: (row.location as string) ?? null,
     monthly_listeners: Number(row.monthly_listeners) || 0,
+    social_links: safeParseJSON<SocialLink[]>((row.social_links as string) ?? null, []),
+    profile_image: (row.profile_image as string) ?? null,
+    banner_image: (row.banner_image as string) ?? null,
+    slug: (row.slug as string) ?? null,
+    is_active: Number(row.is_active) !== 0,
+    deleted_at: (row.deleted_at as string) ?? null,
     created_at: String(row.created_at),
   };
 }
@@ -408,6 +513,13 @@ function parseTrack(row: Record<string, unknown>): Track {
     stems_urls: parseStemsUrls((row.stems_urls as string) ?? null),
     video_embed_url: (row.video_embed_url as string) ?? null,
     gallery_images: parseGalleryImages((row.gallery_images as string) ?? null),
+    // P2.5: New fields
+    external_links: safeParseJSON<ExternalLinks | null>((row.external_links as string) ?? null, null),
+    disc_number: row.disc_number ? Number(row.disc_number) : undefined,
+    is_double_single: row.is_double_single ? Number(row.is_double_single) === 1 : undefined,
+    sides_b: safeParseJSON<string[] | null>((row.sides_b as string) ?? null, null),
+    isrc: (row.isrc as string) ?? null,
+    composers: safeParseJSON<string[] | null>((row.composers as string) ?? null, null),
   };
 }
 
@@ -423,6 +535,15 @@ function parseShow(row: Record<string, unknown>): Show {
     price_range: (row.price_range as string) ?? null,
     status: String(row.status) as ShowStatus,
     ticket_url: (row.ticket_url as string) ?? null,
+    payment_methods: safeParseJSON<PaymentMethod[]>((row.payment_methods as string) ?? null, []),
+    postponement_reason: (row.postponement_reason as string) ?? null,
+    flyer_url: (row.flyer_url as string) ?? null,
+    ticket_link: (row.ticket_link as string) ?? null,
+    description: (row.description as string) ?? null,
+    guest_artists: safeParseJSON<GuestArtist[]>((row.guest_artists as string) ?? null, []),
+    notes: (row.notes as string) ?? null,
+    deleted_at: (row.deleted_at as string) ?? null,
+    updated_at: (row.updated_at as string) ?? null,
     created_at: String(row.created_at),
   };
 }
@@ -452,8 +573,20 @@ export async function getUserById(id: string): Promise<User | null> {
 export async function createUser(user: Omit<User, "id" | "created_at"> & { id: string }): Promise<User> {
   if (USE_TURSO) {
     await tursoExec(
-      "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
-      [user.id, user.name, user.email, user.password_hash, user.role]
+      `INSERT INTO users (id, name, email, password_hash, role, preferences, avatar, email_verified, deleted_at, last_login)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user.id,
+        user.name,
+        user.email,
+        user.password_hash,
+        user.role,
+        user.preferences ? JSON.stringify(user.preferences) : null,
+        user.avatar ?? null,
+        user.email_verified ? 1 : 0,
+        user.deleted_at ?? null,
+        user.last_login ?? null,
+      ]
     );
     const row = await tursoExecSingle("SELECT * FROM users WHERE id = ?", [user.id]);
     if (!row) throw new Error("Failed to create user");
@@ -461,8 +594,20 @@ export async function createUser(user: Omit<User, "id" | "created_at"> & { id: s
   }
   const db = getLocalDbWrite();
   db.prepare(
-    "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)"
-  ).run(user.id, user.name, user.email, user.password_hash, user.role);
+    `INSERT INTO users (id, name, email, password_hash, role, preferences, avatar, email_verified, deleted_at, last_login)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    user.id,
+    user.name,
+    user.email,
+    user.password_hash,
+    user.role,
+    user.preferences ? JSON.stringify(user.preferences) : null,
+    user.avatar ?? null,
+    user.email_verified ? 1 : 0,
+    user.deleted_at ?? null,
+    user.last_login ?? null
+  );
   const row = db.prepare("SELECT * FROM users WHERE id = ?").get(user.id) as Record<string, unknown> | undefined;
   if (!row) throw new Error("Failed to create user");
   return parseUser(row);
@@ -512,8 +657,19 @@ export async function createTrackSubmission(
 ): Promise<TrackSubmission> {
   if (USE_TURSO) {
     await tursoExec(
-      "INSERT INTO track_submissions (id, user_id, track_data, status, admin_notes) VALUES (?, ?, ?, ?, ?)",
-      [submission.id, submission.user_id, submission.track_data, submission.status, submission.admin_notes ?? null]
+      `INSERT INTO track_submissions (id, user_id, track_data, status, admin_notes, submission_type, metadata, admin_id, reviewed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        submission.id,
+        submission.user_id,
+        submission.track_data,
+        submission.status,
+        submission.admin_notes ?? null,
+        submission.submission_type ?? "track",
+        submission.metadata ?? null,
+        submission.admin_id ?? null,
+        submission.reviewed_at ?? null,
+      ]
     );
     const created = await getTrackSubmissionById(submission.id);
     if (!created) throw new Error("Failed to create track submission");
@@ -521,8 +677,19 @@ export async function createTrackSubmission(
   }
   const db = getLocalDbWrite();
   db.prepare(
-    "INSERT INTO track_submissions (id, user_id, track_data, status, admin_notes) VALUES (?, ?, ?, ?, ?)"
-  ).run(submission.id, submission.user_id, submission.track_data, submission.status, submission.admin_notes);
+    `INSERT INTO track_submissions (id, user_id, track_data, status, admin_notes, submission_type, metadata, admin_id, reviewed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    submission.id,
+    submission.user_id,
+    submission.track_data,
+    submission.status,
+    submission.admin_notes,
+    submission.submission_type ?? "track",
+    submission.metadata ?? null,
+    submission.admin_id ?? null,
+    submission.reviewed_at ?? null
+  );
   const created = await getTrackSubmissionById(submission.id);
   if (!created) throw new Error("Failed to create track submission");
   return created;
@@ -571,19 +738,20 @@ export async function getTrackSubmissionsByStatus(status: SubmissionStatus): Pro
 export async function updateTrackSubmissionStatus(
   id: string,
   status: SubmissionStatus,
-  adminNotes?: string
+  adminNotes?: string,
+  adminId?: string
 ): Promise<TrackSubmission | null> {
   if (USE_TURSO) {
     const now = new Date().toISOString();
     if (adminNotes !== undefined) {
       await tursoExec(
-        "UPDATE track_submissions SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?",
-        [status, adminNotes, now, id]
+        "UPDATE track_submissions SET status = ?, admin_notes = ?, admin_id = ?, reviewed_at = ?, updated_at = ? WHERE id = ?",
+        [status, adminNotes, adminId ?? null, now, now, id]
       );
     } else {
       await tursoExec(
-        "UPDATE track_submissions SET status = ?, updated_at = ? WHERE id = ?",
-        [status, now, id]
+        "UPDATE track_submissions SET status = ?, admin_id = ?, reviewed_at = ?, updated_at = ? WHERE id = ?",
+        [status, adminId ?? null, now, now, id]
       );
     }
     return getTrackSubmissionById(id);
@@ -591,11 +759,118 @@ export async function updateTrackSubmissionStatus(
   const db = getLocalDbWrite();
   const now = new Date().toISOString();
   if (adminNotes !== undefined) {
-    db.prepare("UPDATE track_submissions SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?").run(status, adminNotes, now, id);
+    db.prepare("UPDATE track_submissions SET status = ?, admin_notes = ?, admin_id = ?, reviewed_at = ?, updated_at = ? WHERE id = ?").run(status, adminNotes, adminId ?? null, now, now, id);
   } else {
-    db.prepare("UPDATE track_submissions SET status = ?, updated_at = ? WHERE id = ?").run(status, now, id);
+    db.prepare("UPDATE track_submissions SET status = ?, admin_id = ?, reviewed_at = ?, updated_at = ? WHERE id = ?").run(status, adminId ?? null, now, now, id);
   }
   return getTrackSubmissionById(id);
+}
+
+// ─── Subscriptions CRUD ───────────────────────────────────────────────────────
+
+function parseSubscription(row: Record<string, unknown>): Subscription {
+  return {
+    id: String(row.id),
+    subscriber_id: String(row.subscriber_id),
+    artist_id: String(row.artist_id),
+    notify_releases: Number(row.notify_releases) === 1,
+    notify_shows: Number(row.notify_shows) === 1,
+    created_at: String(row.created_at),
+  };
+}
+
+export async function createSubscription(
+  subscription: Omit<Subscription, "id" | "created_at"> & { id: string }
+): Promise<Subscription> {
+  if (USE_TURSO) {
+    await tursoExec(
+      "INSERT INTO subscriptions (id, subscriber_id, artist_id, notify_releases, notify_shows) VALUES (?, ?, ?, ?, ?)",
+      [subscription.id, subscription.subscriber_id, subscription.artist_id, subscription.notify_releases ? 1 : 0, subscription.notify_shows ? 1 : 0]
+    );
+    const created = await getSubscriptionById(subscription.id);
+    if (!created) throw new Error("Failed to create subscription");
+    return created;
+  }
+  const db = getLocalDbWrite();
+  db.prepare(
+    "INSERT INTO subscriptions (id, subscriber_id, artist_id, notify_releases, notify_shows) VALUES (?, ?, ?, ?, ?)"
+  ).run(subscription.id, subscription.subscriber_id, subscription.artist_id, subscription.notify_releases ? 1 : 0, subscription.notify_shows ? 1 : 0);
+  const created = await getSubscriptionById(subscription.id);
+  if (!created) throw new Error("Failed to create subscription");
+  return created;
+}
+
+export async function getSubscriptionById(id: string): Promise<Subscription | null> {
+  if (USE_TURSO) {
+    const row = await tursoExecSingle("SELECT * FROM subscriptions WHERE id = ?", [id]);
+    return row ? parseSubscription(row) : null;
+  }
+  const db = getLocalDb();
+  const row = db.prepare("SELECT * FROM subscriptions WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+  return row !== undefined ? parseSubscription(row) : null;
+}
+
+export async function getSubscriptionByUserAndArtist(subscriberId: string, artistId: string): Promise<Subscription | null> {
+  if (USE_TURSO) {
+    const row = await tursoExecSingle("SELECT * FROM subscriptions WHERE subscriber_id = ? AND artist_id = ?", [subscriberId, artistId]);
+    return row ? parseSubscription(row) : null;
+  }
+  const db = getLocalDb();
+  const row = db.prepare("SELECT * FROM subscriptions WHERE subscriber_id = ? AND artist_id = ?").get(subscriberId, artistId) as Record<string, unknown> | undefined;
+  return row !== undefined ? parseSubscription(row) : null;
+}
+
+export async function getSubscriptionsBySubscriber(subscriberId: string): Promise<Subscription[]> {
+  if (USE_TURSO) {
+    const rows = await tursoExec("SELECT * FROM subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC", [subscriberId]);
+    return rows.map((r) => parseSubscription(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db.prepare("SELECT * FROM subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC").all(subscriberId) as Record<string, unknown>[];
+  return rows.map(parseSubscription);
+}
+
+export async function getSubscriptionsByArtist(artistId: string): Promise<Subscription[]> {
+  if (USE_TURSO) {
+    const rows = await tursoExec("SELECT * FROM subscriptions WHERE artist_id = ? ORDER BY created_at DESC", [artistId]);
+    return rows.map((r) => parseSubscription(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db.prepare("SELECT * FROM subscriptions WHERE artist_id = ? ORDER BY created_at DESC").all(artistId) as Record<string, unknown>[];
+  return rows.map(parseSubscription);
+}
+
+export async function updateSubscription(id: string, data: Partial<Omit<Subscription, "id" | "created_at">>): Promise<Subscription | null> {
+  const updates: string[] = [];
+  const values: unknown[] = [];
+
+  if (data.notify_releases !== undefined) { updates.push("notify_releases = ?"); values.push(data.notify_releases ? 1 : 0); }
+  if (data.notify_shows !== undefined) { updates.push("notify_shows = ?"); values.push(data.notify_shows ? 1 : 0); }
+
+  if (updates.length === 0) return getSubscriptionById(id);
+
+  values.push(id);
+
+  if (USE_TURSO) {
+    const rowsAffected = await tursoExecUpdate(`UPDATE subscriptions SET ${updates.join(", ")} WHERE id = ?`, values);
+    if (rowsAffected === 0) return null;
+    return getSubscriptionById(id);
+  }
+
+  const db = getLocalDbWrite();
+  const localResult = db.prepare(`UPDATE subscriptions SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  if (localResult.changes === 0) return null;
+  return getSubscriptionById(id);
+}
+
+export async function deleteSubscription(id: string): Promise<boolean> {
+  if (USE_TURSO) {
+    await tursoExec("DELETE FROM subscriptions WHERE id = ?", [id]);
+    return true;
+  }
+  const db = getLocalDbWrite();
+  const result = db.prepare("DELETE FROM subscriptions WHERE id = ?").run(id);
+  return result.changes > 0;
 }
 
 // ─── Likes CRUD ─────────────────────────────────────────────────────────────
@@ -883,11 +1158,30 @@ export async function getArtistById(id: string): Promise<ArtistProfile | null> {
 export async function createArtist(data: CreateArtistInput): Promise<ArtistProfile> {
   const id = `art-${Date.now()}`;
   const pressHighlights = data.pressHighlights ? JSON.stringify(data.pressHighlights) : "[]";
+  // Generate slug from name
+  const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const socialLinks = data.socialLinks ? JSON.stringify(data.socialLinks) : "[]";
 
   if (USE_TURSO) {
     await tursoExec(
-      "INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, data.name, data.userId || null, data.biography || null, data.pressText || null, pressHighlights, data.genre || null, data.location || null, data.monthly_listeners || 0]
+      `INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners, social_links, profile_image, banner_image, slug, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        data.name,
+        data.userId || null,
+        data.biography || null,
+        data.pressText || null,
+        pressHighlights,
+        data.genre || null,
+        data.location || null,
+        data.monthly_listeners || 0,
+        socialLinks,
+        data.profileImage || null,
+        data.bannerImage || null,
+        slug,
+        1,
+      ]
     );
     const row = await tursoExecSingle("SELECT * FROM artists WHERE id = ?", [id]);
     if (!row) throw new Error("Failed to create artist");
@@ -896,8 +1190,9 @@ export async function createArtist(data: CreateArtistInput): Promise<ArtistProfi
 
   const db = getLocalDbWrite();
   db.prepare(
-    "INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(id, data.name, data.userId || null, data.biography || null, data.pressText || null, pressHighlights, data.genre || null, data.location || null, data.monthly_listeners || 0);
+    `INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners, social_links, profile_image, banner_image, slug, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, data.name, data.userId || null, data.biography || null, data.pressText || null, pressHighlights, data.genre || null, data.location || null, data.monthly_listeners || 0, socialLinks, data.profileImage || null, data.bannerImage || null, slug, 1);
   const row = db.prepare("SELECT * FROM artists WHERE id = ?").get(id) as Record<string, unknown> | undefined;
   if (!row) throw new Error("Failed to create artist");
   return parseArtist(row);
@@ -913,6 +1208,11 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
   const location = data.location as string | undefined;
   const monthlyListeners = ((data.monthly_listeners ?? data.monthlyListeners) as number | undefined) ?? 0;
   const userId = (data.userId ?? data.user_id) as string | undefined;
+  const socialLinks = (data.socialLinks ?? data.social_links) as SocialLink[] | undefined;
+  const profileImage = (data.profileImage ?? data.profile_image) as string | undefined;
+  const bannerImage = (data.bannerImage ?? data.banner_image) as string | undefined;
+  const slug = (data.slug ?? data.slug) as string | undefined;
+  const isActive = (data.isActive ?? data.is_active) as boolean | undefined;
 
   console.log("[updateArtist] id:", id, "name:", name, "biography:", biography?.substring(0, 30), "genre:", genre, "location:", location, "monthly_listeners:", monthlyListeners);
 
@@ -928,6 +1228,11 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
     if (location !== undefined) { updates.push("location = ?"); values.push(location); }
     if (monthlyListeners !== undefined) { updates.push("monthly_listeners = ?"); values.push(monthlyListeners); }
     if (userId !== undefined) { updates.push("user_id = ?"); values.push(userId); }
+    if (socialLinks !== undefined) { updates.push("social_links = ?"); values.push(JSON.stringify(socialLinks)); }
+    if (profileImage !== undefined) { updates.push("profile_image = ?"); values.push(profileImage); }
+    if (bannerImage !== undefined) { updates.push("banner_image = ?"); values.push(bannerImage); }
+    if (slug !== undefined) { updates.push("slug = ?"); values.push(slug); }
+    if (isActive !== undefined) { updates.push("is_active = ?"); values.push(isActive ? 1 : 0); }
 
     if (updates.length === 0) return getArtistById(id);
 
@@ -956,6 +1261,11 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
   if (location !== undefined) { updates.push("location = ?"); values.push(location); }
   if (monthlyListeners !== undefined) { updates.push("monthly_listeners = ?"); values.push(monthlyListeners); }
   if (userId !== undefined) { updates.push("user_id = ?"); values.push(userId); }
+  if (socialLinks !== undefined) { updates.push("social_links = ?"); values.push(JSON.stringify(socialLinks)); }
+  if (profileImage !== undefined) { updates.push("profile_image = ?"); values.push(profileImage); }
+  if (bannerImage !== undefined) { updates.push("banner_image = ?"); values.push(bannerImage); }
+  if (slug !== undefined) { updates.push("slug = ?"); values.push(slug); }
+  if (isActive !== undefined) { updates.push("is_active = ?"); values.push(isActive ? 1 : 0); }
 
   if (updates.length === 0) return getArtistById(id);
 
@@ -1022,11 +1332,34 @@ export async function getShowById(id: string): Promise<Show | null> {
 
 export async function createShow(data: CreateShowInput): Promise<Show> {
   const id = `show-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date().toISOString();
+  const paymentMethods = data.payment_methods ? JSON.stringify(data.payment_methods) : "[]";
+  const guestArtists = data.guest_artists ? JSON.stringify(data.guest_artists) : "[]";
 
   if (USE_TURSO) {
     await tursoExec(
-      "INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, data.artist_id, data.venue_name, data.city || null, data.country || null, data.date || null, data.time || null, data.price_range || null, data.status || "disponible", data.ticket_url || null]
+      `INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        data.artist_id,
+        data.venue_name,
+        data.city || null,
+        data.country || null,
+        data.date || null,
+        data.time || null,
+        data.price_range || null,
+        data.status || "disponible",
+        data.ticket_url || null,
+        paymentMethods,
+        data.postponement_reason || null,
+        data.flyer_url || null,
+        data.ticket_link || null,
+        data.description || null,
+        guestArtists,
+        data.notes || null,
+        now,
+      ]
     );
     const created = await getShowById(id);
     if (!created) throw new Error("Failed to create show");
@@ -1035,8 +1368,9 @@ export async function createShow(data: CreateShowInput): Promise<Show> {
 
   const db = getLocalDbWrite();
   db.prepare(
-    "INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(id, data.artist_id, data.venue_name, data.city || null, data.country || null, data.date || null, data.time || null, data.price_range || null, data.status || "disponible", data.ticket_url || null);
+    `INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, data.artist_id, data.venue_name, data.city || null, data.country || null, data.date || null, data.time || null, data.price_range || null, data.status || "disponible", data.ticket_url || null, paymentMethods, data.postponement_reason || null, data.flyer_url || null, data.ticket_link || null, data.description || null, guestArtists, data.notes || null, now);
   const created = await getShowById(id);
   if (!created) throw new Error("Failed to create show");
   return created;
@@ -1055,8 +1389,19 @@ export async function updateShow(id: string, data: Partial<CreateShowInput>): Pr
     if (data.price_range !== undefined) { updates.push("price_range = ?"); values.push(data.price_range || null); }
     if (data.status !== undefined) { updates.push("status = ?"); values.push(data.status); }
     if (data.ticket_url !== undefined) { updates.push("ticket_url = ?"); values.push(data.ticket_url || null); }
+    if (data.payment_methods !== undefined) { updates.push("payment_methods = ?"); values.push(JSON.stringify(data.payment_methods)); }
+    if (data.postponement_reason !== undefined) { updates.push("postponement_reason = ?"); values.push(data.postponement_reason || null); }
+    if (data.flyer_url !== undefined) { updates.push("flyer_url = ?"); values.push(data.flyer_url || null); }
+    if (data.ticket_link !== undefined) { updates.push("ticket_link = ?"); values.push(data.ticket_link || null); }
+    if (data.description !== undefined) { updates.push("description = ?"); values.push(data.description || null); }
+    if (data.guest_artists !== undefined) { updates.push("guest_artists = ?"); values.push(JSON.stringify(data.guest_artists)); }
+    if (data.notes !== undefined) { updates.push("notes = ?"); values.push(data.notes || null); }
 
-    if (updates.length === 0) return getShowById(id);
+    // Always update updated_at
+    updates.push("updated_at = ?");
+    values.push(new Date().toISOString());
+
+    if (updates.length === 1) return getShowById(id); // Only updated_at was added
 
     values.push(id);
     const rowsAffected = await tursoExecUpdate(`UPDATE shows SET ${updates.join(", ")} WHERE id = ?`, values);
@@ -1076,13 +1421,23 @@ export async function updateShow(id: string, data: Partial<CreateShowInput>): Pr
   if (data.price_range !== undefined) { updates.push("price_range = ?"); values.push(data.price_range || null); }
   if (data.status !== undefined) { updates.push("status = ?"); values.push(data.status); }
   if (data.ticket_url !== undefined) { updates.push("ticket_url = ?"); values.push(data.ticket_url || null); }
+  if (data.payment_methods !== undefined) { updates.push("payment_methods = ?"); values.push(JSON.stringify(data.payment_methods)); }
+  if (data.postponement_reason !== undefined) { updates.push("postponement_reason = ?"); values.push(data.postponement_reason || null); }
+  if (data.flyer_url !== undefined) { updates.push("flyer_url = ?"); values.push(data.flyer_url || null); }
+  if (data.ticket_link !== undefined) { updates.push("ticket_link = ?"); values.push(data.ticket_link || null); }
+  if (data.description !== undefined) { updates.push("description = ?"); values.push(data.description || null); }
+  if (data.guest_artists !== undefined) { updates.push("guest_artists = ?"); values.push(JSON.stringify(data.guest_artists)); }
+  if (data.notes !== undefined) { updates.push("notes = ?"); values.push(data.notes || null); }
 
-  if (updates.length === 0) return getShowById(id);
+  // Always update updated_at
+  updates.push("updated_at = ?");
+  values.push(new Date().toISOString());
+
+  if (updates.length === 1) return getShowById(id); // Only updated_at was added
 
   values.push(id);
   const localResult = db.prepare(`UPDATE shows SET ${updates.join(", ")} WHERE id = ?`).run(...values);
   if (localResult.changes === 0) return null;
-  return getShowById(id);
   return getShowById(id);
 }
 
@@ -1172,6 +1527,13 @@ export async function createTrack(data: {
   stems_urls?: Partial<import("@/types/music").StemsUrls> | null;
   video_embed_url?: string | null;
   gallery_images?: string[] | null;
+  // P2.5: New fields
+  external_links?: import("@/types/music").ExternalLinks | null;
+  disc_number?: number;
+  is_double_single?: boolean;
+  sides_b?: string[] | null;
+  isrc?: string | null;
+  composers?: string[] | null;
 }): Promise<Track> {
   const track = {
     id: data.id,
@@ -1191,6 +1553,13 @@ export async function createTrack(data: {
     stems_urls: data.stems_urls || null,
     video_embed_url: data.video_embed_url || null,
     gallery_images: data.gallery_images || null,
+    // P2.5: New fields
+    external_links: data.external_links || null,
+    disc_number: data.disc_number ?? 1,
+    is_double_single: data.is_double_single ?? false,
+    sides_b: data.sides_b || null,
+    isrc: data.isrc || null,
+    composers: data.composers || null,
   };
 
   if (USE_TURSO) {
@@ -1198,8 +1567,9 @@ export async function createTrack(data: {
       `INSERT OR REPLACE INTO tracks (
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
-        metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
+        external_links, disc_number, is_double_single, sides_b, isrc, composers
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         track.id, track.title, track.artist_name, track.release_type, track.release_date,
         track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -1208,6 +1578,12 @@ export async function createTrack(data: {
         track.stems_urls ? JSON.stringify(track.stems_urls) : null,
         track.video_embed_url,
         track.gallery_images ? JSON.stringify(track.gallery_images) : null,
+        track.external_links ? JSON.stringify(track.external_links) : null,
+        track.disc_number,
+        track.is_double_single ? 1 : 0,
+        track.sides_b ? JSON.stringify(track.sides_b) : null,
+        track.isrc,
+        track.composers ? JSON.stringify(track.composers) : null,
       ]
     );
   } else {
@@ -1216,8 +1592,9 @@ export async function createTrack(data: {
       INSERT OR REPLACE INTO tracks (
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
-        metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
+        external_links, disc_number, is_double_single, sides_b, isrc, composers
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       track.id, track.title, track.artist_name, track.release_type, track.release_date,
       track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -1225,7 +1602,13 @@ export async function createTrack(data: {
       JSON.stringify(track.production_details), track.lyrics,
       track.stems_urls ? JSON.stringify(track.stems_urls) : null,
       track.video_embed_url,
-      track.gallery_images ? JSON.stringify(track.gallery_images) : null
+      track.gallery_images ? JSON.stringify(track.gallery_images) : null,
+      track.external_links ? JSON.stringify(track.external_links) : null,
+      track.disc_number,
+      track.is_double_single ? 1 : 0,
+      track.sides_b ? JSON.stringify(track.sides_b) : null,
+      track.isrc,
+      track.composers ? JSON.stringify(track.composers) : null
     );
   }
 
@@ -1336,6 +1719,12 @@ export async function syncAllToTurso(): Promise<Record<string, SyncResult>> {
   const showRows = db.prepare("SELECT * FROM shows").all() as Record<string, unknown>[];
   const shows = showRows.map(parseShow);
   results.shows = await syncShowsToTurso(shows);
+
+  // Subscriptions
+  const { syncSubscriptionsToTurso } = await import("@/lib/turso");
+  const subscriptionRows = db.prepare("SELECT * FROM subscriptions").all() as Record<string, unknown>[];
+  const subscriptions = subscriptionRows.map(parseSubscription);
+  results.subscriptions = await syncSubscriptionsToTurso(subscriptions);
 
   return results;
 }
