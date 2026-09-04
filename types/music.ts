@@ -288,7 +288,7 @@ export interface CreateArtistInput {
 }
 
 // Shows & Booking
-export type ShowStatus = "disponible" | "agotado" | "proximamente" | "vip" | "cancelado" | "pausado";
+export type ShowStatus = "proximamente" | "activo" | "pospuesto" | "hoy" | "pasado" | "cancelado" | "suspendido" | "confirmado" | "en_venta" | "agotado";
 
 export interface Show {
   id: string;

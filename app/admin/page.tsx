@@ -81,7 +81,7 @@ export default function AdminPage() {
     date: "",
     time: "",
     price_range: "",
-    status: "disponible" as ShowStatus,
+    status: "proximamente" as ShowStatus,
     ticket_url: "",
   });
   const [artistForm, setArtistForm] = useState({
@@ -1052,7 +1052,7 @@ onSubmit={async (e) => {
                         });
                         if (res.ok) {
                           setEditingShow(null);
-                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "disponible", ticket_url: "" });
+                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "proximamente", ticket_url: "" });
                           fetchShows();
                           setMessage({ type: "success", text: "Show actualizado" });
                         }
@@ -1063,7 +1063,7 @@ onSubmit={async (e) => {
                           body: JSON.stringify(showForm),
                         });
                         if (res.ok) {
-                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "disponible", ticket_url: "" });
+                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "proximamente", ticket_url: "" });
                           fetchShows();
                           setMessage({ type: "success", text: "Show creado" });
                         }
@@ -1153,10 +1153,10 @@ onSubmit={async (e) => {
                         onChange={(e) => setShowForm({ ...showForm, status: e.target.value as ShowStatus })}
                         className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
                       >
-                        <option value="disponible">Disponible</option>
+                        <option value="proximamente">Próximamente</option>
                         <option value="agotado">Agotado</option>
                         <option value="proximamente">Próximamente</option>
-                        <option value="vip">VIP</option>
+                        <option value="confirmado">Confirmado</option>
                         <option value="cancelado">Cancelado</option>
                         <option value="pausado">Pausado</option>
                       </select>
@@ -1183,7 +1183,7 @@ onSubmit={async (e) => {
                       type="button"
                       onClick={() => {
                         setEditingShow(null);
-                        setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "disponible", ticket_url: "" });
+                        setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "proximamente", ticket_url: "" });
                       }}
                       className="px-6 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                     >
@@ -1224,10 +1224,10 @@ onSubmit={async (e) => {
                             <td className="p-3 text-slate-600 dark:text-slate-400">{show.date || "—"}</td>
                             <td className="p-3">
                               <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                show.status === "disponible" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
+                                show.status === "activo" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
                                 show.status === "agotado" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
                                 show.status === "proximamente" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" :
-                                show.status === "vip" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
+                                show.status === "confirmado" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
                                 show.status === "cancelado" ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" :
                                 "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
                               }`}>
