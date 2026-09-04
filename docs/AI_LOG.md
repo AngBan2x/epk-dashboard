@@ -1795,3 +1795,50 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 |-------|-----------|
 | TypeScript | ✅ 0 errores |
 | Unit Tests | ✅ 41/41 passing |
+
+---
+
+## v3.11.0 — Fase P1.8: Setup para Fase P Profesional
+
+**Fecha:** 2026-09-04
+**Modelo:** Mimo v2.5 Free
+**Modo:** Build
+
+### Objetivo
+Preparar infraestructura para la Fase P (Profesional v4.0.0): crear 12 subagentes especializados + configurar MCP Unsplash para stock photos.
+
+### Decisión: Shutterstock vs Unsplash
+| Opción | Estado | Decisión |
+|--------|--------|----------|
+| Shutterstock MCP (ag2-mcp-servers) | Auto-generado, 0 stars, Python | ❌ No confiable |
+| Unsplash API | Gratuita, 50 req/hora, sin API key para demos | ✅ Seleccionada |
+
+### Subagentes Creados (12)
+| # | Archivo | Nombre | Para qué |
+|---|---------|--------|----------|
+| 1 | `.opencode/agents/landing-page-builder.md` | Landing Page Builder | Página de inicio profesional (Unsplash bg, hero, CTAs) |
+| 2 | `.opencode/agents/header-builder.md` | Header Builder | Header sticky + mobile-first + footer |
+| 3 | `.opencode/agents/artist-dashboard-builder.md` | Artist Dashboard Builder | Panel de control de artista + perfil |
+| 4 | `.opencode/agents/release-form-builder.md` | Release Form Builder | CRUD lanzamientos + auto-metadata iTunes + cover handling |
+| 5 | `.opencode/agents/show-form-builder.md` | Show Form Builder | CRUD shows + estados + pagos + disclaimer |
+| 6 | `.opencode/agents/approval-workflow-builder.md` | Approval Workflow Builder | Sistema aprobación admin → artista |
+| 7 | `.opencode/agents/notification-builder.md` | Notification Builder | Notificaciones in-app + email (Resend) |
+| 8 | `.opencode/agents/subscriber-builder.md` | Subscriber Builder | Rol suscriptor + suscripciones + preferencias |
+| 9 | `.opencode/agents/search-builder.md` | Search Builder | Búsqueda en tiempo real (SQLite LIKE, debounced) |
+| 10 | `.opencode/agents/account-settings-builder.md` | Account Settings Builder | Gestión de cuenta (email verif, password, notifs, eliminar 30d) |
+| 11 | `.opencode/agents/carousel-builder.md` | Carousel Builder | Carruseles infinitos de artistas/lanzamientos |
+| 12 | `.opencode/agents/social-links-builder.md` | Social Links Builder | SVG icons (17 plataformas) + CRUD social links |
+
+### MCP Configurado
+| MCP | Estado | Uso |
+|-----|--------|-----|
+| Unsplash | ✅ Agregado a mcp.json | Stock photos para landing page |
+
+### Roadmap Fase P: Profesional (v4.0.0)
+| Fase | Nombre | Tasks | Estado |
+|------|--------|-------|--------|
+| **P1.8** | Setup: subagentes + MCPs | 12 subagentes + MCP Unsplash | ✅ Completada |
+| **P2** | Foundation: DB + Landing + Header | 9 tasks | ⏳ Pendiente |
+| **P3** | Artist Self-Management | 8 tasks | ⏳ Pendiente |
+| **P4** | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
+| **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |

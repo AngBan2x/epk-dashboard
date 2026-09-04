@@ -553,6 +553,60 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.10.1 | Track Page: Apple Music SVG + spacing + icon colors + SocialBar + Recharts + contrast fixes | patch | ✅ Completada |
 | v3.10.2 | Visual Tester: proactive detection + cross-page consistency + model fix | patch | ✅ Completada |
 | v3.10.3 | Auth Fixes: session cookies expiry + likes auth + rememberMe | patch | ✅ Completada |
+| v3.11.0 | Fase P1.8: Setup — 12 subagentes + MCP Unsplash | minor | ✅ Completada |
+
+---
+
+### Roadmap Fase P: Profesional (v4.0.0)
+
+| Fase | Nombre | Tasks | Estado |
+|------|--------|-------|--------|
+| **P1.8** | Setup: subagentes + MCPs | 12 subagentes + MCP Unsplash | ✅ Completada |
+| **P2** | Foundation: DB + Landing + Header | 9 tasks | ⏳ Pendiente |
+| **P3** | Artist Self-Management | 8 tasks | ⏳ Pendiente |
+| **P4** + | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
+| **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |
+
+#### Fase P2: Foundation (DB + Landing + Header)
+| Task | Subagente | Descripción |
+|------|-----------|-------------|
+| P2.1-P2.6 | db-builder | DB migrations: artists, users, subscriptions, shows, tracks, submissions |
+| P2.7 | landing-page-builder | Página de inicio profesional (Unsplash bg, hero, CTAs) |
+| P2.8 | header-builder | Header sticky + mobile-first |
+| P2.9 | header-builder | Footer mejorado |
+
+#### Fase P3: Artist Self-Management
+| Task | Subagente | Descripción |
+|------|-----------|-------------|
+| P3.1 | artist-dashboard-builder | Panel de control de artista |
+| P3.2 | release-form-builder | CRUD lanzamientos (sencillo/EP/álbum) |
+| P3.3 | release-form-builder | Auto-completado metadata iTunes |
+| P3.4 | release-form-builder | Cover image handling (YouTube thumbnail fallback) |
+| P3.5 | approval-workflow-builder | Aprobación admin → artista |
+| P3.6 | show-form-builder | CRUD shows (estados, pagos, fechas) |
+| P3.7 | artist-dashboard-builder | Gestión de perfil artista |
+| P3.8 | account-settings-builder | Gestión de cuenta (email verif, password, notifs, eliminar 30d) |
+
+#### Fase P4: Subscribers + Notifications + Search
+| Task | Subagente | Descripción |
+|------|-----------|-------------|
+| P4.1 | subscriber-builder | Rol suscriptor + registro |
+| P4.2 | subscriber-builder | Sistema de suscripciones |
+| P4.3 | notification-builder | Notificaciones in-app |
+| P4.4 | notification-builder | Notificaciones email (Resend) |
+| P4.5 | notification-builder | Notificaciones aprobación/rechazo |
+| P4.6 | notification-builder | Notificaciones de shows |
+| P4.7 | search-builder | Búsqueda en tiempo real |
+
+#### Fase P5: Polish + Demo
+| Task | Subagente | Descripción |
+|------|-----------|-------------|
+| P5.1 | carousel-builder | Carruseles infinitos |
+| P5.2 | seed-builder | Seed data: 5 artistas reales |
+| P5.3 | social-links-builder | SVG icons (17 plataformas) |
+| P5.4 | show-form-builder | Disclaimer banner pagos |
+| P5.5 | qa-visual | QA visual completo |
+| P5.6 | release-manager | Release v4.0.0 |
 
 ---
 
