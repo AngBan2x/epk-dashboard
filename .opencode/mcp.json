@@ -22,6 +22,5 @@
         "@modelcontextprotocol/server-playwright"
       ]
     }
-  },
-  "_note": "Unsplash API se usa directamente via fetch (no hay MCP server oficial). Requiere UNSPLASH_ACCESS_KEY en .env.local"
+  }
 }
