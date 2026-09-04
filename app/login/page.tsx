@@ -12,6 +12,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
@@ -76,6 +77,19 @@ export default function LoginPage() {
               className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               placeholder="••••••••"
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="rememberMe"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500"
+            />
+            <label htmlFor="rememberMe" className="text-sm text-slate-600 dark:text-slate-400">
+              Recordar mi sesión
+            </label>
           </div>
 
           <Button type="submit" className="w-full py-3" disabled={loading}>

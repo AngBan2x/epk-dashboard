@@ -1760,3 +1760,38 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 
 ### Archivos modificados
 - `.opencode/agents/visual-tester.md` — Reescritura completa con mejoras
+
+---
+
+## v3.10.3 — Auth Fixes: Session Cookies + Likes Counting
+
+**Fecha:** 2026-09-03
+
+### Problema 1: Cookie "Remember Me" — Sesión persiste sin expiración
+| Aspecto | Antes | Después |
+|---------|-------|---------|
+| Token de sesión | `{userId, email, role}` — sin `iat`/`exp` | `{userId, email, role, iat, exp?}` — con timestamp |
+| expiración | Solo `maxAge` en cookie (session cookie sin `maxAge` = indefinido) | Token lleva `exp` embebido: 24h si no rememberMe, indefinido si rememberMe |
+| Validación middleware | Solo decodificaba `atob()` + `JSON.parse()` — nunca verificaba expiración | `decodeSessionToken()` + `isSessionValid()` — rechaza tokens expirados |
+| Login page | Sin checkbox "Recordar sesión" | Checkbox + `rememberMe` state pasado al `login()` |
+
+### Problema 2: Likes — Cookie name mismatch + auth insegura
+| Aspecto | Antes | Después |
+|---------|-------|---------|
+| Cookie leída | `session_user_id` (no existe en el auth flow) | `auth_session` (la que realmente setea el login) |
+| Decode | `req.cookies.get("session_user_id")?.value` (raw string) | `decodeSessionToken()` + `isSessionValid()` |
+| Header fallback | `x-user-id` header (spoofable, inseguro) | Eliminado — solo cookie auth |
+
+### Commits
+- `lib/auth.ts` — utilidad compartida `decodeSessionToken()` + `isSessionValid()`
+- `app/api/auth/login/route.ts` — agregar `iat`/`exp` al token
+- `app/login/page.tsx` — agregar checkbox "Recordar sesión"
+- `middleware.ts` — usar `decodeSessionToken()` + verificar `exp`
+- `app/api/auth/me/route.ts` — usar `decodeSessionToken()` + verificar `exp`
+- `app/api/likes/route.ts` — fix cookie name + decode + eliminar header fallback
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Unit Tests | ✅ 41/41 passing |
