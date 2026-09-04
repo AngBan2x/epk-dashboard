@@ -1742,3 +1742,21 @@ Error occurred prerendering page "/_not-found", "/admin", "/dashboard", etc.
 
 ### Release
 - v3.10.1: https://github.com/AngBan2x/epk-dashboard/releases/tag/v3.10.1
+
+---
+
+## v3.10.2 — Visual Tester: Proactive Detection + Cross-Page Consistency
+
+**Fecha:** 2026-09-03
+
+### Cambios
+| Cambio | Descripción |
+|--------|-------------|
+| **Modelo corregido** | Referencia a "Gemma 4 31B" → Nemotron 3 Nano Omni (el que realmente está configurado) |
+| **Detección proactiva** | Checklist de 30+ items que el agente debe verificar SIN que se le pida: texto truncado, colores hardcodeados, iconos rotos, spacing inconsistente, etc. |
+| **Consistencia cross-page** | Verificar que componentes compartidos (AudioPlayer, MetricCard, SocialBar, Card, Button, Modal) se vean IGUAL en todas las páginas |
+| **Análisis de imágenes** | Buscar issues visuales comunes: elementos superpuestos, imágenes rotas, SVG truncados, desbordamiento |
+| **Formato de reporte** | Sección dedicada para "Detección Proactiva" y "Consistencia Cross-Page" en el reporte |
+
+### Archivos modificados
+- `.opencode/agents/visual-tester.md` — Reescritura completa con mejoras
