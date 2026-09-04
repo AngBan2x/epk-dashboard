@@ -32,11 +32,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Crear sesión (simplificada: solo guardamos user_id en cookie httpOnly)
+    // Crear sesión con timestamp de emisión y expiración condicional
+    const now = Date.now();
     const sessionToken = btoa(JSON.stringify({
       userId: user.id,
       email: user.email,
       role: user.role,
+      iat: now,
+      ...(validated.rememberMe ? {} : { exp: now + 24 * 60 * 60 * 1000 }),
     }));
 
     const response = NextResponse.json({

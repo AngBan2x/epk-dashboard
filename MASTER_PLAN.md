@@ -552,6 +552,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | v3.10.0 | Dark Mode Fix + iTunes→Apple Music Branding | minor | ✅ Completada |
 | v3.10.1 | Track Page: Apple Music SVG + spacing + icon colors + SocialBar + Recharts + contrast fixes | patch | ✅ Completada |
 | v3.10.2 | Visual Tester: proactive detection + cross-page consistency + model fix | patch | ✅ Completada |
+| v3.10.3 | Auth Fixes: session cookies expiry + likes auth + rememberMe | patch | ✅ Completada |
 
 ---
 

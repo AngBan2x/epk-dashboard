@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { toggleLike, getLikeCount, hasUserLikedTrack, getUserLikes, getUserByEmail } from "@/lib/db";
+import { toggleLike, getLikeCount, hasUserLikedTrack, getUserLikes } from "@/lib/db";
+import { decodeSessionToken, isSessionValid } from "@/lib/auth";
 
 const ToggleLikeSchema = z.object({
   track_id: z.string().min(1, "track_id requerido"),
 });
 
 function getUserIdFromSession(req: NextRequest): string | null {
-  const sessionCookie = req.cookies.get("session_user_id");
-  if (sessionCookie?.value) return sessionCookie.value;
-  // Fallback: check x-user-id header for backwards compatibility
-  return req.headers.get("x-user-id");
+  const sessionCookie = req.cookies.get("auth_session");
+  if (!sessionCookie?.value) return null;
+  const session = decodeSessionToken(sessionCookie.value);
+  if (!session || !isSessionValid(session)) return null;
+  return session.userId;
 }
 
 export async function GET(req: NextRequest) {

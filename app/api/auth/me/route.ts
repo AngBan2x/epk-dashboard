@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserById, deleteUser } from "@/lib/db";
+import { decodeSessionToken, isSessionValid } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,20 +14,17 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let session: { userId: string } | null = null;
-    try {
-      const decoded = atob(sessionCookie.value);
-      session = JSON.parse(decoded);
-    } catch {
+    const session = decodeSessionToken(sessionCookie.value);
+    if (!session) {
       return NextResponse.json(
         { error: "Sesión inválida" },
         { status: 401 }
       );
     }
 
-    if (!session) {
+    if (!isSessionValid(session)) {
       return NextResponse.json(
-        { error: "Sesión inválida" },
+        { error: "Sesión expirada" },
         { status: 401 }
       );
     }
@@ -67,20 +65,17 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    let session: { userId: string } | null = null;
-    try {
-      const decoded = atob(sessionCookie.value);
-      session = JSON.parse(decoded);
-    } catch {
+    const session = decodeSessionToken(sessionCookie.value);
+    if (!session) {
       return NextResponse.json(
         { error: "Sesión inválida" },
         { status: 401 }
       );
     }
 
-    if (!session) {
+    if (!isSessionValid(session)) {
       return NextResponse.json(
-        { error: "Sesión inválida" },
+        { error: "Sesión expirada" },
         { status: 401 }
       );
     }
