@@ -1853,7 +1853,56 @@ Preparar infraestructura para la Fase P (Profesional v4.0.0): crear 12 subagente
 | Fase | Nombre | Tasks | Estado |
 |------|--------|-------|--------|
 | **P1.8** | Setup: subagentes + API Unsplash | 12 subagentes + credenciales Unsplash | ✅ Completada |
-| **P2** | Foundation: DB + Landing + Header | 9 tasks | ⏳ Pendiente |
+| **P2** | Foundation: DB + Landing + Header | 9 tasks | ✅ Completada |
 | **P3** | Artist Self-Management | 8 tasks | ⏳ Pendiente |
 | **P4** | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
 | **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |
+
+---
+
+## v4.0.0-alpha.1 — P2: Foundation (DB + Landing + Header)
+
+**Fecha:** 2026-09-04
+**Modelo:** Mimo v2.5 Free
+**Modo:** Build
+
+### DB Migrations (P2.1-P2.6)
+| Tabla | Columnas Agregadas |
+|-------|-------------------|
+| **artists** | social_links (JSON), profile_image, banner_image, slug, is_active, deleted_at |
+| **users** | preferences (JSON), avatar, email_verified, deleted_at, last_login |
+| **subscriptions** | NUEVA TABLA: id, subscriber_id, artist_id, notify_releases, notify_shows |
+| **shows** | payment_methods (JSON), postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, deleted_at, updated_at |
+| **tracks** | external_links (JSON), disc_number, is_double_single, sides_b (JSON), cover_image, isrc, composers (JSON) |
+| **track_submissions** | submission_type, metadata (JSON), admin_id, reviewed_at |
+
+### Landing Page (P2.7)
+- Full-viewport hero con fondo Unsplash (concierto)
+- Dynamic CTA: guest → `/catalog`, authenticated → `/dashboard`
+- Framer Motion animations (logo, slogan, description, CTA)
+- Features section (3 cards: Discover, Follow, Shows)
+- How It Works section (3 steps)
+- No header on landing page (via ClientLayout)
+
+### Header + Footer (P2.8-P2.9)
+- Sticky header con backdrop blur
+- Desktop: logo, search bar, notifications bell, dark/light toggle, user avatar menu
+- Mobile: logo, hamburger menu, simplified navigation
+- Footer: 4-column grid (brand, quick links, social, legal)
+
+### Issues Corregidos
+1. **Layout `'use client'` + metadata export** → Creado `ClientLayout` wrapper para manejar pathname
+2. **motion.button con href** → Cambiado a `Link` + `motion.span`
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Build | ✅ Exitoso |
+| Unit Tests | ✅ 41/41 passing |
+
+### Commits
+- `dd603ed` — feat(P2): Foundation — DB migrations + Landing page + Header/Footer
+
+### Release
+- v4.0.0-alpha.1: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-alpha.1
