@@ -1960,3 +1960,66 @@ Preparar infraestructura para la Fase P (Profesional v4.0.0): crear 12 subagente
 | **P3** | Artist Self-Management | 8 tasks (6/8 completadas) | ⏳ Parcial |
 | **P4** | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
 | **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |
+
+---
+
+## Bugfix: Landing Page — Rediseño Visual (Planeado, no ejecutado)
+
+**Fecha:** 2026-09-04
+**Modelo:** Mimo v2.5 Free
+**Modo:** Plan (pendiente de ejecución tras reinicio de cuota OpenRouter)
+
+### Problemas Detectados (capturas del usuario)
+
+1. **Logo gigante**: `w-1/3 md:w-1/2 xl:w-3/5` en SVG 100x100 → ocupa 33-60% del viewport
+2. **Texto excesivo**: `text-8xl` (128px) en desktop
+3. **Estrella rebotante**: Scroll indicator con `animate-bounce` se desborda del hero
+4. **CTA solapando**: Botón flota entre hero y features
+5. **Títulos duplicados**: Dos secciones "Cómo funciona" casi idénticas
+6. **Iconos genéricos**: Círculo y estrella repetidos 6 veces sin relación con contenido
+7. **SVG anidado roto**: `<svg>` dentro de `<svg>` en LandingHowItWorks
+8. **Animación CSS duplicada**: `@keyframes bounce` choca con Tailwind's built-in
+
+### Fix Planeado
+
+#### Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `components/landing/LandingHero.tsx` | Reescritura completa |
+| `components/landing/LandingFeatures.tsx` | Reescritura completa |
+| `components/landing/LandingHowItWorks.tsx` | Reescritura completa |
+| `app/globals.css` | Eliminar bounce duplicado, agregar smooth scroll |
+
+#### LandingHero — Diseño corregido
+- Logo: `w-16 h-16 md:w-20 md:h-20` (pequeño, arriba)
+- Título: `text-4xl md:text-5xl lg:text-6xl` (bajado de text-8xl)
+- Subtítulo: `text-base md:text-lg`
+- Overlay: gradiente sutil
+- **2 CTAs**: "Explorar Catálogo" (sólido amber) + "Cómo Funciona PressPlay" (outline blanco, scroll a features)
+- **Eliminar**: Scroll indicator (estrella rebotante)
+
+#### LandingFeatures — "¿Qué es PressPlay?"
+- 3 cards con iconos SVG significativos:
+  - Nota musical → "EPK para Artistas"
+  - Calendario → "Shows & Eventos"
+  - Corazón → "Sigue tus Favoritos"
+- Fondo blanco, cards con bordes sutiles
+
+#### LandingHowItWorks — "Cómo Funciona" (pasos numerados)
+- 3 pasos con números circulares:
+  - ① Crea tu Perfil
+  - ② Publica tu Música
+  - ③ Conecta con tu Audiencia
+- Fondo `bg-slate-50` para contraste
+
+#### globals.css
+- Eliminar `@keyframes bounce` y `.animate-bounce` (duplica Tailwind)
+- Agregar `scroll-behavior: smooth`
+
+### Bloqueo Actual
+- Cuota OpenRouter agotada — no se puede usar visual tester para verificar
+- Ejecución pendiente hasta mañana cuando se reinicie la cuota
+
+### Resultado Esperado
+Hero proporcionado → Features con iconos reales → Pasos numerados limpios → Footer existente. Sin solapamientos, sin animaciones buggeadas, sin iconos genéricos.
