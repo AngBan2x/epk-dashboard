@@ -23,6 +23,7 @@ La landing page NO debe renderizar el Header. Se debe crear un layout especial o
 ### 2. Hero Section — Full Viewport
 - **Background:** Imagen de Unsplash como fondo a pantalla completa
   - Usar `https://images.unsplash.com/photo-XXXX?w=1920&q=80` con una imagen de música/concierto
+  - API Key: `process.env.UNSPLASH_ACCESS_KEY` (solo server-side)
   - Overlay oscuro semi-transparente para legibilidad del texto
   - Cover position: `object-cover` centrado
 - **Logo PressPlay:** Centrado, tamaño grande (font-black, text-6xl md:text-8xl)
