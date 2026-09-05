@@ -149,7 +149,7 @@ export interface RawUserRow {
   created_at: string;
 }
 
-export type SubmissionStatus = "pending" | "approved" | "rejected";
+export type SubmissionStatus = "pending" | "approved" | "rejected" | "revision";
 
 export type SubmissionType = "track" | "release" | "show";
 
