@@ -2023,3 +2023,63 @@ Preparar infraestructura para la Fase P (Profesional v4.0.0): crear 12 subagente
 
 ### Resultado Esperado
 Hero proporcionado → Features con iconos reales → Pasos numerados limpios → Footer existente. Sin solapamientos, sin animaciones buggeadas, sin iconos genéricos.
+
+---
+
+## Bugfix: 5 Fixes Post-P3
+
+**Fecha:** 2026-09-05
+**Modelo:** Mimo v2.5 Free
+**Modo:** Build
+
+### Bugs Detectados por Usuario (testing manual)
+
+| # | Bug | Archivo | Línea |
+|---|-----|---------|-------|
+| 1 | 404 en "Explorar Catálogo" | `LandingHero.tsx` | 14 |
+| 2 | Cabecera duplicada en dashboard | `dashboard/page.tsx` | 124, 134 |
+| 3 | Iconos "+" y "✏️" sin contraste dark mode | `dashboard/page.tsx` | 71 |
+| 4 | Botón "Guardar Perfil" no funciona | `profile/page.tsx` | 72 |
+| 5 | Gradiente bottom de hero crea transición fea | `LandingHero.tsx` | 76 |
+
+### Fixes Ejecutados
+
+#### Fix 1: 404 en "Explorar Catálogo"
+- **Causa**: CTA enlazaba a `/catalog` (ruta inexistente)
+- **Solución**: Cambiar a `/dashboard` para ambos estados (guest/logged in)
+- **Archivo**: `components/landing/LandingHero.tsx:14`
+
+#### Fix 2: Header duplicado
+- **Causa**: `ClientLayout` ya renderiza `<Header />` en todas las rutas excepto `/`, pero `dashboard/page.tsx` también lo renderizaba
+- **Solución**: Eliminar `<Header />` y su import de `dashboard/page.tsx`
+- **Archivo**: `app/dashboard/page.tsx`
+
+#### Fix 3: Iconos dark mode
+- **Causa**: `QuickAction` usaba emojis de texto (`+`, `✏️`) que no tienen contraste en fondos oscuros
+- **Solución**: Reemplazar por SVG icons con `text-amber-500 dark:text-amber-400`
+- **Iconos**: Plus (lucide), Pencil (lucide)
+- **Archivo**: `app/dashboard/page.tsx`
+
+#### Fix 4: Save profile no funciona
+- **Causa**: Si el usuario no tiene perfil de artista, `getArtistByUserId()` retorna null → API retorna 404 → save falla silenciosamente
+- **Solución**:
+  - Agregar estado `error` para mostrar mensajes de error
+  - `fetchProfile()`: si 404, crear perfil vacío (no mostrar error)
+  - `handleSave()`: si PATCH retorna 404, intentar POST para crear perfil
+  - Mostrar error banner cuando falla
+- **Archivo**: `app/profile/page.tsx`
+
+#### Fix 5: Gradiente hero feo
+- **Causa**: `bg-gradient-to-t from-white dark:from-slate-900 to-transparent` creaba transición abrupta con la sección de features
+- **Solución**: Eliminar el gradiente bottom completamente
+- **Archivo**: `components/landing/LandingHero.tsx`
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Build | ✅ Exitoso |
+| Unit Tests | ✅ 41/41 passing |
+
+### Commits
+- Pendiente: fix: 5 bugs post-P3 — 404 catálogo, header duplicado, iconos dark mode, save profile, gradiente hero

@@ -24,6 +24,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
 
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
@@ -49,6 +50,7 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
+      setError('');
       const res = await fetch('/api/artists/me');
       if (res.ok) {
         const data = await res.json();
@@ -61,9 +63,16 @@ export default function ProfilePage() {
         setProfileImage(data.profile_image || '');
         setBannerImage(data.banner_image || '');
         setSlug(data.slug || '');
+      } else if (res.status === 404) {
+        // Profile doesn't exist yet — create a blank one
+        setProfile(null);
+        setName(user?.name || '');
+      } else {
+        setError('Error al cargar el perfil');
       }
     } catch (error) {
       console.error('Failed to fetch profile:', error);
+      setError('Error de conexión al cargar perfil');
     } finally {
       setLoading(false);
     }
@@ -73,26 +82,47 @@ export default function ProfilePage() {
     try {
       setSaving(true);
       setSaved(false);
-      const res = await fetch('/api/artists/me', {
+      setError('');
+
+      const payload = {
+        name,
+        bio,
+        genre,
+        country,
+        city,
+        profile_image: profileImage || null,
+        banner_image: bannerImage || null,
+        slug: slug || null,
+      };
+
+      // Try PATCH first, if profile doesn't exist try POST to create
+      let res = await fetch('/api/artists/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          bio,
-          genre,
-          country,
-          city,
-          profile_image: profileImage || null,
-          banner_image: bannerImage || null,
-          slug: slug || null,
-        }),
+        body: JSON.stringify(payload),
       });
+
+      if (res.status === 404 && !profile) {
+        // Profile doesn't exist — try creating via POST
+        res = await fetch('/api/artists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+
       if (res.ok) {
         setSaved(true);
+        const data = await res.json();
+        setProfile(data);
         setTimeout(() => setSaved(false), 3000);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Error al guardar el perfil');
       }
     } catch (error) {
       console.error('Failed to save profile:', error);
+      setError('Error de conexión al guardar');
     } finally {
       setSaving(false);
     }
@@ -109,6 +139,12 @@ export default function ProfilePage() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Mi Perfil</h1>
           <p className="text-slate-500 dark:text-slate-400">Gestiona tu perfil de artista público</p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+            {error}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-12 text-slate-400">Cargando perfil...</div>

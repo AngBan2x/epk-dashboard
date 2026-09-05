@@ -9,7 +9,7 @@ export default function LandingHero() {
   const isGuest = !user;
 
   const CTALabel = isGuest ? 'Explorar Catálogo' : 'Ir al Dashboard';
-  const CTAPath = isGuest ? '/catalog' : '/dashboard';
+  const CTAPath = isGuest ? '/dashboard' : '/dashboard';
 
   return (
     <section className="relative h-screen w-full flex flex-col items-center justify-center overflow-hidden">
@@ -75,8 +75,6 @@ export default function LandingHero() {
         </motion.div>
       </div>
 
-      {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-slate-900 to-transparent" />
     </section>
   );
 }
