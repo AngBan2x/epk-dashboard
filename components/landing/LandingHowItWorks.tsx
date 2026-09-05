@@ -4,60 +4,65 @@ import { motion } from 'framer-motion';
 
 const steps = [
   {
-    title: 'Registro y Perfil',
-    description: 'Crea tu cuenta como artista, admin o suscriptor y personaliza tu perfil.',
-    icon: (
-      <svg className="w-12 h-12 text-amber-500 dark:text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" />
-      </svg>
-    ),
+    number: '1',
+    title: 'Crea tu Perfil',
+    description: 'Regístrate como artista o suscriptor en segundos. Personaliza tu perfil con foto, bio y redes sociales.',
   },
   {
+    number: '2',
     title: 'Publica tu Música',
-    description: 'Sube tus pistas, gestiona lanzamientos y conecta con la comunidad.',
-    icon: (
-      <svg className="w-12 h-12 text-amber-500 dark:text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L6.82 14.14L2 9.27L8.91 8.26L12 2Z" />
-      </svg>
-    ),
+    description: 'Sube releases, tracks y multimedia. Gestiona tu discografía y conecta con plataformas de streaming.',
   },
   {
-    title: 'Descubre y Disfruta',
-    description: 'Explora nuevos talentos, sigue a tus favoritos y asiste a shows en vivo.',
-    icon: (
-      <svg className="w-12 h-12 text-amber-500 dark:text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L6.82 14.14L2 9.27L8.91 8.26L12 2Z" />
-      </svg>
-    ),
+    number: '3',
+    title: 'Conecta con tu Audiencia',
+    description: 'Los fans descubren tu música, siguen tus lanzamientos y asisten a tus shows en vivo.',
   },
 ];
 
 export default function LandingHowItWorks() {
   return (
-    <section className="py-16 bg-gray-50 dark:bg-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-12">Cómo funciona</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+    <section id="como-funciona" className="py-20 bg-slate-50 dark:bg-slate-800">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div
+          className="text-center mb-14"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
+            Cómo Funciona
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl mx-auto">
+            Tres pasos sencillos para empezar
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
           {steps.map((step, idx) => (
             <motion.div
-              key={idx}
-              className="bg-white dark:bg-gray-700 rounded-xl shadow p-6 flex flex-col items-center text-center transition-all hover:transform hover:scale-105"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.8 }}
+              key={step.number}
+              className="relative flex flex-col items-center text-center"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: idx * 0.15 }}
             >
-              <svg
-                className="w-12 h-12 text-amber-500 mb-4"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {step.icon}
-              </svg>
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
+              {/* Connector line (desktop only, not on last item) */}
+              {idx < steps.length - 1 && (
+                <div className="hidden md:block absolute top-7 left-[calc(50%+40px)] w-[calc(100%-80px)] h-0.5 bg-slate-200 dark:bg-slate-600" />
+              )}
+
+              {/* Number circle */}
+              <div className="relative z-10 w-14 h-14 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xl font-bold mb-5 shadow-lg shadow-emerald-500/25">
+                {step.number}
+              </div>
+
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">
                 {step.title}
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
                 {step.description}
               </p>
             </motion.div>
