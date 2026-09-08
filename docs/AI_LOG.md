@@ -2139,4 +2139,89 @@ Hero proporcionado → Features con iconos reales → Pasos numerados limpios �
 | Unit Tests | ✅ 41/41 passing |
 
 ### Commits
-- Pendiente: fix: profile save 500 + audio player close + visualizer CORS + field mapping
+- `827cda8` — fix: profile save 500 + audio player close + visualizer CORS + field mapping
+
+---
+
+## Sesión: Configuración del Ecosistema OpenCode + Análisis de Bugs
+
+**Fecha:** 2026-09-05
+**Modelo:** MiMo V2.5 Free
+**Modo:** Build
+
+### Contexto de la Conversación
+
+El usuario reportó 5 bugs activos y solicitó:
+1. Investigar y documentar los bugs
+2. Crear AGENTS.md para el proyecto
+3. Configurar el ecosistema completo de OpenCode (MCP servers, tools, commands, skills, subagents)
+
+### Bugs Identificados (pendientes de fix)
+
+| # | Bug | Root Cause | Estado |
+|---|-----|------------|--------|
+| 1 | Profile save 500 | `getDbWrite()` usa SQLite local sin tablas en Turso | Investigado, fix pendiente |
+| 2 | Release creation fail | INSERT referencia 6 columnas que no existen | Investigado, fix pendiente |
+| 3 | Double header | ClientLayout + page ambos renderizan Header | Investigado, fix pendiente |
+| 4 | Audio X button no cierra | `handleClose` no pone `isHovered(false)` | Investigado, fix pendiente |
+| 5 | Audio corta + visualizer truncado | `AudioContext.resume()` async + canvas fijo 600px | Investigado, fix pendiente |
+
+### Ecosistema OpenCode Configurado
+
+#### MCP Servers (14 total)
+- **Migrados de `.opencode/mcp.json`**: filesystem, sqlite, github, playwright
+- **Nuevos habilitados**: context7, gh_grep, git, fetch
+- **Opcionales**: sentry, memory, sequential-thinking, plur, novu, strac-dlp, ctxfile
+
+#### Custom Tools (6)
+- `database-query` — Consultar SQLite/Turso
+- `check-types` — Ejecutar `tsc --noEmit`
+- `quality-gates` — typecheck + test + build
+- `seed-data` — Poblar DB con datos de prueba
+- `deploy-vercel` — Deploy a Vercel
+- `test-visual` — Screenshot con Playwright
+
+#### Commands (7)
+- `/fase` — Ejecutar fase completa del MASTER_PLAN.md
+- `/renderizar_epk` — Generar componente EPKCard
+- `/fix-bug` — Investigar y arreglar bug
+- `/quality-gates` — Verificación completa de calidad
+- `/release` — Crear release con changelog
+- `/deploy` — Deploy a Vercel
+- `/audit-security` — Auditoría de seguridad
+
+#### Skills (20)
+- **Existentes (14)**: auditar-mcp, crear-release, db-migration, documentar-proyecto, fase-completa, fix-branding, fix-security, git-workflow, handoff-automatico, optimizar-lighthouse, qa-visual, run-quality-gates, switch-context, validar-null-safety
+- **Nuevos (6)**: frontend-design, vercel-react-best-practices, tdd, agent-browser, web-design-guidelines, improve-codebase-architecture
+
+#### Subagents (29)
+- **Existentes (24)**: api-builder, auth-builder, dashboard-builder, db-builder, landing-page-builder, header-builder, epk-card-builder, carousel-builder, approval-workflow-builder, show-form-builder, notification-builder, search-builder, subscriber-builder, social-links-builder, account-settings-builder, release-form-builder, artist-dashboard-builder, quality-auditor, visual-tester, security-auditor, release-manager, orchestrator, fase-orchestrator, brand-fixer
+- **Nuevos (5)**: playwright-tester, api-tester, db-migrator, vercel-deployer, doc-writer
+
+#### Archivos Creados
+| Archivo | Descripción |
+|---------|-------------|
+| `opencode.json` | Configuración central de OpenCode |
+| `AGENTS.md` | Documentación completa del proyecto |
+| `.opencode/tools/*.ts` (6) | Custom tools |
+| `.opencode/commands/*.md` (5) | Commands personalizados |
+| `.opencode/skills/*/SKILL.md` (6) | Skills del marketplace |
+| `.opencode/agents/*.md` (5) | Subagentes nuevos |
+
+#### Archivos Eliminados
+| Archivo | Razón |
+|---------|-------|
+| `.opencode/mcp.json` | Migrado a `opencode.json` con formato OpenCode |
+
+### Descubrimientos Importantes
+
+1. **`.opencode/mcp.json` no es leído por OpenCode** — Usa formato Claude Desktop (`mcpServers` key), OpenCode espera `opencode.json` con formato nativo (`mcp` key)
+2. **MCP servers no aparecían en "Toggle MCPs"** — Causa: estaban en el archivo/formato incorrecto
+3. **Skills del marketplace** — Existen skills oficiales de Anthropic y Vercel que se pueden agregar
+4. **Custom tools** — OpenCode soporta tools personalizados en `.opencode/tools/` con formato TypeScript
+
+### Pendiente
+- Fixear los 5 bugs activos
+- Verificar que "Toggle MCPs" muestra los servers después de la migración
+- Crear tests E2E con Playwright
+- Ejecutar P4 (Subscribers + Notifications + Search)
