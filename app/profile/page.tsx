@@ -56,10 +56,11 @@ export default function ProfilePage() {
         const data = await res.json();
         setProfile(data);
         setName(data.name || '');
-        setBio(data.bio || '');
+        setBio(data.biography || '');
         setGenre(data.genre || '');
-        setCountry(data.country || '');
-        setCity(data.city || '');
+        // Location is stored as single field "City, Country"
+        setCountry(data.location || '');
+        setCity('');
         setProfileImage(data.profile_image || '');
         setBannerImage(data.banner_image || '');
         setSlug(data.slug || '');
@@ -116,6 +117,8 @@ export default function ProfilePage() {
         const data = await res.json();
         setProfile(data);
         setTimeout(() => setSaved(false), 3000);
+      } else if (res.status === 409) {
+        setError('Este nombre artístico ya está en uso. Elige otro nombre.');
       } else {
         const data = await res.json();
         setError(data.error || 'Error al guardar el perfil');

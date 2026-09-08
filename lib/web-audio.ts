@@ -5,6 +5,9 @@
 
 let sharedAudioCtx: AudioContext | null = null;
 
+// Cache to avoid calling createMediaElementSource multiple times on the same element
+const sourceCache = new WeakMap<HTMLAudioElement, AudioVisualizerNode>();
+
 export function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
 
@@ -18,10 +21,7 @@ export function getAudioContext(): AudioContext | null {
   }
 
   if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
-    // Intenta resumir con interacción del usuario
-    sharedAudioCtx.resume().catch(() => {
-      // Ignorar si aún no hay interacción de usuario
-    });
+    sharedAudioCtx.resume().catch(() => {});
   }
 
   return sharedAudioCtx;
@@ -35,12 +35,22 @@ export interface AudioVisualizerNode {
 
 /**
  * Conecta un elemento HTMLAudioElement a un AnalyserNode.
- * Maneja excepciones de CORS cuando el audio proviene de un origen cruzado (ej. CDN de Apple).
+ * Usa WeakMap cache para no reconectar el mismo elemento (createMediaElementSource solo puede llamarse 1 vez).
  */
 export function createAudioVisualizer(
   audioElement: HTMLAudioElement,
   fftSize = 64
 ): AudioVisualizerNode | null {
+  // Return cached node if already connected
+  const cached = sourceCache.get(audioElement);
+  if (cached) {
+    // Update fftSize if changed
+    if (cached.analyser.fftSize !== fftSize) {
+      cached.analyser.fftSize = fftSize;
+    }
+    return cached;
+  }
+
   const ctx = getAudioContext();
   if (!ctx) return null;
 
@@ -49,7 +59,6 @@ export function createAudioVisualizer(
     analyser.fftSize = fftSize;
     analyser.smoothingTimeConstant = 0.8;
 
-    // Solo podemos conectar createMediaElementSource una vez por elemento
     const source = ctx.createMediaElementSource(audioElement);
     source.connect(analyser);
     analyser.connect(ctx.destination);
@@ -57,7 +66,7 @@ export function createAudioVisualizer(
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
-    return {
+    const node: AudioVisualizerNode = {
       analyser,
       dataArray,
       getFrequencyData: () => {
@@ -65,8 +74,10 @@ export function createAudioVisualizer(
         return dataArray;
       },
     };
+
+    sourceCache.set(audioElement, node);
+    return node;
   } catch (err) {
-    // Si falla por CORS o elemento ya conectado, retornamos null para activar modo sintético en visualizer
     console.warn("[WebAudio] No se pudo vincular AnalyserNode a MediaElement:", err);
     return null;
   }

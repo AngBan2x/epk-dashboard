@@ -2083,3 +2083,60 @@ Hero proporcionado → Features con iconos reales → Pasos numerados limpios �
 
 ### Commits
 - Pendiente: fix: 5 bugs post-P3 — 404 catálogo, header duplicado, iconos dark mode, save profile, gradiente hero
+
+---
+
+## Bugfix: Profile Save 500 + Audio Player + Visualizer
+
+**Fecha:** 2026-09-05
+**Modelo:** Mimo v2.5 Free
+**Modo:** Build
+
+### Bugs Detectados por Usuario
+
+| # | Bug | Gravedad |
+|---|-----|----------|
+| 1 | Guardar Perfil: "Error Interno del servidor" (500) | CRÍTICA |
+| 2 | Audio deja de sonar al abrir Visualizador | ALTA |
+| 3 | No hay botón de cerrar reproductor (solo minimize) | ALTA |
+| 4 | Reproductor no desaparece después de 5 segundos | MEDIA |
+| 5 | Visualización incorrecta (frecuencias sintéticas) | MEDIA |
+
+### Fixes Ejecutados
+
+#### Fix C: Profile Save 500 — UNIQUE Constraint
+- **Causa**: `artists.name` tiene constraint UNIQUE. Si el nombre ya existe para otro artista, el UPDATE lanza SQL error → 500
+- **Solución**: Verificar unicidad del nombre antes del UPDATE. Si existe → 409 "Este nombre artístico ya está en uso"
+- **Archivos**: `app/api/artists/me/route.ts`
+
+#### Fix D: Profile Page — Field Name Mapping
+- **Causa**: Profile page leía `data.bio`, `data.country`, `data.city` pero la API retorna `biography` y `location`
+- **Solución**: Mapear correctamente: `setBio(data.biography)`, `setCountry(data.location)`
+- **Archivo**: `app/profile/page.tsx`
+
+#### Fix A: Audio Player — Close Button + Timer Fix
+- **Causa**: No existía botón de cerrar, solo minimize. El timer de 5s solo minimizaba cuando `!isPlaying`
+- **Solución**:
+  - Agregar botón "X" que ejecuta `pause()`, cierra visualizador, minimiza player
+  - Timer de 5s ahora funciona independientemente del estado de reproducción
+- **Archivo**: `components/GlobalAudioPlayer.tsx`
+
+#### Fix B: Audio Visualizer — CORS + Cache Fix
+- **Causa**: `createMediaElementSource()` solo puede llamarse 1 vez por elemento `<audio>`. Al abrir/cerrar visualizador多次, fallaba silenciosamente
+- **Solución**: Agregar `WeakMap` cache para reusar el `AudioVisualizerNode` existente en vez de recrearlo
+- **Archivo**: `lib/web-audio.ts`
+
+#### Fix E: Field Mismatch Clean
+- **Causa**: `data.slug ?? data.slug` (redundante), `monthlyListeners` siempre se reseteaba a 0
+- **Solución**: Corregir slug extraction, no incluir monthlyListeners si no se provee
+- **Archivo**: `lib/db.ts`
+
+### Quality Gates
+| Check | Resultado |
+|-------|-----------|
+| TypeScript | ✅ 0 errores |
+| Build | ✅ Exitoso |
+| Unit Tests | ✅ 41/41 passing |
+
+### Commits
+- Pendiente: fix: profile save 500 + audio player close + visualizer CORS + field mapping

@@ -1206,12 +1206,12 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
   const pressHighlights = (data.pressHighlights ?? data.press_highlights) as string[] | undefined;
   const genre = data.genre as string | undefined;
   const location = data.location as string | undefined;
-  const monthlyListeners = ((data.monthly_listeners ?? data.monthlyListeners) as number | undefined) ?? 0;
+  const monthlyListeners = data.monthly_listeners as number | undefined;
   const userId = (data.userId ?? data.user_id) as string | undefined;
   const socialLinks = (data.socialLinks ?? data.social_links) as SocialLink[] | undefined;
   const profileImage = (data.profileImage ?? data.profile_image) as string | undefined;
   const bannerImage = (data.bannerImage ?? data.banner_image) as string | undefined;
-  const slug = (data.slug ?? data.slug) as string | undefined;
+  const slug = data.slug as string | undefined;
   const isActive = (data.isActive ?? data.is_active) as boolean | undefined;
 
   console.log("[updateArtist] id:", id, "name:", name, "biography:", biography?.substring(0, 30), "genre:", genre, "location:", location, "monthly_listeners:", monthlyListeners);
