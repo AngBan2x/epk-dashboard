@@ -16,6 +16,7 @@ export function GlobalAudioPlayer() {
     volume,
     isVisualizerOpen,
     togglePlay,
+    pause,
     seek,
     setVolume,
     toggleVisualizer,
@@ -36,21 +37,19 @@ export function GlobalAudioPlayer() {
   const startHideTimer = useCallback(() => {
     clearHideTimer();
     hideTimerRef.current = setTimeout(() => {
-      if (!isPlaying) {
-        setIsMinimized(true);
-      }
+      setIsMinimized(true);
     }, AUTO_HIDE_DELAY);
-  }, [clearHideTimer, isPlaying]);
+  }, [clearHideTimer]);
 
-  // Auto-hide when playing and no interaction
+  // Auto-hide after 5 seconds of no interaction
   useEffect(() => {
-    if (isPlaying && !isHovered) {
+    if (!isHovered) {
       startHideTimer();
     } else {
       clearHideTimer();
     }
     return clearHideTimer;
-  }, [isPlaying, isHovered, startHideTimer, clearHideTimer]);
+  }, [isHovered, startHideTimer, clearHideTimer]);
 
   // Show player when track starts
   useEffect(() => {
@@ -58,6 +57,13 @@ export function GlobalAudioPlayer() {
       setIsMinimized(false);
     }
   }, [activeTrack]);
+
+  const handleClose = () => {
+    pause();
+    if (isVisualizerOpen) toggleVisualizer();
+    setIsMinimized(true);
+    clearHideTimer();
+  };
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -172,6 +178,17 @@ export function GlobalAudioPlayer() {
               >
                 <span>📊</span>
                 <span className="hidden md:inline">Visualizador</span>
+              </button>
+
+              <button
+                onClick={handleClose}
+                className="w-8 h-8 rounded-full border border-dark-700 text-dark-400 hover:text-white hover:border-dark-500 flex items-center justify-center transition"
+                title="Cerrar reproductor"
+                aria-label="Cerrar reproductor"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 

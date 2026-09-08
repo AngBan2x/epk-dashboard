@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArtistByUserId, updateArtist } from "@/lib/db";
+import { getArtistByUserId, updateArtist, getDbWrite } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +49,24 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { name, bio, biography, genre, country, city, location, profile_image, banner_image, slug, social_links } = body;
 
+    // Check UNIQUE constraint on name if changing
+    const newName = name || artist.name;
+    if (newName !== artist.name) {
+      const db = getDbWrite();
+      const existing = db.prepare("SELECT id FROM artists WHERE name = ? AND id != ?").get(newName, artist.id) as any;
+      if (existing) {
+        return NextResponse.json({ error: "Este nombre artístico ya está en uso" }, { status: 409 });
+      }
+    }
+
+    // Build location from country/city if provided
+    const newLocation = location || (city && country ? `${city}, ${country}` : country || city || artist.location);
+
     const updated = await updateArtist(artist.id, {
-      name: name || artist.name,
+      name: newName,
       biography: bio || biography || artist.biography,
       genre: genre || artist.genre,
-      location: location || (city && country ? `${city}, ${country}` : country || city || artist.location),
+      location: newLocation,
       profileImage: profile_image || artist.profile_image,
       bannerImage: banner_image || artist.banner_image,
       slug: slug || artist.slug,
