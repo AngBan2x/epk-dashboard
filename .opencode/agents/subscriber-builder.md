@@ -2,7 +2,6 @@
 name: subscriber-builder
 description: Construye el rol de suscriptor con suscripción a artistas, preferencias de notificación y gestión de cuenta.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Subscriber Builder — PressPlay v4.0.0

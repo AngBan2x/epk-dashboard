@@ -2,7 +2,6 @@
 name: api-tester
 description: Especialista en testear endpoints REST — requests, assertions, error handling
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   bash: allow
   edit: allow

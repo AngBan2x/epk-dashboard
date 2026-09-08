@@ -2223,5 +2223,41 @@ El usuario reportó 5 bugs activos y solicitó:
 ### Pendiente
 - Fixear los 5 bugs activos
 - Verificar que "Toggle MCPs" muestra los servers después de la migración
+
+---
+
+## Sesión: Migración de Agentes a opencode.json
+
+### Fecha: 8 de Septiembre 2026
+
+### Cambio
+Migración de configuración de 29 subagentes de markdown files a `opencode.json` (sección `agent`).
+
+### ¿Por qué?
+- Los markdown files tenían modelos hardcodeados en frontmatter
+- `opencode.json` permite configuración centralizada y más avanzada
+- Facilita el cambio de modelos sin editar 29 archivos individuales
+- Los markdown files quedan como referencia de documentación
+
+### Modelos Asignados (sin Gemma)
+
+| Modelo | Agentes | Uso |
+|--------|---------|-----|
+| `opencode/mimo-v2.5-free` | 11 | Builders UI, documentación |
+| `opencode/nemotron-3-ultra-free` | 11 | APIs, DB, auth, security, testing |
+| `opencode/nemotron-3.5-lightning-free` | 7 | UI rápida, deploy, releases |
+
+### Cambios Realizados
+
+| Archivo | Acción |
+|---------|--------|
+| `opencode.json` | Agregada sección `agent` con 29 agentes |
+| `.opencode/agents/*.md` (29) | Eliminado `model` del frontmatter |
+| `AGENTS.md` | Actualizada tabla de subagentes con modelos |
+
+### Notas Importantes
+- **Sin fallback automático**: OpenCode no soporta fallback de modelos. Si un modelo falla, el agente errora.
+- **Markdown como referencia**: Los archivos `.opencode/agents/*.md` se mantienen como documentación pero el modelo se ignora (opencode.json tiene prioridad).
+- **quality-auditor**: Cambiado de `gemma-4-31b` a `nemotron-3-ultra-free` (sin Gemma).
 - Crear tests E2E con Playwright
 - Ejecutar P4 (Subscribers + Notifications + Search)

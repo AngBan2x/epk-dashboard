@@ -2,7 +2,6 @@
 name: artist-dashboard-builder
 description: Construye el panel de control del artista con estadísticas, acciones rápidas, actividad reciente y gestión de perfil/social.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Artist Dashboard Builder — PressPlay v4.0.0

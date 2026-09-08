@@ -2,7 +2,6 @@
 name: doc-writer
 description: Especialista en documentación — README, AI_LOG, handoffs,的技术文档
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   bash: allow
   edit: allow

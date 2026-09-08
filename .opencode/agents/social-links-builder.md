@@ -2,7 +2,6 @@
 name: social-links-builder
 description: Construye el gestor de 16 plataformas sociales con CRUD, SVG icons, validación de URLs y display en perfiles.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Social Links Builder — PressPlay v4.0.0

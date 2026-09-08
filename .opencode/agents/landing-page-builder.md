@@ -2,7 +2,6 @@
 name: landing-page-builder
 description: Construye la landing page profesional de PressPlay con hero, CTA dinámico, modo oscuro/claro, Framer Motion y diseño mobile-first.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Landing Page Builder — PressPlay v4.0.0
