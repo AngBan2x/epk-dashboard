@@ -2,7 +2,6 @@
 name: carousel-builder
 description: Construye carousels infinitos con Embla Carousel, responsive, navegación y auto-play para artistas y releases.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Carousel Builder — PressPlay v4.0.0

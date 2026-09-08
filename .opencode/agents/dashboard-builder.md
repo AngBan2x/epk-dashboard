@@ -2,7 +2,6 @@
 name: dashboard-builder
 description: Especialista en Server/Client Components de Next.js App Router, vistas de dashboard y gráficos con Recharts.
 mode: subagent
-model: opencode/nemotron-3.5-lightning-free
 permission:
   task:
     "*": "allow"

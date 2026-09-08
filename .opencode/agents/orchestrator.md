@@ -2,7 +2,6 @@
 name: orchestrator
 description: Orquestador que delega tareas a subagentes especializados para ejecutar fases completas de forma autónoma.
 mode: subagent
-model: opencode/nemotron-3-ultra-free
 temperature: 0.3
 permission:
   task:

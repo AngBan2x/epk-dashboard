@@ -2,7 +2,6 @@
 name: show-form-builder
 description: Construye formularios CRUD para shows con estados automáticos, transiciones por fecha, métodos de pago flexibles y sistema de cancelación.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Show Form Builder — PressPlay v4.0.0

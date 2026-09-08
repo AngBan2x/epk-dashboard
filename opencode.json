@@ -88,5 +88,249 @@
     "task": {
       "*": "allow"
     }
+  },
+  "agent": {
+    "orchestrator": {
+      "description": "Orquestador que delega tareas a subagentes especializados para ejecutar fases completas de forma autónoma",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" },
+        "bash": { "*": "allow" },
+        "edit": { "*": "allow" },
+        "read": { "*": "allow" },
+        "glob": { "*": "allow" },
+        "grep": { "*": "allow" }
+      }
+    },
+    "fase-orchestrator": {
+      "description": "Documentación de referencia para orquestación de fases. Usar orchestrator.md para ejecución real",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "api-builder": {
+      "description": "Especialista en crear endpoints REST con better-sqlite3, Zod validation y Next.js App Router",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "auth-builder": {
+      "description": "Especialista en implementar autenticación completa: register, login, middleware, context, bcryptjs",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "dashboard-builder": {
+      "description": "Especialista en Server/Client Components de Next.js App Router, vistas de dashboard y gráficos con Recharts",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3.5-lightning-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "db-builder": {
+      "description": "Diseña esquemas de base de datos, crea migraciones, tablas SQLite/Turso, y gestiona seed data",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "landing-page-builder": {
+      "description": "Construye la landing page profesional de PressPlay con hero, CTA dinámico, modo oscuro/claro, Framer Motion y diseño mobile-first",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3.5-lightning-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "header-builder": {
+      "description": "Construye el header sticky responsivo con búsqueda, notificaciones, dark mode, avatar de usuario y menú móvil",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3.5-lightning-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "epk-card-builder": {
+      "description": "Agente especializado en generar componentes EPKCard para cada track del catálogo musical",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "carousel-builder": {
+      "description": "Construye carousels infinitos con Embla Carousel, responsive, navegación y auto-play para artistas y releases",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3.5-lightning-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "approval-workflow-builder": {
+      "description": "Construye el sistema de aprobación para releases y shows con panel de admin, estados de revisión y notificaciones",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "show-form-builder": {
+      "description": "Construye formularios CRUD para shows con estados automáticos, transiciones por fecha, métodos de pago flexibles y sistema de cancelación",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "notification-builder": {
+      "description": "Construye el sistema de notificaciones in-app y por email con preferencias de usuario, panel de notificaciones y polling",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "search-builder": {
+      "description": "Construye el sistema de búsqueda en tiempo real con SQLite LIKE, debounce, sorting y UI mobile-friendly",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "subscriber-builder": {
+      "description": "Construye el rol de suscriptor con suscripción a artistas, preferencias de notificación y gestión de cuenta",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "social-links-builder": {
+      "description": "Construye el gestor de 16 plataformas sociales con CRUD, SVG icons, validación de URLs y display en perfiles",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "account-settings-builder": {
+      "description": "Construye la página de configuración de cuenta con edición de email, cambio de contraseña, preferencias y eliminación de cuenta",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "release-form-builder": {
+      "description": "Construye formularios CRUD para releases (singles, EPs, albums) con auto-fill de iTunes, manejo de covers y links externos",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "artist-dashboard-builder": {
+      "description": "Construye el panel de control del artista con estadísticas, acciones rápidas, actividad reciente y gestión de perfil/social",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "quality-auditor": {
+      "description": "Audita pruebas E2E con Playwright, verificación de tipos TypeScript y cumplimiento de normas WCAG/a11y",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "visual-tester": {
+      "description": "Especialista en testing visual, regression visual y análisis de screenshots con Playwright",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "security-auditor": {
+      "description": "Audita protecciones de rutas, API auth, vulnerabilidades de seguridad y roles de usuario",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "release-manager": {
+      "description": "Gestiona tags, releases y changelogs en GitHub via GitHub CLI (gh)",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3.5-lightning-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "brand-fixer": {
+      "description": "Busca y reemplaza logos, íconos y marcas inconsistentes en todo el codebase",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "task": { "*": "allow" }
+      }
+    },
+    "playwright-tester": {
+      "description": "Especialista en tests E2E con Playwright — navegación, forms, assertions, screenshots",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow"
+      }
+    },
+    "api-tester": {
+      "description": "Especialista en testear endpoints REST — requests, assertions, error handling",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow"
+      }
+    },
+    "db-migrator": {
+      "description": "Especialista en migraciones de base de datos — schema changes, columnas nuevas, seed data",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3-ultra-free",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow"
+      }
+    },
+    "vercel-deployer": {
+      "description": "Especialista en deployments a Vercel — build, deploy, monitoreo, rollback",
+      "mode": "subagent",
+      "model": "opencode/nemotron-3.5-lightning-free",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow"
+      }
+    },
+    "doc-writer": {
+      "description": "Especialista en documentación — README, AI_LOG, handoffs, docs técnicos",
+      "mode": "subagent",
+      "model": "opencode/mimo-v2.5-free",
+      "permission": {
+        "bash": "allow",
+        "edit": "allow"
+      }
+    }
   }
 }

@@ -2,7 +2,6 @@
 name: release-manager
 description: Gestiona tags, releases y changelogs en GitHub via GitHub CLI (gh).
 mode: subagent
-model: opencode/nemotron-3.5-lightning-free
 permission:
   task:
     "*": "allow"

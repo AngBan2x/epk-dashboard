@@ -2,7 +2,6 @@
 name: search-builder
 description: Construye el sistema de búsqueda en tiempo real con SQLite LIKE, debounce, sorting y UI mobile-friendly.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Search Builder — PressPlay v4.0.0

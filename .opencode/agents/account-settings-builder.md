@@ -2,7 +2,6 @@
 name: account-settings-builder
 description: Construye la página de configuración de cuenta con edición de email, cambio de contraseña, preferencias y eliminación de cuenta.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Account Settings Builder — PressPlay v4.0.0

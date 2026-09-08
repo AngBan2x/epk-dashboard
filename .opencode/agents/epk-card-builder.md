@@ -1,7 +1,6 @@
 ---
 name: epk-card-builder
 description: Agente especializado en generar componentes EPKCard para cada track del catálogo musical.
-model: opencode/nemotron-3-ultra-free
 mode: subagent
 ---
 

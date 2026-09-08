@@ -2,7 +2,6 @@
 name: db-migrator
 description: Especialista en migraciones de base de datos — schema changes, columnas nuevas, seed data
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   bash: allow
   edit: allow

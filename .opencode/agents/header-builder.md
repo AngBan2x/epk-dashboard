@@ -2,7 +2,6 @@
 name: header-builder
 description: Construye el header sticky responsivo con búsqueda, notificaciones, dark mode, avatar de usuario y menú móvil.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Header Builder — PressPlay v4.0.0

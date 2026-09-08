@@ -2,7 +2,6 @@
 name: fase-orchestrator
 description: Documentación de referencia para orquestación de fases. Usar orchestrator.md para ejecución real.
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   task:
     "*": "allow"

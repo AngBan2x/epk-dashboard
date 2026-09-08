@@ -2,7 +2,6 @@
 name: release-form-builder
 description: Construye formularios CRUD para releases (singles, EPs, albums) con auto-fill de iTunes, manejo de covers y links externos.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Release Form Builder — PressPlay v4.0.0

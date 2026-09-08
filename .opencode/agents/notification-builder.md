@@ -2,7 +2,6 @@
 name: notification-builder
 description: Construye el sistema de notificaciones in-app y por email con preferencias de usuario, panel de notificaciones y polling.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Notification Builder — PressPlay v4.0.0

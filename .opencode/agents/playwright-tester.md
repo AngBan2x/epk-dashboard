@@ -2,7 +2,6 @@
 name: playwright-tester
 description: Especialista en tests E2E con Playwright — navegación, forms, assertions, screenshots
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   bash: allow
   edit: allow

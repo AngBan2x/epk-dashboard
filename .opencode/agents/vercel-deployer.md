@@ -2,7 +2,6 @@
 name: vercel-deployer
 description: Especialista en deployments a Vercel — build, deploy, monitoreo, rollback
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   bash: allow
   edit: allow

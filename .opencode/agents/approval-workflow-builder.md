@@ -2,7 +2,6 @@
 name: approval-workflow-builder
 description: Construye el sistema de aprobación para releases y shows con panel de admin, estados de revisión y notificaciones.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 ---
 
 # Approval Workflow Builder — PressPlay v4.0.0

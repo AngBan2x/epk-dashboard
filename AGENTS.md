@@ -77,62 +77,72 @@ Cuando el usuario reporte un bug o pida un fix:
 
 ## Subagentes Disponibles (29)
 
-### Builders (14)
-| Subagente | Uso |
-|-----------|-----|
-| `api-builder` | Endpoints REST |
-| `auth-builder` | Autenticación |
-| `dashboard-builder` | UI/Components |
-| `db-builder` | Schema DB |
-| `landing-page-builder` | Landing page |
-| `header-builder` | Header |
-| `epk-card-builder` | EPK Cards |
-| `carousel-builder` | Carousels |
-| `approval-workflow-builder` | Aprobaciones |
-| `show-form-builder` | Shows |
-| `notification-builder` | Notificaciones |
-| `search-builder` | Búsqueda |
-| `subscriber-builder` | Suscriptores |
-| `social-links-builder` | Links sociales |
-| `account-settings-builder` | Configuración cuenta |
-| `release-form-builder` | Formularios releases |
-| `artist-dashboard-builder` | Dashboard artista |
+> **Configuración centralizada en `opencode.json`** — Los markdown files en `.opencode/agents/` son referencia de documentación.
+
+### Modelos Utilizados
+
+| Modelo | Cantidad | Uso principal |
+|--------|----------|---------------|
+| `opencode/mimo-v2.5-free` | 11 | Builders UI, documentación |
+| `opencode/nemotron-3-ultra-free` | 11 | APIs, DB, auth, security, testing |
+| `opencode/nemotron-3.5-lightning-free` | 7 | UI rápida, deploy, releases |
+
+### Builders (17)
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `api-builder` | mimo-v2.5-free | Endpoints REST |
+| `auth-builder` | nemotron-3-ultra-free | Autenticación |
+| `dashboard-builder` | nemotron-3.5-lightning-free | UI/Components |
+| `db-builder` | nemotron-3-ultra-free | Schema DB |
+| `landing-page-builder` | nemotron-3.5-lightning-free | Landing page |
+| `header-builder` | nemotron-3.5-lightning-free | Header |
+| `epk-card-builder` | nemotron-3-ultra-free | EPK Cards |
+| `carousel-builder` | nemotron-3.5-lightning-free | Carousels |
+| `approval-workflow-builder` | nemotron-3-ultra-free | Aprobaciones |
+| `show-form-builder` | mimo-v2.5-free | Shows |
+| `notification-builder` | mimo-v2.5-free | Notificaciones |
+| `search-builder` | mimo-v2.5-free | Búsqueda |
+| `subscriber-builder` | mimo-v2.5-free | Suscriptores |
+| `social-links-builder` | mimo-v2.5-free | Links sociales |
+| `account-settings-builder` | mimo-v2.5-free | Configuración cuenta |
+| `release-form-builder` | mimo-v2.5-free | Formularios releases |
+| `artist-dashboard-builder` | mimo-v2.5-free | Dashboard artista |
 
 ### QA & Security (3)
-| Subagente | Uso |
-|-----------|-----|
-| `quality-auditor` | Tests E2E |
-| `visual-tester` | Screenshots/DOM |
-| `security-auditor` | Seguridad |
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `quality-auditor` | nemotron-3-ultra-free | Tests E2E |
+| `visual-tester` | nemotron-3-ultra-free | Screenshots/DOM |
+| `security-auditor` | nemotron-3-ultra-free | Seguridad |
 
 ### DevOps & Docs (3)
-| Subagente | Uso |
-|-----------|-----|
-| `release-manager` | Releases |
-| `vercel-deployer` | Deploy Vercel |
-| `doc-writer` | Documentación |
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `release-manager` | nemotron-3.5-lightning-free | Releases |
+| `vercel-deployer` | nemotron-3.5-lightning-free | Deploy Vercel |
+| `doc-writer` | mimo-v2.5-free | Documentación |
 
 ### Orchestration (2)
-| Subagente | Uso |
-|-----------|-----|
-| `orchestrator` | Coordinación general |
-| `fase-orchestrator` | Orquestación por fases |
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `orchestrator` | nemotron-3-ultra-free | Coordinación general |
+| `fase-orchestrator` | mimo-v2.5-free | Orquestación por fases |
 
 ### Testing (2)
-| Subagente | Uso |
-|-----------|-----|
-| `playwright-tester` | Tests E2E |
-| `api-tester` | Testear endpoints |
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `playwright-tester` | nemotron-3-ultra-free | Tests E2E |
+| `api-tester` | nemotron-3-ultra-free | Testear endpoints |
 
 ### Database (1)
-| Subagente | Uso |
-|-----------|-----|
-| `db-migrator` | Migraciones DB |
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `db-migrator` | nemotron-3-ultra-free | Migraciones DB |
 
 ### Branding (1)
-| Subagente | Uso |
-|-----------|-----|
-| `brand-fixer` | Branding |
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `brand-fixer` | mimo-v2.5-free | Branding |
 
 ## Comandos Personalizados (7)
 
