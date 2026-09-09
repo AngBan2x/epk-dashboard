@@ -8,7 +8,7 @@
     },
     "sqlite": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-sqlite", "--dbPath", "./data/music_catalog.db"],
+      "command": ["npx", "-y", "mcp-server-sqlite", "--dbPath", "./data/music_catalog.db"],
       "enabled": true
     },
     "github": {
@@ -21,7 +21,7 @@
     },
     "playwright": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-playwright"],
+      "command": ["npx", "-y", "@playwright/mcp"],
       "enabled": true
     },
     "context7": {
@@ -41,7 +41,7 @@
     },
     "fetch": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-fetch"],
+      "command": ["npx", "-y", "@mokei/mcp-fetch"],
       "enabled": true
     },
     "sentry": {
@@ -258,7 +258,7 @@
     "visual-tester": {
       "description": "Especialista en testing visual, regression visual y análisis de screenshots con Playwright",
       "mode": "subagent",
-      "model": "opencode/nemotron-3-ultra-free",
+      "model": "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
       "permission": {
         "task": { "*": "allow" }
       }
