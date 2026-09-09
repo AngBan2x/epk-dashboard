@@ -21,7 +21,7 @@
     },
     "playwright": {
       "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp"],
+      "command": ["npx", "-y", "@playwright/mcp", "--executable-path", "/home/angel/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome"],
       "enabled": true
     },
     "context7": {
