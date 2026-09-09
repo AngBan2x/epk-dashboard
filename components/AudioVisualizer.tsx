@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useCallback } from "react";
 import { useAudioPlayer } from "@/context/AudioPlayerContext";
-import { createAudioVisualizer, generateSyntheticFrequencies } from "@/lib/web-audio";
+import { createAudioVisualizer, generateSyntheticFrequencies, type AudioVisualizerNode } from "@/lib/web-audio";
 
 interface AudioVisualizerProps {
   className?: string;
@@ -19,6 +19,10 @@ export function AudioVisualizer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const isPlayingRef = useRef(isPlaying);
+
+  // Sync ref with state for the render loop
+  isPlayingRef.current = isPlaying;
 
   const updateCanvasSize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -48,11 +52,11 @@ export function AudioVisualizer({
     });
     resizeObserver.observe(container);
 
-    let visualizerNode: ReturnType<typeof createAudioVisualizer> extends Promise<infer R> ? R : never = null;
+    let visualizerNode: AudioVisualizerNode | null = null;
     let cancelled = false;
 
     const setupVisualizer = async () => {
-      if (audioRef.current) {
+      if (audioRef.current && !cancelled) {
         visualizerNode = await createAudioVisualizer(audioRef.current, 64);
       }
     };
@@ -69,7 +73,7 @@ export function AudioVisualizer({
 
       let frequencies: number[] = [];
 
-      if (isPlaying) {
+      if (isPlayingRef.current) {
         if (visualizerNode) {
           const data = visualizerNode.getFrequencyData();
           frequencies = Array.from(data).slice(0, barCount);
@@ -116,7 +120,7 @@ export function AudioVisualizer({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isPlaying, audioRef, barCount, updateCanvasSize]);
+  }, [audioRef, barCount, updateCanvasSize]);
 
   return (
     <div ref={containerRef} className={`w-full overflow-hidden rounded-xl bg-slate-900/60 dark:bg-slate-900/60 p-4 border border-slate-700/50 dark:border-slate-700/50 backdrop-blur-md ${className}`}>
