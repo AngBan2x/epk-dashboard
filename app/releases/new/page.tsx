@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/Header";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 
@@ -79,7 +78,6 @@ export default function NewReleasePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Header />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <PageTransition>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Nuevo Release</h1>

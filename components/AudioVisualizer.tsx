@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { useAudioPlayer } from "@/context/AudioPlayerContext";
 import { createAudioVisualizer, generateSyntheticFrequencies } from "@/lib/web-audio";
 
@@ -17,20 +17,51 @@ export function AudioVisualizer({
 }: AudioVisualizerProps) {
   const { audioRef, isPlaying } = useAudioPlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  const updateCanvasSize = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const rect = container.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${height}px`;
+  }, [height]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let visualizerNode = audioRef.current
-      ? createAudioVisualizer(audioRef.current, 64)
-      : null;
+    updateCanvasSize();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateCanvasSize();
+    });
+    resizeObserver.observe(container);
+
+    let visualizerNode: ReturnType<typeof createAudioVisualizer> extends Promise<infer R> ? R : never = null;
+    let cancelled = false;
+
+    const setupVisualizer = async () => {
+      if (audioRef.current) {
+        visualizerNode = await createAudioVisualizer(audioRef.current, 64);
+      }
+    };
+    setupVisualizer();
 
     const render = () => {
+      if (cancelled) return;
+
+      const dpr = window.devicePixelRatio || 1;
       const width = canvas.width;
       const canvasHeight = canvas.height;
 
@@ -46,7 +77,6 @@ export function AudioVisualizer({
           frequencies = generateSyntheticFrequencies(barCount, 0.9);
         }
       } else {
-        // Estado reposo con barras sutiles
         frequencies = new Array(barCount).fill(12);
       }
 
@@ -55,21 +85,19 @@ export function AudioVisualizer({
 
       frequencies.forEach((value, i) => {
         const percent = value / 255;
-        const barHeight = Math.max(4, percent * canvasHeight);
+        const barHeight = Math.max(4 * dpr, percent * canvasHeight);
         const x = i * (barWidth + gap);
         const y = canvasHeight - barHeight;
 
-        // Gradiente dinámico
         const gradient = ctx.createLinearGradient(0, canvasHeight, 0, 0);
-        gradient.addColorStop(0, "#4f46e5"); // Indigo
-        gradient.addColorStop(0.5, "#8b5cf6"); // Violet
-        gradient.addColorStop(1, "#ec4899"); // Pink
+        gradient.addColorStop(0, "#4f46e5");
+        gradient.addColorStop(0.5, "#8b5cf6");
+        gradient.addColorStop(1, "#ec4899");
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        // Bordes redondeados en la parte superior
         if (ctx.roundRect) {
-          ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
+          ctx.roundRect(x, y, barWidth, barHeight, [4 * dpr, 4 * dpr, 0, 0]);
           ctx.fill();
         } else {
           ctx.fillRect(x, y, barWidth, barHeight);
@@ -82,14 +110,16 @@ export function AudioVisualizer({
     render();
 
     return () => {
+      cancelled = true;
+      resizeObserver.disconnect();
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isPlaying, audioRef, barCount]);
+  }, [isPlaying, audioRef, barCount, updateCanvasSize]);
 
   return (
-    <div className={`w-full overflow-hidden rounded-xl bg-slate-900/60 dark:bg-slate-900/60 p-4 border border-slate-700/50 dark:border-slate-700/50 backdrop-blur-md ${className}`}>
+    <div ref={containerRef} className={`w-full overflow-hidden rounded-xl bg-slate-900/60 dark:bg-slate-900/60 p-4 border border-slate-700/50 dark:border-slate-700/50 backdrop-blur-md ${className}`}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-purple-400">
           Audio Frequency Visualizer
@@ -100,9 +130,7 @@ export function AudioVisualizer({
       </div>
       <canvas
         ref={canvasRef}
-        width={600}
-        height={height}
-        className="w-full h-auto block"
+        className="w-full block"
       />
     </div>
   );

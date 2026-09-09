@@ -8,7 +8,7 @@ let sharedAudioCtx: AudioContext | null = null;
 // Cache to avoid calling createMediaElementSource multiple times on the same element
 const sourceCache = new WeakMap<HTMLAudioElement, AudioVisualizerNode>();
 
-export function getAudioContext(): AudioContext | null {
+export async function getAudioContext(): Promise<AudioContext | null> {
   if (typeof window === "undefined") return null;
 
   if (!sharedAudioCtx) {
@@ -21,7 +21,11 @@ export function getAudioContext(): AudioContext | null {
   }
 
   if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
-    sharedAudioCtx.resume().catch(() => {});
+    try {
+      await sharedAudioCtx.resume();
+    } catch {
+      // Ignore resume errors
+    }
   }
 
   return sharedAudioCtx;
@@ -37,10 +41,10 @@ export interface AudioVisualizerNode {
  * Conecta un elemento HTMLAudioElement a un AnalyserNode.
  * Usa WeakMap cache para no reconectar el mismo elemento (createMediaElementSource solo puede llamarse 1 vez).
  */
-export function createAudioVisualizer(
+export async function createAudioVisualizer(
   audioElement: HTMLAudioElement,
   fftSize = 64
-): AudioVisualizerNode | null {
+): Promise<AudioVisualizerNode | null> {
   // Return cached node if already connected
   const cached = sourceCache.get(audioElement);
   if (cached) {
@@ -51,7 +55,7 @@ export function createAudioVisualizer(
     return cached;
   }
 
-  const ctx = getAudioContext();
+  const ctx = await getAudioContext();
   if (!ctx) return null;
 
   try {

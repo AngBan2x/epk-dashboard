@@ -38,32 +38,24 @@ export async function POST(req: NextRequest) {
     const {
       title,
       artist_name,
-      artist_id,
       release_date,
-      genre,
       cover_image,
-      description,
       type,
-      tracks,
       external_links,
     } = body;
 
     const stmt = db.prepare(`
-      INSERT INTO tracks (id, title, artist_name, artist_id, release_date, genre, cover_image, description, type, tracks_json, external_links, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))
+      INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, external_links, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `);
 
     stmt.run(
       id,
       title,
       artist_name || "",
-      artist_id || "",
-      release_date || "",
-      genre || "",
-      cover_image || "",
-      description || "",
       type || "single",
-      JSON.stringify(tracks || []),
+      release_date || "",
+      cover_image || "",
       JSON.stringify(external_links || {})
     );
 
