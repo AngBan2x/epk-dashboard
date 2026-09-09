@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Header } from "@/components/Header";
 import { safeString } from "@/lib/null-safe";
 import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
 import { useAuth } from "@/context/AuthContext";
@@ -314,7 +313,6 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Header />
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>

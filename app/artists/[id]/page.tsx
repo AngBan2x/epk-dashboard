@@ -1,5 +1,4 @@
 import { getArtistById } from "@/lib/db";
-import { Header } from "@/components/Header";
 import { BioSection } from "@/components/BioSection";
 import { notFound } from "next/navigation";
 
@@ -12,7 +11,6 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Header />
       <main className="max-w-4xl mx-auto px-4 py-12">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">
