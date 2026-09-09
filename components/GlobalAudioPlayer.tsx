@@ -61,6 +61,7 @@ export function GlobalAudioPlayer() {
   const handleClose = () => {
     pause();
     if (isVisualizerOpen) toggleVisualizer();
+    setIsHovered(false);
     setIsMinimized(true);
     clearHideTimer();
   };

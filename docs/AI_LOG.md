@@ -2326,3 +2326,60 @@ SQLite MCP server seguía fallando después de corregir el nombre del paquete.
 ### Pendiente
 - Crear tests E2E con Playwright
 - Ejecutar P4 (Subscribers + Notifications + Search)
+
+---
+
+## Sesión: Fix 5 Bugs Activos
+
+### Fecha: 8 de Septiembre 2026
+
+### Bugs Corregidos
+
+#### 1. Profile save 500 — `app/api/artists/me/route.ts`
+- **Problema**: `getDbWrite()` en la verificación UNIQUE retornaba SQLite local sin tabla `artists`
+- **Fix**: Reemplazado por query Turso-aware con fallback a SQLite local
+- **Línea**: 54-60
+
+#### 2. Release INSERT columnas incorrectas — `app/api/releases/route.ts`
+- **Problema**: INSERT referenciaba 6 columnas que no existen (`artist_id`, `genre`, `description`, `type`, `tracks_json`, `status`)
+- **Fix**: Reescrito INSERT con columnas correctas: `id, title, artist_name, release_type, release_date, cover_image, external_links, created_at`
+- **Línea**: 51-68
+
+#### 3. Double header en /releases/new — `app/releases/new/page.tsx`
+- **Problema**: Tanto `ClientLayout` como la página renderizaban `<Header />`
+- **Fix**: Eliminado `<Header />` de la página (ClientLayout ya lo renderiza)
+- **Línea**: 82
+
+#### 4. Audio X button no cierra — `components/GlobalAudioPlayer.tsx`
+- **Problema**: `handleClose` seteaba `isMinimized(true)` pero no `isHovered(false)`, y la condición requería `isMinimized && !isHovered`
+- **Fix**: Agregado `setIsHovered(false)` en `handleClose`
+- **Línea**: 61-66
+
+#### 5. Audio corta + visualizer truncado — `lib/web-audio.ts` + `components/AudioVisualizer.tsx`
+- **Problema 1**: `AudioContext.resume()` era async/fire-and-forget
+- **Fix 1**: `getAudioContext()` ahora es `async` y hace `await sharedAudioCtx.resume()`
+- **Problema 2**: Canvas fijo en 600x80px sin resize
+- **Fix 2**: Agregado `ResizeObserver` + `devicePixelRatio` para canvas responsive
+- **Archivos**: `lib/web-audio.ts` (línea 11-28, 40-45), `components/AudioVisualizer.tsx` (reescrito completo)
+
+### Quality Gates
+- ✅ TypeScript: 0 errores
+- ✅ Unit Tests: 41/41 passing
+- ✅ Build: Exitoso
+
+### Testing Visual
+- ❌ Playwright MCP server requiere Chrome en `/opt/google/chrome/chrome` (no disponible en este entorno)
+- Testing visual pendiente de realizar en deploy de Vercel
+
+### Archivos Modificados
+| Archivo | Cambio |
+|---------|--------|
+| `app/api/artists/me/route.ts` | Turso-aware UNIQUE check |
+| `app/api/releases/route.ts` | INSERT con columnas correctas |
+| `app/releases/new/page.tsx` | Eliminado Header duplicado |
+| `components/GlobalAudioPlayer.tsx` | handleClose: setIsHovered(false) |
+| `components/AudioVisualizer.tsx` | Canvas responsive + ResizeObserver |
+| `lib/web-audio.ts` | async getAudioContext + createAudioVisualizer |
+
+### Pendiente
+- Ejecutar P4 (Subscribers + Notifications + Search)
