@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
@@ -14,7 +14,7 @@ interface TrackInput {
 }
 
 export default function NewReleasePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -33,6 +33,15 @@ export default function NewReleasePage() {
   });
 
   const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "" }]);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) return null;
 
   const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "" }]);
   const removeTrack = (index: number) => setTracks(tracks.filter((_, i) => i !== index));
