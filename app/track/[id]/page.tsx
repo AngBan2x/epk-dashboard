@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Header } from "@/components/Header";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { ProductionDetails } from "@/components/ProductionDetails";
 import { LyricsModal } from "@/components/LyricsModal";
@@ -46,7 +45,6 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Header />
       <main className="max-w-6xl mx-auto px-4 py-8">
         <nav className="mb-6 flex items-center gap-4">
           <a

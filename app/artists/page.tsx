@@ -1,13 +1,11 @@
 import { getAllArtists } from "@/lib/db";
 import Link from "next/link";
-import { Header } from "@/components/Header";
 
 export default async function ArtistsPage() {
   const artists = await getAllArtists();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Header />
       <main className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">
