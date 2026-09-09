@@ -2300,6 +2300,29 @@ Paquetes npm con nombres incorrectos. Los servidores MCP de referencia fueron ar
 | git | `uvx mcp-server-git` | ✅ |
 | fetch | `@mokei/mcp-fetch` | ✅ (corregido) |
 
+---
+
+## Sesión: Fix SQLite MCP Argument
+
+### Fecha: 8 de Septiembre 2026
+
+### Problema
+SQLite MCP server seguía fallando después de corregir el nombre del paquete.
+
+### Causa
+- Argumento `--dbPath` era del paquete anterior (archived)
+- El paquete `mcp-server-sqlite` usa `--db` o `--database`
+- Ruta relativa `./data/music_catalog.db` podía fallar si OpenCode ejecuta desde otro directorio
+
+### Cambio
+```json
+// Antes
+"command": ["npx", "-y", "mcp-server-sqlite", "--dbPath", "./data/music_catalog.db"]
+
+// Después
+"command": ["npx", "-y", "mcp-server-sqlite", "--db", "/home/angel/sistinf/epk-dashboard-v2/data/music_catalog.db"]
+```
+
 ### Pendiente
 - Crear tests E2E con Playwright
 - Ejecutar P4 (Subscribers + Notifications + Search)

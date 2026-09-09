@@ -8,7 +8,7 @@
     },
     "sqlite": {
       "type": "local",
-      "command": ["npx", "-y", "mcp-server-sqlite", "--dbPath", "./data/music_catalog.db"],
+      "command": ["npx", "-y", "mcp-server-sqlite", "--db", "/home/angel/sistinf/epk-dashboard-v2/data/music_catalog.db"],
       "enabled": true
     },
     "github": {
