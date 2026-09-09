@@ -2259,5 +2259,47 @@ Migración de configuración de 29 subagentes de markdown files a `opencode.json
 - **Sin fallback automático**: OpenCode no soporta fallback de modelos. Si un modelo falla, el agente errora.
 - **Markdown como referencia**: Los archivos `.opencode/agents/*.md` se mantienen como documentación pero el modelo se ignora (opencode.json tiene prioridad).
 - **quality-auditor**: Cambiado de `gemma-4-31b` a `nemotron-3-ultra-free` (sin Gemma).
+
+---
+
+## Sesión: Fix MCP Servers + visual-tester Vision
+
+### Fecha: 8 de Septiembre 2026
+
+### Problema
+3 MCP servers fallaban con "MCP error -32000: Connection closed":
+- **sqlite**: `@modelcontextprotocol/server-sqlite` no existe (server archived)
+- **fetch**: `@modelcontextprotocol/server-fetch` no existe (nunca fue server de referencia)
+- **playwright**: `@modelcontextprotocol/server-playwright` no existe (ahora es `@playwright/mcp`)
+
+### Causa raíz
+Paquetes npm con nombres incorrectos. Los servidores MCP de referencia fueron archived o renombrados.
+
+### Cambios realizados
+
+| Servidor | Paquete anterior (❌) | Paquete nuevo (✅) |
+|----------|----------------------|-------------------|
+| **sqlite** | `@modelcontextprotocol/server-sqlite` | `mcp-server-sqlite` |
+| **fetch** | `@modelcontextprotocol/server-fetch` | `@mokei/mcp-fetch` |
+| **playwright** | `@modelcontextprotocol/server-playwright` | `@playwright/mcp` |
+
+### visual-tester: Modelo vision-capable
+- **Anterior**: `opencode/nemotron-3-ultra-free` (sin visión)
+- **Nuevo**: `openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` (vision-capable)
+- **Razón**: visual-tester analiza screenshots con Playwright, requiere capacidades de visión
+
+### MCP Servers habilitados (8)
+| Servidor | Paquete | Estado |
+|----------|---------|--------|
+| filesystem | `@modelcontextprotocol/server-filesystem` | ✅ |
+| sqlite | `mcp-server-sqlite` | ✅ (corregido) |
+| github | `@modelcontextprotocol/server-github` | ✅ |
+| playwright | `@playwright/mcp` | ✅ (corregido) |
+| context7 | remote | ✅ |
+| gh_grep | remote | ✅ |
+| git | `uvx mcp-server-git` | ✅ |
+| fetch | `@mokei/mcp-fetch` | ✅ (corregido) |
+
+### Pendiente
 - Crear tests E2E con Playwright
 - Ejecutar P4 (Subscribers + Notifications + Search)
