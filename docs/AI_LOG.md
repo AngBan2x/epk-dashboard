@@ -2381,5 +2381,43 @@ SQLite MCP server seguía fallando después de corregir el nombre del paquete.
 | `components/AudioVisualizer.tsx` | Canvas responsive + ResizeObserver |
 | `lib/web-audio.ts` | async getAudioContext + createAudioVisualizer |
 
+---
+
+## Sesión: Testing Visual + Fix Double Header Global
+
+### Fecha: 9 de Septiembre 2026
+
+### Playwright MCP — Configuración
+- **Problema**: Chrome MCP server esperaba `/opt/google/chrome/chrome`
+- **Fix**: Agregado `--executable-path` apuntando a `~/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome`
+- **Chromium**: Google Chrome for Testing 151.0.7922.34
+
+### Testing Visual — Resultados
+
+| Página | Estado | Notas |
+|--------|--------|-------|
+| Landing (`/`) | ✅ | Hero con fondo de concierto, CTAs, footer |
+| Dashboard (`/dashboard`) | ✅ | Header, 6 tracks, cards con album art |
+| Nuevo Release (`/releases/new`) | ✅ | **Single header** (fix confirmado) |
+| Track Detail (`/track/trk-001`) | ✅ | Audio player, visualizer, métricas, video |
+| Audio Player | ✅ | Play, pause, progress bar, volume |
+| Visualizer | ✅ | Canvas con gradientes indigo→violet→pink |
+| Botón X (close) | ✅ | Cierra inmediatamente (fix confirmado) |
+
+### Fix Adicional: Double Header Global
+Se encontró que **4 páginas más** tenían el mismo bug de double header:
+- `app/track/[id]/page.tsx` — Server Component con Header propio
+- `app/artists/[id]/page.tsx` — Server Component con Header propio
+- `app/artists/page.tsx` — Server Component con Header propio
+- `app/admin/page.tsx` — Client Component con Header propio
+
+**Fix**: Eliminado `<Header />` e import de Header de todas. ClientLayout ya renderiza Header para todas las rutas excepto `/`.
+
+### Commits
+| Commit | Descripción |
+|--------|-------------|
+| `7d90fa8` | playwright MCP --executable-path |
+| `c3b5165` | remove duplicate Header from track, artists, admin pages |
+
 ### Pendiente
 - Ejecutar P4 (Subscribers + Notifications + Search)
