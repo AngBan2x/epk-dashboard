@@ -13,6 +13,8 @@ interface TrackInput {
   isrc: string;
 }
 
+import { getYouTubeThumbnail } from "@/lib/null-safe";
+
 export default function NewReleasePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -31,6 +33,24 @@ export default function NewReleasePage() {
     apple_music_url: "",
     youtube_url: "",
   });
+
+  // Auto-extract YouTube video ID and generate thumbnail
+  const extractYouTubeId = (url: string): string | null => {
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    return match ? match[1] : null;
+  };
+
+  const handleYouTubeUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setForm({ ...form, youtube_url: url });
+    if (url && !form.cover_image) {
+      const videoId = extractYouTubeId(url);
+      if (videoId) {
+        const thumbnail = getYouTubeThumbnail(videoId, "maxres") || "";
+        setForm({ ...form, cover_image: thumbnail });
+      }
+    }
+  };
 
   const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "" }]);
 
@@ -56,6 +76,8 @@ export default function NewReleasePage() {
     setLoading(true);
     setMessage(null);
 
+    const videoId = extractYouTubeId(form.youtube_url) || undefined;
+
     try {
       const res = await fetch("/api/releases", {
         method: "POST",
@@ -68,6 +90,7 @@ export default function NewReleasePage() {
             spotify: form.spotify_url,
             apple_music: form.apple_music_url,
             youtube: form.youtube_url,
+            youtube_video_id: videoId,
           },
         }),
       });
@@ -215,7 +238,7 @@ export default function NewReleasePage() {
                 <input
                   type="url"
                   value={form.youtube_url}
-                  onChange={(e) => setForm({ ...form, youtube_url: e.target.value })}
+                  onChange={handleYouTubeUrlChange}
                   className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                   placeholder="YouTube URL"
                 />

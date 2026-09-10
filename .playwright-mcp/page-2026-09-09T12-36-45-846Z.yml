@@ -1,0 +1,60 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "PressPlay PressPlay" [ref=e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img "PressPlay" [ref=e5]
+        - generic [ref=e6]: PressPlay
+      - navigation [ref=e7]:
+        - link "Dashboard" [ref=e8] [cursor=pointer]:
+          - /url: /dashboard
+        - button "Iniciar Sesión" [ref=e10] [cursor=pointer]
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - img "PressPlay" [ref=e14]
+      - heading "Iniciar Sesión" [level=1] [ref=e15]
+      - paragraph [ref=e16]: Accede a tu cuenta EPK
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]: Email
+        - textbox "Email" [ref=e20]:
+          - /placeholder: tu@email.com
+      - generic [ref=e21]:
+        - generic [ref=e22]: Contraseña
+        - textbox "Contraseña" [ref=e23]:
+          - /placeholder: ••••••••
+      - generic [ref=e24]:
+        - checkbox "Recordar mi sesión" [ref=e25]
+        - generic [ref=e26]: Recordar mi sesión
+      - button "Iniciar Sesión" [ref=e27] [cursor=pointer]
+    - paragraph [ref=e28]:
+      - text: ¿No tienes cuenta?
+      - link "Regístrate" [ref=e29] [cursor=pointer]:
+        - /url: /register
+  - contentinfo [ref=e30]:
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - img "PressPlay" [ref=e35]
+            - generic [ref=e36]: PressPlay
+          - paragraph [ref=e37]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=e38]:
+          - heading "Plataforma" [level=4] [ref=e39]
+          - list [ref=e40]:
+            - listitem [ref=e41]:
+              - link "Catálogo de Tracks" [ref=e42] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=e43]:
+          - heading "Síguenos" [level=4] [ref=e44]
+          - generic [ref=e45]:
+            - link "Instagram" [ref=e46] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=e49] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=e52]:
+        - paragraph [ref=e53]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=e54]:
+          - text: Hecho con
+          - generic [ref=e55]: ♥
+          - text: para artistas musicales

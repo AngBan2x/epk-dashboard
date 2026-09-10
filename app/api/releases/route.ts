@@ -79,10 +79,12 @@ export async function POST(req: NextRequest) {
       external_links,
     } = body;
 
+    const youtubeVideoId = external_links?.youtube_video_id;
+
     await dbRun(
-      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, external_links, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", JSON.stringify(external_links || {})]
+      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, youtube_video_id, external_links, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", youtubeVideoId || "", JSON.stringify(external_links || {})]
     );
 
     return NextResponse.json({ id, message: "Release creado exitosamente" }, { status: 201 });
@@ -99,6 +101,11 @@ export async function PUT(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    }
+
+    // Handle youtube_video_id from external_links
+    if (updates.external_links && updates.external_links.youtube_video_id) {
+      updates.youtube_video_id = updates.external_links.youtube_video_id;
     }
 
     const fields = Object.keys(updates)

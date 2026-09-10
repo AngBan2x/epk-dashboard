@@ -211,7 +211,7 @@ Cuando el usuario reporte un bug o pida un fix:
 | strac-dlp | Local | Detección PII |
 | ctxfile | Local | Context snapshots |
 
-## Custom Tools (6)
+## Custom Tools (7)
 
 | Tool | Función |
 |------|---------|
@@ -221,6 +221,49 @@ Cuando el usuario reporte un bug o pida un fix:
 | `seed-data` | Poblar DB con datos de prueba |
 | `deploy-vercel` | Deploy a Vercel |
 | `test-visual` | Screenshot con Playwright |
+| `analyze-image` | Analizar imágenes via subagente vision-capable |
+
+## Plugins (1)
+
+| Plugin | Función |
+|--------|---------|
+| `image-detector` | Detecta imágenes pegadas y notifica al agente principal |
+
+### image-detector
+- **Hook**: `message.part.updated`
+- **Guarda imágenes en**: `/tmp/opencode-images/{sessionID}-{timestamp}.png`
+- **Metadata**: `/tmp/opencode-images/{sessionID}-latest.json`
+- **Notifica al agente**: Inyecta mensaje "[Imagen detectada - usa analyze-image]"
+
+### analyze-image
+- **Uso**: Agente principal llama cuando detecta imagen
+- **Delega a**: `visual-tester` (Nemotron 3 Nano Omni - vision)
+- **Retorna**: Análisis detallado de la imagen
+
+## Agentes opencode
+
+### Modelo Principal
+- **Modelo**: `opencode/nemotron-3-ultra-free`
+- **Razón**: Mayor ventana de contexto, mejor reasoning para orquestación
+- **Visión**: No (usa subagente para análisis de imágenes)
+
+### Subagentes Principales
+| Subagente | Modelo | Uso |
+|-----------|--------|-----|
+| `visual-tester` | `nemotron-3-nano-omni` | Análisis de imágenes (vision-capable) |
+| `orchestrator` | `nemotron-3-ultra-free` | Coordinación general |
+| `api-builder` | `mimo-v2.5-free` | APIs y endpoints |
+| `db-builder` | `nemotron-3-ultra-free` | Base de datos |
+| `quality-auditor` | `nemotron-3-ultra-free` | Testing y QA |
+
+### Sistema de Análisis de Imágenes
+Cuando el usuario pega una imagen:
+1. Plugin `image-detector` detecta la imagen
+2. Guarda en `/tmp/opencode-images/`
+3. Notifica al agente principal
+4. Agente usa `analyze-image` tool
+5. Tool delega a `visual-tester` (vision-capable)
+6. Retorna análisis al usuario
 
 ## Flujo de Trabajo
 

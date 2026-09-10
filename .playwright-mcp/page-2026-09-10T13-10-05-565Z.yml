@@ -1,0 +1,44 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "PressPlay PressPlay" [ref=e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img "PressPlay" [ref=e5]
+        - generic [ref=e6]: PressPlay
+      - navigation [ref=e7]:
+        - link "Dashboard" [ref=e8] [cursor=pointer]:
+          - /url: /dashboard
+        - button "Cambiar a modo claro" [ref=e9] [cursor=pointer]: ☀️
+        - generic [ref=e57]:
+          - generic [ref=e58]: Angel Bandres (artist)
+          - button "Cerrar sesión" [ref=e59] [cursor=pointer]
+  - main [ref=e61]:
+    - generic [ref=e62]: Cargando...
+  - contentinfo [ref=e30]:
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - img "PressPlay" [ref=e35]
+            - generic [ref=e36]: PressPlay
+          - paragraph [ref=e37]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=e38]:
+          - heading "Plataforma" [level=4] [ref=e39]
+          - list [ref=e40]:
+            - listitem [ref=e41]:
+              - link "Catálogo de Tracks" [ref=e42] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=e43]:
+          - heading "Síguenos" [level=4] [ref=e44]
+          - generic [ref=e45]:
+            - link "Instagram" [ref=e46] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=e49] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=e52]:
+        - paragraph [ref=e53]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=e54]:
+          - text: Hecho con
+          - generic [ref=e55]: ♥
+          - text: para artistas musicales
+  - alert [ref=e56]

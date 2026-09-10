@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { capitalizeReleaseType } from '@/lib/null-safe';
 
 interface Submission {
   id: string;
@@ -233,7 +234,7 @@ export default function ApprovalsPage() {
                     </div>
                     <div className="space-y-3 text-sm">
                       <div><span className="text-slate-500">Artista:</span> <span className="text-slate-900 dark:text-white">{data.artist_name}</span></div>
-                      <div><span className="text-slate-500">Tipo:</span> <span className="text-slate-900 dark:text-white">{data.release_type}</span></div>
+                      <div><span className="text-slate-500">Tipo:</span> <span className="text-slate-900 dark:text-white">{capitalizeReleaseType(data.release_type)}</span></div>
                       <div><span className="text-slate-500">Fecha:</span> <span className="text-slate-900 dark:text-white">{data.release_date}</span></div>
                       <div><span className="text-slate-500">Duración:</span> <span className="text-slate-900 dark:text-white">{data.duration}</span></div>
                       {data.cover_image && (

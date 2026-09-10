@@ -1,0 +1,69 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - img "PressPlay" [ref=e6]
+    - heading "Donde la música se presenta" [level=1] [ref=e7]
+    - paragraph [ref=e8]: PressPlay es la plataforma EPK para artistas independientes. Crea tu press kit profesional, conecta con tu audiencia y gestiona tus shows.
+    - generic [ref=e9]:
+      - link "Explorar Catálogo" [ref=e10] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Cómo Funciona PressPlay" [ref=e11] [cursor=pointer]:
+        - /url: "#como-funciona"
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - heading "¿Qué es PressPlay?" [level=2] [ref=e15]
+      - paragraph [ref=e16]: La plataforma todo-en-uno para artistas musicales independientes
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - heading "EPK para Artistas" [level=3] [ref=e22]
+        - paragraph [ref=e23]: Crea tu press kit profesional con bio, discografía, multimedia y links a tus plataformas de streaming.
+      - generic [ref=e24]:
+        - heading "Shows & Eventos" [level=3] [ref=e28]
+        - paragraph [ref=e29]: Publica tus próximos shows, gestiona fechas en vivo y permite a los fans descubrir eventos cerca de ellos.
+      - generic [ref=e30]:
+        - heading "Sigue tus Favoritos" [level=3] [ref=e34]
+        - paragraph [ref=e35]: Recibe notificaciones de nuevos lanzamientos, shows y novedades de los artistas que sigues.
+  - generic [ref=e37]:
+    - generic [ref=e38]:
+      - heading "Cómo Funciona" [level=2] [ref=e39]
+      - paragraph [ref=e40]: Tres pasos sencillos para empezar
+    - generic [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e44]: "1"
+        - heading "Crea tu Perfil" [level=3] [ref=e45]
+        - paragraph [ref=e46]: Regístrate como artista o suscriptor en segundos. Personaliza tu perfil con foto, bio y redes sociales.
+      - generic [ref=e47]:
+        - generic [ref=e49]: "2"
+        - heading "Publica tu Música" [level=3] [ref=e50]
+        - paragraph [ref=e51]: Sube releases, tracks y multimedia. Gestiona tu discografía y conecta con plataformas de streaming.
+      - generic [ref=e52]:
+        - generic [ref=e53]: "3"
+        - heading "Conecta con tu Audiencia" [level=3] [ref=e54]
+        - paragraph [ref=e55]: Los fans descubren tu música, siguen tus lanzamientos y asisten a tus shows en vivo.
+  - contentinfo [ref=e56]:
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - generic [ref=e60]:
+            - img "PressPlay" [ref=e61]
+            - generic [ref=e62]: PressPlay
+          - paragraph [ref=e63]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=e64]:
+          - heading "Plataforma" [level=4] [ref=e65]
+          - list [ref=e66]:
+            - listitem [ref=e67]:
+              - link "Catálogo de Tracks" [ref=e68] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=e69]:
+          - heading "Síguenos" [level=4] [ref=e70]
+          - generic [ref=e71]:
+            - link "Instagram" [ref=e72] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=e75] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=e78]:
+        - paragraph [ref=e79]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=e80]:
+          - text: Hecho con
+          - generic [ref=e81]: ♥
+          - text: para artistas musicales
+  - alert [ref=e82]

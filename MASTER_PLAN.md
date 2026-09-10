@@ -562,8 +562,8 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | Fase | Nombre | Tasks | Estado |
 |------|--------|-------|--------|
 | **P1.8** | Setup: subagentes + MCPs | 12 subagentes + MCP Unsplash | ✅ Completada |
-| **P2** | Foundation: DB + Landing + Header | 9 tasks | ⏳ Pendiente |
-| **P3** | Artist Self-Management | 8 tasks | ⏳ Pendiente |
+| **P2** | Foundation: DB + Landing + Header | 9 tasks | ✅ Completada |
+| **P3** | Artist Self-Management | 8 tasks | ✅ Completada |
 | **P4** + | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
 | **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |
 

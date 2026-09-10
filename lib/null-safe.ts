@@ -45,3 +45,27 @@ export const isDefined = <T>(v: T | null | undefined): v is T =>
 
 export const coalesce = <T>(...values: (T | null | undefined)[]): T | undefined =>
   values.find(isDefined);
+
+export const capitalizeReleaseType = (type: string): string => {
+  const lower = type.toLowerCase();
+  if (lower === "single") return "Single";
+  if (lower === "ep") return "EP";
+  if (lower === "album") return "Álbum";
+  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+};
+
+export const getYouTubeThumbnail = (youtubeVideoId: string | null | undefined, quality: "maxres" | "hq" | "mq" | "default" = "hq"): string | null => {
+  if (!youtubeVideoId) return null;
+  const qualities: Record<string, string> = {
+    maxres: "maxresdefault",
+    hq: "hqdefault",
+    mq: "mqdefault",
+    default: "default",
+  };
+  return `https://img.youtube.com/vi/${youtubeVideoId}/${qualities[quality]}.jpg`;
+};
+
+export const getCoverImage = (track: { cover_image?: string | null; youtube_video_id?: string | null }): string | null => {
+  if (track.cover_image && track.cover_image !== "—") return track.cover_image;
+  return getYouTubeThumbnail(track.youtube_video_id);
+};

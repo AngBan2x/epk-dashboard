@@ -1,0 +1,85 @@
+- generic [active] [ref=f7e1]:
+  - banner [ref=f7e2]:
+    - generic [ref=f7e3]:
+      - link "PressPlay PressPlay" [ref=f7e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img "PressPlay" [ref=f7e5]
+        - generic [ref=f7e6]: PressPlay
+      - navigation [ref=f7e7]:
+        - link "Dashboard" [ref=f7e8] [cursor=pointer]:
+          - /url: /dashboard
+        - button "Cambiar a modo claro" [ref=f7e9] [cursor=pointer]: ☀️
+        - button "Iniciar Sesión" [ref=f7e10] [cursor=pointer]
+  - main [ref=f7e12]:
+    - generic [ref=f7e13]:
+      - heading "Nuevo Release" [level=1] [ref=f7e14]
+      - generic [ref=f7e15]:
+        - generic [ref=f7e16]:
+          - generic [ref=f7e17]: Tipo de Release *
+          - generic [ref=f7e18]:
+            - button "Single" [ref=f7e19] [cursor=pointer]
+            - button "EP" [ref=f7e20] [cursor=pointer]
+            - button "Álbum" [ref=f7e21] [cursor=pointer]
+        - generic [ref=f7e22]:
+          - generic [ref=f7e23]: Título *
+          - textbox "Nombre del release" [ref=f7e24]
+        - generic [ref=f7e25]:
+          - generic [ref=f7e26]: Nombre del Artista *
+          - textbox "Nombre del artista" [ref=f7e27]
+        - generic [ref=f7e28]:
+          - generic [ref=f7e29]:
+            - generic [ref=f7e30]: Fecha de Lanzamiento *
+            - textbox [ref=f7e31]
+          - generic [ref=f7e32]:
+            - generic [ref=f7e33]: Género
+            - textbox "Rock, Pop, etc." [ref=f7e34]
+        - generic [ref=f7e35]:
+          - generic [ref=f7e36]: URL de Portada *
+          - textbox "https://..." [ref=f7e37]
+        - generic [ref=f7e38]:
+          - generic [ref=f7e39]: Descripción
+          - textbox "Descripción del release..." [ref=f7e40]
+        - generic [ref=f7e41]:
+          - heading "Links Externos" [level=3] [ref=f7e42]
+          - generic [ref=f7e43]:
+            - textbox "Spotify URL" [ref=f7e44]
+            - textbox "Apple Music URL" [ref=f7e45]
+            - textbox "YouTube URL" [ref=f7e46]
+        - generic [ref=f7e47]:
+          - generic [ref=f7e48]:
+            - heading "Tracks" [level=3] [ref=f7e49]
+            - button "+ Agregar track" [ref=f7e50] [cursor=pointer]
+          - generic [ref=f7e52]:
+            - textbox "Track 1" [ref=f7e53]
+            - textbox "3:45" [ref=f7e54]
+        - generic [ref=f7e55]:
+          - button "Crear Release" [ref=f7e56] [cursor=pointer]
+          - button "Cancelar" [ref=f7e57] [cursor=pointer]
+  - contentinfo [ref=f7e58]:
+    - generic [ref=f7e59]:
+      - generic [ref=f7e60]:
+        - generic [ref=f7e61]:
+          - generic [ref=f7e62]:
+            - img "PressPlay" [ref=f7e63]
+            - generic [ref=f7e64]: PressPlay
+          - paragraph [ref=f7e65]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=f7e66]:
+          - heading "Plataforma" [level=4] [ref=f7e67]
+          - list [ref=f7e68]:
+            - listitem [ref=f7e69]:
+              - link "Catálogo de Tracks" [ref=f7e70] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=f7e71]:
+          - heading "Síguenos" [level=4] [ref=f7e72]
+          - generic [ref=f7e73]:
+            - link "Instagram" [ref=f7e74] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=f7e77] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=f7e80]:
+        - paragraph [ref=f7e81]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=f7e82]:
+          - text: Hecho con
+          - generic [ref=f7e83]: ♥
+          - text: para artistas musicales
+  - alert [ref=f7e84]
