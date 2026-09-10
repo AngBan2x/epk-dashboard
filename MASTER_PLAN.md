@@ -581,11 +581,14 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.1 | artist-dashboard-builder | Panel de control de artista |
 | P3.2 | release-form-builder | CRUD lanzamientos (sencillo/EP/álbum) |
 | P3.3 | release-form-builder | Auto-completado metadata iTunes |
-| P3.4 | release-form-builder | Cover image handling (YouTube thumbnail fallback) |
+| P3.4 | release-form-builder | Cover image handling (YouTube thumbnail fallback) | ✅ Completado |
 | P3.5 | approval-workflow-builder | Aprobación admin → artista |
 | P3.6 | show-form-builder | CRUD shows (estados, pagos, fechas) |
 | P3.7 | artist-dashboard-builder | Gestión de perfil artista |
-| P3.8 | account-settings-builder | Gestión de cuenta (email verif, password, notifs, eliminar 30d) |
+| P3.8 | account-settings-builder | Gestión de cuenta (email verif, password, notifs, eliminar 30d) | ✅ Completado |
+| P3.9 | release-form-builder | Release type capitalization (single→Single, ep→EP, album→Álbum) | ✅ Completado |
+| P3.10 | release-form-builder | Dark mode contrast fix (AudioPlayer bg color) | ✅ Completado |
+| P3.11 | release-form-builder | Auto YouTube thumbnail from URL in releases/new | ✅ Completado |
 
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción |

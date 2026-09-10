@@ -2597,3 +2597,76 @@ Usuario pega imagen → plugin detecta → guarda archivo → notifica agente �
 ### Pendiente
 - [ ] Testing completo del sistema de imágenes
 - [ ] Posibles mejoras al manejo de errores del plugin
+
+---
+
+## Fixes de Producción: Cover Image + Release Type + Dark Mode + Auto YouTube Thumbnail
+
+**Fecha:** 2026-09-10
+**Modelo:** Nemotron 3 Ultra Free (opencode)
+**Modo:** Build
+
+### Problemas Reportados
+1. **Cover image genérica** en vez de miniatura de YouTube como se había propuesto
+2. **Release type "single" en minúscula** en vez de "Single" capitalizado como otros releases
+3. **Contraste malo en modo oscuro** en página de track (badge release_type)
+4. **Proyecto v2 epk-dashboard-v2** desplegado sin variables de entorno, no debería existir
+
+### Fixes Aplicados
+
+#### 1. Cover Image YouTube Fallback + Auto Thumbnail
+**Archivos:** `lib/null-safe.ts`, `app/track/[id]/page.tsx`, `components/EPKCard.tsx`, `app/releases/new/page.tsx`, `app/api/releases/route.ts`
+
+- **Nuevas utilidades en `lib/null-safe.ts`:**
+  - `capitalizeReleaseType()`: "single" → "Single", "ep" → "EP", "album" → "Álbum"
+  - `getYouTubeThumbnail(videoId, quality)`: Genera URLs de thumbnail YouTube (maxres/hq/mq/default)
+  - `getCoverImage(track)`: Prioriza `cover_image` → fallback a `youtube_video_id` thumbnail
+
+- **Auto YouTube Thumbnail en `releases/new`:**
+  - Al pegar YouTube URL → extrae video ID → genera thumbnail `maxresdefault.jpg`
+  - Auto-puebla campo "URL de Portada" sin intervención del usuario
+  - Guarda `youtube_video_id` en `external_links` para uso posterior
+
+- **Fallback en display:** `getCoverImage()` usado en track page, EPKCard, AudioPlayer
+
+#### 2. Release Type Capitalization
+**Archivos:** `app/track/[id]/page.tsx`, `components/EPKCard.tsx`, `app/admin/page.tsx`, `app/admin/approvals/page.tsx`
+
+- `capitalizeReleaseType(track.release_type)` aplicado en:
+  - Track page badge (línea 78)
+  - EPKCard metadata (línea 152)
+  - Admin tabla releases (línea 557)
+  - Admin detail view (línea 1302)
+  - Approvals detail (línea 237)
+
+- Resultado: "single" → "Single", "ep" → "EP", "album" → "Álbum"
+
+#### 3. Dark Mode Contrast Fix
+**Archivo:** `components/AudioPlayer.tsx`
+
+- Fix: `dark:bg-dark-800` (color custom del proyecto) en lugar de `dark:bg-dark-800` inexistente
+- El color `dark-800` (#1e293b) está definido en `tailwind.config.ts` palette custom `dark`
+
+#### 4. Proyecto v2 Limpieza
+- **Eliminado** deploy `epk-dashboard-v2` de Vercel (no tenía env vars, no mostraba catálogo)
+- **Deploy principal** en https://epk-dashboard.vercel.app con todos los fixes
+- Proyecto v2 pendiente eliminación manual desde Vercel Dashboard
+
+### Testing en Producción
+| Verificación | Resultado |
+|-------------|-----------|
+| Cover image YouTube fallback (track Se Va) | ✅ Thumbnail YouTube visible |
+| Release type "Single" capitalizado | ✅ Track page, EPKCard, Admin |
+| Dark mode contraste badge "Single" | ✅ Contraste correcto modo oscuro |
+| Auto YouTube thumbnail en releases/new | ✅ Auto-puebla cover_image al pegar URL |
+| YouTube video_id guardado en external_links | ✅ Persistido en DB |
+| TypeScript / Tests / Build | ✅ 0 errores / 41 tests / Build OK |
+
+### Deploy
+- **Commit:** `bdc2366`
+- **Producción:** https://epk-dashboard.vercel.app
+- **Proyecto v2:** Eliminado deploy, pendiente borrar proyecto en Vercel Dashboard
+
+### Pendiente
+- Borrar proyecto `epk-dashboard-v2` desde Vercel Dashboard → Settings → Delete Project
+- Ejecutar P4 (Subscribers + Notifications + Search)
