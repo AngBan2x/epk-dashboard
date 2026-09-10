@@ -2421,3 +2421,179 @@ Se encontró que **4 páginas más** tenían el mismo bug de double header:
 
 ### Pendiente
 - Ejecutar P4 (Subscribers + Notifications + Search)
+
+---
+
+## Bug Fixes: Visualizer, Releases Auth, Turso Schema
+
+**Fecha:** 2026-09-09
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Problemas Reportados
+1. Audio visualizer crashes player when activated during/after playback
+2. Releases page accessible without login — no auth guard
+3. Double header persists on some pages
+4. Release creation fails with 500 error (missing Turso columns)
+5. Profile save fails with 500 error (missing Turso columns)
+
+### Fixes Aplicados
+
+#### 1. AudioVisualizer re-render bug (`components/AudioVisualizer.tsx`)
+- **Causa raíz**: `isPlaying` estaba en las dependencias del `useEffect` (línea 119). Cada cambio de estado de reproducción re-ejecutaba el effect, causando `createMediaElementSource()` a fallar (solo puede llamarse 1 vez por elemento).
+- **Fix**: Removido `isPlaying` de dependencias. Se usa un `isPlayingRef` para leer el estado dentro del render loop sin causar re-renders.
+
+#### 2. Releases API auth guard (`app/api/releases/route.ts`)
+- **Causa**: POST no validaba sesión — cualquiera podía crear releases.
+- **Fix**: Agregada función `validateSession()` con `decodeSessionToken()` + `isSessionValid()`. POST retorna 401 si no autenticado.
+- **Fix adicional**: Convertidos todos los endpoints a dual-mode (Turso + SQLite local) usando helpers `dbQuery()` y `dbRun()`.
+
+#### 3. Releases/new client auth guard (`app/releases/new/page.tsx`)
+- **Fix**: Agregado `useEffect` que redirige a `/login` si no autenticado + `if (authLoading || !user) return null` antes del render.
+- **Nota**: El redirect tiene un race condition — el formulario se muestra brevemente antes del redirect. La protección de API (401) es la barrera de seguridad real.
+
+#### 4. Turso schema — tracks table
+- **Columnas faltantes agregadas**: `external_links`, `disc_number`, `is_double_single`, `sides_b`, `isrc`, `composers`, `created_at`
+- **Método**: `ALTER TABLE tracks ADD COLUMN` via Turso client directo
+
+#### 5. Turso schema — artists table
+- **Columnas faltantes agregadas**: `social_links`, `profile_image`, `banner_image`, `slug`, `is_active`, `deleted_at`
+- **Método**: `ALTER TABLE artists ADD COLUMN` via Turso client directo
+
+### Testing Realizado
+| Test | Resultado |
+|------|-----------|
+| Login angab06@gmail.com | OK — redirect a /dashboard |
+| Crear release "Se Va" (single) | OK — Turso ID: `7c922875-54c5-4670-8940-98b07403f691` |
+| YouTube link en release | OK — guardado en `external_links.youtube` |
+| Editar perfil (bio) | OK — "Artist in residence at PressPlay" guardado |
+| Auth guard releases/new (API) | OK — POST retorna 401 sin sesión |
+| Doble header en track page | OK — single header confirmado en producción |
+| Quality gates | OK — TypeScript 0 errores, 6 tests passing, build exitoso |
+
+### Deploy
+- Commit: `f995fa0`
+- Vercel: https://epk-dashboard.vercel.app
+- Turso schema migration ejecutada directamente (6+6 columnas)
+
+### Pendiente
+- Auth redirect client-side tiene race condition (flash del formulario antes de redirect)
+- Ejecutar P4 (Subscribers + Notifications + Search)
+
+---
+
+## Cambio de Modelo Principal + Sistema Automático de Análisis de Imágenes
+
+**Fecha:** 2026-09-09
+**Modelo:** Nemotron 3 Ultra Free (opencode)
+**Modo:** Build
+
+### Cambios en la Configuración de opencode
+
+#### 1. Modelo Principal Cambiado
+- **Antes**: `opencode/mimo-v2.5-free`
+- **Ahora**: `opencode/nemotron-3-ultra-free`
+- **Razón**: Mayor ventana de contexto y mejor reasoning para planificación/orquestación
+
+#### 2. Nuevo Custom Tool: `analyze-image`
+**Archivo:** `.opencode/tools/analyze-image.ts`
+
+Herramienta que permite al agente principal delegar análisis de imágenes a un subagente con capacidades de visión (vision-capable).
+
+**Uso:**
+- El agente principal llama a `analyze-image` cuando detecta una imagen en la conversación
+- La herramienta lee metadata de `/tmp/opencode-images/{sessionID}-latest.json`
+- Delega al subagente `visual-tester` (Nemotron 3 Nano Omni - vision-capable)
+- Retorna el análisis de la imagen
+
+**Flujo:**
+```
+Agente principal → analyze-image → visual-tester → resultado
+```
+
+#### 3. Nuevo Plugin: `image-detector`
+**Archivo:** `.opencode/plugins/image-detector.ts`
+
+Plugin que detecta automáticamente cuando se pega una imagen en la conversación.
+
+**Funciones:**
+- Hook: `message.part.updated` - Detecta imágenes por tipo MIME o extensión
+- Guarda imagen en `/tmp/opencode-images/{sessionID}-{timestamp}.png`
+- Crea metadata JSON con ruta de imagen
+- Inyecta mensaje "[Imagen detectada]" para notificar al agente principal
+
+**Flujo automático:**
+```
+Usuario pega imagen → plugin detecta → guarda archivo → notifica agente → agente usa analyze-image
+```
+
+#### 4. Configuración Actualizada en `opencode.json`
+```json
+{
+  "model": "opencode/nemotron-3-ultra-free",
+  "small_model": "opencode/mimo-v2.5-free",
+  "plugin": ["./.opencode/plugins/image-detector.ts"]
+}
+```
+
+### Arquitectura de Delegación de Imágenes
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     USUARIO PEGA IMAGEN                         │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PLUGIN: image-detector                                         │
+│  • Hook: message.part.updated                                   │
+│  • Detecta imagen                                               │
+│  • Guarda en /tmp/opencode-images/                              │
+│  • Notifica al agente                                           │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  AGENTE PRINCIPAL: Nemotron 3 Ultra (sin visión)                │
+│  • Recibe notificación de imagen                                │
+│  • Llama analyze-image                                          │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  CUSTOM TOOL: analyze-image                                     │
+│  • Lee metadata → ruta de imagen                                │
+│  • Delega a visual-tester via task()                            │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  SUBAGENT: visual-tester (Nemotron 3 Nano Omni - vision)        │
+│  • Carga imagen                                                 │
+│  • Analiza contenido                                            │
+│  • Retorna descripción                                          │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  AGENTE PRINCIPAL responde al usuario con el análisis           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Archivos Creados/Modificados
+
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `.opencode/plugins/image-detector.ts` | **Crear** | Plugin detector de imágenes |
+| `.opencode/tools/analyze-image.ts` | **Crear** | Custom tool para análisis |
+| `opencode.json` | **Modificar** | Modelo principal + plugin |
+
+### Testing
+- [ ] Pegar imagen → verificar que se guarda en `/tmp/opencode-images/`
+- [ ] Verificar que agente recibe notificación
+- [ ] Verificar que `analyze-image` tool funciona
+- [ ] Verificar que `visual-tester` retorna análisis
+
+### Pendiente
+- [ ] Testing completo del sistema de imágenes
+- [ ] Posibles mejoras al manejo de errores del plugin

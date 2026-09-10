@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { safeString } from "@/lib/null-safe";
+import { safeString, capitalizeReleaseType } from "@/lib/null-safe";
 import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -554,7 +554,7 @@ export default function AdminPage() {
                             </span>
                           </div>
                         </td>
-                        <td className="p-3 text-slate-600 dark:text-slate-400">{track.release_type}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{capitalizeReleaseType(track.release_type)}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{track.release_date}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{track.duration}</td>
                         <td className="p-3 text-right">
@@ -1299,7 +1299,7 @@ onSubmit={async (e) => {
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div><span className="font-medium text-slate-700 dark:text-slate-300">Tipo: </span>{trackData.release_type}</div>
+                        <div><span className="font-medium text-slate-700 dark:text-slate-300">Tipo: </span>{capitalizeReleaseType(trackData.release_type)}</div>
                         <div><span className="font-medium text-slate-700 dark:text-slate-300">Fecha: </span>{trackData.release_date}</div>
                         <div><span className="font-medium text-slate-700 dark:text-slate-300">Duración: </span>{trackData.duration}</div>
                         <div><span className="font-medium text-slate-700 dark:text-slate-300">Estado: </span>

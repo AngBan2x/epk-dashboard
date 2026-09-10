@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/Card";
 import type { Track } from "@/types/music";
-import { safeString, formatDuration, formatNumber } from "@/lib/null-safe";
+import { safeString, formatDuration, formatNumber, capitalizeReleaseType, getCoverImage } from "@/lib/null-safe";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -103,9 +103,9 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="aspect-square bg-slate-100 dark:bg-slate-700 relative overflow-hidden">
-        {track.cover_image && track.cover_image !== "—" ? (
+        {getCoverImage(track) ? (
           <img
-            src={track.cover_image}
+            src={getCoverImage(track)!}
             alt={title}
             className="w-full h-full object-cover"
             loading="lazy"
@@ -149,13 +149,13 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
         <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-white">{title}</h3>
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{artistName}</p>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-          {track.release_type} · {duration}
+          {capitalizeReleaseType(track.release_type)} · {duration}
         </p>
         <AudioPlayer
           id={track.id}
           src={track.audio_preview_url}
           title={track.title}
-          coverImage={track.cover_image}
+          coverImage={getCoverImage(track) || undefined}
         />
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-2">
           <span>▶ {streams} streams</span>

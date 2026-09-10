@@ -1,0 +1,38 @@
+- generic [active] [ref=f10e1]:
+  - banner [ref=f10e2]:
+    - generic [ref=f10e3]:
+      - link "PressPlay PressPlay" [ref=f10e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img "PressPlay" [ref=f10e5]
+        - generic [ref=f10e6]: PressPlay
+      - navigation [ref=f10e7]:
+        - link "Dashboard" [ref=f10e8] [cursor=pointer]:
+          - /url: /dashboard
+        - button "Iniciar Sesión" [ref=f10e10] [cursor=pointer]
+  - contentinfo [ref=f10e11]:
+    - generic [ref=f10e12]:
+      - generic [ref=f10e13]:
+        - generic [ref=f10e14]:
+          - generic [ref=f10e15]:
+            - img "PressPlay" [ref=f10e16]
+            - generic [ref=f10e17]: PressPlay
+          - paragraph [ref=f10e18]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=f10e19]:
+          - heading "Plataforma" [level=4] [ref=f10e20]
+          - list [ref=f10e21]:
+            - listitem [ref=f10e22]:
+              - link "Catálogo de Tracks" [ref=f10e23] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=f10e24]:
+          - heading "Síguenos" [level=4] [ref=f10e25]
+          - generic [ref=f10e26]:
+            - link "Instagram" [ref=f10e27] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=f10e30] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=f10e33]:
+        - paragraph [ref=f10e34]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=f10e35]:
+          - text: Hecho con
+          - generic [ref=f10e36]: ♥
+          - text: para artistas musicales

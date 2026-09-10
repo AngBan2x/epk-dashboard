@@ -1,0 +1,88 @@
+- generic [active] [ref=f7e1]:
+  - banner [ref=f7e2]:
+    - generic [ref=f7e3]:
+      - link "PressPlay PressPlay" [ref=f7e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img "PressPlay" [ref=f7e5]
+        - generic [ref=f7e6]: PressPlay
+      - navigation [ref=f7e7]:
+        - link "Dashboard" [ref=f7e8] [cursor=pointer]:
+          - /url: /dashboard
+        - button "Cambiar a modo claro" [ref=f7e9] [cursor=pointer]: ☀️
+        - generic [ref=f7e38]:
+          - generic [ref=f7e39]: Angel Bandres (artist)
+          - button "Cerrar sesión" [ref=f7e40] [cursor=pointer]
+  - main [ref=f7e42]:
+    - generic [ref=f7e43]:
+      - heading "Nuevo Release" [level=1] [ref=f7e44]
+      - generic [ref=f7e88]: Error al crear release
+      - generic [ref=f7e45]:
+        - generic [ref=f7e46]:
+          - generic [ref=f7e47]: Tipo de Release *
+          - generic [ref=f7e48]:
+            - button "Single" [ref=f7e49] [cursor=pointer]
+            - button "EP" [ref=f7e50] [cursor=pointer]
+            - button "Álbum" [ref=f7e51] [cursor=pointer]
+        - generic [ref=f7e52]:
+          - generic [ref=f7e53]: Título *
+          - textbox "Nombre del release" [ref=f7e54]: Se Va
+        - generic [ref=f7e55]:
+          - generic [ref=f7e56]: Nombre del Artista *
+          - textbox "Nombre del artista" [ref=f7e57]: Angel Bandres
+        - generic [ref=f7e58]:
+          - generic [ref=f7e59]:
+            - generic [ref=f7e60]: Fecha de Lanzamiento *
+            - textbox [ref=f7e61]: 2026-09-15
+          - generic [ref=f7e62]:
+            - generic [ref=f7e63]: Género
+            - textbox "Rock, Pop, etc." [ref=f7e64]
+        - generic [ref=f7e65]:
+          - generic [ref=f7e66]: URL de Portada *
+          - textbox "https://..." [ref=f7e67]: https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500
+        - generic [ref=f7e68]:
+          - generic [ref=f7e69]: Descripción
+          - textbox "Descripción del release..." [ref=f7e70]
+        - generic [ref=f7e71]:
+          - heading "Links Externos" [level=3] [ref=f7e72]
+          - generic [ref=f7e73]:
+            - textbox "Spotify URL" [ref=f7e74]
+            - textbox "Apple Music URL" [ref=f7e75]
+            - textbox "YouTube URL" [ref=f7e76]: https://www.youtube.com/watch?v=M7Z_1wzbxG8
+        - generic [ref=f7e77]:
+          - generic [ref=f7e78]:
+            - heading "Tracks" [level=3] [ref=f7e79]
+            - button "+ Agregar track" [ref=f7e80] [cursor=pointer]
+          - generic [ref=f7e82]:
+            - textbox "Track 1" [ref=f7e83]: Se Va
+            - textbox "3:45" [ref=f7e84]
+        - generic [ref=f7e85]:
+          - button "Crear Release" [ref=f7e86] [cursor=pointer]
+          - button "Cancelar" [ref=f7e87] [cursor=pointer]
+  - contentinfo [ref=f7e11]:
+    - generic [ref=f7e12]:
+      - generic [ref=f7e13]:
+        - generic [ref=f7e14]:
+          - generic [ref=f7e15]:
+            - img "PressPlay" [ref=f7e16]
+            - generic [ref=f7e17]: PressPlay
+          - paragraph [ref=f7e18]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=f7e19]:
+          - heading "Plataforma" [level=4] [ref=f7e20]
+          - list [ref=f7e21]:
+            - listitem [ref=f7e22]:
+              - link "Catálogo de Tracks" [ref=f7e23] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=f7e24]:
+          - heading "Síguenos" [level=4] [ref=f7e25]
+          - generic [ref=f7e26]:
+            - link "Instagram" [ref=f7e27] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=f7e30] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=f7e33]:
+        - paragraph [ref=f7e34]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=f7e35]:
+          - text: Hecho con
+          - generic [ref=f7e36]: ♥
+          - text: para artistas musicales
+  - alert [ref=f7e37]

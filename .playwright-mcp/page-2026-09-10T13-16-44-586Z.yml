@@ -1,0 +1,188 @@
+- generic [active] [ref=f2e1]:
+  - banner [ref=f2e2]:
+    - generic [ref=f2e3]:
+      - link "PressPlay PressPlay" [ref=f2e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img "PressPlay" [ref=f2e5]
+        - generic [ref=f2e6]: PressPlay
+      - navigation [ref=f2e7]:
+        - link "Dashboard" [ref=f2e8] [cursor=pointer]:
+          - /url: /dashboard
+        - button "Cambiar a modo claro" [ref=f2e9] [cursor=pointer]: ☀️
+        - button "Iniciar Sesión" [ref=f2e10] [cursor=pointer]
+  - main [ref=f2e12]:
+    - navigation [ref=f2e13]:
+      - link "← Volver al Dashboard" [ref=f2e14] [cursor=pointer]:
+        - /url: /dashboard
+    - generic [ref=f2e15]:
+      - img "Se Va" [ref=f2e17]
+      - generic [ref=f2e18]:
+        - generic [ref=f2e19]: Single
+        - heading "Se Va" [level=1] [ref=f2e20]
+        - paragraph [ref=f2e21]: 2026-09-15 · — · 0 streams
+        - generic [ref=f2e22]:
+          - button "Reproducir" [ref=f2e23] [cursor=pointer]: ▶
+          - paragraph [ref=f2e25]: Reproducir preview (30 segundos)
+        - generic [ref=f2e26]:
+          - generic [ref=f2e27]:
+            - paragraph [ref=f2e28]: Streams
+            - paragraph [ref=f2e29]: "0"
+          - generic [ref=f2e30]:
+            - paragraph [ref=f2e31]: Saves
+            - paragraph [ref=f2e32]: "0"
+          - generic [ref=f2e33]:
+            - paragraph [ref=f2e34]: Playlists
+            - paragraph [ref=f2e35]: "0"
+    - generic [ref=f2e36]:
+      - generic [ref=f2e37]:
+        - generic [ref=f2e38]:
+          - heading "Ficha de Producción" [level=3] [ref=f2e39]
+          - generic [ref=f2e40]:
+            - generic [ref=f2e41]:
+              - term [ref=f2e42]: DAW
+              - definition [ref=f2e43]: —
+            - generic [ref=f2e44]:
+              - term [ref=f2e45]: Guitarras
+              - definition [ref=f2e46]: —
+            - generic [ref=f2e47]:
+              - term [ref=f2e48]: Efectos
+              - definition [ref=f2e49]: —
+            - generic [ref=f2e50]:
+              - term [ref=f2e51]: Afinación
+              - definition [ref=f2e52]: —
+            - generic [ref=f2e53]:
+              - term [ref=f2e54]: Tonalidad
+              - definition [ref=f2e55]: —
+        - generic [ref=f2e56]:
+          - button "Ver letra" [disabled]
+        - heading "Enlaces Externos" [level=3] [ref=f2e58]
+      - generic [ref=f2e60]:
+        - generic [ref=f2e61]:
+          - generic [ref=f2e62]:
+            - paragraph [ref=f2e67]: Streams
+            - paragraph [ref=f2e68]: "0"
+          - generic [ref=f2e69]:
+            - paragraph [ref=f2e73]: Saves
+            - paragraph [ref=f2e74]: "0"
+          - generic [ref=f2e75]:
+            - paragraph [ref=f2e79]: Playlists
+            - paragraph [ref=f2e80]: "0"
+        - generic [ref=f2e81]:
+          - heading "Top Países" [level=3] [ref=f2e82]
+          - paragraph [ref=f2e83]: Sin datos de países
+        - generic [ref=f2e84]:
+          - heading "Distribución de Métricas" [level=3] [ref=f2e85]
+          - paragraph [ref=f2e86]: Sin métricas para mostrar
+    - generic [ref=f2e87]:
+      - generic [ref=f2e88]:
+        - generic [ref=f2e89]:
+          - generic [ref=f2e90]:
+            - heading "🎬 Videoclip Oficial - Se Va" [level=2] [ref=f2e91]:
+              - generic [ref=f2e92]: 🎬
+              - text: Videoclip Oficial - Se Va
+            - paragraph [ref=f2e93]: Material audiovisual oficial en alta definición
+          - generic [ref=f2e94]: Próximamente
+        - generic [ref=f2e95]:
+          - img "Videoclip Oficial - Se Va" [ref=f2e96]
+          - generic [ref=f2e97]: Material audiovisual en post-producción
+      - generic [ref=f2e99]:
+        - heading "🎚️ Stems & Multitrack" [level=2] [ref=f2e100]
+        - paragraph [ref=f2e101]: Separación de pistas por inteligencia artificial
+        - generic [ref=f2e102]:
+          - generic [ref=f2e103]: 🔒
+          - generic [ref=f2e104]:
+            - paragraph [ref=f2e105]: Próximamente
+            - paragraph [ref=f2e106]: Los stems estarán disponibles pronto
+      - generic [ref=f2e107]:
+        - generic [ref=f2e108]:
+          - generic [ref=f2e109]:
+            - heading "Galería & Assets - Se Va" [level=2] [ref=f2e110]
+            - paragraph [ref=f2e111]: Recursos gráficos en alta resolución para prensa y promotores
+          - generic [ref=f2e112]: 1 Assets HD
+        - generic [ref=f2e114] [cursor=pointer]:
+          - 'img "Asset de Prensa #1" [ref=f2e115]'
+          - generic [ref=f2e116]:
+            - generic [ref=f2e117]: Prensa
+            - paragraph [ref=f2e118]: "Asset de Prensa #1"
+      - generic [ref=f2e119]:
+        - generic [ref=f2e120]:
+          - generic [ref=f2e121]:
+            - heading "Centro de Descargas & Assets" [level=2] [ref=f2e122]
+            - paragraph [ref=f2e123]: Documentación técnica y paquetes de medios para festivales, venues y prensa
+          - generic [ref=f2e124]: Disponibles para Prensa
+        - generic [ref=f2e125]:
+          - generic [ref=f2e126]:
+            - generic [ref=f2e127]:
+              - generic [ref=f2e128]: HTML
+              - generic [ref=f2e129]:
+                - paragraph [ref=f2e130]: Rider Técnico & Stage Plot - Angel Bandres 2026
+                - generic [ref=f2e131]:
+                  - generic [ref=f2e132]: Tech Rider
+                  - generic [ref=f2e133]: ·
+                  - generic [ref=f2e134]: ~15 KB
+            - button "Descargar Rider Técnico & Stage Plot - Angel Bandres 2026" [ref=f2e135] [cursor=pointer]: 📥 Descargar
+          - generic [ref=f2e136]:
+            - generic [ref=f2e137]:
+              - generic [ref=f2e138]: HTML
+              - generic [ref=f2e139]:
+                - paragraph [ref=f2e140]: Dossier de Prensa & Biografía Oficial
+                - generic [ref=f2e141]:
+                  - generic [ref=f2e142]: Ficha EPK
+                  - generic [ref=f2e143]: ·
+                  - generic [ref=f2e144]: ~12 KB
+            - button "Descargar Dossier de Prensa & Biografía Oficial" [ref=f2e145] [cursor=pointer]: 📥 Descargar
+    - generic [ref=f2e147]:
+      - generic [ref=f2e148]:
+        - generic [ref=f2e149]:
+          - heading "📝 Biografía & Prensa" [level=2] [ref=f2e150]:
+            - generic [ref=f2e151]: 📝
+            - text: Biografía & Prensa
+          - paragraph [ref=f2e152]: Historia del artista y material de prensa oficial
+        - button "🖨️ Imprimir Hoja de Prensa" [ref=f2e153] [cursor=pointer]
+      - generic [ref=f2e154]:
+        - generic [ref=f2e155]:
+          - paragraph [ref=f2e156]: Artista
+          - paragraph [ref=f2e157]: Angel Bandres
+        - generic [ref=f2e158]:
+          - paragraph [ref=f2e159]: Género
+          - paragraph [ref=f2e160]: Rock Alternativo
+        - generic [ref=f2e161]:
+          - paragraph [ref=f2e162]: Ubicación
+          - paragraph [ref=f2e163]: Naguanagua, Carabobo, Venezuela
+        - generic [ref=f2e164]:
+          - paragraph [ref=f2e165]: Oyentes Mensuales
+          - paragraph [ref=f2e166]: "10"
+      - paragraph [ref=f2e168]: Guitarrista, cantautor y productor independiente de rock alternativo. Artist in residence at PressPlay.
+      - generic [ref=f2e169]:
+        - button "Leer más →" [ref=f2e170] [cursor=pointer]
+        - button "🖨️ Imprimir Hoja de Prensa" [ref=f2e171] [cursor=pointer]
+    - link "← Running Up That Hill" [ref=f2e173] [cursor=pointer]:
+      - /url: /track/trk-006
+  - contentinfo [ref=f2e174]:
+    - generic [ref=f2e175]:
+      - generic [ref=f2e176]:
+        - generic [ref=f2e177]:
+          - generic [ref=f2e178]:
+            - img "PressPlay" [ref=f2e179]
+            - generic [ref=f2e180]: PressPlay
+          - paragraph [ref=f2e181]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=f2e182]:
+          - heading "Plataforma" [level=4] [ref=f2e183]
+          - list [ref=f2e184]:
+            - listitem [ref=f2e185]:
+              - link "Catálogo de Tracks" [ref=f2e186] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=f2e187]:
+          - heading "Síguenos" [level=4] [ref=f2e188]
+          - generic [ref=f2e189]:
+            - link "Instagram" [ref=f2e190] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=f2e193] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=f2e196]:
+        - paragraph [ref=f2e197]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=f2e198]:
+          - text: Hecho con
+          - generic [ref=f2e199]: ♥
+          - text: para artistas musicales
+  - alert [ref=f2e200]
