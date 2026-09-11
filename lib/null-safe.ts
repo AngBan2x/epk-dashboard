@@ -69,3 +69,8 @@ export const getCoverImage = (track: { cover_image?: string | null; youtube_vide
   if (track.cover_image && track.cover_image !== "—") return track.cover_image;
   return getYouTubeThumbnail(track.youtube_video_id);
 };
+
+export { getAudioSources, getPrimaryAudioSource, getAudioSourceByType, hasStreamingSource, isYouTubeOnly } from './audio-priority';
+export { fetchYouTubeVideo, extractYouTubeId, getYouTubeEmbedUrl, getSpotifyEmbedUrl, getAppleMusicEmbedUrl } from './youtube';
+export type { YouTubeVideo } from './youtube';
+export type { AudioSource, AudioSourceType } from './audio-priority';

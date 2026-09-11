@@ -589,17 +589,22 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.9 | release-form-builder | Release type capitalization (single→Single, ep→EP, album→Álbum) | ✅ Completado |
 | P3.10 | release-form-builder | Dark mode contrast fix (AudioPlayer bg color) | ✅ Completado |
 | P3.11 | release-form-builder | Auto YouTube thumbnail from URL in releases/new | ✅ Completado |
+| P3.12 | release-form-builder | YouTube Data API integration + audio priority + multi-source player | ✅ Completado |
+| P3.13 | release-form-builder | Artist release editing page (`/releases/[id]/edit`) | ✅ Completado |
+| P3.14 | release-form-builder | Track detail page prop fixes + YouTube refactoring to API route | ✅ Completado |
 
 #### Fase P4: Subscribers + Notifications + Search
-| Task | Subagente | Descripción |
-|------|-----------|-------------|
-| P4.1 | subscriber-builder | Rol suscriptor + registro |
-| P4.2 | subscriber-builder | Sistema de suscripciones |
-| P4.3 | notification-builder | Notificaciones in-app |
-| P4.4 | notification-builder | Notificaciones email (Resend) |
-| P4.5 | notification-builder | Notificaciones aprobación/rechazo |
-| P4.6 | notification-builder | Notificaciones de shows |
-| P4.7 | search-builder | Búsqueda en tiempo real |
+| Task | Subagente | Descripción | Estado |
+|------|-----------|-------------|--------|
+| P4.1 | subscriber-builder | Rol suscriptor + registro | ⏳ Pendiente |
+| P4.2 | subscriber-builder | Sistema de suscripciones | ⏳ Pendiente |
+| P4.3 | notification-builder | Notificaciones in-app | ⏳ Pendiente |
+| P4.4 | notification-builder | Notificaciones email (Resend) | ⏳ Pendiente |
+| P4.5 | notification-builder | Notificaciones aprobación/rechazo | ⏳ Pendiente |
+| P4.6 | notification-builder | Notificaciones de shows | ⏳ Pendiente |
+| P4.7 | search-builder | Búsqueda en tiempo real | ⏳ Pendiente |
+
+> **⚠️ TODO antes de P4:** Configurar `YOUTUBE_API_KEY` en Vercel (Google Cloud Console → YouTube Data API v3)
 
 #### Fase P5: Polish + Demo
 | Task | Subagente | Descripción |
