@@ -41,6 +41,18 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
+    const id = searchParams.get("id");
+
+    if (id) {
+      let query = "SELECT * FROM tracks WHERE id = ?";
+      const params = [id];
+      if (userId) {
+        query += " AND artist_id = ?";
+        params.push(userId);
+      }
+      const releases = await dbQuery(query, params);
+      return NextResponse.json(releases[0] || null);
+    }
 
     let query = "SELECT * FROM tracks WHERE 1=1";
     const params: string[] = [];
@@ -77,15 +89,33 @@ export async function POST(req: NextRequest) {
       cover_image,
       type,
       external_links,
+      tracks,
+      genre,
+      description,
+      duration,
     } = body;
 
     const youtubeVideoId = external_links?.youtube_video_id;
 
     await dbRun(
-      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, youtube_video_id, external_links, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", youtubeVideoId || "", JSON.stringify(external_links || {})]
+      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, genre, description, duration, youtube_video_id, external_links, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", genre || "", description || "", duration || "", youtubeVideoId || "", JSON.stringify(external_links || {})]
     );
+
+    // Insert tracks if provided
+    if (tracks && Array.isArray(tracks)) {
+      for (const track of tracks) {
+        if (track.title) {
+          const trackId = crypto.randomUUID();
+          await dbRun(
+            `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, duration, isrc, youtube_video_id, external_links, artist_name, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [trackId, track.title, artist_name || "", type || "single", release_date || "", cover_image || "", track.duration || "", track.isrc || "", null, JSON.stringify({}), artist_name || ""]
+          );
+        }
+      }
+    }
 
     return NextResponse.json({ id, message: "Release creado exitosamente" }, { status: 201 });
   } catch (error) {
@@ -96,6 +126,11 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const session = validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { id, ...updates } = body;
 
@@ -103,9 +138,23 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
+    // Check ownership
+    const existing = await dbQuery("SELECT artist_id FROM tracks WHERE id = ?", [id]) as { artist_id: string }[];
+    if (!existing.length) {
+      return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });
+    }
+    if (existing[0].artist_id !== session.userId && session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
     // Handle youtube_video_id from external_links
     if (updates.external_links && updates.external_links.youtube_video_id) {
       updates.youtube_video_id = updates.external_links.youtube_video_id;
+    }
+
+    // Handle external_links JSON stringify
+    if (updates.external_links) {
+      updates.external_links = JSON.stringify(updates.external_links);
     }
 
     const fields = Object.keys(updates)
@@ -123,11 +172,25 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const session = validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    }
+
+    // Check ownership
+    const existing = await dbQuery("SELECT artist_id FROM tracks WHERE id = ?", [id]) as { artist_id: string }[];
+    if (!existing.length) {
+      return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });
+    }
+    if (existing[0].artist_id !== session.userId && session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     await dbRun("DELETE FROM tracks WHERE id = ?", [id]);
