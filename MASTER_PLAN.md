@@ -592,6 +592,16 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.12 | release-form-builder | YouTube Data API integration + audio priority + multi-source player | ✅ Completado |
 | P3.13 | release-form-builder | Artist release editing page (`/releases/[id]/edit`) | ✅ Completado |
 | P3.14 | release-form-builder | Track detail page prop fixes + YouTube refactoring to API route | ✅ Completado |
+| P3.15 | direct | Eliminar StemsPlayer + SocialBar (redundantes) | ✅ Completado |
+| P3.16 | direct | Audio Player: close real, Framer Motion, visualizer fix, YouTube button | ✅ Completado |
+| P3.17 | artist-dashboard-builder | Track page: layout responsive 2-column + hero section | ✅ Completado |
+| P3.18 | epk-card-builder | EPKCard: alturas consistentes, metadata, likes, cover fallback | ✅ Completado |
+| P3.19 | api-builder | Stream counting API (`POST /api/tracks/:id/streams`) | ✅ Completado |
+| P3.20 | show-form-builder | Lyrics section colapsable + editable + instrumental toggle | ✅ Completado |
+| P3.21 | show-form-builder | Ficha de producción editable + colapsable | ✅ Completado |
+| P3.22 | general | Downloads per-artist (nombres de archivo reales) | ✅ Completado |
+| P3.23 | approval-workflow-builder | Release approval workflow (draft/pending/approved/rejected) | ✅ Completado |
+| P3.24 | direct | Stress tests: 31/31 pass, visualizer toggle verificado | ✅ Completado |
 
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción | Estado |
