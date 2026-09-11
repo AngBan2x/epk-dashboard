@@ -107,12 +107,19 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
       if (isCurrentGlobal) {
         globalPlayer.togglePlay();
       } else {
+        // Check if this is a YouTube-only track
+        const isYouTubeOnly = sources.length === 1 && sources[0].type === 'youtube';
+        const previewSource = sources.find(s => s.type === 'preview');
+        const audioUrl = previewSource?.url || src || '';
+
         globalPlayer.playTrack({
           id: id || src || track?.youtube_video_id || 'unknown',
           title: safeString(title),
           artist: safeString(artist, "Artista EPK"),
-          audioUrl: src || '',
+          audioUrl,
           coverImage,
+          isYouTube: isYouTubeOnly,
+          youtubeVideoId: track?.youtube_video_id || undefined,
         });
       }
       return;
@@ -177,7 +184,7 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
           >
             {sources.map((s) => (
               <option key={s.type} value={s.type}>
-                {s.label} {s.type === 'preview' && '(30s)'}
+                {s.label}
               </option>
             ))}
           </select>

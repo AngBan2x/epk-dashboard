@@ -2941,3 +2941,75 @@ Build: Compiled successfully ✅ (linting timeout known issue)
 1. **P3.3 — Auto-fill iTunes**: Crear componente que busque en iTunes y auto-rellene campos del form de releases
 2. **P3.6 — Página dedicada de shows**: Extraer CRUD de shows del dashboard a `app/shows/page.tsx` con componente standalone
 3. **P3.5 — Unificación**: Mantener solo el sistema de P3.23 (releases) o extender a submissions
+
+---
+
+## v4.0.0-beta.1 — Critical Fixes + YouTube API + Visualizer
+
+**Fecha:** 2026-09-07
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Modo:** Build
+
+### Issues Resueltos (6)
+
+#### Issue 1: Label duplicado "Preview (30s) (30s)"
+- **Archivo:** `components/AudioPlayer.tsx:180`
+- **Causa:** `audio-priority.ts` retornaba `label: 'Preview (30s)'` y AudioPlayer appendaba `(30s)` otra vez
+- **Fix:** Eliminar `{s.type === 'preview' && '(30s)'}` — el label ya lo incluía
+
+#### Issue 2: YouTube IFrame API para tracks YouTube-only
+- **Archivos:** `lib/youtube-player.ts` (nuevo) + `context/AudioPlayerContext.tsx` + `components/GlobalAudioPlayer.tsx` + `components/AudioPlayer.tsx`
+- **Causa:** "Se Va" y "The Rain" no reproducían audio porque `audioUrl` era string vacío
+- **Fix:** Wrapper de YouTube IFrame API que controla playback via iframe oculto, sincronizado con AudioPlayerContext
+- **Detalles:**
+  - `lib/youtube-player.ts`: Clase `YouTubePlayerManager` con play/pause/seek/setVolume/getTime/getDuration
+  - `AudioPlayerContext.tsx`: Nuevo estado `isYouTubeMode`, `playTrack()` detecta YouTube-only tracks
+  - `AudioPlayer.tsx`: Detecta `sources.length === 1 && sources[0].type === 'youtube'` y pasa `isYouTube: true`
+  - `GlobalAudioPlayer.tsx`: Badge "YT" cuando `isYouTubeMode` es true
+
+#### Issue 3: Visualizer stuck — no se puede cerrar
+- **Archivos:** `context/AudioPlayerContext.tsx` + `components/GlobalAudioPlayer.tsx`
+- **Causa:** `clearTrack()` no cerraba el visualizer + no había botón X dentro del visualizer
+- **Fix:**
+  - `clearTrack()` → agregar `setIsVisualizerOpen(false)`
+  - Sección del visualizer → agregar botón X con `toggleVisualizer`
+
+#### Issue 4: Download Center layout roto
+- **Archivo:** `components/DownloadCenter.tsx`
+- **Causa:** Flex layout con nombres largos causaba superposición
+- **Fix:** Reestructurar flex: asset info con `min-w-0 flex-1`, botón con `flex-shrink-0`
+
+#### Issue 5: Tests de archivos descargables
+- **Archivos:** `lib/downloadable-assets.ts` (nuevo) + `tests/unit/downloadable-assets.test.ts` (nuevo)
+- **Fix:** Extraer `generateRiderHTML()` y `generateDossierHTML()` a lib separada + 20 tests unitarios
+
+#### Issue 6: Visualizer lifecycle tests
+- **Archivo:** `tests/e2e/audio-player-stress.spec.ts`
+- **Fix:** 11 nuevos tests E2E:
+  - Suite 9: Downloadable Assets (3 tests)
+  - Suite 10: Visualizer Lifecycle (5 tests)
+
+### Archivos Modificados/Creados
+
+| Archivo | Acción |
+|---------|--------|
+| `components/AudioPlayer.tsx` | Modificar (fix label + YouTube detection) |
+| `context/AudioPlayerContext.tsx` | Modificar (YouTube API + visualizer close) |
+| `components/GlobalAudioPlayer.tsx` | Modificar (YT badge + visualizer close button) |
+| `components/DownloadCenter.tsx` | Modificar (layout fix + import refactor) |
+| `lib/downloadable-assets.ts` | **Crear** (Rider + Dossier generators) |
+| `lib/youtube-player.ts` | **Crear** (YouTube IFrame API wrapper) |
+| `tests/unit/downloadable-assets.test.ts` | **Crear** (20 tests) |
+| `tests/e2e/audio-player-stress.spec.ts` | Modificar (11 nuevos tests) |
+| `docs/handoffs/HANDOFF_V4_BETA.md` | **Crear** (handoff document) |
+
+### Verificación
+
+| Quality Gate | Resultado |
+|--------------|-----------|
+| Unit tests | ✅ 61/61 passing (20 nuevos) |
+| TypeScript | ✅ 0 errores |
+| Build | ✅ Exitoso |
+
+### Commits
+- `feat: v4.0.0-beta.1 — critical fixes + YouTube API + visualizer + tests`
