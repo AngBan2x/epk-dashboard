@@ -90,51 +90,49 @@ export function DownloadCenter({
   };
 
   return (
-    <section className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            Centro de Descargas & Assets
+    <section className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800">
+      <div className="flex items-center justify-between mb-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            Centro de Descargas
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Documentación técnica y paquetes de medios para festivales, venues y prensa
+            Assets para prensa y venues
           </p>
         </div>
-        <span className="text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold px-2.5 py-1 rounded-full border border-emerald-300 dark:border-emerald-800">
-          Disponibles para Prensa
+        <span className="flex-shrink-0 text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+          Disponibles
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-3">
         {assetList.map((asset) => (
           <div
             key={asset.id}
-            className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 hover:border-primary-500/50 transition-all"
+            className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 hover:border-primary-500/50 transition-all"
           >
-            <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-950/80 text-primary-600 dark:text-primary-400 font-bold text-xs flex items-center justify-center border border-primary-300 dark:border-primary-800/60 flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-950/80 text-primary-600 dark:text-primary-400 font-bold text-[10px] flex items-center justify-center border border-primary-300 dark:border-primary-800/60 flex-shrink-0">
               {asset.format}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+              <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
                 {safeString(asset.name)}
               </p>
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                <span>{asset.category}</span>
-                <span>·</span>
-                <span>{asset.size}</span>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {asset.size}
               </div>
             </div>
 
             <button
               onClick={() => handleDownload(asset)}
               disabled={downloadingId === asset.id}
-              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-500 text-white transition flex items-center gap-1.5 disabled:opacity-50"
+              className="flex-shrink-0 px-2 py-1 rounded-lg text-[10px] font-semibold bg-primary-600 hover:bg-primary-500 text-white transition flex items-center gap-1 disabled:opacity-50"
               aria-label={`Descargar ${asset.name}`}
             >
               {downloadingId === asset.id ? (
-                <>⏳ Preparando...</>
+                <>⏳</>
               ) : (
-                <>📥 Descargar</>
+                <>📥</>
               )}
             </button>
           </div>
