@@ -2917,3 +2917,27 @@ Build: Compiled successfully ✅ (linting timeout known issue)
 | `tests/e2e/audio-player-stress.spec.ts` | Selectors actualizados + auto-hide test |
 | `context/AudioPlayerContext.tsx` | `clearTrack()` + is_instrumental support |
 | `lib/audio-priority.ts` | `external_links` acepta null |
+
+---
+
+## Verificación de P3 Tasks (6 tasks sin status original)
+
+**Fecha:** 2026-09-11
+**Método:** Exploración exhaustiva del codebase con subagente `explore`
+
+### Resultados
+
+| Task | Descripción | Estado | Evidencia |
+|------|-------------|--------|-----------|
+| **P3.1** | Panel de control de artista | ✅ | `app/dashboard/page.tsx` (624 líneas): stats cards, track grid, quick actions, recent activity, bio + shows, CRUD inline |
+| **P3.2** | CRUD lanzamientos | ✅ | `app/releases/new/page.tsx` (311 líneas) + `app/releases/[id]/edit/page.tsx` (424 líneas): create/edit con todos los campos, tracks, external links, draft/submit |
+| **P3.3** | Auto-completado iTunes | ⚠️ | Seed script + `app/api/itunes-search/route.ts` existen, pero NO hay auto-fill en forms de releases. Solo seed data. |
+| **P3.5** | Aprobación admin → artista | ⚠️ | Superseded por P3.23. Release approval completo en `app/admin/page.tsx` + `app/api/admin/releases/route.ts`. Página dedicada `app/admin/approvals/page.tsx`. |
+| **P3.6** | CRUD shows | ⚠️ | CRUD funciona inline en `app/dashboard/page.tsx` (líneas 342-541) y `app/admin/page.tsx`. API completa en `app/api/shows/route.ts`. Sin página dedicada `/shows`. |
+| **P3.7** | Gestión de perfil artista | ✅ | `app/profile/page.tsx` (293 líneas): name, bio, genre, location, images, slug. `PATCH /api/artists/me`. Social links declarado pero sin UI. |
+
+### Tasks Pendientes (requieren trabajo adicional)
+
+1. **P3.3 — Auto-fill iTunes**: Crear componente que busque en iTunes y auto-rellene campos del form de releases
+2. **P3.6 — Página dedicada de shows**: Extraer CRUD de shows del dashboard a `app/shows/page.tsx` con componente standalone
+3. **P3.5 — Unificación**: Mantener solo el sistema de P3.23 (releases) o extender a submissions

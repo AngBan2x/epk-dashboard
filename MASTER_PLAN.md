@@ -563,7 +563,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 |------|--------|-------|--------|
 | **P1.8** | Setup: subagentes + MCPs | 12 subagentes + MCP Unsplash | ✅ Completada |
 | **P2** | Foundation: DB + Landing + Header | 9 tasks | ✅ Completada |
-| **P3** | Artist Self-Management | 8 tasks | ✅ Completada |
+| **P3** | Artist Self-Management | 24 tasks (17 features + 7 fixes) | ✅ Completada |
 | **P4** + | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
 | **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |
 
@@ -576,24 +576,21 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P2.9 | header-builder | Footer mejorado |
 
 #### Fase P3: Artist Self-Management
-| Task | Subagente | Descripción |
-|------|-----------|-------------|
-| P3.1 | artist-dashboard-builder | Panel de control de artista |
-| P3.2 | release-form-builder | CRUD lanzamientos (sencillo/EP/álbum) |
-| P3.3 | release-form-builder | Auto-completado metadata iTunes |
+
+##### P3 Features (17 tasks) — Funcionalidades nuevas
+
+| Task | Subagente | Descripción | Estado |
+|------|-----------|-------------|--------|
+| P3.1 | artist-dashboard-builder | Panel de control de artista | ✅ Completado |
+| P3.2 | release-form-builder | CRUD lanzamientos (sencillo/EP/álbum) | ✅ Completado |
+| P3.3 | release-form-builder | Auto-completado metadata iTunes | ⚠️ Parcial (seed script + API, sin UI auto-fill) |
 | P3.4 | release-form-builder | Cover image handling (YouTube thumbnail fallback) | ✅ Completado |
-| P3.5 | approval-workflow-builder | Aprobación admin → artista |
-| P3.6 | show-form-builder | CRUD shows (estados, pagos, fechas) |
-| P3.7 | artist-dashboard-builder | Gestión de perfil artista |
+| P3.5 | approval-workflow-builder | Aprobación admin → artista | ⚠️ Parcial (superseded por P3.23) |
+| P3.6 | show-form-builder | CRUD shows (estados, pagos, fechas) | ⚠️ Parcial (inline en dashboard/admin, sin página dedicada) |
+| P3.7 | artist-dashboard-builder | Gestión de perfil artista | ✅ Completado |
 | P3.8 | account-settings-builder | Gestión de cuenta (email verif, password, notifs, eliminar 30d) | ✅ Completado |
-| P3.9 | release-form-builder | Release type capitalization (single→Single, ep→EP, album→Álbum) | ✅ Completado |
-| P3.10 | release-form-builder | Dark mode contrast fix (AudioPlayer bg color) | ✅ Completado |
-| P3.11 | release-form-builder | Auto YouTube thumbnail from URL in releases/new | ✅ Completado |
 | P3.12 | release-form-builder | YouTube Data API integration + audio priority + multi-source player | ✅ Completado |
 | P3.13 | release-form-builder | Artist release editing page (`/releases/[id]/edit`) | ✅ Completado |
-| P3.14 | release-form-builder | Track detail page prop fixes + YouTube refactoring to API route | ✅ Completado |
-| P3.15 | direct | Eliminar StemsPlayer + SocialBar (redundantes) | ✅ Completado |
-| P3.16 | direct | Audio Player: close real, Framer Motion, visualizer fix, YouTube button | ✅ Completado |
 | P3.17 | artist-dashboard-builder | Track page: layout responsive 2-column + hero section | ✅ Completado |
 | P3.18 | epk-card-builder | EPKCard: alturas consistentes, metadata, likes, cover fallback | ✅ Completado |
 | P3.19 | api-builder | Stream counting API (`POST /api/tracks/:id/streams`) | ✅ Completado |
@@ -601,6 +598,17 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.21 | show-form-builder | Ficha de producción editable + colapsable | ✅ Completado |
 | P3.22 | general | Downloads per-artist (nombres de archivo reales) | ✅ Completado |
 | P3.23 | approval-workflow-builder | Release approval workflow (draft/pending/approved/rejected) | ✅ Completado |
+
+##### P3 Fixes (7 tasks) — Bugs y mejoras
+
+| Task | Subagente | Descripción | Estado |
+|------|-----------|-------------|--------|
+| P3.9 | release-form-builder | Release type capitalization (single→Single, ep→EP, album→Álbum) | ✅ Completado |
+| P3.10 | release-form-builder | Dark mode contrast fix (AudioPlayer bg color) | ✅ Completado |
+| P3.11 | release-form-builder | Auto YouTube thumbnail from URL in releases/new | ✅ Completado |
+| P3.14 | release-form-builder | Track detail page prop fixes + YouTube refactoring to API route | ✅ Completado |
+| P3.15 | direct | Eliminar StemsPlayer + SocialBar (redundantes) | ✅ Completado |
+| P3.16 | direct | Audio Player: close real, Framer Motion, visualizer fix, YouTube button | ✅ Completado |
 | P3.24 | direct | Stress tests: 31/31 pass, visualizer toggle verificado | ✅ Completado |
 
 #### Fase P4: Subscribers + Notifications + Search

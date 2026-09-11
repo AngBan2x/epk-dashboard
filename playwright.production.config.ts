@@ -8,6 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
+    headless: false,
     baseURL: "https://epk-dashboard.vercel.app",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
