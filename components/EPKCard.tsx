@@ -155,7 +155,9 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
           id={track.id}
           src={track.audio_preview_url}
           title={track.title}
+          artist={track.artist_name || undefined}
           coverImage={getCoverImage(track) || undefined}
+          track={track}
         />
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-2">
           <span>▶ {streams} streams</span>

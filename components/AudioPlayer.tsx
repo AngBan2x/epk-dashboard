@@ -16,7 +16,7 @@ interface AudioPlayerProps {
     spotify_url?: string | null;
     apple_music_url?: string | null;
     youtube_video_id?: string | null;
-    external_links?: Record<string, unknown>;
+    external_links?: Record<string, unknown> | null;
   };
 }
 
