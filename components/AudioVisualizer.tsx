@@ -56,8 +56,14 @@ export function AudioVisualizer({
     let cancelled = false;
 
     const setupVisualizer = async () => {
-      if (audioRef.current && !cancelled) {
-        visualizerNode = await createAudioVisualizer(audioRef.current, 64);
+      if (cancelled) return;
+      try {
+        if (audioRef.current && !cancelled) {
+          visualizerNode = await createAudioVisualizer(audioRef.current, 64);
+        }
+      } catch {
+        // CORS or other error — will use synthetic frequencies
+        visualizerNode = null;
       }
     };
     setupVisualizer();

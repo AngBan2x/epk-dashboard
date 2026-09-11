@@ -20,12 +20,14 @@ interface AudioPlayerProps {
   };
 }
 
+// Debounce map: track IDs that have already been counted in this session
+const countedStreams = new Set<string>();
+
 export function AudioPlayer({ src, title, id, artist, coverImage, track }: AudioPlayerProps) {
   const localAudioRef = useRef<HTMLAudioElement>(null);
   const youtubeIframeRef = useRef<HTMLIFrameElement>(null);
   const [localPlaying, setLocalPlaying] = useState(false);
   const [currentSource, setCurrentSource] = useState<AudioSource | null>(null);
-  const [showSourceSelector, setShowSourceSelector] = useState(false);
   const globalPlayer = useContext(AudioPlayerContext);
 
   // Determine available audio sources from track data
@@ -37,6 +39,26 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
     : false;
 
   const isPlaying = globalPlayer ? isCurrentGlobal && globalPlayer.isPlaying : localPlaying;
+
+  // Increment stream count on first play (debounced per track per session)
+  const countedRef = useRef(false);
+  useEffect(() => {
+    if (!id || countedRef.current) return;
+    if (!isPlaying) return;
+
+    // Already counted this track in this browser session
+    if (countedStreams.has(id)) {
+      countedRef.current = true;
+      return;
+    }
+
+    countedRef.current = true;
+    countedStreams.add(id);
+
+    fetch(`/api/tracks/${id}/streams`, { method: "POST" }).catch(() => {
+      // Silently fail — stream counting is best-effort
+    });
+  }, [id, isPlaying]);
 
   // Auto-select best source on mount
   useEffect(() => {
@@ -119,7 +141,6 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
 
   const switchSource = (source: AudioSource) => {
     setCurrentSource(source);
-    setShowSourceSelector(false);
     if (globalPlayer && isCurrentGlobal) {
       // setActiveSource not available on global context
     } else {
@@ -142,8 +163,8 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
 
   return (
     <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-      {/* Source Selector */}
-      {sources.length > 1 && (
+      {/* Source Selector — only when multiple sources with preview */}
+      {sources.length > 1 && sources.some(s => s.type === 'preview') && (
         <div className="flex items-center gap-2">
           <label className="text-xs text-slate-500 dark:text-slate-400">Fuente:</label>
           <select
@@ -163,11 +184,19 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
         </div>
       )}
 
-      {/* YouTube Only Notice */}
-      {sources.length === 1 && sources[0].type === 'youtube' && (
-        <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-700 dark:text-amber-300">
-          🎥 Reproduciendo desde YouTube (iframe embed)
-        </div>
+      {/* YouTube Only — button to open in YouTube */}
+      {sources.length === 1 && sources[0].type === 'youtube' && track?.youtube_video_id && (
+        <a
+          href={`https://www.youtube.com/watch?v=${track.youtube_video_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+          Ver en YouTube
+        </a>
       )}
 
       {/* Main Player */}
@@ -223,39 +252,7 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
           )}
         </div>
 
-        {/* Source Switcher Button */}
-        {sources.length > 1 && (
-          <button
-            onClick={() => setShowSourceSelector(!showSourceSelector)}
-            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-            aria-label="Cambiar fuente de audio"
-          >
-            🔀
-          </button>
-        )}
       </div>
-
-      {/* Source Selector Dropdown */}
-      {showSourceSelector && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-lg p-2 z-10">
-          {sources.map((source) => (
-            <button
-              key={source.type}
-              onClick={() => switchSource(source)}
-              className={`w-full text-left px-3 py-2 text-sm rounded ${
-                currentSource?.type === source.type
-                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{source.label}</span>
-                {source.type === 'preview' && <span className="text-xs text-slate-500">(30s preview)</span>}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

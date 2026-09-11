@@ -55,7 +55,7 @@ export async function ensureTursoSchema(): Promise<boolean> {
     return false;
   }
 
-  // 1. tracks (con columnas multimedia F8 + P2.5)
+  // 1. tracks (con columnas multimedia F8 + P2.5 + streams + release approval)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
@@ -80,9 +80,17 @@ export async function ensureTursoSchema(): Promise<boolean> {
       is_double_single INTEGER DEFAULT 0,
       sides_b TEXT,
       isrc TEXT,
-      composers TEXT
+      composers TEXT,
+      streams INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'draft',
+      updated_at TEXT
     )
   `);
+  // Migrate: add columns if missing (safe for existing tables)
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN streams INTEGER DEFAULT 0`); } catch {}
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN is_instrumental INTEGER DEFAULT 0`); } catch {}
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN status TEXT DEFAULT 'draft'`); } catch {}
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN updated_at TEXT`); } catch {}
 
   // 2. artists (con user_id FK + P2.1)
   await client.execute(`
@@ -251,8 +259,8 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
                audio_preview_url, spotify_url, youtube_video_id, metrics,
                production_details, lyrics, itunes_track_id, stems_urls,
                video_embed_url, gallery_images, external_links, disc_number, is_double_single,
-               sides_b, isrc, composers)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               sides_b, isrc, composers, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           track.id,
           track.title,
@@ -277,6 +285,7 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
           (track as RawTrackRow & { sides_b?: string | null }).sides_b ?? null,
           (track as RawTrackRow & { isrc?: string | null }).isrc ?? null,
           (track as RawTrackRow & { composers?: string | null }).composers ?? null,
+          (track as RawTrackRow & { status?: string | null }).status ?? 'draft',
         ],
       });
       synced++;

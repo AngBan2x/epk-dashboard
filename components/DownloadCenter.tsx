@@ -149,10 +149,12 @@ export function DownloadCenter({
 
         if (asset.category === "Tech Rider") {
           htmlContent = generateRiderHTML();
-          filename = "Rider_Tecnico_PressPlay.html";
+          const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "");
+          filename = `PressPlay_Rider_Tecnico_${safeName}.html`;
         } else if (asset.category === "Ficha EPK") {
           htmlContent = generateDossierHTML();
-          filename = "Dossier_Prensa_PressPlay.html";
+          const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "");
+          filename = `PressPlay_Dossier_${safeName}.html`;
         } else {
           const content = `EPK ASSET: ${asset.name}\nArtista: ${artistName}\nCategoría: ${asset.category}\nGenerado el: ${new Date().toISOString()}`;
           const blob = new Blob([content], { type: "text/plain" });

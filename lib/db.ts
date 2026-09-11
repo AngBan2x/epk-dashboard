@@ -41,6 +41,7 @@ import type {
   RawSubscriptionRow,
   SubmissionType,
   UserPreferences,
+  ReleaseStatus,
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
@@ -328,6 +329,12 @@ function initLocalTables(): void {
   try { db.exec(`ALTER TABLE tracks ADD COLUMN cover_image TEXT`); } catch {}
   try { db.exec(`ALTER TABLE tracks ADD COLUMN isrc TEXT`); } catch {}
   try { db.exec(`ALTER TABLE tracks ADD COLUMN composers TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN is_instrumental INTEGER DEFAULT 0`); } catch {}
+  // Streams counter column (for play tracking)
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN streams INTEGER DEFAULT 0`); } catch {}
+  // Release approval workflow
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN status TEXT DEFAULT 'draft'`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN updated_at TEXT`); } catch {}
 
   // P2.6: Add new columns to track_submissions (safe ALTER TABLE)
   try { db.exec(`ALTER TABLE track_submissions ADD COLUMN submission_type TEXT DEFAULT 'track'`); } catch {}
@@ -509,6 +516,8 @@ function parseTrack(row: Record<string, unknown>): Track {
     metrics: parseMetrics((row.metrics as string) ?? null),
     production_details: parseProductionDetails((row.production_details as string) ?? null),
     lyrics: (row.lyrics as string) ?? null,
+    // Release approval workflow
+    status: (row.status as ReleaseStatus) ?? "draft",
     itunes_track_id: (row.itunes_track_id as string) ?? null,
     stems_urls: parseStemsUrls((row.stems_urls as string) ?? null),
     video_embed_url: (row.video_embed_url as string) ?? null,
@@ -520,6 +529,8 @@ function parseTrack(row: Record<string, unknown>): Track {
     sides_b: safeParseJSON<string[] | null>((row.sides_b as string) ?? null, null),
     isrc: (row.isrc as string) ?? null,
     composers: safeParseJSON<string[] | null>((row.composers as string) ?? null, null),
+    // Streams counter
+    streams: row.streams != null ? Number(row.streams) : 0,
   };
 }
 
@@ -1534,6 +1545,7 @@ export async function createTrack(data: {
   sides_b?: string[] | null;
   isrc?: string | null;
   composers?: string[] | null;
+  is_instrumental?: boolean;
 }): Promise<Track> {
   const track = {
     id: data.id,
@@ -1560,6 +1572,7 @@ export async function createTrack(data: {
     sides_b: data.sides_b || null,
     isrc: data.isrc || null,
     composers: data.composers || null,
+    is_instrumental: data.is_instrumental ?? false,
   };
 
   if (USE_TURSO) {
@@ -1568,8 +1581,8 @@ export async function createTrack(data: {
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
-        external_links, disc_number, is_double_single, sides_b, isrc, composers
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         track.id, track.title, track.artist_name, track.release_type, track.release_date,
         track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -1584,6 +1597,7 @@ export async function createTrack(data: {
         track.sides_b ? JSON.stringify(track.sides_b) : null,
         track.isrc,
         track.composers ? JSON.stringify(track.composers) : null,
+        track.is_instrumental ? 1 : 0,
       ]
     );
   } else {
@@ -1593,8 +1607,8 @@ export async function createTrack(data: {
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
-        external_links, disc_number, is_double_single, sides_b, isrc, composers
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       track.id, track.title, track.artist_name, track.release_type, track.release_date,
       track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -1608,7 +1622,8 @@ export async function createTrack(data: {
       track.is_double_single ? 1 : 0,
       track.sides_b ? JSON.stringify(track.sides_b) : null,
       track.isrc,
-      track.composers ? JSON.stringify(track.composers) : null
+      track.composers ? JSON.stringify(track.composers) : null,
+      track.is_instrumental ? 1 : 0
     );
   }
 
@@ -1632,6 +1647,7 @@ export async function updateTrack(id: string, updates: Partial<{
   stems_urls: Partial<import("@/types/music").StemsUrls> | null;
   video_embed_url: string | null;
   gallery_images: string[] | null;
+  is_instrumental: boolean;
 }>): Promise<Track | null> {
   const existing = await getTrackById(id);
   if (!existing) return null;
@@ -1643,6 +1659,7 @@ export async function updateTrack(id: string, updates: Partial<{
   const values = fields.map((k) => {
     const v = (updates as Record<string, unknown>)[k];
     if (typeof v === "object" && v !== null) return JSON.stringify(v);
+    if (typeof v === "boolean") return v ? 1 : 0;
     return v;
   });
 
@@ -1664,6 +1681,20 @@ export async function deleteTrack(id: string): Promise<boolean> {
   const db = getLocalDbWrite();
   const result = db.prepare("DELETE FROM tracks WHERE id = ?").run(id);
   return result.changes > 0;
+}
+
+export async function incrementTrackStreams(id: string): Promise<number> {
+  if (USE_TURSO) {
+    // Increment streams column (atomic)
+    await tursoExec("UPDATE tracks SET streams = COALESCE(streams, 0) + 1 WHERE id = ?", [id]);
+    // Read back the updated value
+    const row = await tursoExecSingle("SELECT streams FROM tracks WHERE id = ?", [id]);
+    return row ? Number(row.streams) || 0 : 0;
+  }
+  const db = getLocalDbWrite();
+  db.prepare("UPDATE tracks SET streams = COALESCE(streams, 0) + 1 WHERE id = ?").run(id);
+  const row = db.prepare("SELECT streams FROM tracks WHERE id = ?").get(id) as { streams: number } | undefined;
+  return row ? Number(row.streams) || 0 : 0;
 }
 
 // ─── Sync all tables to Turso ───────────────────────────────────────────────

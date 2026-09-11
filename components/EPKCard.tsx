@@ -2,7 +2,13 @@
 
 import { Card, CardContent } from "@/components/ui/Card";
 import type { Track } from "@/types/music";
-import { safeString, formatDuration, formatNumber, capitalizeReleaseType, getCoverImage } from "@/lib/null-safe";
+import {
+  safeString,
+  formatDuration,
+  formatNumber,
+  capitalizeReleaseType,
+  getCoverImage,
+} from "@/lib/null-safe";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -20,6 +26,12 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   const artistName = safeString(track.artist_name);
   const duration = formatDuration(track.duration);
   const streams = formatNumber(track.metrics?.streams ?? 0);
+  const releaseDate = track.release_date ? new Date(track.release_date).toLocaleDateString("es-ES", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }) : "—";
+  const isrc = safeString(track.isrc);
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [animating, setAnimating] = useState(false);
@@ -28,22 +40,11 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   // Badge "Nuevo Lanzamiento" — track released in the last 7 days
   const isNewRelease = (() => {
     if (!track.release_date) return false;
-    const releaseDate = new Date(track.release_date);
+    const releaseDateObj = new Date(track.release_date);
     const now = new Date();
-    const diffMs = now.getTime() - releaseDate.getTime();
+    const diffMs = now.getTime() - releaseDateObj.getTime();
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
     return diffDays >= 0 && diffDays <= 7;
-  })();
-
-  // Badge "Stems Disponibles" — track has stems_urls
-  const hasStems = (() => {
-    return track.stems_urls && (
-      track.stems_urls.drums ||
-      track.stems_urls.bass ||
-      track.stems_urls.guitars ||
-      track.stems_urls.vocals ||
-      track.stems_urls.other
-    );
   })();
 
   useEffect(() => {
@@ -100,14 +101,16 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
     }
   };
 
+  const coverImage = getCoverImage(track);
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="aspect-square bg-slate-100 dark:bg-slate-700 relative overflow-hidden">
-        {getCoverImage(track) ? (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
+      <div className="aspect-square bg-slate-100 dark:bg-slate-700 relative overflow-hidden flex-shrink-0">
+        {coverImage ? (
           <img
-            src={getCoverImage(track)!}
+            src={coverImage}
             alt={title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
             loading="lazy"
           />
         ) : (
@@ -138,35 +141,68 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
             ✨ Nuevo
           </div>
         )}
-        {/* Badge "Stems Disponibles" */}
-        {hasStems && (
-          <div className="absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
-            🎚️ Stems
-          </div>
-        )}
       </div>
-      <CardContent>
+      <CardContent className="flex flex-col flex-grow p-4">
         <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-white">{title}</h3>
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{artistName}</p>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-          {capitalizeReleaseType(track.release_type)} · {duration}
-        </p>
+
+        {/* Metadata: Release type, Duration, Release Date, ISRC */}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-2">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+            {capitalizeReleaseType(track.release_type)}
+          </span>
+          <span>·</span>
+          <span className="inline-flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {duration}
+          </span>
+          {track.release_date && (
+            <>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                {releaseDate}
+              </span>
+            </>
+          )}
+          {track.isrc && track.isrc !== "—" && (
+            <>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1 font-mono">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                ISRC: {isrc}
+              </span>
+            </>
+          )}
+        </div>
+
         <AudioPlayer
           id={track.id}
           src={track.audio_preview_url}
           title={track.title}
           artist={track.artist_name || undefined}
-          coverImage={getCoverImage(track) || undefined}
+          coverImage={coverImage || undefined}
           track={track}
         />
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-2">
-          <span>▶ {streams} streams</span>
-          <span>·</span>
-          <span>♥ {formatNumber(track.metrics?.saves ?? 0)}</span>
-          <span>·</span>
-          <span className={liked ? "text-red-500" : "text-slate-500 dark:text-slate-400"}>
-            🤍 {likeCount}
-          </span>
+
+        {/* Stats footer: streams, saves, likes */}
+        <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {streams}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+              {formatNumber(track.metrics?.saves ?? 0)}
+            </span>
+          </div>
+          <div className={`inline-flex items-center gap-1 ${liked ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`}>
+            <span className={animating ? "animate-heartbeat" : ""} style={{ fontSize: "0.875rem", lineHeight: 1 }}>
+              {liked ? "❤️" : "🤍"}
+            </span>
+            <span>{formatNumber(likeCount)}</span>
+          </div>
         </div>
       </CardContent>
       <style jsx>{`

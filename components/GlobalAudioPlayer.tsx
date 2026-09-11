@@ -1,235 +1,160 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAudioPlayer } from "@/context/AudioPlayerContext";
-import { safeString } from "@/lib/null-safe";
-import { AudioVisualizer } from "./AudioVisualizer";
-
-const AUTO_HIDE_DELAY = 5000; // 5 seconds
+import { AudioVisualizer } from "@/components/AudioVisualizer";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 
 export function GlobalAudioPlayer() {
-  const {
-    activeTrack,
-    isPlaying,
-    currentTime,
-    duration,
-    volume,
-    isVisualizerOpen,
-    togglePlay,
-    pause,
-    seek,
-    setVolume,
-    toggleVisualizer,
-  } = useAudioPlayer();
-
-  const [isHovered, setIsHovered] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const clearHideTimer = useCallback(() => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  }, []);
-
-  const startHideTimer = useCallback(() => {
-    clearHideTimer();
-    hideTimerRef.current = setTimeout(() => {
-      setIsMinimized(true);
-    }, AUTO_HIDE_DELAY);
-  }, [clearHideTimer]);
-
-  // Auto-hide after 5 seconds of no interaction
-  useEffect(() => {
-    if (!isHovered) {
-      startHideTimer();
-    } else {
-      clearHideTimer();
-    }
-    return clearHideTimer;
-  }, [isHovered, startHideTimer, clearHideTimer]);
-
-  // Show player when track starts
-  useEffect(() => {
-    if (activeTrack) {
-      setIsMinimized(false);
-    }
-  }, [activeTrack]);
-
-  const handleClose = () => {
-    pause();
-    if (isVisualizerOpen) toggleVisualizer();
-    setIsHovered(false);
-    setIsMinimized(true);
-    clearHideTimer();
-  };
-
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-    setIsMinimized(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-  };
+  const { activeTrack, isPlaying, duration, currentTime, volume, isVisualizerOpen, togglePlay, clearTrack, seek, setVolume, toggleVisualizer, audioRef } = useAudioPlayer();
+  const [showVolume, setShowVolume] = useState(false);
 
   if (!activeTrack) return null;
 
-  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
-
-  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    seek(parseFloat(e.target.value));
+  const formatTime = (s: number) => {
+    if (!Number.isFinite(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setVolume(parseFloat(e.target.value));
-  };
-
-  const formatSeconds = (sec: number) => {
-    if (!Number.isFinite(sec) || sec < 0) return "0:00";
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  // Minimized state: show thin progress bar
-  if (isMinimized && !isHovered) {
-    return (
-      <div
-        ref={containerRef}
-        className="fixed bottom-0 left-0 right-0 z-50"
-        onMouseEnter={handleMouseEnter}
-        onTouchStart={() => setIsMinimized(false)}
-      >
-        {/* Thin progress bar */}
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Full player
   return (
-    <div
-      ref={containerRef}
-      className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {isVisualizerOpen && (
-        <div className="max-w-4xl mx-auto mb-3">
-          <AudioVisualizer height={80} />
-        </div>
-      )}
-
-      <div className="max-w-4xl mx-auto bg-dark-900/90 dark:bg-dark-900/95 backdrop-blur-xl border border-dark-700/80 rounded-2xl shadow-2xl p-3 sm:p-4 text-white">
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          {/* Info del Track */}
-          <div className="flex items-center gap-3 w-full sm:w-1/3 min-w-0">
-            <div className="w-12 h-12 rounded-lg bg-dark-800 flex-shrink-0 overflow-hidden relative border border-dark-700">
-              {activeTrack.coverImage ? (
-                <img
-                  src={activeTrack.coverImage}
-                  alt={safeString(activeTrack.title)}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xl">
-                  🎵
-                </div>
-              )}
+    <AnimatePresence>
+      {activeTrack && (
+        <motion.div
+          key="global-audio-player"
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 shadow-2xl safe-area-pb"
+        >
+          {isVisualizerOpen && (
+            <div className="w-full h-24 bg-slate-50 dark:bg-slate-800/50">
+              <AudioVisualizer />
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold truncate">
-                {safeString(activeTrack.title)}
-              </p>
-              <p className="text-xs text-dark-400 truncate">
-                {safeString(activeTrack.artist, "Artista EPK")}
-              </p>
-            </div>
-          </div>
+          )}
 
-          {/* Controles Principales & Scrubber */}
-          <div className="flex-1 w-full flex flex-col items-center gap-1.5">
+          <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex items-center gap-4">
               <button
-                onClick={togglePlay}
-                className="w-10 h-10 rounded-full bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center transition shadow-md hover:scale-105"
-                aria-label={isPlaying ? "Pausar" : "Reproducir"}
-              >
-                {isPlaying ? "⏸" : "▶"}
-              </button>
-
-              <button
                 onClick={toggleVisualizer}
-                className={`text-xs px-2.5 py-1 rounded-full border transition flex items-center gap-1.5 ${
-                  isVisualizerOpen
-                    ? "bg-purple-600/30 border-purple-500 text-purple-300"
-                    : "border-dark-700 text-dark-400 hover:text-white"
-                }`}
-                title="Alternar Visualizador de Espectro"
+                className={`p-2 rounded-lg transition-colors ${isVisualizerOpen ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                aria-label={isVisualizerOpen ? "Cerrar visualizador" : "Abrir visualizador"}
               >
-                <span>📊</span>
-                <span className="hidden md:inline">Visualizador</span>
-              </button>
-
-              <button
-                onClick={handleClose}
-                className="w-8 h-8 rounded-full border border-dark-700 text-dark-400 hover:text-white hover:border-dark-500 flex items-center justify-center transition"
-                title="Cerrar reproductor"
-                aria-label="Cerrar reproductor"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                 </svg>
               </button>
-            </div>
 
-            {/* Barra de progreso */}
-            <div className="w-full flex items-center gap-2 text-xs text-dark-400">
-              <span className="w-8 text-right font-mono">{formatSeconds(currentTime)}</span>
-              <div className="relative flex-1 flex items-center">
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  step={0.1}
-                  value={currentTime}
-                  onChange={handleSeekChange}
-                  className="w-full h-1.5 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-primary-500 hover:h-2 transition-all"
-                  aria-label="Progreso del audio"
-                />
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {activeTrack.coverImage && (
+                  <img src={activeTrack.coverImage} alt={activeTrack.title} className="w-12 h-12 rounded-lg object-cover shadow-md" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{activeTrack.title}</p>
+                  {activeTrack.artist && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{activeTrack.artist}</p>
+                  )}
+                </div>
               </div>
-              <span className="w-8 font-mono">{formatSeconds(duration)}</span>
+
+              <div className="flex items-center gap-2 flex-1 justify-center max-w-xl">
+                <span className="text-xs text-slate-500 dark:text-slate-400 w-10 text-right font-mono">{formatTime(currentTime)}</span>
+
+                <div className="flex-1 relative group">
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 0}
+                    step={0.1}
+                    value={currentTime}
+                    onChange={(e) => seek(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-primary-500 group-hover:h-2 transition-all"
+                  />
+                </div>
+
+                <span className="text-xs text-slate-500 dark:text-slate-400 w-10 font-mono">{formatTime(duration)}</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <div
+                  className="relative"
+                  onMouseEnter={() => setShowVolume(true)}
+                  onMouseLeave={() => setShowVolume(false)}
+                >
+                  <button
+                    onClick={() => setVolume(volume > 0 ? 0 : 0.85)}
+                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    {volume === 0 ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                      </svg>
+                    ) : volume < 0.5 ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>
+                    )}
+                  </button>
+
+                  <AnimatePresence>
+                    {showVolume && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-xl p-3 w-8 h-24 flex items-center justify-center"
+                      >
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={volume}
+                          onChange={(e) => setVolume(parseFloat(e.target.value))}
+                          className="w-20 h-1 accent-primary-500"
+                          style={{ writingMode: "vertical-lr", direction: "rtl", height: "100%" }}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <button
+                  onClick={togglePlay}
+                  className="p-2.5 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors shadow-lg shadow-primary-500/25"
+                >
+                  {isPlaying ? (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
+                    </svg>
+                  )}
+                </button>
+
+                <button
+                  onClick={clearTrack}
+                  className="p-2 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                  aria-label="Cerrar reproductor"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Control de Volumen */}
-          <div className="hidden sm:flex items-center justify-end gap-2 w-1/4">
-            <span className="text-xs text-dark-400">
-              {volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={volume}
-              onChange={handleVolumeChange}
-              className="w-20 h-1.5 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
-              aria-label="Control de volumen"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
