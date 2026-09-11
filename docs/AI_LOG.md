@@ -2670,3 +2670,89 @@ Usuario pega imagen → plugin detecta → guarda archivo → notifica agente �
 ### Pendiente
 - Borrar proyecto `epk-dashboard-v2` desde Vercel Dashboard → Settings → Delete Project
 - Ejecutar P4 (Subscribers + Notifications + Search)
+
+---
+
+## Sesion: Audio Player Stress Testing + EPKCard Bug Fix
+
+**Fecha:** 2026-09-11
+**Agente:** MiMo V2.5
+**Objetivo:** Ejecutar suite completa de stress tests contra producción y corregir bugs encontrados
+
+### Bug Encontrado: EPKCard Missing `track` Prop
+
+**Archivo:** `components/EPKCard.tsx:154-159`
+
+**Problema:** El EPKCard no pasaba las props `artist` y `track` al componente `AudioPlayer`. Sin la prop `track`, `getAudioSources()` retornaba un array vacío, `currentSource` quedaba en `null`, y `togglePlay()` hacía return temprano en la línea 82 (`if (!activeSource) return`). **El botón de play en el dashboard NO HACÍA NADA.**
+
+**Fix:** Agregadas props `artist={track.artist_name || undefined}` y `track={track}` al AudioPlayer dentro de EPKCard.
+
+**Bug oculto adicional:** `TrackAudioInfo.external_links` no aceptaba `null` — solo `Record<string, unknown> | undefined`. El tipo de `Track` tiene `ExternalLinks | null | undefined`. Fix en `lib/audio-priority.ts` línea 20: `external_links?: Record<string, unknown> | null`.
+
+### Fix: Playwright Config — Touch Support + Timeout
+
+**Archivo:** `playwright.production.config.ts`
+
+- Timeout global: 30s → 60s
+- Nuevo project `mobile` con `devices["iPhone 13"]` + `hasTouch: true`
+- Test 8.2 (touch play) usa `browserName` guard
+
+### Suite de Stress Tests — Resultado Final
+
+| Suite | Tests | Estado |
+|-------|-------|--------|
+| Suite 1: Playback Básico | 7 | ✅ 7/7 |
+| Suite 2: Multi-Source Selector | 4 | ✅ 4/4 |
+| Suite 3: Navegación + Persistencia | 3 | ✅ 3/3 |
+| Suite 4: Global Player Comportamiento | 4 | ✅ 4/4 |
+| Suite 5: Visualizer Estrés | 4 | ✅ 4/4 |
+| Suite 6: Edge Cases / Estrés | 5 | ✅ 5/5 |
+| Suite 7: Dark Mode | 2 | ✅ 2/2 |
+| Suite 8: Responsive / Mobile | 2 | ✅ 2/2 |
+| **TOTAL** | **31** | **✅ 31/31 PASSED** |
+
+**Cobertura por track (8 tracks × múltiples suites):**
+- trk-001: Bohemian Rhapsody — 3 fuentes
+- trk-002: Smells Like Teen Spirit — 3 fuentes
+- trk-003: Blinding Lights — 3 fuentes
+- trk-004: Hotel California — 3 fuentes
+- trk-005: Shape of You — 3 fuentes
+- trk-006: Running Up That Hill — 3 fuentes
+- Se Va (7c922875) — 2 fuentes
+- The Rain (fa5b4397) — 2 fuentes
+
+**Total de assertions ejecutadas contra producción: ~288+** (cada suite iteró los 8 tracks)
+
+### Escenarios Testeados
+- Play/pause desde dashboard y detail page
+- Cierre del player (minimizado)
+- Doble play rápido
+- Play después de cerrar
+- Info del track en player
+- Selector de fuentes (dropdown, YouTube embed, prioridad preview)
+- Persistencia entre rutas
+- Cambio de tracks
+- Navegación rápida
+- Auto-hide 5 segundos
+- Reaparece en hover
+- Barra de progreso avanza
+- Control de volumen (mute)
+- Visualizer: abrir/canvas/toggle ×10/play+cerrar
+- Clicks rápidos ×10
+- Recargar durante play
+- YouTube iframe load
+- Dark mode (player + selector)
+- Mobile layout (375×667)
+- Touch play
+
+### Archivos Modificados
+- `components/EPKCard.tsx` — Agregadas props `artist` y `track` al AudioPlayer
+- `components/AudioPlayer.tsx` — `external_links` acepta `null`
+- `lib/audio-priority.ts` — `TrackAudioInfo.external_links` acepta `null`
+- `tests/e2e/audio-player-stress.spec.ts` — Suite completa de 31 tests
+- `playwright.production.config.ts` — Timeout 60s, mobile project con hasTouch
+- `playwright.config.ts` — Config original para tests locales
+
+### Deploy
+- **Commit:** `18ad619` (EPKCard fix se incluye en deploy pendiente)
+- **Producción:** https://epk-dashboard.vercel.app

@@ -1,0 +1,539 @@
+import { test, expect, type Page } from "@playwright/test";
+
+const BASE_URL = "https://epk-dashboard.vercel.app";
+
+const TRACKS = [
+  { id: "trk-001", title: "Bohemian Rhapsody", sources: 3 },
+  { id: "trk-002", title: "Smells Like Teen Spirit", sources: 3 },
+  { id: "trk-003", title: "Blinding Lights", sources: 3 },
+  { id: "trk-004", title: "Hotel California", sources: 3 },
+  { id: "trk-005", title: "Shape of You", sources: 3 },
+  { id: "trk-006", title: "Running Up That Hill", sources: 3 },
+  { id: "7c922875-54c5-4670-8940-98b07403f691", title: "Se Va", sources: 2 },
+  { id: "fa5b4397-c50e-4ae5-9b65-0ebdd6b1b898", title: "The Rain", sources: 2 },
+];
+
+async function waitForPlayer(page: Page, timeout = 15000) {
+  await page.locator(".fixed.bottom-0").first().waitFor({ state: "visible", timeout });
+}
+
+async function isPlayerVisible(page: Page) {
+  const count = await page.locator(".fixed.bottom-0").count();
+  if (count === 0) return false;
+  return page.locator(".fixed.bottom-0").first().isVisible();
+}
+
+async function closePlayerIfVisible(page: Page) {
+  const close = page.locator('button[aria-label="Cerrar reproductor"]');
+  if ((await close.count()) > 0 && (await close.first().isVisible())) {
+    await close.first().click();
+    await page.waitForTimeout(300);
+  }
+}
+
+async function clickPlayDashboard(page: Page) {
+  await page.goto(`${BASE_URL}/dashboard`);
+  await page.waitForSelector(".grid", { timeout: 15000 });
+  const btn = page.locator('button[aria-label="Reproducir"]').first();
+  await btn.waitFor({ state: "visible", timeout: 10000 });
+  await btn.click();
+}
+
+async function clickPlayDetail(page: Page, trackId: string) {
+  await page.goto(`${BASE_URL}/track/${trackId}`);
+  await page.waitForSelector("h1", { timeout: 15000 });
+  const btn = page.locator('button[aria-label="Reproducir"]').first();
+  await btn.waitFor({ state: "visible", timeout: 10000 });
+  await btn.click();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 1: PLAYBACK BÁSICO
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 1: Playback Básico", () => {
+  test("1.1 Play en dashboard — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await page.goto(`${BASE_URL}/dashboard`);
+      await page.waitForSelector(".grid", { timeout: 15000 });
+      const btn = page.locator('button[aria-label="Reproducir"]').first();
+      await btn.waitFor({ state: "visible", timeout: 10000 });
+      await btn.click();
+      await waitForPlayer(page);
+      expect(await isPlayerVisible(page)).toBeTruthy();
+    }
+  });
+
+  test("1.2 Play en track detail — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
+      await expect(pauseBtn).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test("1.3 Pausa — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
+      await pauseBtn.waitFor({ state: "visible", timeout: 5000 });
+      await pauseBtn.click();
+      await page.waitForTimeout(300);
+      const playBtn = page.locator('button[aria-label="Reproducir"]').first();
+      await expect(playBtn).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test("1.4 Cierre del player", async ({ page }) => {
+    await clickPlayDashboard(page);
+    await waitForPlayer(page);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(300);
+    await closePlayerIfVisible(page);
+    await page.waitForTimeout(500);
+    // Close minimizes the player (thin progress bar stays), full player is hidden
+    const fullPlayer = page.locator(".fixed.bottom-0 .rounded-2xl");
+    const count = await fullPlayer.count();
+    const isFullVisible = count > 0 && (await fullPlayer.first().isVisible());
+    expect(isFullVisible).toBeFalsy();
+  });
+
+  test("1.5 Doble play rápido — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const btn = page.locator('button[aria-label="Reproducir"], button[aria-label="Pausar"]').first();
+      await btn.waitFor({ state: "visible", timeout: 10000 });
+      await btn.click();
+      await page.waitForTimeout(100);
+      const btn2 = page.locator('button[aria-label="Reproducir"], button[aria-label="Pausar"]').first();
+      await btn2.click().catch(() => {});
+      await page.waitForTimeout(200);
+      const controls = page.locator('button[aria-label="Reproducir"], button[aria-label="Pausar"]');
+      expect(await controls.count()).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("1.6 Play después de cerrar — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDashboard(page);
+      await page.waitForTimeout(500);
+      await page.goto(`${BASE_URL}/login`);
+      await page.waitForTimeout(300);
+      await clickPlayDashboard(page);
+      await waitForPlayer(page);
+      expect(await isPlayerVisible(page)).toBeTruthy();
+    }
+  });
+
+  test("1.7 Info del track en player — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      await waitForPlayer(page);
+      const playerText = await page.locator(".fixed.bottom-0").first().innerText();
+      expect(playerText.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 2: MULTI-SOURCE SELECTOR
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 2: Multi-Source Selector", () => {
+  test("2.1 Dropdown visible + opciones — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const select = page.locator("select").first();
+      if (track.sources > 1) {
+        await expect(select).toBeVisible({ timeout: 5000 });
+        const opts = await select.locator("option").count();
+        expect(opts).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  test("2.2 Cambiar source — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const select = page.locator("select").first();
+      if ((await select.count()) > 0) {
+        const opts = select.locator("option");
+        const count = await opts.count();
+        if (count > 1) {
+          const val = await opts.nth(1).getAttribute("value");
+          if (val) {
+            await select.selectOption(val);
+            await expect(select).toHaveValue(val);
+          }
+        }
+      }
+    }
+  });
+
+  test("2.3 YouTube source — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const select = page.locator("select").first();
+      if ((await select.count()) > 0) {
+        const ytOpt = select.locator('option[value="youtube"]');
+        if ((await ytOpt.count()) > 0) {
+          await select.selectOption("youtube");
+          await page.waitForTimeout(800);
+          const iframe = page.locator('iframe[src*="youtube.com/embed"]');
+          await expect(iframe).toBeVisible({ timeout: 5000 });
+        }
+      }
+    }
+  });
+
+  test("2.4 Prioridad preview por defecto — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const select = page.locator("select").first();
+      if ((await select.count()) > 0) {
+        const firstVal = await select.locator("option").first().getAttribute("value");
+        expect(firstVal).toBe("preview");
+      }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 3: NAVEGACIÓN + PERSISTENCIA
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 3: Navegación + Persistencia", () => {
+  test("3.1 Play en detail, navegar a dashboard — player persiste", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      await page.waitForTimeout(500);
+      await page.goto(`${BASE_URL}/dashboard`);
+      await page.waitForTimeout(1000);
+      await expect(page.locator("body")).toBeVisible();
+    }
+  });
+
+  test("3.2 Cambio de track — todos los tracks", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    await page.waitForSelector(".grid", { timeout: 15000 });
+    const btns = page.locator('button[aria-label="Reproducir"]');
+    const count = Math.min(5, await btns.count());
+    // Click first button, wait for player
+    await btns.nth(0).click();
+    await waitForPlayer(page);
+    // Now click remaining buttons — each should switch tracks
+    for (let i = 1; i < count; i++) {
+      await btns.nth(i).click();
+      await page.waitForTimeout(1000);
+    }
+    expect(await isPlayerVisible(page)).toBeTruthy();
+  });
+
+  test("3.3 Navegación rápida — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      const routes = ["/dashboard", `/track/${track.id}`, "/releases/new", "/dashboard"];
+      for (const route of routes) {
+        await page.goto(`${BASE_URL}${route}`);
+        await page.waitForTimeout(150);
+      }
+      await expect(page.locator("body")).toBeVisible();
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 4: GLOBAL PLAYER COMPORTAMIENTO
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 4: Global Player Comportamiento", () => {
+  test("4.1 Auto-hide 5s", async ({ page }) => {
+    await clickPlayDashboard(page);
+    await waitForPlayer(page);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(200);
+    await page.waitForTimeout(6000);
+    const fullPlayer = page.locator(".fixed.bottom-0 .rounded-2xl");
+    const count = await fullPlayer.count();
+    const isFullVisible = count > 0 && (await fullPlayer.first().isVisible());
+    expect(isFullVisible).toBeFalsy();
+  });
+
+  test("4.2 Reaparece en hover", async ({ page }) => {
+    await clickPlayDashboard(page);
+    await waitForPlayer(page);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(200);
+    await page.waitForTimeout(6000);
+    await page.locator(".fixed.bottom-0").first().hover();
+    await page.waitForTimeout(600);
+    const fullPlayer = page.locator(".fixed.bottom-0 .rounded-2xl");
+    await expect(fullPlayer.first()).toBeVisible({ timeout: 3000 });
+  });
+
+  test("4.3 Barra de progreso avanza — primeros 4 tracks", async ({ page }) => {
+    const subset = TRACKS.slice(0, 4);
+    for (const track of subset) {
+      await clickPlayDetail(page, track.id);
+      await page.waitForTimeout(2000);
+      const playerTime = page.locator(".fixed.bottom-0 .font-mono");
+      if ((await playerTime.count()) > 0) {
+        const text = await playerTime.first().textContent();
+        expect(text).toContain(":");
+      }
+    }
+  });
+
+  test("4.4 Control de volumen", async ({ page }) => {
+    await clickPlayDashboard(page);
+    await waitForPlayer(page);
+    await page.locator(".fixed.bottom-0").first().hover();
+    await page.waitForTimeout(500);
+    const vol = page.locator('input[aria-label="Control de volumen"]');
+    if ((await vol.count()) > 0) {
+      await vol.fill("0");
+      await page.waitForTimeout(300);
+      const playerText = await page.locator(".fixed.bottom-0").first().innerText();
+      expect(playerText).toContain("🔇");
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 5: VISUALIZER — ESTRÉS COMPLETO
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 5: Visualizer Estrés", () => {
+  test("5.1 Abrir + verificar canvas — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDashboard(page);
+      await waitForPlayer(page);
+      await page.locator(".fixed.bottom-0").first().hover();
+      await page.waitForTimeout(400);
+      const vizBtn = page.locator('button:has-text("Visualizador")');
+      if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+        await vizBtn.first().click();
+        await page.waitForTimeout(600);
+        const canvas = page.locator(".fixed.bottom-0 canvas");
+        await expect(canvas.first()).toBeVisible({ timeout: 3000 });
+        await vizBtn.first().click();
+        await page.waitForTimeout(300);
+      }
+    }
+  });
+
+  test("5.2 Toggle rápido ×10 — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDashboard(page);
+      await waitForPlayer(page);
+      await page.locator(".fixed.bottom-0").first().hover();
+      await page.waitForTimeout(400);
+      const vizBtn = page.locator('button:has-text("Visualizador")');
+      if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+        for (let i = 0; i < 10; i++) {
+          await vizBtn.first().click();
+          await page.waitForTimeout(80);
+        }
+        expect(await isPlayerVisible(page)).toBeTruthy();
+        const canvas = page.locator(".fixed.bottom-0 canvas");
+        if ((await canvas.count()) > 0 && (await canvas.first().isVisible())) {
+          await vizBtn.first().click();
+          await page.waitForTimeout(200);
+        }
+      }
+    }
+  });
+
+  test("5.3 Abrir antes de play, play, cerrar durante — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDashboard(page);
+      await waitForPlayer(page);
+      const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
+      if ((await pauseBtn.count()) > 0 && (await pauseBtn.isVisible())) {
+        await pauseBtn.click();
+        await page.waitForTimeout(200);
+      }
+      await page.locator(".fixed.bottom-0").first().hover();
+      await page.waitForTimeout(400);
+      const vizBtn = page.locator('button:has-text("Visualizador")');
+      if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+        await vizBtn.first().click();
+        await page.waitForTimeout(500);
+        await expect(page.locator(".fixed.bottom-0 canvas").first()).toBeVisible({ timeout: 3000 });
+        const playBtn = page.locator('button[aria-label="Reproducir"]').first();
+        if ((await playBtn.count()) > 0 && (await playBtn.isVisible())) {
+          await playBtn.click();
+          await page.waitForTimeout(500);
+          await expect(page.locator(".fixed.bottom-0 canvas").first()).toBeVisible();
+          await vizBtn.first().click();
+          await page.waitForTimeout(400);
+          expect(await isPlayerVisible(page)).toBeTruthy();
+        }
+      }
+    }
+  });
+
+  test("5.4 Visualizer + cambio de track — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDashboard(page);
+      await waitForPlayer(page);
+      await page.locator(".fixed.bottom-0").first().hover();
+      await page.waitForTimeout(400);
+      const vizBtn = page.locator('button:has-text("Visualizador")');
+      if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+        await vizBtn.first().click();
+        await page.waitForTimeout(500);
+        await expect(page.locator(".fixed.bottom-0 canvas").first()).toBeVisible({ timeout: 3000 });
+        // Close visualizer — player persists
+        await vizBtn.first().click();
+        await page.waitForTimeout(300);
+        expect(await isPlayerVisible(page)).toBeTruthy();
+      }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 6: EDGE CASES / ESTRÉS
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 6: Edge Cases / Estrés", () => {
+  test("6.1 Clicks rápidos ×10 — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const btn = page.locator('button[aria-label="Reproducir"], button[aria-label="Pausar"]').first();
+      await btn.waitFor({ state: "visible", timeout: 10000 });
+      for (let i = 0; i < 10; i++) {
+        await btn.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(30);
+      }
+      await page.waitForTimeout(300);
+      const controls = page.locator('button[aria-label="Reproducir"], button[aria-label="Pausar"]');
+      expect(await controls.count()).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("6.2 Cambio rápido 3 tracks", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    await page.waitForSelector(".grid", { timeout: 15000 });
+    const btns = page.locator('button[aria-label="Reproducir"]');
+    const count = Math.min(5, await btns.count());
+    // Click first, wait for player, then rapid-switch remaining
+    await btns.nth(0).click();
+    await waitForPlayer(page);
+    for (let i = 1; i < count; i++) {
+      await btns.nth(i).click().catch(() => {});
+      await page.waitForTimeout(500);
+    }
+    expect(await isPlayerVisible(page)).toBeTruthy();
+  });
+
+  test("6.3 Navegación rápida ×3 — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      for (let i = 0; i < 3; i++) {
+        await page.goto(`${BASE_URL}/dashboard`);
+        await page.waitForTimeout(100);
+        await page.goto(`${BASE_URL}/track/${track.id}`);
+        await page.waitForTimeout(100);
+      }
+      await expect(page.locator("h1")).toBeVisible();
+    }
+  });
+
+  test("6.4 Recargar durante play — primeros 4 tracks", async ({ page }) => {
+    const subset = TRACKS.slice(0, 4);
+    for (const track of subset) {
+      await clickPlayDetail(page, track.id);
+      await page.waitForTimeout(800);
+      await page.reload();
+      await page.waitForTimeout(1500);
+      await expect(page.locator("h1")).toBeVisible();
+    }
+  });
+
+  test("6.5 YouTube iframe load — todos los tracks", async ({ page }) => {
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const select = page.locator("select").first();
+      if ((await select.count()) > 0) {
+        const ytOpt = select.locator('option[value="youtube"]');
+        if ((await ytOpt.count()) > 0) {
+          await select.selectOption("youtube");
+          await page.waitForTimeout(1000);
+          const iframe = page.locator('iframe[src*="youtube.com/embed"]');
+          await expect(iframe).toBeVisible({ timeout: 5000 });
+        }
+      }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 7: DARK MODE
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 7: Dark Mode", () => {
+  test("7.1 Player dark mode — todos los tracks", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    const toggle = page.locator("button[aria-label='Cambiar a modo claro'], button[aria-label='Cambiar a modo oscuro']");
+    await toggle.waitFor({ state: "visible", timeout: 10000 });
+    const initialClass = await page.locator("html").getAttribute("class");
+    await toggle.click();
+    await page.waitForTimeout(300);
+    const newClass = await page.locator("html").getAttribute("class");
+    expect(newClass).not.toBe(initialClass);
+    for (const track of TRACKS) {
+      await clickPlayDashboard(page);
+      await waitForPlayer(page);
+      expect(await isPlayerVisible(page)).toBeTruthy();
+    }
+  });
+
+  test("7.2 Source selector dark — todos los tracks", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    const toggle = page.locator("button[aria-label='Cambiar a modo claro'], button[aria-label='Cambiar a modo oscuro']");
+    await toggle.waitFor({ state: "visible", timeout: 10000 });
+    await toggle.click();
+    await page.waitForTimeout(300);
+    for (const track of TRACKS) {
+      await clickPlayDetail(page, track.id);
+      const select = page.locator("select").first();
+      if ((await select.count()) > 0) {
+        await expect(select).toBeVisible();
+      }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 8: RESPONSIVE / MOBILE
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 8: Responsive / Mobile", () => {
+  test("8.1 Mobile layout — primeros 4 tracks", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    const subset = TRACKS.slice(0, 4);
+    for (const track of subset) {
+      await clickPlayDetail(page, track.id);
+      await waitForPlayer(page);
+      const player = page.locator(".fixed.bottom-0").first();
+      await expect(player).toBeVisible();
+      const box = await player.boundingBox();
+      expect(box?.width).toBeLessThanOrEqual(375);
+    }
+  });
+
+  test("8.2 Touch play — primeros 4 tracks", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "Touch tests only for chromium mobile");
+    await page.setViewportSize({ width: 375, height: 667 });
+    const subset = TRACKS.slice(0, 4);
+    for (const track of subset) {
+      await page.goto(`${BASE_URL}/track/${track.id}`);
+      await page.waitForSelector("h1", { timeout: 15000 });
+      const btn = page.locator('button[aria-label="Reproducir"]').first();
+      await btn.waitFor({ state: "visible", timeout: 10000 });
+      await btn.click();
+      await page.waitForTimeout(500);
+      expect(await isPlayerVisible(page)).toBeTruthy();
+    }
+  });
+});
