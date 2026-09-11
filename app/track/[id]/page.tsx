@@ -113,13 +113,13 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
 
                   <div className="mt-5">
                     <AudioPlayer
-                      src={track.audio_preview_url || undefined}
+                      src={track.audio_preview_url && track.audio_preview_url !== '—' ? track.audio_preview_url : undefined}
                       title={track.title}
                       id={track.id}
                       artist={track.artist_name}
                       coverImage={getCoverImage(track) || undefined}
                       track={{
-                        audio_preview_url: track.audio_preview_url,
+                        audio_preview_url: track.audio_preview_url && track.audio_preview_url !== '—' ? track.audio_preview_url : null,
                         spotify_url: track.spotify_url,
                         apple_music_url: track.external_links?.apple_music ?? null,
                         youtube_video_id: track.youtube_video_id,

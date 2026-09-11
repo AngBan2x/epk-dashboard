@@ -231,7 +231,7 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
               )}
 
               {/* YouTube Iframe Embed */}
-              {(currentSource?.type === 'youtube' || (track?.youtube_video_id && !track?.audio_preview_url && !track?.spotify_url && !track?.apple_music_url)) && (
+              {(currentSource?.type === 'youtube' || (track?.youtube_video_id && (!track?.audio_preview_url || track.audio_preview_url === '—') && !track?.spotify_url && !track?.apple_music_url)) && (
                 <iframe
                   ref={youtubeIframeRef}
                   src={currentSource?.embedUrl || `https://www.youtube.com/embed/${track?.youtube_video_id}?autoplay=1&enablejsapi=1`}
