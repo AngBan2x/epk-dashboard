@@ -43,7 +43,7 @@ export function getAudioSources(track: TrackAudioInfo): AudioSource[] {
   const external = track.external_links as Record<string, unknown> | undefined;
 
   // 1. Preview directo (iTunes/Spotify 30s) - MÁXIMA PRIORIDAD
-  if (track.audio_preview_url) {
+  if (track.audio_preview_url && track.audio_preview_url !== '—' && track.audio_preview_url.trim() !== '') {
     sources.push({
       type: 'preview',
       url: track.audio_preview_url,
