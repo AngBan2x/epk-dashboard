@@ -538,3 +538,192 @@ test.describe("Suite 8: Responsive / Mobile", () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 9: DOWNLOADABLE ASSETS
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 9: Downloadable Assets", () => {
+  test("9.1 Download section visible — primeros 3 tracks", async ({ page }) => {
+    const subset = TRACKS.slice(0, 3);
+    for (const track of subset) {
+      await page.goto(`${BASE_URL}/track/${track.id}`);
+      await page.waitForSelector("h1", { timeout: 15000 });
+      const downloadSection = page.locator('text=Centro de Descargas');
+      if ((await downloadSection.count()) > 0) {
+        await expect(downloadSection.first()).toBeVisible();
+      }
+    }
+  });
+
+  test("9.2 Download buttons present — primeros 3 tracks", async ({ page }) => {
+    const subset = TRACKS.slice(0, 3);
+    for (const track of subset) {
+      await page.goto(`${BASE_URL}/track/${track.id}`);
+      await page.waitForSelector("h1", { timeout: 15000 });
+      const downloadBtns = page.locator('button[aria-label*="Descargar"]');
+      const count = await downloadBtns.count();
+      expect(count).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("9.3 Rider download generates valid HTML", async ({ page }) => {
+    await page.goto(`${BASE_URL}/track/trk-001`);
+    await page.waitForSelector("h1", { timeout: 15000 });
+
+    // Listen for new page (download opens in new tab)
+    const [downloadPage] = await Promise.all([
+      page.waitForEvent("popup", { timeout: 5000 }).catch(() => null),
+      page.locator('button[aria-label*="Descargar"]').first().click(),
+    ]);
+
+    if (downloadPage) {
+      await downloadPage.waitForLoadState();
+      const content = await downloadPage.content();
+      // Verify it's HTML with PressPlay branding
+      expect(content).toContain("PressPlay");
+      expect(content).toContain("<!DOCTYPE html>");
+      await downloadPage.close();
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUITE 10: VISUALIZER LIFECYCLE
+// ═══════════════════════════════════════════════════════════════
+
+test.describe("Suite 10: Visualizer Lifecycle", () => {
+  test("10.1 Open visualizer before play — no crash", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    await page.waitForSelector(".grid", { timeout: 15000 });
+    const btn = page.locator('button[aria-label="Reproducir"]').first();
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    await btn.click();
+    await waitForPlayer(page);
+
+    // Hover to expand player
+    await page.locator(".fixed.bottom-0").first().hover();
+    await page.waitForTimeout(300);
+
+    // Open visualizer
+    const vizBtn = page.locator('button[aria-label="Abrir visualizador"]');
+    if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+      await vizBtn.first().click();
+      await page.waitForTimeout(500);
+      // Visualizer should be visible
+      const canvas = page.locator("canvas").first();
+      if ((await canvas.count()) > 0) {
+        await expect(canvas).toBeVisible({ timeout: 3000 });
+      }
+    }
+  });
+
+  test("10.2 Visualizer during play — audio continues", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    await page.waitForSelector(".grid", { timeout: 15000 });
+    const btn = page.locator('button[aria-label="Reproducir"]').first();
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    await btn.click();
+    await waitForPlayer(page);
+
+    // Verify playing
+    const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
+    await expect(pauseBtn).toBeVisible({ timeout: 5000 });
+
+    // Hover to expand
+    await page.locator(".fixed.bottom-0").first().hover();
+    await page.waitForTimeout(300);
+
+    // Open visualizer
+    const vizBtn = page.locator('button[aria-label="Abrir visualizador"]');
+    if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+      await vizBtn.first().click();
+      await page.waitForTimeout(500);
+
+      // Audio should still be playing (pause button still visible)
+      await expect(pauseBtn).toBeVisible();
+    }
+  });
+
+  test("10.3 Close visualizer during play — audio continues", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    await page.waitForSelector(".grid", { timeout: 15000 });
+    const btn = page.locator('button[aria-label="Reproducir"]').first();
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    await btn.click();
+    await waitForPlayer(page);
+
+    // Hover to expand
+    await page.locator(".fixed.bottom-0").first().hover();
+    await page.waitForTimeout(300);
+
+    // Open visualizer
+    const vizBtn = page.locator('button[aria-label="Abrir visualizador"]');
+    if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+      await vizBtn.first().click();
+      await page.waitForTimeout(300);
+
+      // Close visualizer via the X button inside it
+      const closeVizBtn = page.locator('button[aria-label="Cerrar visualizador"]').first();
+      if ((await closeVizBtn.count()) > 0 && (await closeVizBtn.isVisible())) {
+        await closeVizBtn.click();
+        await page.waitForTimeout(300);
+      }
+
+      // Audio should still be playing
+      const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
+      await expect(pauseBtn).toBeVisible();
+    }
+  });
+
+  test("10.4 Visualizer + clearTrack — auto close", async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    await page.waitForSelector(".grid", { timeout: 15000 });
+    const btn = page.locator('button[aria-label="Reproducir"]').first();
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    await btn.click();
+    await waitForPlayer(page);
+
+    // Hover to expand
+    await page.locator(".fixed.bottom-0").first().hover();
+    await page.waitForTimeout(300);
+
+    // Open visualizer
+    const vizBtn = page.locator('button[aria-label="Abrir visualizador"]');
+    if ((await vizBtn.count()) > 0 && (await vizBtn.first().isVisible())) {
+      await vizBtn.first().click();
+      await page.waitForTimeout(300);
+
+      // Clear track (close player)
+      const closeBtn = page.locator('button[aria-label="Cerrar reproductor"]');
+      if ((await closeBtn.count()) > 0 && (await closeBtn.isVisible())) {
+        await closeBtn.click();
+        await page.waitForTimeout(500);
+
+        // Player should be hidden
+        expect(await isPlayerVisible(page)).toBeFalsy();
+      }
+    }
+  });
+
+  test("10.5 Rapid visualizer toggle ×20 — no crash", async ({ page }) => {
+    for (const track of TRACKS.slice(0, 3)) {
+      await clickPlayDetail(page, track.id);
+      await waitForPlayer(page);
+
+      // Hover to expand
+      await page.locator(".fixed.bottom-0").first().hover();
+      await page.waitForTimeout(200);
+
+      const vizBtn = page.locator('button[aria-label="Abrir visualizador"], button[aria-label="Cerrar visualizador"]').first();
+      if ((await vizBtn.count()) > 0 && (await vizBtn.isVisible())) {
+        for (let i = 0; i < 20; i++) {
+          await vizBtn.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(50);
+        }
+        // Player should still be visible
+        expect(await isPlayerVisible(page)).toBeTruthy();
+      }
+    }
+  });
+});

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 
 export function GlobalAudioPlayer() {
-  const { activeTrack, isPlaying, duration, currentTime, volume, isVisualizerOpen, togglePlay, clearTrack, seek, setVolume, toggleVisualizer, audioRef } = useAudioPlayer();
+  const { activeTrack, isPlaying, duration, currentTime, volume, isVisualizerOpen, isYouTubeMode, togglePlay, clearTrack, seek, setVolume, toggleVisualizer, audioRef } = useAudioPlayer();
   const [showVolume, setShowVolume] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -72,8 +72,17 @@ export function GlobalAudioPlayer() {
           className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 shadow-2xl safe-area-pb"
         >
           {isVisualizerOpen && (
-            <div className="w-full h-24 bg-slate-50 dark:bg-slate-800/50">
+            <div className="relative w-full h-24 bg-slate-50 dark:bg-slate-800/50">
               <AudioVisualizer />
+              <button
+                onClick={toggleVisualizer}
+                className="absolute top-2 right-2 p-1 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors z-10"
+                aria-label="Cerrar visualizador"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           )}
 
@@ -111,7 +120,14 @@ export function GlobalAudioPlayer() {
                       <img src={activeTrack.coverImage} alt={activeTrack.title} className="w-12 h-12 rounded-lg object-cover shadow-md" />
                     )}
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{activeTrack.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{activeTrack.title}</p>
+                        {isYouTubeMode && (
+                          <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded border border-red-200 dark:border-red-800">
+                            YT
+                          </span>
+                        )}
+                      </div>
                       {activeTrack.artist && (
                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{activeTrack.artist}</p>
                       )}
