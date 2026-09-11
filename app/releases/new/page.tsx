@@ -71,7 +71,7 @@ export default function NewReleasePage() {
     setTracks(newTracks);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, submitForReview = false) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
@@ -92,11 +92,13 @@ export default function NewReleasePage() {
             youtube: form.youtube_url,
             youtube_video_id: videoId,
           },
+          status: submitForReview ? "pending" : "draft",
         }),
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: "Release creado exitosamente" });
+        const msg = submitForReview ? "Release enviado para revisión" : "Release guardado como borrador";
+        setMessage({ type: "success", text: msg });
         setTimeout(() => router.push("/dashboard"), 1500);
       } else {
         setMessage({ type: "error", text: "Error al crear release" });
@@ -283,7 +285,15 @@ export default function NewReleasePage() {
                 disabled={loading}
                 className="px-6 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold transition disabled:opacity-50"
               >
-                {loading ? "Creando..." : "Crear Release"}
+                {loading ? "Guardando..." : "Guardar como borrador"}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={loading}
+                className="px-6 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold transition disabled:opacity-50"
+              >
+                {loading ? "Enviando..." : "Enviar para revisión"}
               </button>
               <button
                 type="button"

@@ -21,6 +21,7 @@ export interface AudioPlayerContextType {
   playTrack: (track: ActiveTrack) => void;
   togglePlay: () => void;
   pause: () => void;
+  clearTrack: () => void;
   seek: (time: number) => void;
   setVolume: (val: number) => void;
   toggleVisualizer: () => void;
@@ -81,6 +82,18 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  const clearTrack = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current.load();
+    }
+    setActiveTrack(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+  };
+
   const seek = (time: number) => {
     if (audioRef.current && Number.isFinite(time)) {
       audioRef.current.currentTime = time;
@@ -131,6 +144,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         playTrack,
         togglePlay,
         pause,
+        clearTrack,
         seek,
         setVolume,
         toggleVisualizer,

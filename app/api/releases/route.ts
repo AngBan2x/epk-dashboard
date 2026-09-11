@@ -98,9 +98,9 @@ export async function POST(req: NextRequest) {
     const youtubeVideoId = external_links?.youtube_video_id;
 
     await dbRun(
-      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, genre, description, duration, youtube_video_id, external_links, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", genre || "", description || "", duration || "", youtubeVideoId || "", JSON.stringify(external_links || {})]
+      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, genre, description, duration, youtube_video_id, external_links, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", genre || "", description || "", duration || "", youtubeVideoId || "", JSON.stringify(external_links || {}), "draft"]
     );
 
     // Insert tracks if provided

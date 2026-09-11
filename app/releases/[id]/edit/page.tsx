@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { extractYouTubeId, getYouTubeThumbnail, fetchYouTubeVideo } from "@/lib/youtube";
+import type { ReleaseStatus } from "@/types/music";
 
 type ReleaseType = "single" | "ep" | "album";
 
@@ -36,6 +37,7 @@ export default function EditReleasePage() {
     spotify_url: "",
     apple_music_url: "",
     youtube_url: "",
+    status: "draft" as ReleaseStatus,
   });
 
   const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "" }]);
@@ -60,6 +62,7 @@ export default function EditReleasePage() {
             spotify_url: data.external_links?.spotify || "",
             apple_music_url: data.external_links?.apple_music || "",
             youtube_url: data.external_links?.youtube || "",
+            status: data.status || "draft",
           });
           if (data.tracks) {
             setTracks(data.tracks.map((t: any) => ({
@@ -142,12 +145,13 @@ export default function EditReleasePage() {
     setTracks(newTracks);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, submitForReview = false) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
     const videoId = extractYouTubeId(form.youtube_url);
+    const status = submitForReview ? "pending" : form.status;
 
     try {
       const res = await fetch(`/api/releases?id=${releaseId}`, {
@@ -155,6 +159,7 @@ export default function EditReleasePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          status,
           artist_id: user?.id,
           tracks: tracks.filter((t) => t.title),
           external_links: {
@@ -167,11 +172,14 @@ export default function EditReleasePage() {
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: "Release actualizado exitosamente" });
+        const msg = submitForReview ? "Release enviado para revisión" : "Release actualizado exitosamente";
+        setMessage({ type: "success", text: msg });
+        window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(() => router.push("/dashboard"), 1500);
       } else {
         const error = await res.json();
         setMessage({ type: "error", text: error.error || "Error al actualizar release" });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch {
       setMessage({ type: "error", text: "Error de conexión" });
@@ -356,6 +364,31 @@ export default function EditReleasePage() {
               </div>
             </div>
 
+            {/* Status Display */}
+            {releaseData && (
+              <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado actual:</span>
+                  <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${
+                    form.status === "draft" ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300" :
+                    form.status === "pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300" :
+                    form.status === "approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" :
+                    "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                  }`}>
+                    {form.status === "draft" ? "📝 Borrador" :
+                     form.status === "pending" ? "⏳ Pendiente de revisión" :
+                     form.status === "approved" ? "✅ Aprobado" :
+                     "❌ Rechazado"}
+                  </span>
+                </div>
+                {form.status === "rejected" && releaseData.admin_notes && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                    Motivo: {releaseData.admin_notes}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Submit Buttons */}
             <div className="flex gap-4 pt-4">
               <button
@@ -365,6 +398,16 @@ export default function EditReleasePage() {
               >
                 {loading ? "Guardando..." : "Guardar Cambios"}
               </button>
+              {(form.status === "draft" || form.status === "rejected") && (
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e, true)}
+                  disabled={loading}
+                  className="flex-1 px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Enviando..." : "Enviar para revisión"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => router.push("/dashboard")}

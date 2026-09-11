@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { safeString, capitalizeReleaseType } from "@/lib/null-safe";
-import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
+import type { Track, ArtistProfile, Show, ShowStatus, ReleaseStatus } from "@/types/music";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +17,21 @@ interface AdminTrack {
   spotify_url: string | null;
   youtube_video_id: string | null;
   lyrics: string | null;
+}
+
+interface Release {
+  id: string;
+  title: string;
+  artist_name: string;
+  release_type: string;
+  release_date: string;
+  cover_image: string;
+  genre: string | null;
+  description: string | null;
+  status: ReleaseStatus;
+  created_at: string;
+  updated_at: string;
+  artist_slug: string | null;
 }
 
 interface Submission {
@@ -60,11 +75,14 @@ interface Notification {
   created_at: string;
 }
 
+type AdminTab = "tracks" | "releases" | "submissions" | "notifications" | "artists" | "shows";
+
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"tracks" | "submissions" | "notifications" | "artists" | "shows">("tracks");
+  const [activeTab, setActiveTab] = useState<AdminTab>("tracks");
   const [tracks, setTracks] = useState<AdminTrack[]>([]);
+  const [releases, setReleases] = useState<Release[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
@@ -94,6 +112,9 @@ export default function AdminPage() {
   });
   const [loading, setLoading] = useState(true);
   const [editingTrack, setEditingTrack] = useState<AdminTrack | null>(null);
+  const [releasesLoading, setReleasesLoading] = useState(false);
+  const [releasesPage, setReleasesPage] = useState(1);
+  const [releasesStatusFilter, setReleasesStatusFilter] = useState<ReleaseStatus | "all">("all");
   //
   const [viewingSubmission, setViewingSubmission] = useState<Submission | null>(null);
   const [formData, setFormData] = useState({
@@ -120,6 +141,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchTracks();
+    fetchReleases();
     fetchSubmissions();
     fetchNotifications();
     fetchArtists();
@@ -200,6 +222,28 @@ export default function AdminPage() {
       }
     } catch {
       console.error("Error fetching shows");
+    }
+  };
+
+  const fetchReleases = async () => {
+    setReleasesLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: releasesPage.toString(),
+        limit: "20",
+      });
+      if (releasesStatusFilter !== "all") {
+        params.append("status", releasesStatusFilter);
+      }
+      const res = await fetch(`/api/admin/releases?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReleases(data.releases || []);
+      }
+    } catch {
+      console.error("Error fetching releases");
+    } finally {
+      setReleasesLoading(false);
     }
   };
 
@@ -285,6 +329,31 @@ export default function AdminPage() {
     }
   };
 
+  const handleReleaseAction = async (releaseId: string, status: ReleaseStatus, notes?: string) => {
+    setActionLoading(releaseId);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/admin/releases", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: releaseId, status, admin_notes: notes }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: `Release ${status === "approved" ? "aprobado" : status === "rejected" ? "rechazado" : "actualizado"}` });
+        fetchReleases();
+      } else {
+        const error = await res.json();
+        setMessage({ type: "error", text: error.error || "Error al actualizar" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Error de conexión" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const parseTrackData = (trackData: string): SubmissionTrackData => {
     try {
       return JSON.parse(trackData);
@@ -311,6 +380,20 @@ export default function AdminPage() {
     rejected: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
   };
 
+  const releaseStatusColors: Record<ReleaseStatus, string> = {
+    draft: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600",
+    pending: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
+    approved: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
+    rejected: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
+  };
+
+  const releaseStatusLabels: Record<ReleaseStatus, string> = {
+    draft: "📝 Borrador",
+    pending: "⏳ Pendiente",
+    approved: "✅ Aprobado",
+    rejected: "❌ Rechazado",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <main className="max-w-6xl mx-auto px-4 py-8">
@@ -327,7 +410,7 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="mb-6 border-b border-slate-200 dark:border-slate-700">
-          <nav className="flex gap-4" aria-label="Admin tabs">
+          <nav className="flex flex-wrap gap-4" aria-label="Admin tabs">
             <button
               onClick={() => setActiveTab("tracks")}
               className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
@@ -337,6 +420,16 @@ export default function AdminPage() {
               }`}
             >
               Tracks ({tracks.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("releases")}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
+                activeTab === "releases"
+                  ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border-b-2 border-amber-600"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+            >
+              Releases ({releases.length})
             </button>
             <button
               onClick={() => setActiveTab("submissions")}
@@ -571,6 +664,127 @@ export default function AdminPage() {
                             >
                               🗑️ Eliminar
                             </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Releases Table */}
+        {activeTab === "releases" && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h2 className="font-semibold text-slate-900 dark:text-slate-100">
+                Releases ({releases.length})
+              </h2>
+              <div className="flex gap-2">
+                <select
+                  value={releasesStatusFilter}
+                  onChange={(e) => {
+                    setReleasesStatusFilter(e.target.value as ReleaseStatus | "all");
+                    setReleasesPage(1);
+                    fetchReleases();
+                  }}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                >
+                  <option value="all">Todos los estados</option>
+                  <option value="draft">Borrador</option>
+                  <option value="pending">Pendiente</option>
+                  <option value="approved">Aprobado</option>
+                  <option value="rejected">Rechazado</option>
+                </select>
+              </div>
+            </div>
+
+            {releasesLoading ? (
+              <div className="p-8 text-center text-slate-400">Cargando releases...</div>
+            ) : releases.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <p>No hay releases.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800">
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Título</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Artista</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Tipo</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Fecha</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Estado</th>
+                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Creado</th>
+                      <th className="text-right p-3 font-semibold text-slate-700 dark:text-slate-300">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {releases.map((release) => (
+                      <tr key={release.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                        <td className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
+                              {release.cover_image ? (
+                                <img src={release.cover_image} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
+                              )}
+                            </div>
+                            <span className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
+                              {safeString(release.title)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{safeString(release.artist_name)}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{capitalizeReleaseType(release.release_type)}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{release.release_date}</td>
+                        <td className="p-3">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${releaseStatusColors[release.status]}`}>
+                            {releaseStatusLabels[release.status]}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400 text-xs">
+                          {new Date(release.created_at).toLocaleDateString("es-ES")}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {(release.status === "pending" || release.status === "draft") && (
+                              <>
+                                <button
+                                  onClick={() => handleReleaseAction(release.id, "approved")}
+                                  disabled={actionLoading === release.id}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950 transition disabled:opacity-50"
+                                >
+                                  ✅ Aprobar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const notes = prompt("Notas de rechazo (requerido):");
+                                    if (notes !== null && notes.trim().length >= 20) {
+                                      handleReleaseAction(release.id, "rejected", notes);
+                                    } else if (notes !== null) {
+                                      alert("Las notas de rechazo deben tener al menos 20 caracteres");
+                                    }
+                                  }}
+                                  disabled={actionLoading === release.id}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition disabled:opacity-50"
+                                >
+                                  ❌ Rechazar
+                                </button>
+                              </>
+                            )}
+                            {release.status === "rejected" && (
+                              <button
+                                onClick={() => handleReleaseAction(release.id, "draft")}
+                                disabled={actionLoading === release.id}
+                                className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition disabled:opacity-50"
+                              >
+                                🔄 Resetear a borrador
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

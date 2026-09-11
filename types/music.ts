@@ -16,6 +16,13 @@ export interface ProductionDetails {
   effects_chain: string | null;
   tuning: string | null;
   key: string | null;
+  // Extended fields (Ficha de Producción)
+  genre?: string | null;
+  sub_genre?: string | null;
+  bpm?: number | null;
+  mood?: string | null;
+  recording_date?: string | null;
+  production_credits?: string | null;
 }
 
 export interface StemsUrls {
@@ -40,6 +47,8 @@ export interface Track {
   metrics: Metrics;
   production_details: ProductionDetails;
   lyrics: string | null;
+  // Release approval workflow
+  status?: ReleaseStatus;
   // Campos multimedia F8
   itunes_track_id?: string | null;
   stems_urls?: StemsUrls | null;
@@ -52,6 +61,10 @@ export interface Track {
   sides_b?: string[] | null;
   isrc?: string | null;
   composers?: string[] | null;
+  // Streams counter (incremented on play)
+  streams?: number;
+  // Lyrics metadata
+  is_instrumental?: boolean;
 }
 
 export interface ExternalLinks {
@@ -92,6 +105,8 @@ export interface RawTrackRow {
   metrics: string | null;
   production_details: string | null;
   lyrics: string | null;
+  // Release approval workflow
+  status?: string | null;
   // Campos multimedia F8
   itunes_track_id?: string | null;
   stems_urls?: string | null;
@@ -104,6 +119,7 @@ export interface RawTrackRow {
   sides_b?: string | null;
   isrc?: string | null;
   composers?: string | null;
+  is_instrumental?: number | null;
 }
 
 export interface SyncResult {
@@ -152,6 +168,8 @@ export interface RawUserRow {
 export type SubmissionStatus = "pending" | "approved" | "rejected" | "revision";
 
 export type SubmissionType = "track" | "release" | "show";
+
+export type ReleaseStatus = "draft" | "pending" | "approved" | "rejected";
 
 export interface TrackSubmission {
   id: string;
