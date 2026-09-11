@@ -2756,3 +2756,164 @@ Usuario pega imagen → plugin detecta → guarda archivo → notifica agente �
 ### Deploy
 - **Commit:** `18ad619` (EPKCard fix se incluye en deploy pendiente)
 - **Producción:** https://epk-dashboard.vercel.app
+
+---
+
+## Sesión: 19-Issue Comprehensive Fix + Stress Test Verification
+
+**Fecha:** 2026-09-11
+**Modelo Principal:** MiMo V2.5 Free (opencode) + 6 subagentes paralelos
+**Objetivo:** Resolver 19 issues reportados tras testing manual: bugs, diseño, features nuevas
+
+### Contexto
+
+Tras el deployment de la fase P3 (Artist Self-Management) y la suite de stress tests (31/31), se realizó testing manual completo del producto. Se reportaron 19 issues que abarcaban bugs críticos, problemas de diseño, y features faltantes.
+
+### Estrategia de Ejecución
+
+Se organizó el trabajo en 6 fases (A–F) ejecutadas de forma secuencial con subagentes paralelos cuando fue posible:
+
+| Fase | Descripción | Método | Estado |
+|------|-------------|--------|--------|
+| A | Quick fixes (6 issues) | Directo | ✅ |
+| B | Audio Player (5 issues) | Directo | ✅ |
+| C | Rediseño UI (2 issues) | Subagentes paralelos | ✅ |
+| D | Features (5 issues) | Subagentes paralelos | ✅ |
+| E | Build + Deploy | Bash | ✅ |
+| F | Stress Tests Playwright | Bash | ✅ 31/31 |
+
+### Fase A: Quick Fixes (Directo)
+
+| # | Issue | Cambio | Archivos |
+|---|-------|--------|----------|
+| A1 | Eliminar StemsPlayer (issue 10) | Import + uso eliminados de track page | `app/track/[id]/page.tsx` |
+| A2 | Eliminar SocialBar (issue 13) | Import + uso eliminados, redundante con External Links | `app/track/[id]/page.tsx` |
+| A3 | Eliminar shuffle emoji (issue 3) | Botón 🔀 + dropdown eliminados del AudioPlayer | `components/AudioPlayer.tsx` |
+| A4 | Títulos de sección (issue 8) | VideoShowcase: "Videoclip Oficial", ImageGallery: "Galería de Prensa" | `app/track/[id]/page.tsx` |
+| A5 | Cover "Se Va" (issue 4) | `getCoverImage` ahora maneja empty strings | `lib/null-safe.ts` |
+| A6 | Auto-scroll releases (issue 18) | `window.scrollTo({top:0})` tras save/error | `app/releases/[id]/edit/page.tsx` |
+
+### Fase B: Audio Player (Directo)
+
+| # | Issue | Cambio | Archivos |
+|---|-------|--------|----------|
+| B1 | Close button real (issue 14) | `clearTrack()` en context: pause + clear src + reset state | `context/AudioPlayerContext.tsx`, `components/GlobalAudioPlayer.tsx` |
+| B2 | Framer Motion animations (issue 12) | `AnimatePresence` + `motion.div` en GlobalAudioPlayer, volume slider | `components/GlobalAudioPlayer.tsx` |
+| B3 | Visualizer crash fix (issue 9) | Try/catch en `createAudioVisualizer`, fallback a synthetic frequencies | `components/AudioVisualizer.tsx` |
+| B4 | Source selector inteligente (issue 2) | Dropdown solo aparece cuando hay preview sources | `components/AudioPlayer.tsx` |
+| B5 | YouTube-only button (issue 6) | Botón "Ver en YouTube" con icono when only YouTube source | `components/AudioPlayer.tsx` |
+
+### Fase C: Rediseño UI (Subagentes)
+
+**Subagente: `artist-dashboard-builder`** → Track page redesign
+- Layout responsive: `grid-cols-1 lg:grid-cols-3` (hero + 2-column)
+- Hero section unificada (cover + title + player)
+- Animaciones staggered con `SlideIn`
+- Bottom padding `pb-32` para global player
+- External links interactivos con hover backgrounds
+- Navegación prev/next con animaciones
+
+**Subagente: `epk-card-builder`** → EPK cards fix
+- Altura consistente: `h-full flex flex-col` + `mt-auto` en footer
+- Metadata completa: tipo, duración, fecha, ISRC con iconos
+- Like count con heart icon (fetch en tiempo real)
+- Cover fallback chain: upload > YouTube > placeholder
+- Grid responsive: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`
+
+### Fase D: Features (Subagentes)
+
+**Subagente: `api-builder`** → Stream counting
+- Nuevo endpoint: `POST /api/tracks/[id]/streams`
+- `incrementTrackStreams()` en `lib/db.ts` (COALESCE para NULL safety)
+- Debounce: `Set<string>` a nivel de módulo, 1 conteo por sesión por track
+- AudioPlayer llama al API en primer play
+
+**Subagente: `show-form-builder`** → Lyrics section
+- Nuevo componente: `LyricsSection.tsx` + `LyricsSectionWrapper.tsx`
+- Colapsable con toggle, preview de 120 chars
+- Badge "Instrumental" cuando `is_instrumental = true`
+- Editable solo para owner (via auth cookie)
+- PATCH endpoint: `app/api/tracks/[id]/route.ts`
+- Campo `is_instrumental` agregado a Track type + schema
+
+**Subagente: `general`** → Downloads per-artist
+- DownloadCenter acepta `artistName` prop
+- Filenames: `PressPlay_Dossier_{ArtistName}.html`
+
+**Subagente: `show-form-builder`** → Production sheet editable
+- Renombrado a "Ficha de Producción"
+- Colapsable con toggle + resumen
+- Edit mode con inputs para género, BPM, key, mood, fecha, créditos
+- `ProductionDetailsWrapper.tsx` para auth + state
+
+**Subagente: `approval-workflow-builder`** → Release approval
+- Campo `status`: draft | pending | approved | rejected
+- Admin panel: tabla de releases con filtros por estado
+- Botones: Aprobar, Rechazar (requiere razón 20+ chars), Resetear
+- Artista: "Enviar para revisión" en new/edit
+- Notificaciones automáticas al approve/reject
+
+### Fase E: Deploy
+
+- **Commits:** `a5be80a` (19-issue fix), `f1ba53c` (test fixes)
+- **Push:** `git push origin main`
+- **Vercel:** Auto-deploy desde main (pendiente re-auth CLI para deploy manual)
+
+### Fase F: Stress Tests — Resultado Final
+
+| Suite | Tests | Estado |
+|-------|-------|--------|
+| Suite 1: Playback Básico | 7 | ✅ 7/7 |
+| Suite 2: Multi-Source Selector | 4 | ✅ 4/4 |
+| Suite 3: Navegación + Persistencia | 3 | ✅ 3/3 |
+| Suite 4: Global Player Comportamiento | 4 | ✅ 4/4 |
+| Suite 5: Visualizer Estrés | 4 | ✅ 4/4 |
+| Suite 6: Edge Cases / Estrés | 5 | ✅ 5/5 |
+| Suite 7: Dark Mode | 2 | ✅ 2/2 |
+| Suite 8: Responsive / Mobile | 2 | ✅ 2/2 |
+| **TOTAL** | **31** | **✅ 31/31 PASSED** |
+
+**Visualizer toggle verification (issue 9):** Tests 5.1–5.4 verifican:
+- Abrir visualizer durante reproducción
+- Toggle rápido ×10 sin crash
+- Abrir antes de play, play, cerrar durante
+- Cambio de track con visualizer abierto
+**Resultado: TODOS PASAN** — el fix de try/catch + fallback synthetic funciona correctamente.
+
+### Quality Gates Final
+
+```
+TypeScript: 0 errores ✅
+Unit Tests: 41/41 passing ✅
+Playwright: 31/31 passing (chromium desktop) ✅
+Build: Compiled successfully ✅ (linting timeout known issue)
+```
+
+### Archivos Modificados (24 archivos, 1745+ líneas)
+
+| Archivo | Cambio Principal |
+|---------|-----------------|
+| `app/track/[id]/page.tsx` | Rediseño completo: layout 2-column, hero, animaciones |
+| `components/AudioPlayer.tsx` | Shuffle emoji, source selector, YouTube button, streams API |
+| `components/GlobalAudioPlayer.tsx` | Framer Motion, clearTrack, auto-hide, collapsed view |
+| `components/AudioVisualizer.tsx` | Crash fix: try/catch + safety guard |
+| `components/EPKCard.tsx` | Altura consistente, metadata, likes, cover fallback |
+| `components/DownloadCenter.tsx` | Artist name en filenames |
+| `components/LyricsSection.tsx` | **NUEVO** — letra colapsable + editable |
+| `components/LyricsSectionWrapper.tsx` | **NUEVO** — wrapper con auth |
+| `components/ProductionDetails.tsx` | Editable + colapsable + "Ficha de Producción" |
+| `components/ProductionDetailsWrapper.tsx` | **NUEVO** — wrapper con auth |
+| `context/AudioPlayerContext.tsx` | `clearTrack()` method |
+| `types/music.ts` | `is_instrumental`, `streams`, `status` fields |
+| `lib/db.ts` | `incrementTrackStreams()`, `is_instrumental` in parse/create/update |
+| `lib/turso.ts` | Schema: `streams`, `is_instrumental`, `status` columns |
+| `lib/null-safe.ts` | Empty string handling en `getCoverImage` |
+| `app/api/tracks/[id]/route.ts` | **NUEVO** — PATCH para lyrics + production details |
+| `app/api/tracks/[id]/streams/route.ts` | **NUEVO** — POST stream counter |
+| `app/api/admin/releases/route.ts` | **NUEVO** — GET/PUT admin releases |
+| `app/admin/page.tsx` | Releases tab + approval workflow |
+| `app/releases/new/page.tsx` | "Enviar para revisión" button |
+| `app/releases/[id]/edit/page.tsx` | Status badge + submit for review + auto-scroll |
+| `tests/e2e/audio-player-stress.spec.ts` | Selectors actualizados + auto-hide test |
+| `context/AudioPlayerContext.tsx` | `clearTrack()` + is_instrumental support |
+| `lib/audio-priority.ts` | `external_links` acepta null |
