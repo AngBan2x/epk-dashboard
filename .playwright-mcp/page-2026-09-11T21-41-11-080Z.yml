@@ -1,0 +1,220 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "PressPlay PressPlay" [ref=e4] [cursor=pointer]:
+        - /url: /dashboard
+        - img "PressPlay" [ref=e5]
+        - generic [ref=e6]: PressPlay
+      - navigation [ref=e7]:
+        - link "Dashboard" [ref=e8] [cursor=pointer]:
+          - /url: /dashboard
+        - button "Iniciar Sesión" [ref=e10] [cursor=pointer]
+  - generic [ref=e12]:
+    - navigation "Breadcrumb" [ref=e14]:
+      - generic [ref=e15]:
+        - link "Dashboard" [ref=e16] [cursor=pointer]:
+          - /url: /dashboard
+        - generic [ref=e19]: /
+        - generic [ref=e20]: Bohemian Rhapsody
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - img "Bohemian Rhapsody" [ref=e27]
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - generic [ref=e31]: Single
+              - generic [ref=e32]: 05:55
+            - heading "Bohemian Rhapsody" [level=1] [ref=e33]
+            - paragraph [ref=e34]: Queen
+            - paragraph [ref=e35]: 1975-10-31 · 0 streams
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - generic [ref=e39]: "Fuente:"
+              - combobox [ref=e40]:
+                - option "Preview (30s)" [selected]
+                - option "Spotify"
+                - option "YouTube"
+            - generic [ref=e41]:
+              - button "Reproducir" [ref=e42] [cursor=pointer]: ▶
+              - paragraph [ref=e45]: Reproducir
+      - generic [ref=e47]:
+        - generic [ref=e48]:
+          - paragraph [ref=e49]: "0"
+          - paragraph [ref=e50]: Streams
+        - generic [ref=e51]:
+          - paragraph [ref=e52]: "195.000"
+          - paragraph [ref=e53]: Saves
+        - generic [ref=e54]:
+          - paragraph [ref=e55]: "64.000"
+          - paragraph [ref=e56]: Playlists
+    - generic [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - heading "📝 Biografía & Prensa" [level=2] [ref=e65]:
+                - generic [ref=e66]: 📝
+                - text: Biografía & Prensa
+              - paragraph [ref=e67]: Historia del artista y material de prensa oficial
+            - button "🖨️ Imprimir Hoja de Prensa" [ref=e68] [cursor=pointer]
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - paragraph [ref=e71]: Artista
+              - paragraph [ref=e72]: Queen
+            - generic [ref=e73]:
+              - paragraph [ref=e74]: Género
+              - paragraph [ref=e75]: Rock / Pop Rock / Opera Rock
+            - generic [ref=e76]:
+              - paragraph [ref=e77]: Ubicación
+              - paragraph [ref=e78]: Londres, Reino Unido
+            - generic [ref=e79]:
+              - paragraph [ref=e80]: Oyentes Mensuales
+              - paragraph [ref=e81]: 45.000.000
+          - paragraph [ref=e83]: Queen es una banda británica de rock formada en Londres en 1970. Con Freddie Mercury como vocalista, Brian May en guitarra, Roger Taylor en batería y John Deacon en bajo, la banda se convirtió en una de las más influyentes e innovadoras de la historia del rock. Su sonido fusionaba rock, ópera, music hall y pop, creando himnos atemporales como 'Bohemian Rhapsody', 'We Will Rock You' y 'Don't Stop Me Now'.
+          - generic [ref=e84]:
+            - button "Leer más →" [ref=e85] [cursor=pointer]
+            - button "🖨️ Imprimir Hoja de Prensa" [ref=e86] [cursor=pointer]
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - heading "🎵 Letra" [level=2] [ref=e91]:
+              - generic [ref=e92]: 🎵
+              - text: Letra
+            - button "Expandir" [ref=e94] [cursor=pointer]
+          - paragraph [ref=e97]: "Preview: Is this the real life? Is this just fantasy? Caught in a landslide, no escape from reality... [Coro] Mama, just killed a..."
+        - generic [ref=e100]:
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - heading "🎬 Videoclip Oficial" [level=2] [ref=e103]:
+                - generic [ref=e104]: 🎬
+                - text: Videoclip Oficial
+              - paragraph [ref=e105]: Material audiovisual oficial en alta definición
+            - generic [ref=e106]: Video Disponible
+          - generic [ref=e107] [cursor=pointer]:
+            - img "Videoclip Oficial" [ref=e108]
+            - generic [ref=e113]:
+              - generic [ref=e114]: Videoclip Oficial
+              - generic [ref=e115]: HD 1080p
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - generic [ref=e120]:
+              - heading "Galería de Prensa" [level=2] [ref=e121]
+              - paragraph [ref=e122]: Recursos gráficos en alta resolución para prensa y promotores
+            - generic [ref=e123]: 3 Assets HD
+          - generic [ref=e124]:
+            - generic [ref=e125] [cursor=pointer]:
+              - img "Estudio de Grabación" [ref=e126]
+              - generic [ref=e127]:
+                - generic [ref=e128]: Estudio
+                - paragraph [ref=e129]: Estudio de Grabación
+            - generic [ref=e130] [cursor=pointer]:
+              - img "Concierto en Vivo" [ref=e131]
+              - generic [ref=e132]:
+                - generic [ref=e133]: En Vivo
+                - paragraph [ref=e134]: Concierto en Vivo
+            - generic [ref=e135] [cursor=pointer]:
+              - img "Presentación Escénica" [ref=e136]
+              - generic [ref=e137]:
+                - generic [ref=e138]: En Vivo
+                - paragraph [ref=e139]: Presentación Escénica
+      - generic [ref=e140]:
+        - generic [ref=e142]:
+          - heading "Enlaces Externos" [level=3] [ref=e143]
+          - generic [ref=e144]:
+            - link "Escuchar en Spotify" [ref=e145] [cursor=pointer]:
+              - /url: https://open.spotify.com/track/7tFiyTwD0nx5a1eklYtX2J
+            - link "Ver en YouTube" [ref=e148] [cursor=pointer]:
+              - /url: https://www.youtube.com/watch?v=fJ9rUzIMcZQ
+            - link "Escuchar en Apple Music" [ref=e151] [cursor=pointer]:
+              - /url: https://music.apple.com/us/album/158672215
+        - generic [ref=e156]:
+          - generic [ref=e157]:
+            - heading "Ficha de Producción" [level=3] [ref=e159]
+            - button "Colapsar" [ref=e160] [cursor=pointer]
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - term [ref=e165]: DAW
+              - definition [ref=e166]: EMI Studios (16-track tape)
+            - generic [ref=e167]:
+              - term [ref=e168]: Guitarras
+              - definition [ref=e169]: Brian May Red Special
+            - generic [ref=e170]:
+              - term [ref=e171]: Efectos
+              - definition [ref=e172]: Deacy Amp + AC30 + Univibe
+            - generic [ref=e173]:
+              - term [ref=e174]: Afinación
+              - definition [ref=e175]: Standard E
+            - generic [ref=e176]:
+              - term [ref=e177]: Género
+              - definition [ref=e178]: —
+            - generic [ref=e179]:
+              - term [ref=e180]: Sub-género
+              - definition [ref=e181]: —
+            - generic [ref=e182]:
+              - term [ref=e183]: BPM
+              - definition [ref=e184]: —
+            - generic [ref=e185]:
+              - term [ref=e186]: Tonalidad
+              - definition [ref=e187]: B♭ Major / Multiple Modulations
+            - generic [ref=e188]:
+              - term [ref=e189]: Mood
+              - definition [ref=e190]: —
+            - generic [ref=e191]:
+              - term [ref=e192]: Fecha de grabación
+              - definition [ref=e193]: —
+        - generic [ref=e196]:
+          - generic [ref=e197]:
+            - generic [ref=e198]:
+              - heading "Centro de Descargas & Assets" [level=2] [ref=e199]
+              - paragraph [ref=e200]: Documentación técnica y paquetes de medios para festivales, venues y prensa
+            - generic [ref=e201]: Disponibles para Prensa
+          - generic [ref=e202]:
+            - generic [ref=e203]:
+              - generic [ref=e204]: HTML
+              - generic:
+                - paragraph: Rider Técnico & Stage Plot - Queen 2026
+                - generic:
+                  - generic [ref=e205]: Tech Rider
+                  - generic [ref=e206]: ·
+                  - generic [ref=e207]: ~15 KB
+              - button "Descargar Rider Técnico & Stage Plot - Queen 2026" [ref=e208] [cursor=pointer]: 📥 Descargar
+            - generic [ref=e209]:
+              - generic [ref=e210]: HTML
+              - generic:
+                - paragraph: Dossier de Prensa & Biografía Oficial
+                - generic:
+                  - generic [ref=e211]: Ficha EPK
+                  - generic [ref=e212]: ·
+                  - generic [ref=e213]: ~12 KB
+              - button "Descargar Dossier de Prensa & Biografía Oficial" [ref=e214] [cursor=pointer]: 📥 Descargar
+    - navigation "Navegacion de tracks" [ref=e216]:
+      - generic [ref=e217]:
+        - generic [ref=e218]: Ficha de Producción
+        - link "Smells Like Teen Spirit" [ref=e219] [cursor=pointer]:
+          - /url: /track/trk-002
+  - contentinfo [ref=e223]:
+    - generic [ref=e224]:
+      - generic [ref=e225]:
+        - generic [ref=e226]:
+          - generic [ref=e227]:
+            - img "PressPlay" [ref=e228]
+            - generic [ref=e229]: PressPlay
+          - paragraph [ref=e230]: Donde la música se presenta. Comparte tu música, conecta con tu audiencia.
+        - generic [ref=e231]:
+          - heading "Plataforma" [level=4] [ref=e232]
+          - list [ref=e233]:
+            - listitem [ref=e234]:
+              - link "Catálogo de Tracks" [ref=e235] [cursor=pointer]:
+                - /url: /dashboard
+        - generic [ref=e236]:
+          - heading "Síguenos" [level=4] [ref=e237]
+          - generic [ref=e238]:
+            - link "Instagram" [ref=e239] [cursor=pointer]:
+              - /url: https://instagram.com
+            - link "X (Twitter)" [ref=e242] [cursor=pointer]:
+              - /url: https://x.com
+      - generic [ref=e245]:
+        - paragraph [ref=e246]: © 2026 PressPlay. Todos los derechos reservados.
+        - paragraph [ref=e247]:
+          - text: Hecho con
+          - generic [ref=e248]: ♥
+          - text: para artistas musicales
