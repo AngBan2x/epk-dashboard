@@ -3013,3 +3013,54 @@ Build: Compiled successfully ✅ (linting timeout known issue)
 
 ### Commits
 - `feat: v4.0.0-beta.1 — critical fixes + YouTube API + visualizer + tests`
+- `fix: handle audio_preview_url '—' as empty for YouTube-only tracks`
+- `fix: Download Center layout compact for sidebar`
+
+---
+
+## Sesión: E2E Test Fixes — YouTube-Only Track Compatibility
+
+**Fecha:** 2026-09-12
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Fix
+
+### Contexto
+Los E2E tests fallaban para tracks YouTube-only (Se Va, The Rain) porque:
+1. Estos tracks ahora muestran YouTube iframe en vez de global player
+2. Tests esperaban select dropdown / pause button que no existe para YouTube-only
+
+### Fixes Aplicados
+
+#### Test data update
+- **Archivo:** `tests/e2e/audio-player-stress.spec.ts:5-14`
+- Agregado campo `youtubeOnly: boolean` al array TRACKS
+- Se Va y The Rain marcados como `youtubeOnly: true, sources: 0`
+
+#### Test 1.2 — Play en track detail
+- YouTube-only: verifica YouTube iframe o link "Ver en YouTube"
+- Normal: verifica button pause como antes
+
+#### Test 1.3 — Pausa
+- YouTube-only: skipped (no global player pause available)
+
+#### Test 1.7 — Info del track en player
+- YouTube-only: verifica YouTube embed o "Ver en YouTube"
+- Normal: verifica player text
+
+#### Test 2.1 — Dropdown visible
+- YouTube-only: skipped (no dropdown for YouTube-only tracks)
+
+#### Test 10.4 — Visualizer + clearTrack auto close
+- Fix: cierra visualizer primero antes de cerrar player (el visualizer overlay bloqueaba el botón)
+
+### Verificación Final
+
+| Quality Gate | Resultado |
+|--------------|-----------|
+| TypeScript | ✅ 0 errores |
+| Unit tests | ✅ 61/61 passing |
+| E2E tests | ✅ 39/39 passing (9.3m) |
+| Deploy Vercel | ✅ Exitoso |
+
+### Commits
+- `fix: E2E tests — YouTube-only track compatibility`
