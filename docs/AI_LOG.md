@@ -3064,3 +3064,46 @@ Los E2E tests fallaban para tracks YouTube-only (Se Va, The Rain) porque:
 
 ### Commits
 - `fix: E2E tests — YouTube-only track compatibility`
+
+---
+
+## Sesión: CORS Fix — Real Audio Frequency Data for Visualizer
+
+**Fecha:** 2026-09-12
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Fix
+
+### Problema
+El visualizer mostraba animación sintética (`generateSyntheticFrequencies()`) en vez de datos reales de frecuencia FFT del audio. Razón: el `<audio>` element no tenía `crossOrigin="anonymous"`, entonces el browser no enviaba CORS headers y `createMediaElementSource()` fallaba silenciosamente.
+
+### Verificación CORS
+Se verificó que iTunes CDN (`audio-ssl.itunes.apple.com`) sí soporta CORS:
+```
+access-control-allow-origin: *
+access-control-allow-methods: HEAD, GET, PUT
+access-control-allow-headers: range
+```
+
+### Fix
+- **Archivo:** `context/AudioPlayerContext.tsx:275`
+- **Cambio:** Agregado `crossOrigin="anonymous"` al elemento `<audio>`
+- **Efecto:** Browser envía CORS headers → `createMediaElementSource()` conecta al `AnalyserNode` → `getFrequencyData()` retorna datos FFT reales → visualizer muestra barras que reaccionan al audio real
+
+### Cadena técnica
+```
+HTMLAudioElement (crossOrigin="anonymous")
+  → createMediaElementSource()
+    → AnalyserNode (FFT 64 bins)
+      → getByteFrequencyData()
+        → 48 barras de visualizer con datos reales
+```
+
+### Verificación
+
+| Quality Gate | Resultado |
+|--------------|-----------|
+| TypeScript | ✅ 0 errores |
+| E2E tests | ✅ 39/39 passing (10.4m) |
+
+### Commits
+- `fix: CORS — real audio frequency data for visualizer`
