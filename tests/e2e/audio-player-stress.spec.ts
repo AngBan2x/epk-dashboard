@@ -3,14 +3,14 @@ import { test, expect, type Page } from "@playwright/test";
 const BASE_URL = "https://epk-dashboard.vercel.app";
 
 const TRACKS = [
-  { id: "trk-001", title: "Bohemian Rhapsody", sources: 3 },
-  { id: "trk-002", title: "Smells Like Teen Spirit", sources: 3 },
-  { id: "trk-003", title: "Blinding Lights", sources: 3 },
-  { id: "trk-004", title: "Hotel California", sources: 3 },
-  { id: "trk-005", title: "Shape of You", sources: 3 },
-  { id: "trk-006", title: "Running Up That Hill", sources: 3 },
-  { id: "7c922875-54c5-4670-8940-98b07403f691", title: "Se Va", sources: 2 },
-  { id: "fa5b4397-c50e-4ae5-9b65-0ebdd6b1b898", title: "The Rain", sources: 2 },
+  { id: "trk-001", title: "Bohemian Rhapsody", sources: 3, youtubeOnly: false },
+  { id: "trk-002", title: "Smells Like Teen Spirit", sources: 3, youtubeOnly: false },
+  { id: "trk-003", title: "Blinding Lights", sources: 3, youtubeOnly: false },
+  { id: "trk-004", title: "Hotel California", sources: 3, youtubeOnly: false },
+  { id: "trk-005", title: "Shape of You", sources: 3, youtubeOnly: false },
+  { id: "trk-006", title: "Running Up That Hill", sources: 3, youtubeOnly: false },
+  { id: "7c922875-54c5-4670-8940-98b07403f691", title: "Se Va", sources: 0, youtubeOnly: true },
+  { id: "fa5b4397-c50e-4ae5-9b65-0ebdd6b1b898", title: "The Rain", sources: 0, youtubeOnly: true },
 ];
 
 async function waitForPlayer(page: Page, timeout = 15000) {
@@ -67,13 +67,20 @@ test.describe("Suite 1: Playback Básico", () => {
   test("1.2 Play en track detail — todos los tracks", async ({ page }) => {
     for (const track of TRACKS) {
       await clickPlayDetail(page, track.id);
-      const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
-      await expect(pauseBtn).toBeVisible({ timeout: 5000 });
+      if (track.youtubeOnly) {
+        // YouTube-only: verify YouTube iframe or "Ver en YouTube" is visible
+        const ytFrame = page.locator('iframe[src*="youtube.com/embed"], a[href*="youtube.com/watch"]');
+        await expect(ytFrame.first()).toBeVisible({ timeout: 5000 });
+      } else {
+        const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
+        await expect(pauseBtn).toBeVisible({ timeout: 5000 });
+      }
     }
   });
 
   test("1.3 Pausa — todos los tracks", async ({ page }) => {
     for (const track of TRACKS) {
+      if (track.youtubeOnly) continue; // YouTube-only: no global player pause
       await clickPlayDetail(page, track.id);
       const pauseBtn = page.locator('button[aria-label="Pausar"]').first();
       await pauseBtn.waitFor({ state: "visible", timeout: 5000 });
@@ -128,9 +135,15 @@ test.describe("Suite 1: Playback Básico", () => {
   test("1.7 Info del track en player — todos los tracks", async ({ page }) => {
     for (const track of TRACKS) {
       await clickPlayDetail(page, track.id);
-      await waitForPlayer(page);
-      const playerText = await page.locator(".fixed.bottom-0").first().innerText();
-      expect(playerText.length).toBeGreaterThan(0);
+      if (track.youtubeOnly) {
+        // YouTube-only: verify YouTube embed or "Ver en YouTube" visible
+        const ytVisible = page.locator('iframe[src*="youtube.com/embed"], a:has-text("Ver en YouTube")').first();
+        await expect(ytVisible).toBeVisible({ timeout: 5000 });
+      } else {
+        await waitForPlayer(page);
+        const playerText = await page.locator(".fixed.bottom-0").first().innerText();
+        expect(playerText.length).toBeGreaterThan(0);
+      }
     }
   });
 });
@@ -142,6 +155,7 @@ test.describe("Suite 1: Playback Básico", () => {
 test.describe("Suite 2: Multi-Source Selector", () => {
   test("2.1 Dropdown visible + opciones — todos los tracks", async ({ page }) => {
     for (const track of TRACKS) {
+      if (track.youtubeOnly) continue; // YouTube-only: no dropdown
       await clickPlayDetail(page, track.id);
       const select = page.locator("select").first();
       if (track.sources > 1) {
@@ -694,9 +708,20 @@ test.describe("Suite 10: Visualizer Lifecycle", () => {
       await vizBtn.first().click();
       await page.waitForTimeout(300);
 
-      // Clear track (close player)
+      // Verify visualizer canvas is visible
+      const canvas = page.locator(".fixed.bottom-0 canvas");
+      await expect(canvas.first()).toBeVisible({ timeout: 3000 });
+
+      // Close visualizer first, then close player
+      const closeViz = page.locator('button[aria-label="Cerrar visualizador"]');
+      if ((await closeViz.count()) > 0 && (await closeViz.first().isVisible())) {
+        await closeViz.first().click();
+        await page.waitForTimeout(300);
+      }
+
+      // Now close player
       const closeBtn = page.locator('button[aria-label="Cerrar reproductor"]');
-      if ((await closeBtn.count()) > 0 && (await closeBtn.isVisible())) {
+      if ((await closeBtn.count()) > 0 && (await closeBtn.first().isVisible())) {
         await closeBtn.click();
         await page.waitForTimeout(500);
 
