@@ -3107,3 +3107,61 @@ HTMLAudioElement (crossOrigin="anonymous")
 
 ### Commits
 - `fix: CORS — real audio frequency data for visualizer`
+
+---
+
+## Session: 14 User-Reported Fixes
+
+**Fecha:** 2026-09-12
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build + Fix
+
+### Resumen
+Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes simples ejecutados directamente, fixes UI delegados a `dashboard-builder` y fixes de datos a `api-builder`.
+
+### Fixes Ejecutados
+
+| # | Fix | Archivo | Estado |
+|---|-----|---------|--------|
+| 1 | Remover iframe YouTube visible | `components/AudioPlayer.tsx` | ✅ |
+| 2 | Desactivar autoplay (autoplay=0) | `lib/audio-priority.ts`, `AudioPlayer.tsx`, `VideoPlayerModal.tsx` | ✅ |
+| 3 | Volume control — slider horizontal, toggle, touch-friendly | `components/GlobalAudioPlayer.tsx` | ✅ |
+| 4 | parseMetrics() acepta string/Record/null | `lib/db.ts` | ✅ |
+| 5 | ProductionDetails collapsed by default | `components/ProductionDetails.tsx` | ✅ |
+| 6 | Badge contrast fix (slate-200, emerald-200, pink-200) | `components/EPKCard.tsx`, `DownloadCenter.tsx` | ✅ |
+| 7 | Remover nav label en track detail | `app/track/[id]/page.tsx` | ✅ |
+| 8 | MetricsCharts en track detail sidebar | `app/track/[id]/page.tsx` | ✅ |
+| 9 | Remover dropdown source selector | `components/AudioPlayer.tsx` | ✅ |
+| 10 | Apple Music icon simplificado | `app/track/[id]/page.tsx` | ✅ |
+| 11 | Dossier/Rider usan artistName en body HTML | `lib/downloadable-assets.ts` | ✅ |
+| 12 | YouTube API auto-fill para cover/duration/date | `app/releases/new/page.tsx` | ✅ |
+| 13 | Visualizer height h-24→h-48, progress bar below visualizer | `components/GlobalAudioPlayer.tsx`, `AudioVisualizer.tsx` | ✅ |
+| 14 | Visualizer button hidden for YouTube-only tracks | `components/GlobalAudioPlayer.tsx` | ✅ |
+
+### Bug Fix Adicional
+- **Play/Pause + Close buttons missing from expanded player**: Los botones de play/pause y cerrar solo existían en la vista collapsed del `GlobalAudioPlayer`. Agregados a la vista expanded para que el usuario pueda controlar el player desde cualquier estado.
+
+### E2E Tests
+- Suite 2.1 renombrada (dropdown removed → "Tracks con múltiples fuentes")
+- Suite 3.3 y 6.3: navegación rápida con `domcontentloaded` + `.catch()` para evitar frame detach
+- Suite 6.5: YouTube iframe test actualizado para YouTube-only tracks
+- Tests 1.4 y 1.6: fixes de selectores y simplificación
+
+### Verificación
+
+| Quality Gate | Resultado |
+|--------------|-----------|
+| TypeScript | ✅ 0 errores |
+| Unit tests | ✅ 71/71 passing |
+| Build | ✅ OK |
+| E2E (local, Suite 1) | ✅ 7/7 passing |
+| E2E (local, Suite 2-4) | ✅ 10/11 (1 retry ok) |
+| E2E (local, Suite 5) | ✅ 4/4 passing |
+| E2E (local, Suite 6) | ✅ 5/5 passing |
+| E2E (local, Suite 7-8) | ✅ 4/4 passing |
+| E2E (local, Suite 9-13) | ✅ 15/15 passing |
+| E2E (production, critical 8) | ✅ 8/8 passing |
+
+### Deploy
+- **Commit:** `13d1b12` — "fix: 14 user-reported issues"
+- **Vercel:** https://epk-dashboard.vercel.app (1m deploy)
