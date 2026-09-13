@@ -753,8 +753,8 @@ export default function AdminPage() {
                         <td className="p-3 text-slate-600 dark:text-slate-400">{capitalizeReleaseType(release.release_type)}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{release.release_date}</td>
                         <td className="p-3">
-                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${releaseStatusColors[release.status]}`}>
-                            {releaseStatusLabels[release.status]}
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${releaseStatusColors[release.status as keyof typeof releaseStatusColors] || "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>
+                            {releaseStatusLabels[release.status as keyof typeof releaseStatusLabels] || release.status || "Sin estado"}
                           </span>
                         </td>
                         <td className="p-3 text-slate-600 dark:text-slate-400 text-xs">
