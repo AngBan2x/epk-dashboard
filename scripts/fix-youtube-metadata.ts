@@ -12,7 +12,11 @@ dotenv.config({ path: ".env.local" });
  * - "The Rain" (ID: fa5b4397-c50e-4ae5-9b65-0ebdd6b1b898, youtube: zgXZnJ2DtF4)
  */
 
-const YOUTUBE_API_KEY = "AIzaSyDhkS9U3FKVylanI9SzekHdDZ3Icily_8M";
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+if (!YOUTUBE_API_KEY) {
+  console.error("Error: YOUTUBE_API_KEY environment variable is not set");
+  process.exit(1);
+}
 
 interface YouTubeMetadata {
   title: string;

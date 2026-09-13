@@ -8,6 +8,7 @@ import { BioSection } from "@/components/BioSection";
 import { SocialBar } from "@/components/SocialBar";
 import { ShowsBooking } from "@/components/ShowsBooking";
 import { LoginModal } from "@/components/LoginModal";
+import LastfmMetrics from "@/components/LastfmMetrics";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
@@ -354,6 +355,13 @@ export default function DashboardPage() {
                 </SlideIn>
               </div>
 
+              {/* Last.fm Metrics */}
+              <div className="mb-12">
+                <SlideIn index={artistTracks.length + 2}>
+                  <LastfmMetrics artist={artistProfile.name} />
+                </SlideIn>
+              </div>
+
               {/* Show Form Modal */}
               {showFormOpen || editingShow !== null && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -555,7 +563,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <SlideIn index={artistTracks.length + 2}>
+              <SlideIn index={artistTracks.length + 3}>
                 <EPKExporter tracks={artistTracks} />
               </SlideIn>
             </>
