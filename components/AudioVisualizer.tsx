@@ -13,7 +13,7 @@ interface AudioVisualizerProps {
 export function AudioVisualizer({
   className = "",
   barCount = 48,
-  height = 100,
+  height = 140,
 }: AudioVisualizerProps) {
   const { audioRef, isPlaying } = useAudioPlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);

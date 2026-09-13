@@ -85,7 +85,7 @@ export function getAudioSources(track: TrackAudioInfo): AudioSource[] {
     sources.push({
       type: 'youtube',
       url: `https://www.youtube.com/watch?v=${youtubeId}`,
-      embedUrl: `https://www.youtube.com/embed/${youtubeId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_URL || 'https://epk-dashboard.vercel.app')}`,
+      embedUrl: `https://www.youtube.com/embed/${youtubeId}?autoplay=0&enablejsapi=1&origin=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_URL || 'https://epk-dashboard.vercel.app')}`,
       videoId: youtubeId,
       priority: 50,
       label: 'YouTube',

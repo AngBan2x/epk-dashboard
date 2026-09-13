@@ -148,7 +148,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
 
         {/* Metadata: Release type, Duration, Release Date, ISRC */}
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-2">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
             {capitalizeReleaseType(track.release_type)}
           </span>
           <span>·</span>

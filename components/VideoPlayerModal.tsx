@@ -41,20 +41,20 @@ export function VideoPlayerModal({
   let isDirectVideo = false;
 
   if (youtubeId) {
-    embedSrc = `https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&rel=0`;
+    embedSrc = `https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=0&rel=0`;
   } else if (videoUrl) {
     if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
       const match = videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
       const extractedId = match ? match[1] : null;
       if (extractedId) {
-        embedSrc = `https://www.youtube-nocookie.com/embed/${extractedId}?autoplay=1&rel=0`;
+        embedSrc = `https://www.youtube-nocookie.com/embed/${extractedId}?autoplay=0&rel=0`;
       } else {
         embedSrc = videoUrl;
       }
     } else if (videoUrl.includes("vimeo.com")) {
       const match = videoUrl.match(/vimeo\.com\/(?:video\/)?(\d+)/);
       const vimeoId = match ? match[1] : "";
-      embedSrc = `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
+      embedSrc = `https://player.vimeo.com/video/${vimeoId}?autoplay=0`;
     } else if (videoUrl.endsWith(".mp4") || videoUrl.endsWith(".webm")) {
       isDirectVideo = true;
       embedSrc = videoUrl;

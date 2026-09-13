@@ -25,7 +25,6 @@ const countedStreams = new Set<string>();
 
 export function AudioPlayer({ src, title, id, artist, coverImage, track }: AudioPlayerProps) {
   const localAudioRef = useRef<HTMLAudioElement>(null);
-  const youtubeIframeRef = useRef<HTMLIFrameElement>(null);
   const [localPlaying, setLocalPlaying] = useState(false);
   const [currentSource, setCurrentSource] = useState<AudioSource | null>(null);
   const globalPlayer = useContext(AudioPlayerContext);
@@ -85,16 +84,6 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
     return () => window.removeEventListener('message', handleMessage);
   }, [globalPlayer]);
 
-  // Send command to YouTube iframe
-  const sendYouTubeCommand = (command: string, value?: any) => {
-    if (youtubeIframeRef.current?.contentWindow) {
-      youtubeIframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: command, args: value ? [value] : [] }),
-        'https://www.youtube.com'
-      );
-    }
-  };
-
   const togglePlay = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -136,13 +125,6 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
         audio.play();
       }
       setLocalPlaying(!localPlaying);
-    } else if (activeSource.type === 'youtube' && youtubeIframeRef.current) {
-      if (isPlaying) {
-        sendYouTubeCommand('pauseVideo');
-      } else {
-        sendYouTubeCommand('playVideo');
-      }
-      setLocalPlaying(!localPlaying);
     }
   };
 
@@ -170,27 +152,6 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
 
   return (
     <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-      {/* Source Selector — only when multiple sources with preview */}
-      {sources.length > 1 && sources.some(s => s.type === 'preview') && (
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500 dark:text-slate-400">Fuente:</label>
-          <select
-            value={currentSource?.type || ''}
-            onChange={(e) => {
-              const selected = sources.find(s => s.type === e.target.value);
-              if (selected) switchSource(selected);
-            }}
-            className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded"
-          >
-            {sources.map((s) => (
-              <option key={s.type} value={s.type}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* YouTube Only — button to open in YouTube */}
       {sources.length === 1 && sources[0].type === 'youtube' && track?.youtube_video_id && (
         <a
@@ -227,22 +188,6 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
                   onEnded={handleSourceEnd}
                   onError={() => setLocalPlaying(false)}
                   style={{ display: 'none' }}
-                />
-              )}
-
-              {/* YouTube Iframe Embed */}
-              {(currentSource?.type === 'youtube' || (track?.youtube_video_id && (!track?.audio_preview_url || track.audio_preview_url === '—') && !track?.spotify_url && !track?.apple_music_url)) && (
-                <iframe
-                  ref={youtubeIframeRef}
-                  src={currentSource?.embedUrl || `https://www.youtube.com/embed/${track?.youtube_video_id}?autoplay=1&enablejsapi=1`}
-                  width="100%"
-                  height="100"
-                  frameBorder="0"
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                  title="YouTube Player"
-                  className="rounded-lg"
-                  style={{ minHeight: '100px' }}
                 />
               )}
 

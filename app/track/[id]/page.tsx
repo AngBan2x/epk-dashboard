@@ -250,8 +250,8 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-3 text-sm text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-950/30 rounded-lg px-3 py-2 transition-colors"
                       >
-                        <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M23.994 6.124a9.23 9.23 0 0 0-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043A5.022 5.022 0 0 0 19.2.293 10.143 10.143 0 0 0 17.06.04C16.432.01 15.803 0 15.174 0H8.826c-.63 0-1.258.01-1.887.04a10.143 10.143 0 0 0-2.14.253A5.022 5.022 0 0 0 2.426.872C1.308 1.605.563 2.605.246 3.915a9.23 9.23 0 0 0-.24 2.19C.004 6.764 0 7.423 0 8.082v7.836c0 .66.004 1.318.006 1.977.017 1.12.16 2.18.486 3.09.317 1.31 1.062 2.31 2.18 3.043a5.022 5.022 0 0 0 2.574.579 10.143 10.143 0 0 0 2.14.253c.629.03 1.258.04 1.887.04h6.348c.63 0 1.258-.01 1.887-.04a10.143 10.143 0 0 0 2.14-.253 5.022 5.022 0 0 0 2.574-.579c1.118-.733 1.863-1.733 2.18-3.043.325-.91.47-1.97.486-3.09.002-.659.006-1.317.006-1.977V8.082c0-.66-.004-1.318-.006-1.977zM15.19 10.15v5.148c0 .417-.058.827-.17 1.222-.316 1.117-1.18 1.776-2.316 1.836-.256.014-.513.02-.77.02H9.065c-.257 0-.514-.006-.77-.02-1.136-.06-2-.719-2.316-1.836a2.76 2.76 0 0 1-.17-1.222V10.15c0-.417.058-.827.17-1.222.316-1.117 1.18-1.776 2.316-1.836.256-.014.513-.02.77-.02h2.869c.257 0 .514.006.77.02 1.136.06 2 .719 2.316 1.836.112.395.17.805.17 1.222z" />
+                        <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
                         </svg>
                         Escuchar en Apple Music
                       </a>
@@ -288,8 +288,24 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 </section>
               </SlideIn>
 
-              {/* Download Center */}
+              {/* Metrics Charts */}
               <SlideIn index={6}>
+                <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
+                  <h3 className="font-semibold text-lg mb-4 text-slate-900 dark:text-slate-100">
+                    Métricas y Gráficas
+                  </h3>
+                  <MetricsCharts
+                    top_countries={track.metrics?.top_countries || []}
+                    streams={track.metrics?.streams || 0}
+                    saves={track.metrics?.saves || 0}
+                    playlist_additions={track.metrics?.playlist_additions || 0}
+                    trackId={track.id}
+                  />
+                </section>
+              </SlideIn>
+
+              {/* Download Center */}
+              <SlideIn index={7}>
                 <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
                   <DownloadCenter artistName={track.artist_name} trackTitle={track.title} />
                 </section>
@@ -316,9 +332,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 <span />
               )}
 
-              <span className="text-xs text-slate-400 dark:text-slate-500 hidden sm:block select-none">
-                Ficha de Producción
-              </span>
+              <span className="hidden" />
 
               {nextTrack ? (
                 <a

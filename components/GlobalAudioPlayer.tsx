@@ -71,8 +71,8 @@ export function GlobalAudioPlayer() {
           onMouseLeave={handleMouseLeave}
           className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 shadow-2xl safe-area-pb"
         >
-          {isVisualizerOpen && (
-            <div className="relative w-full h-24 bg-slate-50 dark:bg-slate-800/50">
+          {isVisualizerOpen && !isYouTubeMode && (
+            <div className="relative w-full h-48 bg-slate-50 dark:bg-slate-800/50">
               <AudioVisualizer />
               <button
                 onClick={toggleVisualizer}
@@ -86,13 +86,22 @@ export function GlobalAudioPlayer() {
             </div>
           )}
 
-          {/* Progress bar — always visible (thin bar when collapsed) */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-slate-200 dark:bg-slate-700">
-            <motion.div
-              className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
-              style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
-            />
-          </div>
+          {/* Progress bar — below visualizer when expanded, above controls when collapsed */}
+          {isExpanded ? (
+            <div className="mt-4 bg-slate-200 dark:bg-slate-700 h-1">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
+                style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
+              />
+            </div>
+          ) : (
+            <div className="mt-2 bg-slate-200 dark:bg-slate-700 h-1">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
+                style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
+              />
+            </div>
+          )}
 
           <AnimatePresence mode="wait">
             {isExpanded ? (
@@ -109,6 +118,7 @@ export function GlobalAudioPlayer() {
                     onClick={toggleVisualizer}
                     className={`p-2 rounded-lg transition-colors ${isVisualizerOpen ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                     aria-label={isVisualizerOpen ? "Cerrar visualizador" : "Abrir visualizador"}
+                    onMouseLeave={() => { if (isYouTubeMode) toggleVisualizer(); }}
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
@@ -134,6 +144,31 @@ export function GlobalAudioPlayer() {
                     </div>
                   </div>
 
+                  <button
+                    onClick={togglePlay}
+                    className="p-2 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors flex-shrink-0"
+                    aria-label={isPlaying ? "Pausar" : "Reproducir"}
+                  >
+                    {isPlaying ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
+                    onClick={clearTrack}
+                    className="p-2 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+                    aria-label="Cerrar reproductor"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
                   <div className="flex items-center gap-2 flex-1 justify-center max-w-xl">
                     <span className="text-xs text-slate-500 dark:text-slate-400 w-10 text-right font-mono">{formatTime(currentTime)}</span>
 
@@ -152,79 +187,38 @@ export function GlobalAudioPlayer() {
                     <span className="text-xs text-slate-500 dark:text-slate-400 w-10 font-mono">{formatTime(duration)}</span>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="relative"
-                      onMouseEnter={() => setShowVolume(true)}
-                      onMouseLeave={() => setShowVolume(false)}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setVolume(volume > 0 ? 0 : 0.85)}
+                      className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1.5"
                     >
-                      <button
-                        onClick={() => setVolume(volume > 0 ? 0 : 0.85)}
-                        className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      <svg
+                        className="w-4 h-4 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
                       >
                         {volume === 0 ? (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                          </svg>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         ) : volume < 0.5 ? (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                          </svg>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                         ) : (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                          </svg>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                         )}
-                      </button>
-
-                      <AnimatePresence>
-                        {showVolume && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-xl p-3 w-8 h-24 flex items-center justify-center"
-                          >
-                            <input
-                              type="range"
-                              min={0}
-                              max={1}
-                              step={0.01}
-                              value={volume}
-                              onChange={(e) => setVolume(parseFloat(e.target.value))}
-                              className="w-20 h-1 accent-primary-500"
-                              style={{ writingMode: "vertical-lr", direction: "rtl", height: "100%" }}
-                            />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    <button
-                      onClick={togglePlay}
-                      className="p-2.5 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors shadow-lg shadow-primary-500/25"
-                    >
-                      {isPlaying ? (
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
-                        </svg>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={clearTrack}
-                      className="p-2 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                      aria-label="Cerrar reproductor"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
+                      <span className="text-xs font-medium ml-1">{Math.round(volume * 100)}%</span>
                     </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={volume}
+                      onChange={(e) => setVolume(parseFloat(e.target.value))}
+                      className="w-24 h-1.5 accent-primary-500 rounded-full cursor-pointer accent-primary-500 group-hover:h-2 transition-all"
+                      style={{ width: "100px" }}
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -246,7 +240,7 @@ export function GlobalAudioPlayer() {
                   </div>
                   <button
                     onClick={togglePlay}
-                    className="p-1.5 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors"
+                    className="p-2 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors"
                   >
                     {isPlaying ? (
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -260,10 +254,10 @@ export function GlobalAudioPlayer() {
                   </button>
                   <button
                     onClick={clearTrack}
-                    className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
                     aria-label="Cerrar reproductor"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>

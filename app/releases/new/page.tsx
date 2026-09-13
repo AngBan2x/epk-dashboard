@@ -40,14 +40,57 @@ export default function NewReleasePage() {
     return match ? match[1] : null;
   };
 
-  const handleYouTubeUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
     setForm({ ...form, youtube_url: url });
-    if (url && !form.cover_image) {
+    if (url) {
       const videoId = extractYouTubeId(url);
       if (videoId) {
-        const thumbnail = getYouTubeThumbnail(videoId, "maxres") || "";
-        setForm({ ...form, cover_image: thumbnail });
+        // Always set thumbnail as fallback
+        if (!form.cover_image) {
+          const thumbnail = getYouTubeThumbnail(videoId, "maxres") || "";
+          setForm((prev) => ({ ...prev, cover_image: thumbnail }));
+        }
+
+        // Fetch full metadata from YouTube API
+        try {
+          const res = await fetch(`/api/youtube?id=${videoId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setForm((prev) => {
+              const updates: Record<string, string> = {};
+
+              // Auto-fill cover image from YouTube thumbnails if not set
+              if (!prev.cover_image && data.thumbnails) {
+                const maxRes = data.thumbnails.maxres?.url
+                  || data.thumbnails.standard?.url
+                  || data.thumbnails.high?.url
+                  || data.thumbnails.medium?.url
+                  || getYouTubeThumbnail(videoId, "maxres")
+                  || "";
+                updates.cover_image = maxRes;
+              }
+
+              // Auto-fill release date from publishedAt
+              if (!prev.release_date && data.publishedAt) {
+                updates.release_date = data.publishedAt.substring(0, 10);
+              }
+
+              return { ...prev, ...updates };
+            });
+
+            // Auto-fill first track duration (format seconds as MM:SS)
+            if (data.durationSeconds && tracks.length > 0 && !tracks[0].duration) {
+              const totalSec = Math.round(data.durationSeconds);
+              const minutes = Math.floor(totalSec / 60);
+              const seconds = totalSec % 60;
+              const formatted = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+              updateTrack(0, "duration", formatted);
+            }
+          }
+        } catch {
+          // Silently fail — YouTube API may not be configured
+        }
       }
     }
   };
