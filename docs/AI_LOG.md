@@ -3251,3 +3251,49 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 | 12.2 | "show Ver en YouTube" → "do NOT show Ver en YouTube" (removed) |
 | 12.3 | "visualizer button hidden" → "visualizer canvas NOT in DOM" |
 | 13.2 | "MetricsCharts exists" → "MetricsCharts removed from sidebar" |
+
+---
+
+## Fase: Mega-fix + Features — 16 Tareas
+
+**Fecha:** 2026-09-13
+**Commits:** `01f6e2a`
+**Modelo:** MiMo v2.5 Free (opencode)
+
+### Resumen Ejecutivo
+16 tareas ejecutadas secuencialmente. Quality gates pasados (tsc + 71 unit tests + build). Deploy a producción exitoso.
+
+### Cambios Implementados
+
+| Batch | # | Cambio | Archivos |
+|-------|---|--------|----------|
+| A | A4 | Metadata YouTube ejecutado contra Turso (Se Va + The Rain) | `scripts/fix-youtube-metadata.ts` |
+| B | B2 | Botón "Editar" movido a `bottom-2 right-2` para evitar overlap con like | `app/dashboard/page.tsx` |
+| B | B3 | Botón visualizer oculto para YouTube-only | `components/GlobalAudioPlayer.tsx` |
+| B | B4 | Visualizer: gradient dinámico por frecuencia, glow effect, mejor spacing | `components/AudioVisualizer.tsx` |
+| C | C1 | YouTube Data API v3 — `getVideoStats` + API route | `lib/youtube.ts`, `app/api/youtube/stats/route.ts` |
+| C | C2 | Métricas unificadas — `UnifiedMetrics` componente cliente con YouTube stats | `components/UnifiedMetrics.tsx`, `app/track/[id]/page.tsx` |
+| C | C3 | Likes combinados — YouTube likes + platform likes en EPKCard | `components/EPKCard.tsx` |
+| C | C4 | `DossierEditor` componente para personalización manual | `components/DossierEditor.tsx` |
+| C | C5 | `MetricsInput` — input manual de saves/playlists | `components/MetricsInput.tsx` |
+| — | — | `getYouTubeThumbnail` acepta `"maxres"` shorthand | `lib/youtube.ts` |
+
+### Tasks Pre-existente (ya implementadas)
+| # | Tarea | Estado |
+|---|-------|--------|
+| A1 | Cover images `maxres` fix | ✅ Ya implementado |
+| A2 | YouTube links en External Links | ✅ Ya implementado |
+| A3 | Admin status fallback | ✅ Ya implementado |
+| B1 | Badge contrast `primary-950` | ✅ Ya implementado |
+| D1 | Release edit UX (botones) | ✅ Ya implementado |
+| D2 | Quick actions dashboard | ✅ Ya implementado |
+
+### Verificación Producción
+- YouTube API: `GET /api/youtube/stats?videoId=M7Z_1wzbxG8` → `viewCount:12, likeCount:4`
+- UnifiedMetrics: Streams=12, Likes=4, Saves=0 (Próximamente), Playlists=0 (Próximamente)
+
+### Quality Gates
+- ✅ `npx tsc --noEmit` — 0 errores
+- ✅ `pnpm test:unit` — 71/71 tests pasan (7 suites)
+- ✅ `pnpm build` — Build exitoso
+- ✅ Deploy Vercel production — Status: Ready
