@@ -8,6 +8,7 @@ import { ImageGallery } from "@/components/ImageGallery";
 import { DownloadCenter } from "@/components/DownloadCenter";
 import { VideoShowcase } from "@/components/VideoShowcase";
 import { BioSection } from "@/components/BioSection";
+import LastfmMetrics from "@/components/LastfmMetrics";
 import { PageTransition, SlideIn } from "@/components/MotionWrappers";
 import { getTrackById, getAllTracks, getArtistByName } from "@/lib/db";
 import { safeString, formatNumber, capitalizeReleaseType, getCoverImage } from "@/lib/null-safe";
@@ -275,6 +276,10 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 </section>
               </SlideIn>
 
+              {/* Last.fm Metrics */}
+              <SlideIn index={6}>
+                <LastfmMetrics artist={track.artist_name} trackTitle={track.title} />
+              </SlideIn>
 
               {/* Download Center */}
               <SlideIn index={7}>
