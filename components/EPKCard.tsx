@@ -34,8 +34,18 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   const isrc = safeString(track.isrc);
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialLikeCount);
+  const [ytLikes, setYtLikes] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (track.youtube_video_id) {
+      fetch(`/api/youtube/stats?videoId=${track.youtube_video_id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => { if (data) setYtLikes(data.likeCount); })
+        .catch(() => {});
+    }
+  }, [track.youtube_video_id]);
 
   // Badge "Nuevo Lanzamiento" — track released in the last 7 days
   const isNewRelease = (() => {
@@ -201,7 +211,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
             <span className={animating ? "animate-heartbeat" : ""} style={{ fontSize: "0.875rem", lineHeight: 1 }}>
               {liked ? "❤️" : "🤍"}
             </span>
-            <span>{formatNumber(likeCount)}</span>
+            <span>{formatNumber(likeCount + ytLikes)}</span>
           </div>
         </div>
       </CardContent>

@@ -9,6 +9,7 @@ import { DownloadCenter } from "@/components/DownloadCenter";
 import { VideoShowcase } from "@/components/VideoShowcase";
 import { BioSection } from "@/components/BioSection";
 import LastfmMetrics from "@/components/LastfmMetrics";
+import { UnifiedMetrics } from "@/components/UnifiedMetrics";
 import { PageTransition, SlideIn } from "@/components/MotionWrappers";
 import { getTrackById, getAllTracks, getArtistByName } from "@/lib/db";
 import { safeString, formatNumber, capitalizeReleaseType, getCoverImage } from "@/lib/null-safe";
@@ -132,28 +133,13 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
               </div>
 
               {/* Metrics Bar */}
-              <div className="border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/50 px-5 sm:px-6 lg:px-8 py-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
-                      {formatNumber(streamCount)}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Streams</p>
-                  </div>
-                  <div className="text-center border-x border-slate-200 dark:border-slate-700">
-                    <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
-                      {formatNumber(track.metrics?.saves ?? 0)}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Saves</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
-                      {formatNumber(track.metrics?.playlist_additions ?? 0)}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Playlists</p>
-                  </div>
-                </div>
-              </div>
+              <UnifiedMetrics
+                streamCount={streamCount}
+                likeCount={0}
+                saves={track.metrics?.saves ?? 0}
+                playlists={track.metrics?.playlist_additions ?? 0}
+                youtubeVideoId={track.youtube_video_id}
+              />
             </div>
           </section>
         </SlideIn>
@@ -255,6 +241,19 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                           <path d="M18.81 4.16v3.19h-4.78V4.16zM18.81 8.73v3.19h-4.78V8.73zM18.81 13.3v3.19h-4.78V13.3zM6.39 4.16v3.19H1.61V4.16zM6.39 8.73v3.19H1.61V8.73zM6.39 13.3v3.19H1.61V13.3zM12.6 9.56v7.93h-4.78V9.56z" />
                         </svg>
                         Escuchar en Deezer
+                      </a>
+                    )}
+                    {track.youtube_video_id && (
+                      <a
+                        href={`https://www.youtube.com/watch?v=${track.youtube_video_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg px-3 py-2 transition-colors"
+                      >
+                        <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                        Ver en YouTube
                       </a>
                     )}
                     {!track.spotify_url && !track.youtube_video_id && !track.itunes_track_id && !track.external_links?.deezer && (

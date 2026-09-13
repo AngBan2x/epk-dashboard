@@ -87,22 +87,25 @@ export function AudioVisualizer({
           frequencies = generateSyntheticFrequencies(barCount, 0.9);
         }
       } else {
-        frequencies = new Array(barCount).fill(12);
-      }
+      const time = Date.now() / 1000;
+      frequencies = Array.from({ length: barCount }, (_, i) =>
+        Math.sin(time * 0.8 + i * 0.4) * 15 + 20
+      );
+    }
 
-      const barWidth = (width / barCount) * 0.75;
-      const gap = (width / barCount) * 0.25;
+      const barWidth = (width / barCount) * 0.65;
+      const gap = (width / barCount) * 0.35;
 
       frequencies.forEach((value, i) => {
         const percent = value / 255;
-        const barHeight = Math.max(4 * dpr, percent * canvasHeight);
+        const barHeight = Math.max(6 * dpr, percent * canvasHeight);
         const x = i * (barWidth + gap);
         const y = canvasHeight - barHeight;
 
-        const gradient = ctx.createLinearGradient(0, canvasHeight, 0, 0);
-        gradient.addColorStop(0, "#4f46e5");
-        gradient.addColorStop(0.5, "#8b5cf6");
-        gradient.addColorStop(1, "#ec4899");
+        const gradient = ctx.createLinearGradient(0, canvasHeight, 0, y);
+        gradient.addColorStop(0, `rgba(79, 70, 229, ${0.4 + percent * 0.6})`);
+        gradient.addColorStop(0.5, `rgba(139, 92, 246, ${0.5 + percent * 0.5})`);
+        gradient.addColorStop(1, `rgba(236, 72, 153, ${0.6 + percent * 0.4})`);
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -111,6 +114,13 @@ export function AudioVisualizer({
           ctx.fill();
         } else {
           ctx.fillRect(x, y, barWidth, barHeight);
+        }
+
+        if (percent > 0.3) {
+          ctx.shadowColor = "#8b5cf6";
+          ctx.shadowBlur = 4 * dpr;
+          ctx.fill();
+          ctx.shadowBlur = 0;
         }
       });
 

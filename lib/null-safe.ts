@@ -67,7 +67,7 @@ export const getYouTubeThumbnail = (youtubeVideoId: string | null | undefined, q
 
 export const getCoverImage = (track: { cover_image?: string | null; youtube_video_id?: string | null }): string | null => {
   if (track.cover_image && track.cover_image.trim() !== "" && track.cover_image !== "—") return track.cover_image;
-  return getYouTubeThumbnail(track.youtube_video_id);
+  return getYouTubeThumbnail(track.youtube_video_id, "maxres");
 };
 
 export { getAudioSources, getPrimaryAudioSource, getAudioSourceByType, hasStreamingSource, isYouTubeOnly } from './audio-priority';

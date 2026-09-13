@@ -124,7 +124,7 @@ export default function EditReleasePage() {
     if (url && !form.cover_image) {
       const videoId = extractYouTubeId(url);
       if (videoId) {
-        const thumbnail = getYouTubeThumbnail(videoId, "maxresdefault") || "";
+        const thumbnail = getYouTubeThumbnail(videoId, "maxres") || "";
         setForm({ ...form, cover_image: thumbnail });
       }
     }
@@ -140,7 +140,7 @@ export default function EditReleasePage() {
             ...prev,
             title: prev.title || videoData.title,
             duration: prev.duration || videoData.duration,
-            cover_image: prev.cover_image || getYouTubeThumbnail(videoId, "maxresdefault"),
+            cover_image: prev.cover_image || getYouTubeThumbnail(videoId, "maxres"),
             description: prev.description || videoData.description,
           }));
         }
@@ -396,6 +396,12 @@ export default function EditReleasePage() {
                      "❌ Rechazado"}
                   </span>
                 </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {form.status === "draft" && "Guarda cambios sin enviar. Cuando estés listo, usa 'Enviar para Revisión'."}
+                  {form.status === "pending" && "En revisión. Los cambios se guardan directamente."}
+                  {form.status === "approved" && "Aprobado y visible públicamente."}
+                  {form.status === "rejected" && "Rechazado. Edita y reenvía para revisión."}
+                </p>
                 {form.status === "rejected" && releaseData.admin_notes && (
                   <p className="mt-2 text-sm text-red-600 dark:text-red-400">
                     Motivo: {releaseData.admin_notes}
@@ -411,7 +417,7 @@ export default function EditReleasePage() {
                 disabled={loading}
                 className="flex-1 px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Guardando..." : "Guardar Cambios"}
+                {loading ? "Guardando..." : "Guardar como Borrador"}
               </button>
               {(form.status === "draft" || form.status === "rejected") && (
                 <button
