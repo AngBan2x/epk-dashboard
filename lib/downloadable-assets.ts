@@ -30,7 +30,7 @@ export function generateRiderHTML(artistName: string): string {
   </style>
 </head>
 <body>
-  <h1>🎤 Rider Técnico</h1>
+  <h1>🎤 Rider Técnico — ${artistName}</h1>
   <p><strong>Artista:</strong> ${artistName}</p>
   <p><strong>Fecha:</strong> ${date}</p>
 
@@ -99,11 +99,11 @@ export function generateDossierHTML(artistName: string): string {
   </style>
 </head>
 <body>
-  <h1>🎵 PressPlay — Dossier de Prensa</h1>
+  <h1>🎵 ${artistName} — Dossier de Prensa</h1>
   <p class="meta">Generado el ${date}</p>
 
   <h2>Biografía</h2>
-  <p class="meta">Artista multidisciplinario con trayectoria en producción musical, composición y performance en vivo. Catálogo que abarca desde rock clásico hasta producción electrónica contemporánea.</p>
+  <p class="meta">${artistName} es un artista multidisciplinario con trayectoria en producción musical, composición y performance en vivo. Catálogo que abarca desde rock clásico hasta producción electrónica contemporánea.</p>
 
   <h2>Contacto</h2>
   <p class="meta"><strong>Email:</strong> booking@epk-dashboard.com</p>

@@ -19,9 +19,14 @@ describe("downloadable-assets", () => {
       expect(html).toContain(`<title>Rider Técnico - ${testArtist}</title>`);
     });
 
-    it("contains artist name", () => {
+    it("contains artist name in header", () => {
       const html = generateRiderHTML(testArtist);
-      expect(html).toContain(testArtist);
+      expect(html).toContain(`Rider Técnico — ${testArtist}`);
+    });
+
+    it("contains artist name in body", () => {
+      const html = generateRiderHTML(testArtist);
+      expect(html).toContain(`<strong>Artista:</strong> ${testArtist}`);
     });
 
     it("contains all required sections", () => {
@@ -71,6 +76,16 @@ describe("downloadable-assets", () => {
     it("contains correct title", () => {
       const html = generateDossierHTML(testArtist);
       expect(html).toContain("<title>PressPlay — Dossier de Prensa</title>");
+    });
+
+    it("contains artist name in header", () => {
+      const html = generateDossierHTML(testArtist);
+      expect(html).toContain(`${testArtist} — Dossier de Prensa`);
+    });
+
+    it("contains artist name in body", () => {
+      const html = generateDossierHTML(testArtist);
+      expect(html).toContain(`${testArtist} es un artista multidisciplinario`);
     });
 
     it("contains PressPlay branding", () => {

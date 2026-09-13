@@ -445,12 +445,12 @@ function parseArtist(row: Record<string, unknown>): ArtistProfile {
   };
 }
 
-function parseMetrics(raw: string | null): Metrics {
+export function parseMetrics(raw: string | Record<string, unknown> | null): Metrics {
   const fallback: Metrics = { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
   if (!raw) return fallback;
 
-  const parsed = safeParseJSON<Record<string, unknown> | null>(raw, null);
-  if (!parsed) return fallback;
+  const parsed = typeof raw === 'string' ? safeParseJSON<Record<string, unknown> | null>(raw, null) : raw;
+  if (!parsed || typeof parsed !== 'object') return fallback;
 
   return {
     streams: safeNumber(parsed.streams),

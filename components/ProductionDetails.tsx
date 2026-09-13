@@ -21,7 +21,7 @@ export function ProductionDetails({
   trackId,
   onDetailsUpdated,
 }: ProductionDetailsProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
