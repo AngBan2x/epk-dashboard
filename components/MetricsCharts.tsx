@@ -23,6 +23,16 @@ interface MetricsHistoryPoint {
 const COLORS = ["#ec4899", "#8b5cf6", "#06b6d4", "#f59e0b", "#10b981"];
 
 export function MetricsCharts({ top_countries, streams, saves, playlist_additions, trackId }: MetricsChartsProps) {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  const textColor = isDark ? '#e2e8f0' : '#475569';
+  const gridColor = isDark ? '#334155' : '#e2e8f0';
   const countries = safeArray<TopCountry>(top_countries);
   const pieData = [
     { name: "Streams", value: streams },
@@ -82,9 +92,9 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
         {countries.length > 0 ? (
           <ResponsiveContainer width="100%" height={200} minHeight={200}>
             <BarChart data={countries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="country" fontSize={12} tick={{ fill: "#64748b" }} />
-              <YAxis fontSize={12} tick={{ fill: "#64748b" }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="country" fontSize={12} tick={{ fill: textColor }} />
+              <YAxis fontSize={12} tick={{ fill: textColor }} />
               <Tooltip 
                 contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px" }}
               />
@@ -109,7 +119,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
                 outerRadius={80} 
                 innerRadius={40}
                 dataKey="value" 
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) => `${name.length > 8 ? name.slice(0, 8) + '…' : name} ${(percent * 100).toFixed(0)}%`}
                 labelLine={false}
                 key={`pie-${pieData.length}`}
               >
@@ -139,7 +149,7 @@ export function MetricsCharts({ top_countries, streams, saves, playlist_addition
           ) : history.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={history}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+<CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis 
                   dataKey="date" 
                   fontSize={11} 

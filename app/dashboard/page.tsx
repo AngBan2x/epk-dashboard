@@ -232,7 +232,7 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Actividad Reciente</h2>
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
                   {artistTracks.slice(0, 3).map((track) => (
-                    <div key={track.id} className="px-4 py-3 flex items-center gap-3">
+                    <div key={track.id} className="px-4 py-3 flex items-center gap-3 group">
                       <div className="w-10 h-10 rounded bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
                         <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" /></svg>
                       </div>
@@ -240,7 +240,13 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{track.title}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">Release publicado</p>
                       </div>
-                      <span className="text-xs text-slate-400">{track.release_date || "N/A"}</span>
+                      <span className="text-xs text-slate-400 mr-2">{track.release_date || "N/A"}</span>
+                      <a
+                        href={`/releases/${track.id}/edit`}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 whitespace-nowrap"
+                      >
+                        Editar
+                      </a>
                     </div>
                   ))}
                   {artistShows.slice(0, 2).map((show) => (
@@ -269,9 +275,18 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {artistTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
-                      <a href={`/track/${track.id}`} className="block h-full">
-                        <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
-                      </a>
+                      <div className="relative group">
+                        <a href={`/track/${track.id}`} className="block h-full">
+                          <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
+                        </a>
+                        <a
+                          href={`/releases/${track.id}/edit`}
+                          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm text-xs font-medium text-slate-700 dark:text-slate-300 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950 dark:hover:text-amber-300 shadow-sm"
+                        >
+                          <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          Editar
+                        </a>
+                      </div>
                     </SlideIn>
                   ))}
                   {artistTracks.length === 0 && (

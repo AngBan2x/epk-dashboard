@@ -788,24 +788,20 @@ test.describe("Suite 12: YouTube-only Track Behavior", () => {
     }
   });
 
-  test("12.2 YouTube-only tracks show 'Ver en YouTube' button", async ({ page }) => {
+  test("12.2 YouTube-only tracks do NOT show 'Ver en YouTube' button (removed)", async ({ page }) => {
     for (const track of youtubeOnlyTracks) {
       await clickPlayDetail(page, track.id);
-      const ytButton = page.locator('a:has-text("Ver en YouTube"), button:has-text("Ver en YouTube")').first();
-      await expect(ytButton).toBeVisible({ timeout: 5000 });
+      const ytButton = page.locator('a:has-text("Ver en YouTube"), button:has-text("Ver en YouTube")');
+      expect(await ytButton.count()).toBe(0);
     }
   });
 
-  test("12.3 Visualizer button is hidden when playing YouTube-only track", async ({ page }) => {
+  test("12.3 Visualizer canvas is hidden when playing YouTube-only track", async ({ page }) => {
     for (const track of youtubeOnlyTracks) {
       await clickPlayDetail(page, track.id);
-      // Visualizer button should not be visible for YouTube-only tracks
-      const vizBtn = page.locator('button:has-text("Visualizador"), button[aria-label="Abrir visualizador"]').first();
-      // Check if visible - should be hidden
-      if ((await vizBtn.count()) > 0) {
-        const isVisible = await vizBtn.isVisible();
-        expect(isVisible).toBeFalsy();
-      }
+      // The canvas visualizer should NOT render for YouTube-only tracks
+      const canvas = page.locator('canvas[aria-label="Audio Frequency Visualizer"]');
+      expect(await canvas.count()).toBe(0);
     }
   });
 });
@@ -829,15 +825,15 @@ test.describe("Suite 13: UI Fixes Verification", () => {
     }
   });
 
-  test("13.2 MetricsCharts section exists on track detail page", async ({ page }) => {
+  test("13.2 MetricsCharts removed from track detail sidebar (fix #3)", async ({ page }) => {
     for (const track of TRACKS.slice(0, 3)) {
       await page.goto(`${BASE_URL}/track/${track.id}`);
       await page.waitForSelector("h1", { timeout: 15000 });
-      // Check for metrics charts section
-      const metricsSection = page.locator('text=Métricas, text=Streams, text=Saves, text=Playlist, text=Top Countries').first();
-      // Should have some metrics-related content visible
-      if ((await metricsSection.count()) > 0) {
-        await expect(metricsSection).toBeVisible({ timeout: 5000 });
+      // MetricsCharts component should NOT be rendered (removed per fix #3)
+      const metricsCharts = page.locator('[class*="recharts-responsive-container"]').first();
+      // The page should still have metric cards (Streams/Saves/Playlists) but no Charts
+      if ((await metricsCharts.count()) > 0) {
+        expect(await metricsCharts.isVisible()).toBe(false);
       }
     }
   });

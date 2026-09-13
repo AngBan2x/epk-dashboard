@@ -138,12 +138,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    // Check ownership
-    const existing = await dbQuery("SELECT artist_id FROM tracks WHERE id = ?", [id]) as { artist_id: string }[];
+    // Check ownership: tracks use artist_name, verify via artists table
+    const existing = await dbQuery("SELECT artist_name FROM tracks WHERE id = ?", [id]) as { artist_name: string }[];
     if (!existing.length) {
       return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });
     }
-    if (existing[0].artist_id !== session.userId && session.role !== "admin") {
+    const artistRow = await dbQuery("SELECT user_id FROM artists WHERE name = ?", [existing[0].artist_name]) as { user_id: string }[];
+    const ownsTrack = artistRow.length > 0 && artistRow[0].user_id === session.userId;
+    if (!ownsTrack && session.role !== "admin") {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
@@ -184,12 +186,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    // Check ownership
-    const existing = await dbQuery("SELECT artist_id FROM tracks WHERE id = ?", [id]) as { artist_id: string }[];
+    // Check ownership: tracks use artist_name, verify via artists table
+    const existing = await dbQuery("SELECT artist_name FROM tracks WHERE id = ?", [id]) as { artist_name: string }[];
     if (!existing.length) {
       return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });
     }
-    if (existing[0].artist_id !== session.userId && session.role !== "admin") {
+    const artistRow = await dbQuery("SELECT user_id FROM artists WHERE name = ?", [existing[0].artist_name]) as { user_id: string }[];
+    const ownsTrack = artistRow.length > 0 && artistRow[0].user_id === session.userId;
+    if (!ownsTrack && session.role !== "admin") {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 

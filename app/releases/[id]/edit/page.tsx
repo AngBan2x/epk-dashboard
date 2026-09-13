@@ -86,14 +86,29 @@ export default function EditReleasePage() {
     }
   }, [user, authLoading, router]);
 
-  // Redirect if not owner/admin
+  // Check ownership: tracks use artist_name, so we verify via user's artist profile
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+
   useEffect(() => {
-    if (releaseData && user && releaseData.artist_id !== user.id && user.role !== "admin") {
+    if (!releaseData || !user) return;
+    if (user.role === "admin") { setIsOwner(true); return; }
+
+    // Look up the user's artist profile and check if name matches
+    fetch(`/api/artists/me?user_id=${user.id}`)
+      .then((res) => res.json())
+      .then((profile) => {
+        setIsOwner(profile?.name === releaseData.artist_name);
+      })
+      .catch(() => setIsOwner(false));
+  }, [releaseData, user]);
+
+  useEffect(() => {
+    if (isOwner === false) {
       router.push("/dashboard");
     }
-  }, [releaseData, user, router]);
+  }, [isOwner, router]);
 
-  if (authLoading || !user || (releaseData && releaseData.artist_id !== user.id && user.role !== "admin")) {
+  if (authLoading || !user || isOwner === null || isOwner === false) {
     return null;
   }
 

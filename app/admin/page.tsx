@@ -88,6 +88,7 @@ export default function AdminPage() {
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [editingArtist, setEditingArtist] = useState<ArtistProfile | null>(null);
   const editFormRef = useRef<HTMLDivElement>(null);
+  const trackEditRef = useRef<HTMLDivElement>(null);
   const [shows, setShows] = useState<Show[]>([]);
   const [editingShow, setEditingShow] = useState<Show | null>(null);
   const [showForm, setShowForm] = useState({
@@ -155,6 +156,14 @@ export default function AdminPage() {
       }, 100);
     }
   }, [editingArtist]);
+
+  useEffect(() => {
+    if (editingTrack && trackEditRef.current) {
+      setTimeout(() => {
+        trackEditRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [editingTrack]);
 
   useEffect(() => {
     if (message) {
@@ -225,15 +234,16 @@ export default function AdminPage() {
     }
   };
 
-  const fetchReleases = async () => {
+  const fetchReleases = async (statusFilter?: string) => {
     setReleasesLoading(true);
     try {
+      const activeFilter = statusFilter ?? releasesStatusFilter;
       const params = new URLSearchParams({
         page: releasesPage.toString(),
         limit: "20",
       });
-      if (releasesStatusFilter !== "all") {
-        params.append("status", releasesStatusFilter);
+      if (activeFilter !== "all") {
+        params.append("status", activeFilter);
       }
       const res = await fetch(`/api/admin/releases?${params.toString()}`);
       if (res.ok) {
@@ -486,7 +496,7 @@ export default function AdminPage() {
 
         {/* Track Form */}
         {activeTab === "tracks" && editingTrack && (
-          <div className="mb-8 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div ref={trackEditRef} className="mb-8 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">
               {editingTrack ? "Editar Track" : "Nuevo Track"}
             </h2>
@@ -686,9 +696,10 @@ export default function AdminPage() {
                 <select
                   value={releasesStatusFilter}
                   onChange={(e) => {
-                    setReleasesStatusFilter(e.target.value as ReleaseStatus | "all");
+                    const newFilter = e.target.value as ReleaseStatus | "all";
+                    setReleasesStatusFilter(newFilter);
                     setReleasesPage(1);
-                    fetchReleases();
+                    fetchReleases(newFilter);
                   }}
                   className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
                 >

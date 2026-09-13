@@ -17,12 +17,14 @@ interface DownloadCenterProps {
   artistName?: string;
   trackTitle?: string;
   assets?: DownloadableAsset[];
+  trackCount?: number;
 }
 
 export function DownloadCenter({
   artistName = "Artista",
   trackTitle,
   assets = [],
+  trackCount = 0,
 }: DownloadCenterProps) {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -36,7 +38,7 @@ export function DownloadCenter({
     },
     {
       id: "asset-3",
-      name: `Dossier de Prensa & Biografía Oficial`,
+      name: `Dossier ${artistName}`,
       category: "Ficha EPK",
       size: "~12 KB",
       format: "HTML",
@@ -100,8 +102,11 @@ export function DownloadCenter({
             Assets para prensa y venues
           </p>
         </div>
-        <span className="flex-shrink-0 text-[10px] bg-emerald-200 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 font-semibold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+        <span className="flex-shrink-0 text-[10px] bg-emerald-800 text-emerald-50 font-semibold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
           Disponibles
+        </span>
+        <span className="flex-shrink-0 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold px-2 py-0.5 rounded-full border border-slate-300 dark:border-slate-600">
+          {trackCount || 0} tracks incluidos
         </span>
       </div>
 
@@ -111,7 +116,7 @@ export function DownloadCenter({
             key={asset.id}
             className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 hover:border-primary-500/50 transition-all"
           >
-            <div className="w-8 h-8 rounded-lg bg-pink-200 dark:bg-pink-900/50 text-pink-800 dark:text-pink-200 font-bold text-[10px] flex items-center justify-center border border-pink-300 dark:border-pink-800/60 flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-pink-800 text-pink-50 font-bold text-[10px] flex items-center justify-center border border-pink-300 dark:border-pink-800/60 flex-shrink-0">
               {asset.format}
             </div>
             <div className="min-w-0 flex-1">

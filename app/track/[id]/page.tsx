@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper";
 import { LyricsSectionWrapper } from "@/components/LyricsSectionWrapper";
-import { MetricsCharts } from "@/components/MetricsCharts";
+
 import { ImageGallery } from "@/components/ImageGallery";
 import { DownloadCenter } from "@/components/DownloadCenter";
 import { VideoShowcase } from "@/components/VideoShowcase";
@@ -230,19 +230,6 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                         Escuchar en Spotify
                       </a>
                     )}
-                    {track.youtube_video_id && (
-                      <a
-                        href={`https://www.youtube.com/watch?v=${track.youtube_video_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg px-3 py-2 transition-colors"
-                      >
-                        <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 7.754 0 12 0 12s0 4.246.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 16.246 24 12 24 12s0-4.246-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                        </svg>
-                        Ver en YouTube
-                      </a>
-                    )}
                     {track.itunes_track_id && (
                       <a
                         href={`https://music.apple.com/us/album/${track.itunes_track_id}`}
@@ -288,26 +275,11 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 </section>
               </SlideIn>
 
-              {/* Metrics Charts */}
-              <SlideIn index={6}>
-                <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
-                  <h3 className="font-semibold text-lg mb-4 text-slate-900 dark:text-slate-100">
-                    Métricas y Gráficas
-                  </h3>
-                  <MetricsCharts
-                    top_countries={track.metrics?.top_countries || []}
-                    streams={track.metrics?.streams || 0}
-                    saves={track.metrics?.saves || 0}
-                    playlist_additions={track.metrics?.playlist_additions || 0}
-                    trackId={track.id}
-                  />
-                </section>
-              </SlideIn>
 
               {/* Download Center */}
               <SlideIn index={7}>
                 <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
-                  <DownloadCenter artistName={track.artist_name} trackTitle={track.title} />
+                  <DownloadCenter artistName={track.artist_name} trackTitle={track.title} trackCount={1} />
                 </section>
               </SlideIn>
             </div>
