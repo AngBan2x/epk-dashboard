@@ -28,16 +28,35 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
   const [localPlaying, setLocalPlaying] = useState(false);
   const [currentSource, setCurrentSource] = useState<AudioSource | null>(null);
   const globalPlayer = useContext(AudioPlayerContext);
+  const { isPlaying: globalIsPlaying, isLoading: globalIsLoading } = globalPlayer || {};
 
   // Determine available audio sources from track data
   const sources = track ? getAudioSources(track) : [];
 
-  // Determine if this track is the current global track
+  // Determine if this track is the current global track — prefer id comparison to avoid
+  // YouTube-only tracks colliding on shared audioUrl "—"
   const isCurrentGlobal = globalPlayer
-    ? (globalPlayer.activeTrack?.audioUrl === src || (Boolean(id) && globalPlayer.activeTrack?.id === id))
+    ? (Boolean(id)
+        ? globalPlayer.activeTrack?.id === id
+        : globalPlayer.activeTrack?.audioUrl === src)
     : false;
 
-  const isPlaying = globalPlayer ? isCurrentGlobal && globalPlayer.isPlaying : localPlaying;
+  const isPlaying = globalPlayer ? isCurrentGlobal && globalIsPlaying : localPlaying;
+
+  let playButton: React.ReactNode;
+  if (globalIsLoading && !isPlaying) {
+    playButton = (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <circle cx="12" cy="12" r="10" strokeWidth="4" />
+        <line x1="4" y1="4" x2="20" y2="20" strokeWidth="2" />
+        <line x1="4" y1="20" x2="20" y2="4" strokeWidth="2" />
+      </svg>
+    );
+  } else if (isPlaying) {
+    playButton = "⏸";
+  } else {
+    playButton = "▶";
+  }
 
   // Increment stream count on first play (debounced per track per session)
   const countedRef = useRef(false);
@@ -152,29 +171,13 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
 
   return (
     <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-      {/* YouTube Only — button to open in YouTube */}
-      {sources.length === 1 && sources[0].type === 'youtube' && track?.youtube_video_id && (
-        <a
-          href={`https://www.youtube.com/watch?v=${track.youtube_video_id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-          </svg>
-          Ver en YouTube
-        </a>
-      )}
-
-      {/* Main Player */}
       <div className="flex items-center gap-3">
         <button
           onClick={togglePlay}
           className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0"
           aria-label={isPlaying ? "Pausar" : "Reproducir"}
         >
-          {isPlaying ? "⏸" : "▶"}
+          {playButton}
         </button>
 
         <div className="flex-1 min-w-0">

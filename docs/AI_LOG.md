@@ -3165,3 +3165,57 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 ### Deploy
 - **Commit:** `13d1b12` — "fix: 14 user-reported issues"
 - **Vercel:** https://epk-dashboard.vercel.app (1m deploy)
+
+---
+
+## Session: 12 New User-Reported Fixes (Batches 1-3)
+
+**Fecha:** 2026-09-12
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build + Fix
+
+### Análisis de 12 Issues Reportados
+
+| # | Issue | Causa Raíz | Fix Propuesto |
+|---|-------|------------|---------------|
+| 1 | YT-only tracks muestran "Reproduciendo" todos | `isCurrentGlobal` compara `audioUrl` que es `"—"` para todos los YT tracks | Priorizar comparación por `id` |
+| 2 | Métricas siempre 0 | `metrics_history` tabla vacía, no se sembró | Integración Spotify API (pendiente credenciales) — **Batch 4** |
+| 3 | Métricas redundantes en detalle track | Streams/Saves/Playlists aparecen 3 veces | Eliminar `<MetricsCharts>` del sidebar |
+| 4 | Portada genérica Se Va + metadata incorrecta | Tracks en Turso sin cover correcto | Migración DB + actualizar cover/duration |
+| 5 | Artista no puede editar releases/dossier/rider | Dashboard sin links de edición, dossier/rider hardcoded | Agregar links + hacer dossier/rider editables |
+| 6 | Ciudad y País en mismo campo | DB tiene 1 columna `location`, perfil carga todo en `country` | Parsear `"city, country"` al cargar |
+| 7 | Badges contraste oscuro + gráficas | `bg-*-900/50` opaca, colores hardcoded `#64748b` | Fondos sólidos + dark mode en charts + truncar labels |
+| 8 | Admin filtro status no funciona | `fetchReleases` captura stale closure de `releasesStatusFilter` | Pasar filtro como parámetro directo |
+| 9 | Admin falta auto-scroll a track edit | Solo artist edit tiene `scrollIntoView` | Agregar ref + scroll para tracks |
+| 10 | Sin loading indicator en player | No hay `isLoading` en context, no escucha `waiting`/`canplay` | Agregar state + eventos + spinner |
+| 11 | "Ver en YouTube" innecesario | Botón en AudioPlayer + link en track detail | Eliminar ambos |
+| 12 | Dossier nombre incorrecto | Título hardcoded, sin conteo de tracks | Nombre dinámico + count por artista |
+
+### Batch 1 — Fixes Directos (5 issues)
+
+| # | Fix | Archivos |
+|---|-----|----------|
+| 1 | `isCurrentGlobal`: `Boolean(id) ? activeTrack.id === id : audioUrl === src` | `AudioPlayer.tsx:37` |
+| 6 | Parsear `location` en `"city, country"` al cargar perfil | `profile/page.tsx:61-63` |
+| 8 | `fetchReleases(newFilter)` con parámetro directo | `admin/page.tsx` |
+| 9 | Agregar `trackEditRef` + `scrollIntoView` para track edit | `admin/page.tsx` |
+| 11 | Eliminar botón YouTube en AudioPlayer:155-168 + track detail:233-245 | `AudioPlayer.tsx`, `track/[id]/page.tsx` |
+
+### Batch 2 — UI/UX Fixes (4 issues)
+
+| # | Fix | Archivos |
+|---|-----|----------|
+| 3 | Eliminar `<MetricsCharts>` del track detail sidebar | `app/track/[id]/page.tsx` |
+| 7 | Badges: fondos sólidos. Charts: colores adaptables + truncar labels | `EPKCard.tsx`, `DownloadCenter.tsx`, `MetricsCharts.tsx` |
+| 10 | `isLoading` state + eventos `waiting`/`canplay` + spinner | `AudioPlayerContext.tsx`, `AudioPlayer.tsx`, `GlobalAudioPlayer.tsx` |
+| 12 | Título dinámico `"Dossier {artistName}"` + conteo de tracks | `DownloadCenter.tsx`, `lib/downloadable-assets.ts` |
+
+### Batch 3 — Data Fixes (2 issues)
+
+| # | Fix | Archivos |
+|---|-----|----------|
+| 4 | Migración: actualizar cover_image con YouTube thumbnail, duration desde API | Script de migración, `lib/db.ts` |
+| 5 | Agregar links de edición en dashboard para releases | Dashboard page |
+
+### Pendiente (Batch 4 — usuario aprueba)
+- Issue #2: Integración Spotify API para métricas reales

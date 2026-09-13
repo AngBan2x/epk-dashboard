@@ -59,8 +59,15 @@ export default function ProfilePage() {
         setBio(data.biography || '');
         setGenre(data.genre || '');
         // Location is stored as single field "City, Country"
-        setCountry(data.location || '');
-        setCity('');
+        const loc = data.location || '';
+        const commaIdx = loc.lastIndexOf(',');
+        if (commaIdx > 0) {
+          setCity(loc.substring(0, commaIdx).trim());
+          setCountry(loc.substring(commaIdx + 1).trim());
+        } else {
+          setCountry(loc);
+          setCity('');
+        }
         setProfileImage(data.profile_image || '');
         setBannerImage(data.banner_image || '');
         setSlug(data.slug || '');

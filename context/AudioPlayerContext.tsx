@@ -17,6 +17,7 @@ export interface ActiveTrack {
 export interface AudioPlayerContextType {
   activeTrack: ActiveTrack | null;
   isPlaying: boolean;
+  isLoading: boolean;
   duration: number;
   currentTime: number;
   volume: number;
@@ -40,6 +41,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolumeState] = useState(0.85);
+  const [isLoading, setIsLoading] = useState(false);
   const [isVisualizerOpen, setIsVisualizerOpen] = useState(false);
   const [isYouTubeMode, setIsYouTubeMode] = useState(false);
 
@@ -229,15 +231,24 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleLoadedMetadata = () => setDuration(audio.duration || 0);
     const handleEnded = () => setIsPlaying(false);
+    const handleLoadingStart = () => setIsLoading(true);
+    const handleWaiting = () => setIsLoading(true);
+    const handleCanPlay = () => setIsLoading(false);
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("loadstart", handleLoadingStart);
+    audio.addEventListener("waiting", handleWaiting);
+    audio.addEventListener("canplay", handleCanPlay);
 
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("loadstart", handleLoadingStart);
+      audio.removeEventListener("waiting", handleWaiting);
+      audio.removeEventListener("canplay", handleCanPlay);
     };
   }, []);
 
@@ -254,6 +265,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       value={{
         activeTrack,
         isPlaying,
+        isLoading,
         duration,
         currentTime,
         volume,

@@ -6,9 +6,50 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 
 export function GlobalAudioPlayer() {
-  const { activeTrack, isPlaying, duration, currentTime, volume, isVisualizerOpen, isYouTubeMode, togglePlay, clearTrack, seek, setVolume, toggleVisualizer, audioRef } = useAudioPlayer();
+  const { activeTrack, isPlaying, isLoading, duration, currentTime, volume, isVisualizerOpen, isYouTubeMode, togglePlay, clearTrack, seek, setVolume, toggleVisualizer, audioRef } = useAudioPlayer();
   const [showVolume, setShowVolume] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+
+  // Determine play/pause button content for expanded and collapsed players
+  let playButtonExpanded: React.ReactNode;
+  let playButtonCollapsed: React.ReactNode;
+
+  if (isLoading && !isPlaying) {
+    playButtonExpanded = (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <circle cx="12" cy="12" r="10" strokeWidth="4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v16m8-8V4" />
+      </svg>
+    );
+    playButtonCollapsed = (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <circle cx="12" cy="12" r="10" strokeWidth="4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v16m8-8V4" />
+      </svg>
+    );
+  } else if (isPlaying) {
+    playButtonExpanded = (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+      </svg>
+    );
+    playButtonCollapsed = (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+      </svg>
+    );
+  } else {
+    playButtonExpanded = (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
+      </svg>
+    );
+    playButtonCollapsed = (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
+      </svg>
+    );
+  }
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
@@ -149,15 +190,7 @@ export function GlobalAudioPlayer() {
                     className="p-2 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors flex-shrink-0"
                     aria-label={isPlaying ? "Pausar" : "Reproducir"}
                   >
-                    {isPlaying ? (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
-                      </svg>
-                    )}
+                    {playButtonExpanded}
                   </button>
                   <button
                     onClick={clearTrack}
@@ -242,15 +275,7 @@ export function GlobalAudioPlayer() {
                     onClick={togglePlay}
                     className="p-2 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors"
                   >
-                    {isPlaying ? (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
-                      </svg>
-                    )}
+                    {playButtonCollapsed}
                   </button>
                   <button
                     onClick={clearTrack}
