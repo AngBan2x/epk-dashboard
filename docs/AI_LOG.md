@@ -3500,4 +3500,50 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 
 ### Estimación
 - **Esfuerzo**: ~700-800 líneas nuevas/modificadas en ~11 archivos
+
+---
+
+## P3 Batch 2 Hotfix — Production Verification
+
+**Fecha:** 2026-09-14
+**Commits:** `7f49fd0`, `d1dc09c`, `166f1d4`
+**Deploy:** https://epk-dashboard.vercel.app (v4.0.0-rc.3+)
+
+### Issues Found & Fixed During Production Testing
+
+#### 1. Missing `genre` + `description` columns in Turso/SQLite
+- **Causa**: POST `/api/releases` INSERT uses `genre` and `description` columns that weren't in the tracks table schema
+- **Fix**: ALTER TABLE + CREATE TABLE update in `lib/turso.ts` and `lib/db.ts`
+- **Impact**: Creating releases via form was silently failing (500 error)
+- **Verified**: "Sad Winter Song" release created successfully via API
+
+#### 2. Dossier GET returning null despite data in Turso
+- **Causa**: `getDossierByArtistId()` used `getTursoClient()` singleton directly instead of `tursoExec()` helper with cache-busting
+- **Fix**: Switched to `tursoExec()` / `tursoExecUpdate()` in `lib/db.ts`
+- **Impact**: DossierEditor showed empty form even with saved data
+- **Verified**: GET returns full dossier with all 27 fields
+
+#### 3. Dossier PUT silently failing
+- **Causa**: Same singleton cache issue on write operations
+- **Fix**: Switched to `tursoExecUpdate()` in `upsertDossier()`
+- **Verified**: PUT updates custom rider values, persists on reload
+
+### Production Test Results
+
+| Test | Result | Notes |
+|------|--------|-------|
+| curl GET `/api/dossiers?artist_id=...` | ✅ 200 | Returns full dossier with rider defaults |
+| curl PUT `/api/dossiers` (auth) | ✅ 200 | Updates custom rider values |
+| curl POST `/api/releases` (auth) | ✅ 201 | Creates release with lyrics + production_details |
+| curl PUT `/api/releases` (auth) | ✅ 200 | Updates lyrics + production_details |
+| E2E admin (7 tests) | ✅ | All pass |
+| E2E artist (6 tests) | ✅ | All pass |
+| E2E auth (10 tests) | ✅ | All pass |
+| E2E null safety (2 tests) | ✅ | All pass |
+| **Total E2E** | **25/25** | **1.9 min** |
+
+### Key Files Modified in Hotfix
+- `lib/turso.ts` — Added `genre` + `description` to CREATE TABLE + ALTER migrations
+- `lib/db.ts` — Fixed dossier GET/PUT with `tursoExec()`, added local SQLite dossiers table
+- `app/api/releases/route.ts` — No changes needed (columns now exist)
 - **Tiempo estimado**: ~2-3 horas de ejecución
