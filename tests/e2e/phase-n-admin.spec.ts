@@ -20,8 +20,8 @@ test.describe("N4: Admin Flow", () => {
       fullPage: true,
     });
 
-    // Check admin panel link exists
-    const adminLink = page.locator('a[href="/admin"]');
+    // Check admin panel link exists (may be multiple: header nav + dashboard body)
+    const adminLink = page.locator('a[href="/admin"]').first();
     await expect(adminLink).toBeVisible();
 
     // Click admin link
