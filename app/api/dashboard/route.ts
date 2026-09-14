@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtist, getParentReleases } from "@/lib/db";
+import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtist } from "@/lib/db";
 import type { Show } from "@/types/music";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +9,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
 
-    // P3 Batch 2: Only parent releases (release_id IS NULL)
-    const tracks = await getParentReleases();
+    const tracks = await getAllTracks();
     const artists = await getAllArtists();
 
     let artistProfile = null;
