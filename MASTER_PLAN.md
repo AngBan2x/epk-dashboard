@@ -563,7 +563,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 |------|--------|-------|--------|
 | **P1.8** | Setup: subagentes + MCPs | 12 subagentes + MCP Unsplash | ✅ Completada |
 | **P2** | Foundation: DB + Landing + Header | 9 tasks | ✅ Completada |
-| **P3** | Artist Self-Management | 24 tasks (17 features + 7 fixes) | ✅ Completada |
+| **P3** | Artist Self-Management | 34 tasks (24 features + 10 fixes) | ✅ Completada |
 | **P4** + | Subscribers + Notifications + Search | 7 tasks | ⏳ Pendiente |
 | **P5** | Polish + Demo + Release v4.0.0 | 6 tasks | ⏳ Pendiente |
 
@@ -577,7 +577,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 
 #### Fase P3: Artist Self-Management
 
-##### P3 Features (17 tasks) — Funcionalidades nuevas
+##### P3 Features (24 tasks) — Funcionalidades nuevas
 
 | Task | Subagente | Descripción | Estado |
 |------|-----------|-------------|--------|
@@ -598,8 +598,15 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.21 | show-form-builder | Ficha de producción editable + colapsable | ✅ Completado |
 | P3.22 | general | Downloads per-artist (nombres de archivo reales) | ✅ Completado |
 | P3.23 | approval-workflow-builder | Release approval workflow (draft/pending/approved/rejected) | ✅ Completado |
+| P3.25 | api-builder | Multi-track releases: schema `release_id`, fix SQL duplicate, agrupación | ✅ Completado |
+| P3.26 | release-form-builder | YouTube timestamps por pista (`start_time`/`end_time`), seek automático | ✅ Completado |
+| P3.27 | release-form-builder | YouTube chapter detection desde descripción del video | ✅ Completado |
+| P3.28 | release-form-builder | Release detail page (`/releases/[id]`) con tracklist | ✅ Completado |
+| P3.29 | epk-card-builder | EPKCard: badge "N pistas" para releases multipista | ✅ Completado |
+| P3.30 | release-form-builder | YouTube auto-fill button en edit (forzado, no solo campos vacíos) | ✅ Completado |
+| P3.31 | artist-dashboard-builder | Dashboard: sección Dossier/Rider con DossierEditor + DownloadCenter | ✅ Completado |
 
-##### P3 Fixes (7 tasks) — Bugs y mejoras
+##### P3 Fixes (10 tasks) — Bugs y mejoras
 
 | Task | Subagente | Descripción | Estado |
 |------|-----------|-------------|--------|
@@ -610,6 +617,9 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.15 | direct | Eliminar StemsPlayer + SocialBar (redundantes) | ✅ Completado |
 | P3.16 | direct | Audio Player: close real, Framer Motion, visualizer fix, YouTube button | ✅ Completado |
 | P3.24 | direct | Stress tests: 31/31 pass, visualizer toggle verificado | ✅ Completado |
+| P3.32 | direct | Admin release status filter: migrar NULL→approved, dropdown inline | ✅ Completado |
+| P3.33 | direct | Dashboard redundancy: eliminar links duplicados, consolidar navegación | ✅ Completado |
+| P3.34 | direct | Audio Player: loading/error states, event handlers, UI feedback | ✅ Completado |
 
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción | Estado |

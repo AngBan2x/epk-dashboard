@@ -129,7 +129,7 @@ export default function EditReleasePage() {
       }
     }
     
-    // Auto-fetch YouTube metadata
+    // Auto-fetch YouTube metadata (only when fields are empty)
     const videoId = extractYouTubeId(url);
     if (videoId && (!form.title || !form.duration)) {
       setYoutubeLoading(true);
@@ -149,6 +149,45 @@ export default function EditReleasePage() {
       } finally {
         setYoutubeLoading(false);
       }
+    }
+  };
+
+  // P3.30: Force YouTube auto-fill even when fields are populated
+  const forceYouTubeAutoFill = async () => {
+    const videoId = extractYouTubeId(form.youtube_url);
+    if (!videoId) {
+      setMessage({ type: "error", text: "URL de YouTube no válida" });
+      return;
+    }
+
+    // Confirm if fields are populated
+    if (form.title || form.duration) {
+      const confirmed = window.confirm(
+        "¿Sobrescribir datos existentes con información de YouTube?"
+      );
+      if (!confirmed) return;
+    }
+
+    setYoutubeLoading(true);
+    try {
+      const videoData = await fetchYouTubeVideo(videoId);
+      if (videoData) {
+        setForm(prev => ({
+          ...prev,
+          title: videoData.title,
+          duration: videoData.duration,
+          cover_image: getYouTubeThumbnail(videoId, "maxres"),
+          description: videoData.description,
+        }));
+        setMessage({ type: "success", text: "Datos de YouTube cargados exitosamente" });
+      } else {
+        setMessage({ type: "error", text: "No se pudo obtener información del video" });
+      }
+    } catch (error) {
+      console.error("Error fetching YouTube video:", error);
+      setMessage({ type: "error", text: "Error al obtener datos de YouTube" });
+    } finally {
+      setYoutubeLoading(false);
     }
   };
 
@@ -338,6 +377,17 @@ export default function EditReleasePage() {
                   className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                   placeholder="YouTube URL"
                 />
+                {/* P3.30: Force YouTube auto-fill button */}
+                {form.youtube_url && (
+                  <button
+                    type="button"
+                    onClick={forceYouTubeAutoFill}
+                    disabled={youtubeLoading}
+                    className="mt-2 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50"
+                  >
+                    {youtubeLoading ? "⏳ Cargando..." : "🔄 Auto-completar desde YouTube"}
+                  </button>
+                )}
               </div>
             </div>
 

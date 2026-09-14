@@ -3297,3 +3297,54 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 - ✅ `pnpm test:unit` — 71/71 tests pasan (7 suites)
 - ✅ `pnpm build` — Build exitoso
 - ✅ Deploy Vercel production — Status: Ready
+
+---
+
+## Fase: P3 Batch 2 — Multi-track + YouTube + Audio Player (7 Issues)
+
+**Fecha:** 2026-09-13
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Resumen Ejecutivo
+7 issues reportados por usuario, categorizados bajo P3. Workflow: documentación → local → tests → commit → production → prerelease.
+
+### Issues Implementados
+
+| # | Issue | Tipo | P3 Task | Descripción |
+|---|-------|------|---------|-------------|
+| 1 | Admin status filter | Fix | P3.32 | Migrar NULL→approved, dropdown inline por release |
+| 2 | YouTube auto-fill en edit | Feature | P3.30 | Botón explícito "Auto-completar desde YouTube" |
+| 3 | Dashboard redundancy | Fix | P3.33 | Eliminar links duplicados, DossierEditor section |
+| 4 | Multi-track releases | Feature | P3.25 | Schema `release_id`, fix SQL duplicate, agrupación |
+| 5 | YouTube timestamps | Feature | P3.26 | `start_time`/`end_time`, seek automático por pista |
+| 6 | Loading/error states | Fix | P3.34 | Error state, event handlers, UI feedback |
+| 7 | YouTube chapter detection | Feature | P3.27 | Auto-detect chapters desde descripción del video |
+
+### Archivos Modificados/Creados
+
+| Archivo | Tipo | Issues |
+|---------|------|--------|
+| `scripts/fix-release-status.ts` | Nuevo | 1 |
+| `lib/turso.ts` | Modificar | 4,5 |
+| `lib/db.ts` | Modificar | 4,5 |
+| `lib/youtube.ts` | Modificar | 7 |
+| `app/api/releases/route.ts` | Modificar | 4 |
+| `app/api/dashboard/route.ts` | Modificar | 4 |
+| `app/admin/page.tsx` | Modificar | 1 |
+| `app/dashboard/page.tsx` | Modificar | 3,4 |
+| `app/releases/[id]/edit/page.tsx` | Modificar | 2,5,7 |
+| `app/releases/[id]/page.tsx` | Nuevo | 5 |
+| `app/releases/new/page.tsx` | Modificar | 5,7 |
+| `app/track/[id]/page.tsx` | Modificar | 5 |
+| `components/EPKCard.tsx` | Modificar | 4,5 |
+| `components/ReleaseTrackList.tsx` | Nuevo | 5 |
+| `components/AudioPlayer.tsx` | Modificar | 6 |
+| `components/GlobalAudioPlayer.tsx` | Modificar | 6 |
+| `context/AudioPlayerContext.tsx` | Modificar | 5,6 |
+| `MASTER_PLAN.md` | Modificar | Todos |
+
+### Quality Gates (previos al commit)
+- ⏳ `npx tsc --noEmit` — Pendiente
+- ⏳ `pnpm test:unit` — Pendiente
+- ⏳ `pnpm build` — Pendiente

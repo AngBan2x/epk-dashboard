@@ -83,7 +83,10 @@ export async function ensureTursoSchema(): Promise<boolean> {
       composers TEXT,
       streams INTEGER DEFAULT 0,
       status TEXT DEFAULT 'draft',
-      updated_at TEXT
+      updated_at TEXT,
+      release_id TEXT,
+      start_time REAL DEFAULT 0,
+      end_time REAL DEFAULT 0
     )
   `);
   // Migrate: add columns if missing (safe for existing tables)
@@ -91,6 +94,10 @@ export async function ensureTursoSchema(): Promise<boolean> {
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN is_instrumental INTEGER DEFAULT 0`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN status TEXT DEFAULT 'draft'`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN updated_at TEXT`); } catch {}
+  // P3 Batch 2: Multi-track releases + YouTube timestamps
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN release_id TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN start_time REAL DEFAULT 0`); } catch {}
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN end_time REAL DEFAULT 0`); } catch {}
 
   // 2. artists (con user_id FK + P2.1)
   await client.execute(`

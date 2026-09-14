@@ -12,12 +12,16 @@ export interface ActiveTrack {
   coverImage?: string;
   isYouTube?: boolean;
   youtubeVideoId?: string;
+  // P3 Batch 2: YouTube timestamps for multi-track
+  startTimestamp?: number;
+  endTimestamp?: number;
 }
 
 export interface AudioPlayerContextType {
   activeTrack: ActiveTrack | null;
   isPlaying: boolean;
   isLoading: boolean;
+  error: string | null;
   duration: number;
   currentTime: number;
   volume: number;
@@ -42,11 +46,13 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolumeState] = useState(0.85);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isVisualizerOpen, setIsVisualizerOpen] = useState(false);
   const [isYouTubeMode, setIsYouTubeMode] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const youtubeSyncRef = useRef<NodeJS.Timeout | null>(null);
+  const endTimestampRef = useRef<number>(0);
 
   // Sync YouTube player state with context
   const startYouTubeSync = useCallback(() => {
@@ -61,6 +67,14 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
       setCurrentTime(ytTime);
       if (ytDuration > 0) setDuration(ytDuration);
+
+      // P3 Batch 2: Stop at endTimestamp for multi-track YouTube
+      if (endTimestampRef.current > 0 && ytTime >= endTimestampRef.current) {
+        yt.pause();
+        setIsPlaying(false);
+        stopYouTubeSync();
+        return;
+      }
 
       if (ytState === YT_STATE.ENDED) {
         setIsPlaying(false);
@@ -82,6 +96,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const playTrack = useCallback((track: ActiveTrack) => {
     const isYT = track.isYouTube === true && !!track.youtubeVideoId;
 
+    // Reset error on new track
+    setError(null);
+
     // If same track and already playing, do nothing
     if (activeTrack?.id === track.id && isPlaying) return;
 
@@ -94,7 +111,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         startYouTubeSync();
       } else if (audioRef.current) {
         getAudioContext();
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+        audioRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
+          console.error("Error resuming playback:", err);
+          setError("Error al reanudar reproducción");
+        });
       }
       return;
     }
@@ -104,12 +124,19 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setIsYouTubeMode(isYT);
     setIsPlaying(true);
 
+    // P3 Batch 2: Set endTimestamp for multi-track YouTube
+    endTimestampRef.current = track.endTimestamp || 0;
+
     if (isYT) {
       // YouTube mode
       const yt = getYouTubePlayer();
       yt.init(track.youtubeVideoId!, {
         onReady: () => {
           yt.setVolume(volume);
+          // Seek to startTimestamp if provided
+          if (track.startTimestamp && track.startTimestamp > 0) {
+            yt.seek(track.startTimestamp);
+          }
           yt.play();
           startYouTubeSync();
         },
@@ -123,6 +150,17 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
             setIsPlaying(false);
           }
         },
+        onError: (errorCode: number) => {
+          const errorMessages: Record<number, string> = {
+            2: "Parámetro inválido",
+            3: "Error de reproducción",
+            5: "Error de HTML5",
+            100: "Video no encontrado",
+            150: "Video no disponible",
+          };
+          setError(errorMessages[errorCode] || "Error de YouTube desconocido");
+          setIsPlaying(false);
+        },
       });
     } else {
       // HTML5 audio mode
@@ -131,13 +169,19 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       getAudioContext();
       if (audioRef.current) {
         audioRef.current.src = track.audioUrl;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+        audioRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
+          console.error("Error starting playback:", err);
+          setError("Error al iniciar reproducción — archivo no disponible");
+          setIsPlaying(false);
+        });
       }
     }
   }, [activeTrack, isPlaying, volume, startYouTubeSync, stopYouTubeSync]);
 
   const togglePlay = useCallback(() => {
     if (!activeTrack) return;
+
+    setError(null);
 
     if (isYouTubeMode) {
       const yt = getYouTubePlayer();
@@ -160,7 +204,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         audio.pause();
         setIsPlaying(false);
       } else {
-        audio.play().then(() => setIsPlaying(true)).catch(console.error);
+        audio.play().then(() => setIsPlaying(true)).catch((err) => {
+          console.error("Error toggling playback:", err);
+          setError("Error al reanudar reproducción");
+        });
       }
     }
   }, [activeTrack, isPlaying, isYouTubeMode, startYouTubeSync, stopYouTubeSync]);
@@ -233,7 +280,22 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     const handleEnded = () => setIsPlaying(false);
     const handleLoadingStart = () => setIsLoading(true);
     const handleWaiting = () => setIsLoading(true);
-    const handleCanPlay = () => setIsLoading(false);
+    const handleCanPlay = () => {
+      setIsLoading(false);
+      setError(null);
+    };
+    // P3.34: Error event handlers
+    const handleError = () => {
+      setIsLoading(false);
+      setError("Error de reproducción — archivo no disponible");
+      setIsPlaying(false);
+    };
+    const handleStalled = () => {
+      setIsLoading(true);
+    };
+    const handleAbort = () => {
+      setIsLoading(false);
+    };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
@@ -241,6 +303,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     audio.addEventListener("loadstart", handleLoadingStart);
     audio.addEventListener("waiting", handleWaiting);
     audio.addEventListener("canplay", handleCanPlay);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("stalled", handleStalled);
+    audio.addEventListener("abort", handleAbort);
 
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
@@ -249,6 +314,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       audio.removeEventListener("loadstart", handleLoadingStart);
       audio.removeEventListener("waiting", handleWaiting);
       audio.removeEventListener("canplay", handleCanPlay);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("stalled", handleStalled);
+      audio.removeEventListener("abort", handleAbort);
     };
   }, []);
 
@@ -266,6 +334,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         activeTrack,
         isPlaying,
         isLoading,
+        error,
         duration,
         currentTime,
         volume,

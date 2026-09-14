@@ -109,9 +109,22 @@ export async function POST(req: NextRequest) {
         if (track.title) {
           const trackId = crypto.randomUUID();
           await dbRun(
-            `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, duration, isrc, youtube_video_id, external_links, artist_name, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-            [trackId, track.title, artist_name || "", type || "single", release_date || "", cover_image || "", track.duration || "", track.isrc || "", null, JSON.stringify({}), artist_name || ""]
+            `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, duration, isrc, youtube_video_id, release_id, start_time, end_time, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', datetime('now'))`,
+            [
+              trackId,
+              track.title,
+              artist_name || "",
+              type || "single",
+              release_date || "",
+              cover_image || "",
+              track.duration || "",
+              track.isrc || "",
+              youtubeVideoId || null,
+              id,  // release_id = parent release id
+              track.start_time || 0,
+              track.end_time || 0,
+            ]
           );
         }
       }

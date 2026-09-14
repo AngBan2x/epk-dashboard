@@ -531,6 +531,10 @@ function parseTrack(row: Record<string, unknown>): Track {
     composers: safeParseJSON<string[] | null>((row.composers as string) ?? null, null),
     // Streams counter
     streams: row.streams != null ? Number(row.streams) : 0,
+    // P3 Batch 2: Multi-track releases + YouTube timestamps
+    release_id: (row.release_id as string) ?? null,
+    start_time: row.start_time != null ? Number(row.start_time) : 0,
+    end_time: row.end_time != null ? Number(row.end_time) : 0,
   };
 }
 
@@ -1517,6 +1521,52 @@ export async function searchTracks(query: string): Promise<Track[]> {
   const rows = db
     .prepare("SELECT * FROM tracks WHERE title LIKE ? OR artist_name LIKE ? OR release_type LIKE ? OR lyrics LIKE ?")
     .all(pattern, pattern, pattern, pattern) as Record<string, unknown>[];
+  return rows.map(parseTrack);
+}
+
+// P3 Batch 2: Multi-track releases — tracks by release_id
+export async function getTracksByReleaseId(releaseId: string): Promise<Track[]> {
+  if (USE_TURSO) {
+    const rows = await tursoExec(
+      "SELECT * FROM tracks WHERE release_id = ? ORDER BY start_time ASC",
+      [releaseId]
+    );
+    return rows.map((r) => parseTrack(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db
+    .prepare("SELECT * FROM tracks WHERE release_id = ? ORDER BY start_time ASC")
+    .all(releaseId) as Record<string, unknown>[];
+  return rows.map(parseTrack);
+}
+
+// P3 Batch 2: Dashboard — only parent releases (release_id IS NULL)
+export async function getParentReleases(): Promise<Track[]> {
+  if (USE_TURSO) {
+    const rows = await tursoExec(
+      "SELECT * FROM tracks WHERE release_id IS NULL ORDER BY created_at DESC"
+    );
+    return rows.map((r) => parseTrack(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db
+    .prepare("SELECT * FROM tracks WHERE release_id IS NULL ORDER BY created_at DESC")
+    .all() as Record<string, unknown>[];
+  return rows.map(parseTrack);
+}
+
+// P3 Batch 2: Catalog — only approved parent releases
+export async function getApprovedReleases(): Promise<Track[]> {
+  if (USE_TURSO) {
+    const rows = await tursoExec(
+      "SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved' ORDER BY created_at DESC"
+    );
+    return rows.map((r) => parseTrack(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db
+    .prepare("SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved' ORDER BY created_at DESC")
+    .all() as Record<string, unknown>[];
   return rows.map(parseTrack);
 }
 
