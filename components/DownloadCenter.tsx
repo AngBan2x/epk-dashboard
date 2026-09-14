@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { safeString } from "@/lib/null-safe";
 import { generateRiderHTML, generateDossierHTML } from "@/lib/downloadable-assets";
 
@@ -14,6 +14,7 @@ export interface DownloadableAsset {
 }
 
 interface DownloadCenterProps {
+  artistId?: string;
   artistName?: string;
   trackTitle?: string;
   assets?: DownloadableAsset[];
@@ -21,17 +22,34 @@ interface DownloadCenterProps {
 }
 
 export function DownloadCenter({
+  artistId,
   artistName = "Artista",
   trackTitle,
   assets = [],
   trackCount = 0,
 }: DownloadCenterProps) {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [dossierData, setDossierData] = useState<Record<string, string | null> | null>(null);
+
+  const loadDossier = useCallback(async () => {
+    if (!artistId) return;
+    try {
+      const res = await fetch(`/api/dossiers?artist_id=${artistId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.dossier) setDossierData(json.dossier);
+      }
+    } catch {}
+  }, [artistId]);
+
+  useEffect(() => {
+    loadDossier();
+  }, [loadDossier]);
 
   const defaultAssets: DownloadableAsset[] = [
     {
       id: "asset-1",
-      name: `Rider Técnico & Stage Plot - ${artistName} 2026`,
+      name: `Rider Tecnico & Stage Plot - ${artistName} 2026`,
       category: "Tech Rider",
       size: "~15 KB",
       format: "HTML",
@@ -57,15 +75,15 @@ export function DownloadCenter({
         let filename = "";
 
         if (asset.category === "Tech Rider") {
-          htmlContent = generateRiderHTML(artistName);
+          htmlContent = generateRiderHTML(artistName, dossierData);
           const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "");
           filename = `PressPlay_Rider_Tecnico_${safeName}.html`;
         } else if (asset.category === "Ficha EPK") {
-          htmlContent = generateDossierHTML(artistName);
+          htmlContent = generateDossierHTML(artistName, dossierData);
           const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "");
           filename = `PressPlay_Dossier_${safeName}.html`;
         } else {
-          const content = `EPK ASSET: ${asset.name}\nArtista: ${artistName}\nCategoría: ${asset.category}\nGenerado el: ${new Date().toISOString()}`;
+          const content = `EPK ASSET: ${asset.name}\nArtista: ${artistName}\nCategoria: ${asset.category}\nGenerado el: ${new Date().toISOString()}`;
           const blob = new Blob([content], { type: "text/plain" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -135,9 +153,9 @@ export function DownloadCenter({
               aria-label={`Descargar ${asset.name}`}
             >
               {downloadingId === asset.id ? (
-                <>⏳</>
+                <>...</>
               ) : (
-                <>📥</>
+                <>Download</>
               )}
             </button>
           </div>

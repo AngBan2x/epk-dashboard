@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getAllTracks, getTrackById } from "@/lib/db";
+import { getAllTracks, getTrackById, DOSSIER_DEFAULTS } from "@/lib/db";
 import { parseMetrics } from "@/lib/db";
 
 describe("Database", () => {
@@ -83,5 +83,29 @@ describe("parseMetrics", () => {
   it("handles non-object parsed result", () => {
     const result = parseMetrics("not an object");
     expect(result).toEqual({ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] });
+  });
+});
+
+describe("Dossier defaults", () => {
+  it("has all required rider defaults", () => {
+    expect(DOSSIER_DEFAULTS.rider_pa_system).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_monitors).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_console).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_subwoofers).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_guitar).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_bass).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_drums).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_keyboards).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_lighting).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_stage_size).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_stage_conditions).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_hospitality).toBeTruthy();
+    expect(DOSSIER_DEFAULTS.rider_transport).toBeTruthy();
+  });
+
+  it("defaults contain expected values", () => {
+    expect(DOSSIER_DEFAULTS.rider_pa_system).toContain("15,000W");
+    expect(DOSSIER_DEFAULTS.rider_console).toContain("32 canales");
+    expect(DOSSIER_DEFAULTS.rider_stage_size).toContain("6m");
   });
 });

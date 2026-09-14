@@ -41,6 +41,14 @@ export default function EditReleasePage() {
   });
 
   const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "" }]);
+  const [lyrics, setLyrics] = useState("");
+  const [productionDetails, setProductionDetails] = useState({
+    daw: "",
+    guitars: "",
+    effects_chain: "",
+    tuning: "",
+    key: "",
+  });
 
   // Fetch release data on mount
   useEffect(() => {
@@ -50,8 +58,16 @@ export default function EditReleasePage() {
         if (res.ok) {
           const data = await res.json();
           setReleaseData(data);
+          // Parse external_links: Turso returns JSON string, local SQLite returns object
+          const el = typeof data.external_links === "string"
+            ? JSON.parse(data.external_links || "{}")
+            : (data.external_links || {});
+          // Parse production_details: same pattern
+          const pd = typeof data.production_details === "string"
+            ? JSON.parse(data.production_details || "{}")
+            : (data.production_details || {});
           setForm({
-            type: data.type || "single",
+            type: data.release_type || data.type || "single",
             title: data.title || "",
             artist_name: data.artist_name || "",
             release_date: data.release_date || "",
@@ -59,10 +75,18 @@ export default function EditReleasePage() {
             cover_image: data.cover_image || "",
             description: data.description || "",
             duration: data.duration || "",
-            spotify_url: data.external_links?.spotify || "",
-            apple_music_url: data.external_links?.apple_music || "",
-            youtube_url: data.external_links?.youtube || "",
+            spotify_url: el.spotify || "",
+            apple_music_url: el.apple_music || "",
+            youtube_url: el.youtube || "",
             status: data.status || "draft",
+          });
+          setLyrics(data.lyrics || "");
+          setProductionDetails({
+            daw: pd.daw || "",
+            guitars: pd.guitars || "",
+            effects_chain: pd.effects_chain || "",
+            tuning: pd.tuning || "",
+            key: pd.key || "",
           });
           if (data.tracks) {
             setTracks(data.tracks.map((t: any) => ({
@@ -216,6 +240,8 @@ export default function EditReleasePage() {
           status,
           artist_id: user?.id,
           tracks: tracks.filter((t) => t.title),
+          lyrics: lyrics || null,
+          production_details: JSON.stringify(productionDetails),
           external_links: {
             spotify: form.spotify_url,
             apple_music: form.apple_music_url,
@@ -426,6 +452,75 @@ export default function EditReleasePage() {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Lyrics */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Letras</label>
+              <textarea
+                value={lyrics}
+                onChange={(e) => setLyrics(e.target.value)}
+                rows={6}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono text-sm resize-y"
+                placeholder="Pega las letras del track aquí..."
+              />
+            </div>
+
+            {/* Production Details */}
+            <div>
+              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Ficha de Producción</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">DAW / Software</label>
+                  <input
+                    type="text"
+                    value={productionDetails.daw}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, daw: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="Pro Tools, Logic Pro, Ableton..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Guitarras / Instrumentos</label>
+                  <input
+                    type="text"
+                    value={productionDetails.guitars}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, guitars: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="Fender Stratocaster, Gibson Les Paul..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Cadena de Efectos</label>
+                  <input
+                    type="text"
+                    value={productionDetails.effects_chain}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, effects_chain: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="Reverb, Delay, Distortion..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Afinación</label>
+                  <input
+                    type="text"
+                    value={productionDetails.tuning}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, tuning: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="Standard E, Drop D..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Tonalidad</label>
+                  <input
+                    type="text"
+                    value={productionDetails.key}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, key: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="C major, A minor..."
+                  />
+                </div>
               </div>
             </div>
 

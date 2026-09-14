@@ -1821,3 +1821,146 @@ export function getDbWrite() {
 }
 
 export { getTursoClient as getTurso };
+
+// ─── Dossiers (P3 Batch 2 Hotfix) ──────────────────────────────────────────
+
+export interface DossierData {
+  id: string;
+  artist_id: string;
+  biography: string | null;
+  press_text: string | null;
+  genre: string | null;
+  location: string | null;
+  influences: string | null;
+  contact_email: string | null;
+  booking_email: string | null;
+  management: string | null;
+  website: string | null;
+  rider_pa_system: string | null;
+  rider_monitors: string | null;
+  rider_console: string | null;
+  rider_subwoofers: string | null;
+  rider_guitar: string | null;
+  rider_bass: string | null;
+  rider_drums: string | null;
+  rider_keyboards: string | null;
+  rider_lighting: string | null;
+  rider_stage_size: string | null;
+  rider_stage_conditions: string | null;
+  rider_hospitality: string | null;
+  rider_transport: string | null;
+  rider_special_notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export const DOSSIER_DEFAULTS = {
+  rider_pa_system: "Line Array - Minimo 15,000W RMS",
+  rider_monitors: "Minimo 4 mezclas in-ear o wedge",
+  rider_console: "Digital - minimo 32 canales",
+  rider_subwoofers: "Minimo 4 sub-graves (18 o 21)",
+  rider_guitar: "Amplificador Combo 100W o Head + Cabinet",
+  rider_bass: "Amplificador Combo 300W minimo",
+  rider_drums: "Kit completo + hardware + baquetas",
+  rider_keyboards: "Piano digital 88 teclas con sustain",
+  rider_lighting: "Iluminacion basica con focus en escenario",
+  rider_stage_size: "Minimo 6m x 4m",
+  rider_stage_conditions: "Escenario cubierto y seco",
+  rider_hospitality: "Agua natural, cafe, frutas frescas, snacks antes del show",
+  rider_transport: "Transporte desde hotel al venue incluido",
+};
+
+function parseDossier(row: Record<string, unknown>): DossierData {
+  return {
+    id: safeString(row.id),
+    artist_id: safeString(row.artist_id),
+    biography: row.biography as string | null,
+    press_text: row.press_text as string | null,
+    genre: row.genre as string | null,
+    location: row.location as string | null,
+    influences: row.influences as string | null,
+    contact_email: row.contact_email as string | null,
+    booking_email: row.booking_email as string | null,
+    management: row.management as string | null,
+    website: row.website as string | null,
+    rider_pa_system: (row.rider_pa_system as string) || DOSSIER_DEFAULTS.rider_pa_system,
+    rider_monitors: (row.rider_monitors as string) || DOSSIER_DEFAULTS.rider_monitors,
+    rider_console: (row.rider_console as string) || DOSSIER_DEFAULTS.rider_console,
+    rider_subwoofers: (row.rider_subwoofers as string) || DOSSIER_DEFAULTS.rider_subwoofers,
+    rider_guitar: (row.rider_guitar as string) || DOSSIER_DEFAULTS.rider_guitar,
+    rider_bass: (row.rider_bass as string) || DOSSIER_DEFAULTS.rider_bass,
+    rider_drums: (row.rider_drums as string) || DOSSIER_DEFAULTS.rider_drums,
+    rider_keyboards: (row.rider_keyboards as string) || DOSSIER_DEFAULTS.rider_keyboards,
+    rider_lighting: (row.rider_lighting as string) || DOSSIER_DEFAULTS.rider_lighting,
+    rider_stage_size: (row.rider_stage_size as string) || DOSSIER_DEFAULTS.rider_stage_size,
+    rider_stage_conditions: (row.rider_stage_conditions as string) || DOSSIER_DEFAULTS.rider_stage_conditions,
+    rider_hospitality: (row.rider_hospitality as string) || DOSSIER_DEFAULTS.rider_hospitality,
+    rider_transport: (row.rider_transport as string) || DOSSIER_DEFAULTS.rider_transport,
+    rider_special_notes: row.rider_special_notes as string | null,
+    created_at: row.created_at as string | null,
+    updated_at: row.updated_at as string | null,
+  };
+}
+
+export async function getDossierByArtistId(artistId: string): Promise<DossierData | null> {
+  if (USE_TURSO) {
+    const client = getTursoClient();
+    if (!client) return null;
+    const result = await client.execute({
+      sql: "SELECT * FROM dossiers WHERE artist_id = ?",
+      args: [artistId],
+    });
+    if (result.rows.length === 0) return null;
+    return parseDossier(result.rows[0] as Record<string, unknown>);
+  }
+  const db = getLocalDbWrite();
+  const row = db.prepare("SELECT * FROM dossiers WHERE artist_id = ?").get(artistId) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return parseDossier(row);
+}
+
+export async function upsertDossier(artistId: string, data: Partial<DossierData>): Promise<DossierData> {
+  const existing = await getDossierByArtistId(artistId);
+  const now = new Date().toISOString();
+
+  if (existing) {
+    const fields = Object.keys(data).filter(k => k !== "id" && k !== "artist_id" && k !== "created_at" && k !== "updated_at");
+    const setClauses = fields.map(k => `${k} = ?`).join(", ");
+    const values = fields.map(k => (data as any)[k] ?? null);
+
+    if (USE_TURSO) {
+      const client = getTursoClient();
+      if (!client) throw new Error("Turso not configured");
+      await client.execute({
+        sql: `UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`,
+        args: [...values, now, artistId],
+      });
+    } else {
+      const db = getLocalDbWrite();
+      db.prepare(`UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`).run(...values, now, artistId);
+    }
+    return (await getDossierByArtistId(artistId))!;
+  }
+
+  const id = `dos-${Date.now()}`;
+  const allFields = ["id", "artist_id", ...Object.keys(data).filter(k => k !== "id" && k !== "artist_id")];
+  const placeholders = allFields.map(() => "?").join(", ");
+  const values = allFields.map(k => {
+    if (k === "id") return id;
+    if (k === "artist_id") return artistId;
+    return (data as any)[k] ?? null;
+  });
+
+  if (USE_TURSO) {
+    const client = getTursoClient();
+    if (!client) throw new Error("Turso not configured");
+    await client.execute({
+      sql: `INSERT INTO dossiers (${allFields.join(", ")}, created_at, updated_at) VALUES (${placeholders}, ?, ?)`,
+      args: [...values, now, now],
+    });
+  } else {
+    const db = getLocalDbWrite();
+    db.prepare(`INSERT INTO dossiers (${allFields.join(", ")}, created_at, updated_at) VALUES (${placeholders}, ?, ?)`).run(...values, now, now);
+  }
+  return (await getDossierByArtistId(artistId))!;
+}

@@ -3370,3 +3370,134 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 - `edc5029` — fix(P3): Revert dashboard to getAllTracks() temporarily
 - `b1338e8` — fix(P3): Filter parent releases client-side in dashboard API
 - `0bb1c5f` — fix(test): Use .first() for admin link locator
+
+---
+
+## P3 Batch 2 Hotfix — Plan de Cambios (2026-09-13)
+
+> **Autor**: opencode/mimo-v2.5-free
+> **Fecha**: 2026-09-13
+> **Estado**: PLAN — Pre-ejecución
+
+### Problemas Reportados por Usuario
+
+| # | Problema | Severidad | Impacto |
+|---|----------|-----------|---------|
+| 1 | Releases "Sin estado" en admin panel | Alta | Admin no puede filtrar/Aprobar/Rechazar releases |
+| 2 | YouTube auto-fill invisible en edit release | Alta | Artista no puede auto-completar datos desde YouTube |
+| 3 | Sin campos de lyrics/producción en edit release | Media | Artista no puede editar letras ni ficha de producción |
+| 4 | DossierEditor es un stub sin funcionalidad real | Alta | No hay forma de editar dossier/press kit |
+| 5 | Rider Técnico no editable | Alta | No hay UI para personalizar rider técnico |
+
+### Causas Raíz Identificadas
+
+**Issue 1**: `scripts/fix-release-status.ts` fue creado pero nunca ejecutado contra Turso producción. Los 8 tracks seed tienen `status = NULL`.
+
+**Issue 2**: `app/releases/[id]/edit/page.tsx:63` carga `external_links` directamente pero Turso retorna JSON string (`'{"youtube":"..."}'`), no objeto. Resultado: `data.external_links?.youtube` → `undefined` → `form.youtube_url = ""` → botón auto-fill invisible (línea 381: `{form.youtube_url && ...}`).
+
+**Issue 3**: Formulario de edición solo tiene: título, artista, fecha, género, cover, descripción, links, tracks. Faltan campos de `lyrics` (textarea) y `production_details` (DAW, guitars, effects_chain, tuning, key).
+
+**Issue 4+5**: `DossierEditor.tsx` (70 líneas) solo tiene biography + email de contacto. No existe tabla en DB para persistir datos de dossier/rider. No hay API route. `generateRiderHTML()` y `generateDossierHTML()` usan valores hardcodeados.
+
+### Plan de Ejecución (7 Pasos)
+
+#### Paso 1: Fix Releases Status NULL → approved
+- **Acción**: Ejecutar `npx tsx scripts/fix-release-status.ts` contra Turso
+- **Verificación**: Query SQL post-ejecución
+- **Testing**: curl `GET /api/admin/releases` → verificar status "approved"
+
+#### Paso 2: Fix YouTube Auto-fill Invisible
+- **Archivo**: `app/releases/[id]/edit/page.tsx`
+- **Cambio**: Parsear `external_links` de JSON string a objeto al cargar release
+- **Testing**:
+  - Unit test: `parseExternalLinks()` en Vitest
+  - E2E: Login → Edit release con YouTube → Verificar botón visible
+  - Visual: Screenshot edit page con botón
+
+#### Paso 3: Agregar Lyrics + Production Details
+- **Archivo**: `app/releases/[id]/edit/page.tsx`
+- **Cambios**:
+  - form state: `lyrics: ""`, `production_details: { daw, guitars, effects_chain, tuning, key }`
+  - Parsear ambos campos al cargar (JSON string → objeto)
+  - UI: textarea lyrics + grid 5 campos producción
+  - PUT: enviar `lyrics` + `JSON.stringify(production_details)`
+- **Testing**:
+  - E2E: Edit → modificar lyrics/producción → guardar → recargar → verificar persistencia
+  - API: curl PUT + GET verificar campos
+
+#### Paso 4: Tabla dossiers + API Route
+- **Archivos nuevos**:
+  - `lib/turso.ts` — CREATE TABLE dossiers
+  - `lib/db.ts` — `getDossierByArtistId()`, `upsertDossier()`, `parseDossier()`
+  - `app/api/dossiers/route.ts` — GET + PUT
+- **Schema** (14 campos rider con defaults del Rider actual hardcodeado + 9 campos dossier):
+  ```
+  dossiers: id, artist_id (UNIQUE FK), biography, press_text, genre, location,
+  influences, contact_email, booking_email, management, website,
+  rider_pa_system (DEFAULT Line Array 15kW), rider_monitors (DEFAULT 4 in-ear),
+  rider_console (DEFAULT Digital 32ch), rider_subwoofers (DEFAULT 4 sub 18"),
+  rider_guitar (DEFAULT Combo 100W), rider_bass (DEFAULT Combo 300W),
+  rider_drums (DEFAULT Kit completo), rider_keyboards (DEFAULT 88 teclas),
+  rider_lighting (DEFAULT básica), rider_stage_size (DEFAULT 6x4m),
+  rider_stage_conditions (DEFAULT cubierto), rider_hospitality (DEFAULT café+frutas),
+  rider_transport (DEFAULT hotel→venue), rider_special_notes
+  ```
+- **Testing**:
+  - Unit: parseDossier(), getDossierByArtistId(), upsertDossier()
+  - API: curl GET/PUT dossiers
+
+#### Paso 5: Reescribir DossierEditor
+- **Archivo**: `components/DossierEditor.tsx` — rewrite ~300 líneas
+- **Props**: `{ artistId: string, artistName: string }`
+- **UI**: Tabs "📄 Dossier" | "🎤 Rider"
+  - Dossier: 9 campos (biography, press_text, genre, location, influences, contact_email, booking_email, management, website)
+  - Rider: 14 campos en 6 secciones (Audio, Backline, Escenario, Hospitality, Transporte, Notas)
+- **Persistencia**: GET/PUT via `/api/dossiers`
+- **Testing**:
+  - E2E: Login → Dashboard → Tabs → Edit → Save → Reload → Verify
+  - Visual: Screenshots tabs, mobile
+  - Null safety: Sin datos iniciales
+
+#### Paso 6: Actualizar downloadable-assets
+- **Archivo**: `lib/downloadable-assets.ts`
+- **Cambios**: `generateRiderHTML(name, riderData)`, `generateDossierHTML(name, dossierData)` con datos reales
+- **Testing**:
+  - Unit: Tests actualizados en `tests/unit/downloadable-assets.test.ts`
+  - Visual: Screenshot HTML generado con datos personalizados
+
+#### Paso 7: Dashboard Wiring
+- **Archivo**: `app/dashboard/page.tsx`
+- **Cambio**: `<DossierEditor artistId={artistProfile.id} artistName={artistProfile.name} />`
+- **Testing**:
+  - E2E: Dashboard → Sección Dossier/Rider visible con nombre del artista
+
+### Estrategia de Testing
+
+| Tipo | Herramienta | Tests Nuevos | Cobertura |
+|------|-------------|-------------|-----------|
+| Unit | Vitest | ~8 | parseExternalLinks, parseDossier, getDossierByArtistId, upsertDossier, downloadable-assets actualizados |
+| API | curl (producción) | ~6 | dossiers GET/PUT, releases status, edit release PUT con lyrics/production |
+| E2E Production | Playwright | ~8 | Edit release YouTube, DossierEditor tabs, admin releases status, edit lyrics/production |
+| Visual Regression | Playwright screenshot | ~5 | Edit page con botón, DossierEditor tabs, Rider HTML generado |
+| Null Safety | Playwright | ~2 | DossierEditor sin datos, edit release campos vacíos |
+| Regression | Playwright | Suite existente | Admin 7, Artist 6, Auth 10, Null Safety 2 |
+
+### Archivos Afectados
+
+| Archivo | Tipo | Issues |
+|---------|------|--------|
+| `scripts/fix-release-status.ts` | Ejecutar | 1 |
+| `app/releases/[id]/edit/page.tsx` | Modificar | 2, 3 |
+| `lib/turso.ts` | Modificar | 4 |
+| `lib/db.ts` | Modificar | 4 |
+| `app/api/dossiers/route.ts` | **Nuevo** | 4 |
+| `components/DossierEditor.tsx` | **Reescribir** | 4, 5 |
+| `lib/downloadable-assets.ts` | Modificar | 4 |
+| `app/dashboard/page.tsx` | Modificar | 7 |
+| `tests/unit/downloadable-assets.test.ts` | Modificar | 6 |
+| `tests/unit/db.test.ts` | Modificar | 4 |
+| `tests/unit/json-parse.test.ts` | **Nuevo** | 2 |
+
+### Estimación
+- **Esfuerzo**: ~700-800 líneas nuevas/modificadas en ~11 archivos
+- **Tiempo estimado**: ~2-3 horas de ejecución
