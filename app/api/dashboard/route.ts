@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
 
-    const tracks = await getAllTracks();
+    // P3 Batch 2: Only parent releases (release_id IS NULL) — filter client-side
+    // to avoid Turso issues with new columns
+    const allTracks = await getAllTracks();
+    const tracks = allTracks.filter(t => !t.release_id);
     const artists = await getAllArtists();
 
     let artistProfile = null;
