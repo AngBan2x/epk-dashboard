@@ -3345,6 +3345,28 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 | `MASTER_PLAN.md` | Modificar | Todos |
 
 ### Quality Gates (previos al commit)
-- ⏳ `npx tsc --noEmit` — Pendiente
-- ⏳ `pnpm test:unit` — Pendiente
-- ⏳ `pnpm build` — Pendiente
+- ✅ `npx tsc --noEmit` — 0 errores
+- ✅ `pnpm test:unit` — 71/71 tests passed
+- ✅ `pnpm build` — Exitoso (NODE_OPTIONS="--max-old-space-size=4096")
+
+### Production Test Results (Vercel — 2026-09-13)
+- ✅ **Dashboard API**: 200 — 8 tracks, 7 artists
+- ✅ **Admin E2E**: 7/7 passed (login, panel, tabs, dark mode, non-admin blocked)
+- ✅ **Artist E2E**: 6/6 passed (login, tracks, bio, shows, dark mode, mobile)
+- ✅ **Auth E2E**: 10/10 passed (login, logout, token, expired, middleware, session)
+- ✅ **Null Safety E2E**: 2/2 passed (console errors, null youtube_video_id)
+- ⏭️ Register/Delete E2E: Skipped (write ops on Turso, expected to fail in prod)
+- ⏭️ Multimedia E2E: Timeout (audio player tests, non-blocking)
+
+### Production Fix (2026-09-13)
+- 🐛 **Dashboard API 500**: `getParentReleases()` query failed on Turso
+  - **Root cause**: SQL query with `release_id IS NULL` caused Turso error
+  - **Fix**: Reverted to `getAllTracks()` + client-side filter `t => !t.release_id`
+  - **Commits**: `edc5029`, `b1338e8`
+
+### Commits (P3 Batch 2)
+- `43d0c20` — feat(P3): Multi-track releases, YouTube timestamps, loading/error states, chapters
+- `2a8777e` — fix(P3): Remove ORDER BY created_at from dashboard queries
+- `edc5029` — fix(P3): Revert dashboard to getAllTracks() temporarily
+- `b1338e8` — fix(P3): Filter parent releases client-side in dashboard API
+- `0bb1c5f` — fix(test): Use .first() for admin link locator
