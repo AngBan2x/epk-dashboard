@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
-import { getTursoClient } from "@/lib/turso";
 import { decodeSessionToken, isSessionValid } from "@/lib/auth";
+
+const TURSO_URL = process.env.TURSO_DATABASE_URL;
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +16,19 @@ function validateAdminSession(req: NextRequest): { userId: string; role: string 
   return { userId: session.userId, role: session.role };
 }
 
+function createFreshClient() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createClient } = require("@libsql/client");
+  return createClient({ url: TURSO_URL!, authToken: TURSO_TOKEN! });
+}
+
 async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
   if (isTursoConfigured()) {
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso client not available");
-    const result = await client.execute({ sql, args: (params ?? []) as any[] });
+    const client = createFreshClient();
+    const bustSql = sql.trimStart().toUpperCase().startsWith("SELECT")
+      ? `${sql} /*admin${Date.now()}*/`
+      : sql;
+    const result = await client.execute({ sql: bustSql, args: (params ?? []) as any[] });
     return result.rows as unknown[];
   }
   const db = getDbWrite();
@@ -28,8 +38,7 @@ async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
 
 async function dbRun(sql: string, params?: unknown[]): Promise<void> {
   if (isTursoConfigured()) {
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso client not available");
+    const client = createFreshClient();
     await client.execute({ sql, args: (params ?? []) as any[] });
     return;
   }
@@ -56,7 +65,7 @@ export async function GET(req: NextRequest) {
       SELECT t.*, a.name as artist_name, a.slug as artist_slug
       FROM tracks t
       LEFT JOIN artists a ON t.artist_name = a.name
-      WHERE 1=1
+      WHERE t.release_id IS NULL
     `;
     const params: (string | number)[] = [];
 
@@ -71,7 +80,7 @@ export async function GET(req: NextRequest) {
     const releases = await dbQuery(query, params);
 
     // Get total count for pagination
-    let countQuery = "SELECT COUNT(*) as total FROM tracks WHERE 1=1";
+    let countQuery = "SELECT COUNT(*) as total FROM tracks WHERE release_id IS NULL";
     const countParams: (string | number)[] = [];
     if (status && status !== "all") {
       countQuery += " AND status = ?";

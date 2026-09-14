@@ -84,7 +84,7 @@ export default function EditReleasePage() {
           setProductionDetails({
             daw: pd.daw || "",
             guitars: pd.guitars || "",
-            effects_chain: pd.effects_chain || "",
+            effects_chain: pd.effects_chain || pd.effects || "",
             tuning: pd.tuning || "",
             key: pd.key || "",
           });
