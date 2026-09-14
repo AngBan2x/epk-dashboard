@@ -1544,13 +1544,13 @@ export async function getTracksByReleaseId(releaseId: string): Promise<Track[]> 
 export async function getParentReleases(): Promise<Track[]> {
   if (USE_TURSO) {
     const rows = await tursoExec(
-      "SELECT * FROM tracks WHERE release_id IS NULL ORDER BY created_at DESC"
+      "SELECT * FROM tracks WHERE release_id IS NULL"
     );
     return rows.map((r) => parseTrack(r as Record<string, unknown>));
   }
   const db = getLocalDb();
   const rows = db
-    .prepare("SELECT * FROM tracks WHERE release_id IS NULL ORDER BY created_at DESC")
+    .prepare("SELECT * FROM tracks WHERE release_id IS NULL")
     .all() as Record<string, unknown>[];
   return rows.map(parseTrack);
 }
@@ -1559,13 +1559,13 @@ export async function getParentReleases(): Promise<Track[]> {
 export async function getApprovedReleases(): Promise<Track[]> {
   if (USE_TURSO) {
     const rows = await tursoExec(
-      "SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved' ORDER BY created_at DESC"
+      "SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved'"
     );
     return rows.map((r) => parseTrack(r as Record<string, unknown>));
   }
   const db = getLocalDb();
   const rows = db
-    .prepare("SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved' ORDER BY created_at DESC")
+    .prepare("SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved'")
     .all() as Record<string, unknown>[];
   return rows.map(parseTrack);
 }
