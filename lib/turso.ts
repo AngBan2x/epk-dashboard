@@ -81,6 +81,8 @@ export async function ensureTursoSchema(): Promise<boolean> {
       sides_b TEXT,
       isrc TEXT,
       composers TEXT,
+      genre TEXT,
+      description TEXT,
       streams INTEGER DEFAULT 0,
       status TEXT DEFAULT 'draft',
       updated_at TEXT,
@@ -98,6 +100,9 @@ export async function ensureTursoSchema(): Promise<boolean> {
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN release_id TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN start_time REAL DEFAULT 0`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN end_time REAL DEFAULT 0`); } catch {}
+  // P3 Batch 2: Release form fields
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN genre TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN description TEXT`); } catch {}
 
   // 2. artists (con user_id FK + P2.1)
   await client.execute(`
