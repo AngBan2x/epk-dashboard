@@ -9,6 +9,8 @@ import { SocialBar } from "@/components/SocialBar";
 import { ShowsBooking } from "@/components/ShowsBooking";
 import { LoginModal } from "@/components/LoginModal";
 import LastfmMetrics from "@/components/LastfmMetrics";
+import { DossierEditor } from "@/components/DossierEditor";
+import { DownloadCenter } from "@/components/DownloadCenter";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
@@ -287,20 +289,6 @@ export default function DashboardPage() {
                           <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           Editar
                         </a>
-                        <a
-                          href={`/track/${track.id}`}
-                          className="absolute bottom-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm text-xs font-medium text-slate-700 dark:text-slate-300 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950 dark:hover:text-blue-300 shadow-sm"
-                        >
-                          📝 Lyrics / Producción
-                        </a>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <a
-                          href={`/track/${track.id}`}
-                          className="text-[10px] text-slate-500 hover:text-primary-500 dark:text-slate-400 dark:hover:text-primary-400"
-                        >
-                          Ver detalle
-                        </a>
                       </div>
                     </SlideIn>
                   ))}
@@ -311,6 +299,29 @@ export default function DashboardPage() {
                   )}
                 </div>
               </section>
+
+              {/* P3 Batch 2: Dossier / Rider Section */}
+              {artistProfile && (
+                <section className="mb-12">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">📄 Dossier / Rider</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    Personaliza tu biografía y datos de contacto para generar documentos profesionales descargables.
+                  </p>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <SlideIn index={artistTracks.length + 2}>
+                      <DossierEditor
+                        artistName={artistProfile.name}
+                      />
+                    </SlideIn>
+                    <SlideIn index={artistTracks.length + 3}>
+                      <DownloadCenter
+                        artistName={artistProfile.name}
+                        trackCount={artistTracks.length}
+                      />
+                    </SlideIn>
+                  </div>
+                </section>
+              )}
 
               {/* Artist's Bio + Shows */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">

@@ -28,7 +28,7 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
   const [localPlaying, setLocalPlaying] = useState(false);
   const [currentSource, setCurrentSource] = useState<AudioSource | null>(null);
   const globalPlayer = useContext(AudioPlayerContext);
-  const { isPlaying: globalIsPlaying, isLoading: globalIsLoading } = globalPlayer || {};
+  const { isPlaying: globalIsPlaying, isLoading: globalIsLoading, error: globalError } = globalPlayer || {};
 
   // Determine available audio sources from track data
   const sources = track ? getAudioSources(track) : [];
@@ -42,14 +42,21 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
     : false;
 
   const isPlaying = globalPlayer ? isCurrentGlobal && globalIsPlaying : localPlaying;
+  const isError = globalPlayer && isCurrentGlobal && globalError;
 
   let playButton: React.ReactNode;
-  if (globalIsLoading && !isPlaying) {
+  if (isError) {
+    // P3.34: Error state
     playButton = (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-        <circle cx="12" cy="12" r="10" strokeWidth="4" />
-        <line x1="4" y1="4" x2="20" y2="20" strokeWidth="2" />
-        <line x1="4" y1="20" x2="20" y2="4" strokeWidth="2" />
+      <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    );
+  } else if (globalIsLoading && !isPlaying) {
+    playButton = (
+      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75" />
       </svg>
     );
   } else if (isPlaying) {

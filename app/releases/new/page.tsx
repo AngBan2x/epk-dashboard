@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
+import { parseYouTubeChapters, parseISO8601Duration, secondsToTimestamp, type YouTubeChapter } from "@/lib/youtube";
 
 type ReleaseType = "single" | "ep" | "album";
 
@@ -11,6 +12,9 @@ interface TrackInput {
   title: string;
   duration: string;
   isrc: string;
+  // P3.27: YouTube timestamps
+  start_time: number;
+  end_time: number;
 }
 
 import { getYouTubeThumbnail } from "@/lib/null-safe";
@@ -95,7 +99,8 @@ export default function NewReleasePage() {
     }
   };
 
-  const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "" }]);
+  const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "", start_time: 0, end_time: 0 }]);
+  const [chaptersLoading, setChaptersLoading] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -106,12 +111,57 @@ export default function NewReleasePage() {
 
   if (authLoading || !user) return null;
 
-  const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "" }]);
+  const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "", start_time: 0, end_time: 0 }]);
   const removeTrack = (index: number) => setTracks(tracks.filter((_, i) => i !== index));
   const updateTrack = (index: number, field: keyof TrackInput, value: string) => {
     const newTracks = [...tracks];
-    newTracks[index][field] = value;
+    (newTracks[index] as any)[field] = value;
     setTracks(newTracks);
+  };
+
+  // P3.27: Detect chapters from YouTube video
+  const detectChapters = async () => {
+    const videoId = extractYouTubeId(form.youtube_url);
+    if (!videoId) {
+      setMessage({ type: "error", text: "URL de YouTube no válida" });
+      return;
+    }
+
+    setChaptersLoading(true);
+    try {
+      const res = await fetch(`/api/youtube?id=${videoId}`);
+      if (!res.ok) {
+        throw new Error("No se pudo obtener información del video");
+      }
+
+      const videoData = await res.json();
+      const description = videoData.description || "";
+      const durationSeconds = videoData.durationSeconds || parseISO8601Duration(videoData.duration || "PT0S");
+
+      const chapters = parseYouTubeChapters(description, durationSeconds);
+
+      if (chapters.length === 0) {
+        setMessage({ type: "error", text: "No se detectaron chapters en la descripción del video" });
+        return;
+      }
+
+      // Convert chapters to track inputs
+      const newTracks: TrackInput[] = chapters.map((chapter) => ({
+        title: chapter.title,
+        duration: secondsToTimestamp(chapter.endTime - chapter.startTime),
+        isrc: "",
+        start_time: chapter.startTime,
+        end_time: chapter.endTime,
+      }));
+
+      setTracks(newTracks);
+      setMessage({ type: "success", text: `${chapters.length} chapters detectados y agregados como tracks` });
+    } catch (error) {
+      console.error("Error detecting chapters:", error);
+      setMessage({ type: "error", text: "Error al detectar chapters" });
+    } finally {
+      setChaptersLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent, submitForReview = false) => {
@@ -287,6 +337,17 @@ export default function NewReleasePage() {
                   className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                   placeholder="YouTube URL"
                 />
+                {/* P3.27: Detect chapters button */}
+                {form.youtube_url && (
+                  <button
+                    type="button"
+                    onClick={detectChapters}
+                    disabled={chaptersLoading}
+                    className="mt-2 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors disabled:opacity-50"
+                  >
+                    {chaptersLoading ? "⏳ Detectando..." : "🎯 Detectar chapters"}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -313,6 +374,14 @@ export default function NewReleasePage() {
                       className="w-20 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
                       placeholder="3:45"
                     />
+                    {/* P3.27: Show timestamps for YouTube chapters */}
+                    {track.start_time > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="font-mono">{secondsToTimestamp(track.start_time)}</span>
+                        <span>—</span>
+                        <span className="font-mono">{secondsToTimestamp(track.end_time)}</span>
+                      </div>
+                    )}
                     {tracks.length > 1 && (
                       <button type="button" onClick={() => removeTrack(index)} className="p-2 text-red-500 hover:text-red-600">✕</button>
                     )}

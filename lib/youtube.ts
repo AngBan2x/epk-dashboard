@@ -85,6 +85,7 @@ export interface YouTubeVideoStats {
   duration: string; // ISO 8601 like PT4M13S
   title: string;
   thumbnail: string;
+  description: string; // P3.27: For chapter detection
 }
 
 /**
@@ -114,6 +115,7 @@ export async function getVideoStats(videoId: string): Promise<YouTubeVideoStats 
       duration: contentDetails?.duration || '',
       title: snippet?.title || '',
       thumbnail: snippet?.thumbnails?.high?.url || snippet?.thumbnails?.default?.url || '',
+      description: snippet?.description || '',
     };
   } catch {
     return null;
@@ -134,4 +136,83 @@ export function parseISODuration(duration: string): string {
     return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+// P3.27: YouTube Chapter Detection
+export interface YouTubeChapter {
+  title: string;
+  startTime: number;
+  endTime: number;
+}
+
+/**
+ * Parse YouTube chapters from video description.
+ * Supports formats:
+ * - "0:00 Intro"
+ * - "1:30 - Song 1"
+ * - "01:30:00 Track 1"
+ * - "1:30 Canción 1 - Artista"
+ */
+export function parseYouTubeChapters(description: string, durationSeconds: number): YouTubeChapter[] {
+  if (!description || durationSeconds <= 0) return [];
+
+  const lines = description.split('\n');
+  const chapters: YouTubeChapter[] = [];
+
+  // Regex: timestamp (MM:SS or HH:MM:SS) followed by optional separator and title
+  const timestampRegex = /^(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–]?\s*(.+)$/;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(timestampRegex);
+
+    if (match) {
+      const timestamp = match[1];
+      const title = match[2].trim();
+
+      // Convert timestamp to seconds
+      const parts = timestamp.split(':').map(Number);
+      let seconds = 0;
+      if (parts.length === 3) {
+        // HH:MM:SS
+        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      } else if (parts.length === 2) {
+        // MM:SS
+        seconds = parts[0] * 60 + parts[1];
+      }
+
+      // Skip if timestamp is 0 (first chapter) or if title is empty
+      if (seconds > 0 && title) {
+        chapters.push({ title, startTime: seconds, endTime: 0 });
+      }
+    }
+  }
+
+  // Sort by startTime
+  chapters.sort((a, b) => a.startTime - b.startTime);
+
+  // Calculate endTime for each chapter (next chapter's startTime or video duration)
+  for (let i = 0; i < chapters.length; i++) {
+    if (i < chapters.length - 1) {
+      chapters[i].endTime = chapters[i + 1].startTime;
+    } else {
+      chapters[i].endTime = durationSeconds;
+    }
+  }
+
+  return chapters;
+}
+
+/**
+ * Convert seconds to MM:SS or HH:MM:SS format
+ */
+export function secondsToTimestamp(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${mins}:${String(secs).padStart(2, '0')}`;
 }

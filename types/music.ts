@@ -65,6 +65,10 @@ export interface Track {
   streams?: number;
   // Lyrics metadata
   is_instrumental?: boolean;
+  // P3 Batch 2: Multi-track releases + YouTube timestamps
+  release_id?: string | null;
+  start_time?: number;
+  end_time?: number;
 }
 
 export interface ExternalLinks {

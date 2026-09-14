@@ -151,6 +151,12 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
             ✨ Nuevo
           </div>
         )}
+        {/* P3.29: Badge for multi-track releases */}
+        {track.release_id && (
+          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
+            🎵 Multipista
+          </div>
+        )}
       </div>
       <CardContent className="flex flex-col flex-grow p-4">
         <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-white">{title}</h3>
