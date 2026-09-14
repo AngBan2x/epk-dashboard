@@ -335,12 +335,51 @@ function initLocalTables(): void {
   // Release approval workflow
   try { db.exec(`ALTER TABLE tracks ADD COLUMN status TEXT DEFAULT 'draft'`); } catch {}
   try { db.exec(`ALTER TABLE tracks ADD COLUMN updated_at TEXT`); } catch {}
+  // Release form fields
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN genre TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN description TEXT`); } catch {}
 
   // P2.6: Add new columns to track_submissions (safe ALTER TABLE)
   try { db.exec(`ALTER TABLE track_submissions ADD COLUMN submission_type TEXT DEFAULT 'track'`); } catch {}
   try { db.exec(`ALTER TABLE track_submissions ADD COLUMN metadata TEXT`); } catch {}
   try { db.exec(`ALTER TABLE track_submissions ADD COLUMN admin_id TEXT`); } catch {}
   try { db.exec(`ALTER TABLE track_submissions ADD COLUMN reviewed_at TEXT`); } catch {}
+
+  // Dossiers table (artist profiles + rider)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dossiers (
+      id TEXT PRIMARY KEY,
+      artist_id TEXT NOT NULL UNIQUE,
+      biography TEXT,
+      press_text TEXT,
+      genre TEXT,
+      location TEXT,
+      influences TEXT,
+      contact_email TEXT,
+      booking_email TEXT,
+      management TEXT,
+      website TEXT,
+      rider_pa_system TEXT DEFAULT 'Line Array — 2x JBL VTX A12 por lado',
+      rider_monitors TEXT DEFAULT '2x wedge por músico (Shure PSM300)',
+      rider_console TEXT DEFAULT 'Yamaha CL5 o Allen & Heath dLive',
+      rider_subwoofers TEXT DEFAULT '4x JBL VTX S28',
+      rider_guitar TEXT DEFAULT 'Fender Twin Reverb o Marshall JCM800',
+      rider_bass TEXT DEFAULT 'Ampeg SVT-CL + 8x10 cab',
+      rider_drums TEXT DEFAULT 'Pearl Reference — platillos Zildjian A Custom',
+      rider_keyboards TEXT DEFAULT 'Nord Stage 4 88',
+      rider_lighting TEXT DEFAULT 'Mínimo 8 cabezales moving head + LED bars',
+      rider_stage_size TEXT DEFAULT 'Mínimo 8x6 metros',
+      rider_stage_conditions TEXT DEFAULT 'Piso seco, sin pendiente, protección del viento',
+      rider_hospitality TEXT DEFAULT '2 habitaciones privadas, catering vegano disponible',
+      rider_transport TEXT DEFAULT 'Furgoneta para equipo + transporte artista',
+      rider_special_notes TEXT,
+      created_at TEXT,
+      updated_at TEXT,
+      FOREIGN KEY (artist_id) REFERENCES artists(id)
+    )
+  `);
+  try { db.exec(`ALTER TABLE dossiers ADD COLUMN genre TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE dossiers ADD COLUMN description TEXT`); } catch {}
 }
 
 // Initialize local tables on module load (only when not using Turso)
@@ -1904,14 +1943,9 @@ function parseDossier(row: Record<string, unknown>): DossierData {
 
 export async function getDossierByArtistId(artistId: string): Promise<DossierData | null> {
   if (USE_TURSO) {
-    const client = getTursoClient();
-    if (!client) return null;
-    const result = await client.execute({
-      sql: "SELECT * FROM dossiers WHERE artist_id = ?",
-      args: [artistId],
-    });
-    if (result.rows.length === 0) return null;
-    return parseDossier(result.rows[0] as Record<string, unknown>);
+    const rows = await tursoExec("SELECT * FROM dossiers WHERE artist_id = ?", [artistId]);
+    if (rows.length === 0) return null;
+    return parseDossier(rows[0] as Record<string, unknown>);
   }
   const db = getLocalDbWrite();
   const row = db.prepare("SELECT * FROM dossiers WHERE artist_id = ?").get(artistId) as Record<string, unknown> | undefined;
@@ -1929,12 +1963,7 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
     const values = fields.map(k => (data as any)[k] ?? null);
 
     if (USE_TURSO) {
-      const client = getTursoClient();
-      if (!client) throw new Error("Turso not configured");
-      await client.execute({
-        sql: `UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`,
-        args: [...values, now, artistId],
-      });
+      await tursoExecUpdate(`UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`, [...values, now, artistId]);
     } else {
       const db = getLocalDbWrite();
       db.prepare(`UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`).run(...values, now, artistId);
@@ -1952,12 +1981,7 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
   });
 
   if (USE_TURSO) {
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso not configured");
-    await client.execute({
-      sql: `INSERT INTO dossiers (${allFields.join(", ")}, created_at, updated_at) VALUES (${placeholders}, ?, ?)`,
-      args: [...values, now, now],
-    });
+    await tursoExecUpdate(`INSERT INTO dossiers (${allFields.join(", ")}, created_at, updated_at) VALUES (${placeholders}, ?, ?)`, [...values, now, now]);
   } else {
     const db = getLocalDbWrite();
     db.prepare(`INSERT INTO dossiers (${allFields.join(", ")}, created_at, updated_at) VALUES (${placeholders}, ?, ?)`).run(...values, now, now);
