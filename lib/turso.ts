@@ -243,6 +243,40 @@ export async function ensureTursoSchema(): Promise<boolean> {
     )
   `);
 
+  // 10. dossiers (P3 Batch 2 Hotfix)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS dossiers (
+      id TEXT PRIMARY KEY,
+      artist_id TEXT NOT NULL UNIQUE,
+      biography TEXT,
+      press_text TEXT,
+      genre TEXT,
+      location TEXT,
+      influences TEXT,
+      contact_email TEXT,
+      booking_email TEXT,
+      management TEXT,
+      website TEXT,
+      rider_pa_system TEXT DEFAULT 'Line Array - Minimo 15,000W RMS',
+      rider_monitors TEXT DEFAULT 'Minimo 4 mezclas in-ear o wedge',
+      rider_console TEXT DEFAULT 'Digital - minimo 32 canales',
+      rider_subwoofers TEXT DEFAULT 'Minimo 4 sub-graves (18 o 21)',
+      rider_guitar TEXT DEFAULT 'Amplificador Combo 100W o Head + Cabinet',
+      rider_bass TEXT DEFAULT 'Amplificador Combo 300W minimo',
+      rider_drums TEXT DEFAULT 'Kit completo + hardware + baquetas',
+      rider_keyboards TEXT DEFAULT 'Piano digital 88 teclas con sustain',
+      rider_lighting TEXT DEFAULT 'Iluminacion basica con focus en escenario',
+      rider_stage_size TEXT DEFAULT 'Minimo 6m x 4m',
+      rider_stage_conditions TEXT DEFAULT 'Escenario cubierto y seco',
+      rider_hospitality TEXT DEFAULT 'Agua natural, cafe, frutas frescas, snacks antes del show',
+      rider_transport TEXT DEFAULT 'Transporte desde hotel al venue incluido',
+      rider_special_notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (artist_id) REFERENCES artists(id)
+    )
+  `);
+
   return true;
 }
 

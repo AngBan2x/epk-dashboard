@@ -310,11 +310,13 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <SlideIn index={artistTracks.length + 2}>
                       <DossierEditor
+                        artistId={artistProfile.id}
                         artistName={artistProfile.name}
                       />
                     </SlideIn>
                     <SlideIn index={artistTracks.length + 3}>
                       <DownloadCenter
+                        artistId={artistProfile.id}
                         artistName={artistProfile.name}
                         trackCount={artistTracks.length}
                       />
