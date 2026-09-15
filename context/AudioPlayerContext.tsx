@@ -122,7 +122,6 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     // New track
     setActiveTrack(track);
     setIsYouTubeMode(isYT);
-    setIsPlaying(true);
 
     // P3 Batch 2: Set endTimestamp for multi-track YouTube
     endTimestampRef.current = track.endTimestamp || 0;
@@ -138,6 +137,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
             yt.seek(track.startTimestamp);
           }
           yt.play();
+          setIsPlaying(true);
           startYouTubeSync();
         },
         onStateChange: (state) => {

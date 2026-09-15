@@ -236,6 +236,7 @@ export default function EditReleasePage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: releaseId,
           ...form,
           status,
           artist_id: user?.id,

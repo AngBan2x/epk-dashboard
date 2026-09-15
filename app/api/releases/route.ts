@@ -128,6 +128,11 @@ export async function POST(req: NextRequest) {
           );
         }
       }
+
+      // For single-track releases, copy duration from child to parent
+      if (tracks.length === 1 && tracks[0].duration) {
+        await dbRun("UPDATE tracks SET duration = ? WHERE id = ?", [tracks[0].duration, id]);
+      }
     }
 
     return NextResponse.json({ id, message: "Release creado exitosamente" }, { status: 201 });

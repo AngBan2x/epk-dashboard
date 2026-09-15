@@ -109,7 +109,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                       {track.artist_name}
                     </p>
                     <p className="text-slate-400 dark:text-slate-500 text-xs">
-                      {track.release_date} &middot; {formatNumber(streamCount)} streams
+                      {track.release_date} &middot; {formatNumber(streamCount)} {streamCount === 1 ? 'stream' : 'streams'}
                     </p>
                   </div>
 

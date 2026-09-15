@@ -1,12 +1,42 @@
-import { NextResponse } from "next/server";
-import { getAllArtists } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { getAllArtists, getDbWrite, isTursoConfigured } from "@/lib/db";
+import { getTursoClient } from "@/lib/turso";
+import { decodeSessionToken, isSessionValid } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/artists — Listar todos los artistas (público)
-export async function GET() {
+function validateSession(req: NextRequest): { userId: string; role: string } | null {
+  const sessionCookie = req.cookies.get("auth_session");
+  if (!sessionCookie) return null;
+  const session = decodeSessionToken(sessionCookie.value);
+  if (!session || !isSessionValid(session)) return null;
+  return { userId: session.userId, role: session.role };
+}
+
+// GET /api/artists — Listar artistas: admin ve todos, público solo aprobados
+export async function GET(req: NextRequest) {
   try {
-    const artists = await getAllArtists();
+    const session = validateSession(req);
+    const isAdmin = session?.role === "admin";
+
+    let artists;
+    if (isAdmin) {
+      artists = await getAllArtists();
+    } else {
+      if (isTursoConfigured()) {
+        const client = getTursoClient();
+        if (!client) throw new Error("Turso client not available");
+        const result = await client.execute({
+          sql: "SELECT * FROM artists WHERE is_active = 1 ORDER BY created_at DESC",
+          args: [],
+        });
+        artists = result.rows;
+      } else {
+        const db = getDbWrite();
+        artists = db.prepare("SELECT * FROM artists WHERE is_active = 1 ORDER BY created_at DESC").all();
+      }
+    }
+
     return NextResponse.json({ artists }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",

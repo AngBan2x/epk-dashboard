@@ -272,6 +272,46 @@ export default function AdminPage() {
     });
   };
 
+  const handleAdminYouTubeIdChange = async (videoId: string) => {
+    if (!videoId) return;
+    try {
+      const res = await fetch(`/api/youtube?id=${videoId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFormData(prev => {
+          const updates: Record<string, string> = {};
+
+          // Auto-fill cover image from YouTube thumbnail
+          if (data.thumbnails) {
+            const maxRes = data.thumbnails.maxres?.url
+              || data.thumbnails.standard?.url
+              || data.thumbnails.high?.url
+              || data.thumbnails.medium?.url
+              || "";
+            updates.cover_image = maxRes;
+          }
+
+          // Auto-fill duration from YouTube durationSeconds (format MM:SS)
+          if (data.durationSeconds) {
+            const totalSec = Math.round(data.durationSeconds);
+            const minutes = Math.floor(totalSec / 60);
+            const seconds = totalSec % 60;
+            updates.duration = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+          }
+
+          // Auto-fill title from YouTube video title
+          if (data.title && !prev.title) {
+            updates.title = data.title;
+          }
+
+          return { ...prev, ...updates };
+        });
+      }
+    } catch {
+      console.error("Error fetching YouTube metadata for admin auto-fill");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
@@ -578,7 +618,11 @@ export default function AdminPage() {
                   <input
                     type="text"
                     value={formData.youtube_video_id}
-                    onChange={(e) => setFormData({ ...formData, youtube_video_id: e.target.value })}
+                    onChange={(e) => {
+                      const videoId = e.target.value.trim();
+                      setFormData({ ...formData, youtube_video_id: videoId });
+                      handleAdminYouTubeIdChange(videoId);
+                    }}
                     placeholder="ej: fJ9rUzIMcZQ"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
                   />
