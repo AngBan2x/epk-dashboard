@@ -40,7 +40,7 @@ export function UnifiedMetrics({
             {formatNumber(youtubeStats?.viewCount ?? streamCount)}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Streams
+            {(youtubeStats?.viewCount ?? streamCount) === 1 ? 'Stream' : 'Streams'}
           </p>
         </div>
         <div className="text-center border-x border-slate-200 dark:border-slate-700">
