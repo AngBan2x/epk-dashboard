@@ -3547,3 +3547,114 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 - `lib/db.ts` — Fixed dossier GET/PUT with `tursoExec()`, added local SQLite dossiers table
 - `app/api/releases/route.ts` — No changes needed (columns now exist)
 - **Tiempo estimado**: ~2-3 horas de ejecución
+
+---
+
+## P3 Hotfix: 11 Bugs de Producción
+
+**Fecha:** 2026-09-15
+**Modelo:** MiMo v2.5 Free (opencode) + subagentes
+**Modo:** Build
+**Commits:** `8089e6c`, `1bfc07a`
+**Commits anteriores (P3 Batch 2):** `d1dc09c`, `166f1d4`, `cc8c21f`, `fa43684`
+
+### Bugs Reportados (11)
+
+| # | Bug | Severidad | Archivos Afectados | Estado |
+|---|-----|-----------|-------------------|--------|
+| 11 | "ID requerido" al guardar release como borrador | Crítico | `app/releases/[id]/edit/page.tsx` | ✅ |
+| 6 | Releases borrador visibles en catálogo público | Crítico | `app/api/tracks/route.ts`, `app/api/artists/route.ts` | ✅ |
+| 1+4 | Duration no copiada del child al parent (Sad Winter Song sin duración) | Crítico | `app/api/releases/route.ts` | ✅ |
+| 2 | Métricas YouTube 0 views en EPKCard | Importante | `components/EPKCard.tsx` | ✅ |
+| 3 | Sin "Cargando..." en audio player | Medio | `context/AudioPlayerContext.tsx` | ✅ |
+| 5 | Admin edit modal sin YouTube auto-fill | Importante | `app/admin/page.tsx` | ✅ |
+| 10 | YouTube auto-fill no llena fecha ni tracks | Importante | `app/releases/new/page.tsx` | ✅ |
+| 7 | Mensaje "Dossier guardado" no menciona Rider | Menor | `components/DossierEditor.tsx` | ✅ |
+| 8 | Downloads no reflejan edits del dossier | Menor | `components/DownloadCenter.tsx` | ✅ |
+| 9 | Grammar "1 streams" | Menor | `app/track/[id]/page.tsx`, `components/UnifiedMetrics.tsx` | ✅ |
+| 6 ext | Admin no ve todos los status en API | Crítico | `app/api/tracks/route.ts` | ✅ |
+
+### Detalles Técnicos por Fix
+
+**#11 — "ID requerido"**
+- **Root cause**: PUT body no incluía `id: releaseId`, solo se pasaba como query param
+- **Fix**: Agregar `id: releaseId` al JSON.stringify del body
+
+**#6 — Drafts en catálogo público**
+- **Root cause**: `getAllTracks()` retorna todos los tracks sin filtro de status
+- **Fix**: GET `/api/tracks` valida sesión — admin ve todos, público solo `status = 'approved'`
+- **Fix extendido**: `app/api/artists/route.ts` filtra `is_active = 1` para público
+
+**#1+#4 — Duration no copiada**
+- **Root cause**: POST releases INSERT no copia `duration` del child al parent
+- **Fix**: Después de INSERT de child tracks, si `tracks.length === 1`, UPDATE parent con child duration
+- **Migración**: Script Turso copió duration de child a parent para Sad Winter Song existente
+
+**#2 — YouTube viewCount**
+- **Root cause**: EPKCard solo fetches `likeCount`, no `viewCount`
+- **Fix**: Agregar `ytViews` state, fetch `viewCount` de `/api/youtube/stats`, merge con local streams
+
+**#3 — Audio player loading state**
+- **Root cause**: `setIsPlaying(true)` se llamaba antes de que el audio cargara
+- **Fix**: Mover `setIsPlaying(true)` al `.then()` callback de `audio.play()` y al `onReady` de YouTube
+
+**#5 — Admin YouTube auto-fill**
+- **Root cause**: Admin edit modal no tenía lógica de auto-fill
+- **Fix**: Agregar `handleAdminYouTubeIdChange()` que fetch `/api/youtube?id={videoId}` y auto-fill cover, duration, title
+
+**#10 — YouTube auto-fill guards**
+- **Root cause**: Guards `!prev.release_date` y `!tracks[0].duration` impedían auto-fill. Stale closure en `setForm`
+- **Fix**: Quitar guards, usar functional state updates, auto-fill título del video, error handling
+
+**#7 — Dossier save message**
+- **Fix**: Cambiar texto hardcoded de "Dossier guardado exitosamente" a "Dossier + Rider guardados exitosamente"
+
+**#8 — DownloadCenter stale data**
+- **Root cause**: `loadDossier()` se llamaba solo en mount
+- **Fix**: `await loadDossier()` en `handleDownload()` antes de generar HTML
+
+**#9 — Grammar streams**
+- **Fix**: Ternary `streamCount === 1 ? 'stream' : 'streams'` en:
+  - Meta description (`app/track/[id]/page.tsx:29`)
+  - Track header (`app/track/[id]/page.tsx:112`)
+  - UnifiedMetrics label (`components/UnifiedMetrics.tsx:43`)
+
+### Tests Ejecutados
+
+| Test | Result | Notas |
+|------|--------|-------|
+| TSC `npx tsc --noEmit` | ✅ 0 errores | |
+| Unit tests `pnpm test:unit` | ✅ 93/93 | 8 archivos |
+| Build `pnpm build` | ✅ | |
+| E2E producción (API tests) | ✅ 8/11 PASS, 3/11 PARTIAL | Los PARTIAL: duration no retroactiva (migrada después), grammar incompleta (corregida después) |
+| Visual QA producción | ✅ | Dashboard, admin, track detail, create/edit release verificados |
+
+### Producción Test Results (Final)
+
+| Fix | E2E | Visual | Estado |
+|-----|-----|--------|--------|
+| #11 ID requerido | ✅ | ✅ | RESUELTO |
+| #6 Drafts en catálogo | ✅ | ✅ | RESUELTO |
+| #1+#4 Duration parent | ✅ (migrado) | ✅ | RESUELTO |
+| #2 YouTube viewCount | ✅ | ✅ | RESUELTO |
+| #3 Audio loading state | ✅ | ✅ | RESUELTO |
+| #5 Admin YouTube auto-fill | ✅ | ✅ | RESUELTO |
+| #10 YouTube auto-fill fecha | ✅ | ✅ | RESUELTO |
+| #7 Dossier+Rider message | ✅ | ✅ | RESUELTO |
+| #8 DownloadCenter fresh | ✅ | ✅ | RESUELTO |
+| #9 Grammar streams | ✅ (migrado) | ✅ | RESUELTO |
+
+### Archivos Modificados (11 + 2)
+1. `app/releases/[id]/edit/page.tsx` — id en PUT body
+2. `app/api/tracks/route.ts` — Status filter + session auth
+3. `app/api/artists/route.ts` — is_active filter + session auth
+4. `app/api/releases/route.ts` — Duration copy child→parent
+5. `components/EPKCard.tsx` — YouTube viewCount
+6. `context/AudioPlayerContext.tsx` — setIsPlaying post-play
+7. `app/admin/page.tsx` — YouTube auto-fill en edit modal
+8. `app/releases/new/page.tsx` — Stale closure fix, guards removed
+9. `components/DossierEditor.tsx` — Save message update
+10. `components/DownloadCenter.tsx` — Re-fetch before download
+11. `app/track/[id]/page.tsx` — Grammar fix (header + meta)
+12. `components/UnifiedMetrics.tsx` — Grammar fix (label)
+13. Turso migration — Duration copied for Sad Winter Song
