@@ -5,6 +5,7 @@ import { safeString, capitalizeReleaseType } from "@/lib/null-safe";
 import type { Track, ArtistProfile, Show, ShowStatus, ReleaseStatus } from "@/types/music";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { ShowForm } from "@/components/ShowForm";
 
 interface AdminTrack {
   id: string;
@@ -91,17 +92,7 @@ export default function AdminPage() {
   const trackEditRef = useRef<HTMLDivElement>(null);
   const [shows, setShows] = useState<Show[]>([]);
   const [editingShow, setEditingShow] = useState<Show | null>(null);
-  const [showForm, setShowForm] = useState({
-    artist_id: "",
-    venue_name: "",
-    city: "",
-    country: "",
-    date: "",
-    time: "",
-    price_range: "",
-    status: "proximamente" as ShowStatus,
-    ticket_url: "",
-  });
+  const [showFormOpen, setShowFormOpen] = useState(false);
   const [artistForm, setArtistForm] = useState({
     name: "",
     biography: "",
@@ -533,6 +524,14 @@ export default function AdminPage() {
             {message.type === "success" ? "✅" : "⚠️"} {message.text}
           </div>
         )}
+
+        {/* Nuevo Show button */}
+        <button
+          onClick={() => setShowFormOpen(true)}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition mr-4"
+        >
+          Nuevo Show
+        </button>
 
         {/* Track Form */}
         {activeTab === "tracks" && editingTrack && (
@@ -1305,161 +1304,64 @@ onSubmit={async (e) => {
 
             {/* Show Form */}
             {editingShow ? (
-              <div className="p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                <h4 className="text-lg font-semibold mb-4">Editar Show</h4>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    try {
-                      if (editingShow) {
-                        const res = await fetch("/api/shows", {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ id: editingShow.id, ...showForm }),
-                        });
-                        if (res.ok) {
-                          setEditingShow(null);
-                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "proximamente", ticket_url: "" });
-                          fetchShows();
-                          setMessage({ type: "success", text: "Show actualizado" });
-                        }
-                      } else {
-                        const res = await fetch("/api/shows", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify(showForm),
-                        });
-                        if (res.ok) {
-                          setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "proximamente", ticket_url: "" });
-                          fetchShows();
-                          setMessage({ type: "success", text: "Show creado" });
-                        }
-                      }
-                    } catch {
-                      setMessage({ type: "error", text: "Error al guardar show" });
-                    }
-                  }}
-                  className="space-y-4"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Artista *</label>
-                      <select
-                        required
-                        value={showForm.artist_id}
-                        onChange={(e) => setShowForm({ ...showForm, artist_id: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      >
-                        <option value="">Seleccionar artista</option>
-                        {artists.map((a) => (
-                          <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Lugar *</label>
-                      <input
-                        type="text"
-                        required
-                        value={showForm.venue_name}
-                        onChange={(e) => setShowForm({ ...showForm, venue_name: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                        placeholder="Nombre del lugar"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ciudad</label>
-                      <input
-                        type="text"
-                        value={showForm.city}
-                        onChange={(e) => setShowForm({ ...showForm, city: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">País</label>
-                      <input
-                        type="text"
-                        value={showForm.country}
-                        onChange={(e) => setShowForm({ ...showForm, country: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha</label>
-                      <input
-                        type="date"
-                        value={showForm.date}
-                        onChange={(e) => setShowForm({ ...showForm, date: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Hora</label>
-                      <input
-                        type="time"
-                        value={showForm.time}
-                        onChange={(e) => setShowForm({ ...showForm, time: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Rango de Precio</label>
-                      <input
-                        type="text"
-                        value={showForm.price_range}
-                        onChange={(e) => setShowForm({ ...showForm, price_range: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                        placeholder="ej: $20-$50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Estado</label>
-                      <select
-                        value={showForm.status}
-                        onChange={(e) => setShowForm({ ...showForm, status: e.target.value as ShowStatus })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      >
-                        <option value="proximamente">Próximamente</option>
-                        <option value="agotado">Agotado</option>
-                        <option value="proximamente">Próximamente</option>
-                        <option value="confirmado">Confirmado</option>
-                        <option value="cancelado">Cancelado</option>
-                        <option value="pausado">Pausado</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">URL Tickets</label>
-                    <input
-                      type="url"
-                      value={showForm.ticket_url}
-                      onChange={(e) => setShowForm({ ...showForm, ticket_url: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      placeholder="https://..."
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      className="px-6 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                    >
-                      {editingShow ? "Guardar Cambios" : "Crear Show"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingShow(null);
-                        setShowForm({ artist_id: "", venue_name: "", city: "", country: "", date: "", time: "", price_range: "", status: "proximamente", ticket_url: "" });
-                      }}
-                      className="px-6 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : null}
+  <div className="p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+    <ShowForm
+      show={editingShow}
+      artists={artists.map(a => ({ id: a.id, name: a.name }))}
+      onSave={async (data) => {
+        try {
+          const res = await fetch("/api/shows", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: editingShow.id, ...data }),
+          });
+          if (res.ok) {
+            setEditingShow(null);
+            fetchShows();
+            setMessage({ type: "success", text: "Show actualizado" });
+          }
+        } catch {
+          setMessage({ type: "error", text: "Error al guardar show" });
+        }
+      }}
+      onCancel={() => {
+        setEditingShow(null);
+      }}
+    />
+  </div>
+) : null}
+
+ {/* Nuevo Show button - added for create mode */}
+{showFormOpen ? (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-full max-w-2xl m-6 p-8 max-h-[90vh] overflow-y-auto">
+      <ShowForm
+        show={undefined}
+        artistId=""
+        artists={artists.map(a => ({ id: a.id, name: a.name }))}
+        onSave={async (data) => {
+          try {
+            const res = await fetch("/api/shows", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+            if (res.ok) {
+              setShowFormOpen(false);
+              fetchShows();
+              setMessage({ type: "success", text: "Show creado" });
+            }
+          } catch {
+            setMessage({ type: "error", text: "Error al guardar show" });
+          }
+        }}
+        onCancel={() => {
+          setShowFormOpen(false);
+        }}
+      />
+    </div>
+  </div>
+) : null}
 
             {/* Shows Table */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -1506,17 +1408,6 @@ onSubmit={async (e) => {
                                 <button
                                   onClick={() => {
                                     setEditingShow(show);
-                                    setShowForm({
-                                      artist_id: show.artist_id,
-                                      venue_name: show.venue_name,
-                                      city: show.city || "",
-                                      country: show.country || "",
-                                      date: show.date || "",
-                                      time: show.time || "",
-                                      price_range: show.price_range || "",
-                                      status: show.status,
-                                      ticket_url: show.ticket_url || "",
-                                    });
                                   }}
                                   className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
                                 >
