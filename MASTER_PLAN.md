@@ -583,10 +583,10 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 |------|-----------|-------------|--------|
 | P3.1 | artist-dashboard-builder | Panel de control de artista | ✅ Completado |
 | P3.2 | release-form-builder | CRUD lanzamientos (sencillo/EP/álbum) | ✅ Completado |
-| P3.3 | release-form-builder | Auto-completado metadata iTunes | ⚠️ Parcial (seed script + API, sin UI auto-fill) |
+| P3.3 | release-form-builder | Auto-completado metadata iTunes | ✅ Completado |
 | P3.4 | release-form-builder | Cover image handling (YouTube thumbnail fallback) | ✅ Completado |
 | P3.5 | approval-workflow-builder | Aprobación admin → artista | ⚠️ Parcial (superseded por P3.23) |
-| P3.6 | show-form-builder | CRUD shows (estados, pagos, fechas) | ⚠️ Parcial (inline en dashboard/admin, sin página dedicada) |
+| P3.6 | show-form-builder | CRUD shows (estados, pagos, fechas) | ✅ Completado |
 | P3.7 | artist-dashboard-builder | Gestión de perfil artista | ✅ Completado |
 | P3.8 | account-settings-builder | Gestión de cuenta (email verif, password, notifs, eliminar 30d) | ✅ Completado |
 | P3.12 | release-form-builder | YouTube Data API integration + audio priority + multi-source player | ✅ Completado |
@@ -636,6 +636,8 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.43 | Fix DownloadCenter re-fetch antes de download | ✅ Completado |
 | P3.44 | Fix grammar "1 stream" en meta description + UnifiedMetrics | ✅ Completado |
 | P3.45 | Fix Sad Winter Song release_date → YouTube publishedAt (2025-12-27) | ✅ Completado |
+| P3.3-FULL | ITunesSearch component + integración en /releases/new y /releases/[id]/edit | ✅ Completado |
+| P3.6-FULL | ShowForm reutilizable + página /shows pública + refactor dashboard/admin + BookingModule API real | ✅ Completado |
 
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción | Estado |

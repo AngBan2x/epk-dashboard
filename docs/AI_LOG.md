@@ -3658,3 +3658,71 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 11. `app/track/[id]/page.tsx` — Grammar fix (header + meta)
 12. `components/UnifiedMetrics.tsx` — Grammar fix (label)
 13. Turso migration — Duration copied for Sad Winter Song
+
+---
+
+## P3.3 + P3.6: Shows CRUD Completo + iTunes Auto-Complete
+
+**Fecha:** 2026-09-15
+**Modelo:** MiMo v2.5 Free (opencode) + subagentes
+
+### P3.3 — iTunes Auto-Complete (UI)
+
+**Componente ITunesSearch** (`components/ITunesSearch.tsx`):
+- Input con icono de búsqueda, debounce 500ms
+- Dropdown con resultados de iTunes API (artwork 600x600, previewUrl, trackName, artistName, collectionName)
+- Selección llama `onSelect({ artworkUrl100, trackName, artistName, collectionName, releaseDate, trackCount })`
+- Escape cierra dropdown
+
+**Integración:**
+- `app/releases/new/page.tsx` — ITunesSearch + `handleITunesSelect` auto-llena título, artista, fecha, cover
+- `app/releases/[id]/edit/page.tsx` — ITunesSearch para editing releases existentes
+
+### P3.6 — Shows CRUD Completo
+
+**ShowForm** (`components/ShowForm.tsx`):
+- 21 campos: venue, city, country, date, time, description, ticket_url, price_range, payment_methods (JSON editor), guest_artists (JSON editor), poster_url, capacity, age_restriction, contact_name, contact_email, contact_phone, notes, streaming_url, status (10 values)
+
+**Página /shows** (`app/shows/page.tsx`):
+- Pública, accesible sin auth
+- Filtros: búsqueda por venue/ciudad, status dropdown, checkbox solo futuros
+- Cards con poster, venue, ciudad, país, fecha, precio, badge de status, link a tickets
+- Fetches desde `/api/shows`
+
+**Dashboard refactor** (`app/dashboard/page.tsx`):
+- Botón "Nuevo Show" abre modal con `<ShowForm>` (antes form inline con ~200 líneas)
+- `onEdit` pasa show al ShowForm
+
+**Admin refactor** (`app/admin/page.tsx`):
+- Tabla de shows con botón "Editar" abre `<ShowForm>` modal (antes form inline)
+
+**BookingModule** (`components/BookingModule.tsx`):
+- Reemplazado `defaultShows` hardcoded con fetch real a `/api/shows?artistId=X`
+- Prop `artistId` para filtrar shows del artista
+
+**Unit tests:**
+- `tests/unit/shows.test.ts` — 12 tests CRUD (create, getById, getByArtist, update, delete, getAll)
+- `tests/unit/itunes-search.test.ts` — 5 tests (getHighResArtwork, searchITunes)
+- Total: 110/110 unit tests pass
+
+### Archivos creados/modificados:
+1. `components/ITunesSearch.tsx` — 180 líneas (nuevo)
+2. `components/ShowForm.tsx` — ~300 líneas (nuevo)
+3. `app/shows/page.tsx` — 233 líneas (nuevo)
+4. `app/releases/new/page.tsx` — ITunesSearch integrado
+5. `app/releases/[id]/edit/page.tsx` — ITunesSearch integrado
+6. `app/dashboard/page.tsx` — refactor ShowForm + stale cleanup
+7. `app/admin/page.tsx` — refactor ShowForm + stale cleanup
+8. `components/BookingModule.tsx` — API real + artistId prop
+9. `tests/unit/shows.test.ts` — 12 tests (nuevo)
+10. `tests/unit/itunes-search.test.ts` — 5 tests (nuevo)
+
+### Quality Gates:
+- TSC: 0 errors
+- Unit tests: 110/110 pass
+- Build: success (shows page in output)
+- E2E production: 6/6 pass
+- Visual QA: screenshots taken
+
+### Commit: `eb5347c` — feat: P3.6 CRUD Shows + P3.3 iTunes auto-complete
+### Deploy: https://epk-dashboard.vercel.app (production)
