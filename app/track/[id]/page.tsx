@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: TrackDetailPageProps): Promis
   }
   return {
     title: `${track.title} | PressPlay`,
-    description: `${capitalizeReleaseType(track.release_type)} - ${track.duration} - ${formatNumber(track.streams ?? track.metrics?.streams ?? 0)} streams`,
+    description: `${capitalizeReleaseType(track.release_type)} - ${track.duration} - ${formatNumber(track.streams ?? track.metrics?.streams ?? 0)} ${(track.streams ?? track.metrics?.streams ?? 0) === 1 ? 'stream' : 'streams'}`,
   };
 }
 
