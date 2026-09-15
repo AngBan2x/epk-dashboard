@@ -621,6 +621,22 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.33 | direct | Dashboard redundancy: eliminar links duplicados, consolidar navegación | ✅ Completado |
 | P3.34 | direct | Audio Player: loading/error states, event handlers, UI feedback | ✅ Completado |
 
+##### P3 Hotfix: 11 Bugs de Producción (2026-09-15)
+
+| Task | Descripción | Estado |
+|------|-------------|--------|
+| P3.35 | Fix "ID requerido" — add id to PUT body in edit release | ✅ Completado |
+| P3.36 | Fix drafts en catálogo público — filter status='approved' en /api/tracks | ✅ Completado |
+| P3.37 | Fix duration parent track — copy from child en POST releases + migration Turso | ✅ Completado |
+| P3.38 | Fix YouTube viewCount en EPKCard — fetch viewCount alongside likeCount | ✅ Completado |
+| P3.39 | Fix audio player loading state — setIsPlaying post-play callback | ✅ Completado |
+| P3.40 | Fix admin YouTube auto-fill en edit modal | ✅ Completado |
+| P3.41 | Fix YouTube auto-fill guards + stale closure en /releases/new | ✅ Completado |
+| P3.42 | Fix Dossier+Rider save message | ✅ Completado |
+| P3.43 | Fix DownloadCenter re-fetch antes de download | ✅ Completado |
+| P3.44 | Fix grammar "1 stream" en meta description + UnifiedMetrics | ✅ Completado |
+| P3.45 | Fix Sad Winter Song release_date → YouTube publishedAt (2025-12-27) | ✅ Completado |
+
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción | Estado |
 |------|-----------|-------------|--------|

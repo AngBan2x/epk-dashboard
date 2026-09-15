@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import { parseISO8601Duration } from '@/lib/youtube';
+import { parseISO8601Duration, parseYouTubeChapters } from '@/lib/youtube';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     }
 
     const durationSeconds = parseISO8601Duration(video.contentDetails?.duration || 'PT0S');
+    const chapters = parseYouTubeChapters(video.snippet?.description || '', durationSeconds);
 
     return NextResponse.json({
       id: video.id!,
@@ -42,6 +43,7 @@ export async function GET(req: NextRequest) {
       viewCount: video.statistics?.viewCount || '0',
       likeCount: video.statistics?.likeCount || '0',
       topicCategories: video.topicDetails?.topicCategories || [],
+      chapters,
     });
   } catch (error) {
     console.error('YouTube API error:', error);
