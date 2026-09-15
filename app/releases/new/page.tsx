@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { parseYouTubeChapters, parseISO8601Duration, secondsToTimestamp, type YouTubeChapter } from "@/lib/youtube";
+import { ITunesSearch } from "@/components/ITunesSearch";
 
 type ReleaseType = "single" | "ep" | "album";
 
@@ -102,6 +103,25 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           setMessage({ type: "error", text: "Error al obtener metadatos de YouTube" });
         }
       }
+    }
+  };
+
+  const handleITunesSelect = (track: any) => {
+    setForm(prev => ({
+      ...prev,
+      title: prev.title || track.trackName,
+      artist_name: prev.artist_name || track.artistName,
+      cover_image: prev.cover_image || track.artworkUrl600 || "",
+      genre: prev.genre || track.primaryGenreName || "",
+      release_date: prev.release_date || (track.releaseDate ? track.releaseDate.substring(0, 10) : ""),
+      apple_music_url: prev.apple_music_url || `https://music.apple.com/us/album/${track.trackId}`,
+    }));
+    // Auto-fill duration
+    if (track.trackTimeMillis) {
+      const totalSec = Math.round(track.trackTimeMillis / 1000);
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      updateTrack(0, "duration", `${min}:${sec.toString().padStart(2, "0")}`);
     }
   };
 
@@ -316,6 +336,11 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                 placeholder="Descripción del release..."
               />
+            </div>
+
+            {/* Buscar en iTunes */}
+            <div>
+              <ITunesSearch onSelect={handleITunesSelect} placeholder="Buscar en iTunes" />
             </div>
 
             {/* External Links */}
