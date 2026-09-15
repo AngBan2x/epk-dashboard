@@ -124,7 +124,7 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
         body: JSON.stringify({ artist_id: artistId, ...data }),
       });
       if (res.ok) {
-        setMessage({ type: "success", text: "Dossier guardado exitosamente" });
+        setMessage({ type: "success", text: "Dossier + Rider guardados exitosamente" });
         setTimeout(() => setMessage(null), 3000);
       } else {
         const err = await res.json();

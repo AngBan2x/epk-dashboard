@@ -44,9 +44,9 @@ export default function NewReleasePage() {
     return match ? match[1] : null;
   };
 
-  const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
-    setForm({ ...form, youtube_url: url });
+    setForm(prev => ({ ...prev, youtube_url: url }));
     if (url) {
       const videoId = extractYouTubeId(url);
       if (videoId) {
@@ -75,16 +75,21 @@ export default function NewReleasePage() {
                 updates.cover_image = maxRes;
               }
 
-              // Auto-fill release date from publishedAt
-              if (!prev.release_date && data.publishedAt) {
-                updates.release_date = data.publishedAt.substring(0, 10);
+              // Auto-fill release date from publishedAt (always update, no guard)
+              updates.release_date = data.publishedAt ? data.publishedAt.substring(0, 10) : "";
+
+              // Auto-fill first track title from YouTube video title if track title is empty
+              if (data.title && tracks.length > 0 && !tracks[0].title) {
+                setTracks(prevTracks => prevTracks.map((track, index) =>
+                  index === 0 ? { ...track, title: data.title } : track
+                ));
               }
 
               return { ...prev, ...updates };
             });
 
             // Auto-fill first track duration (format seconds as MM:SS)
-            if (data.durationSeconds && tracks.length > 0 && !tracks[0].duration) {
+            if (data.durationSeconds && tracks.length > 0) {
               const totalSec = Math.round(data.durationSeconds);
               const minutes = Math.floor(totalSec / 60);
               const seconds = totalSec % 60;
@@ -92,8 +97,9 @@ export default function NewReleasePage() {
               updateTrack(0, "duration", formatted);
             }
           }
-        } catch {
-          // Silently fail — YouTube API may not be configured
+        } catch (error) {
+          console.error("Error fetching YouTube metadata:", error);
+          setMessage({ type: "error", text: "Error al obtener metadatos de YouTube" });
         }
       }
     }

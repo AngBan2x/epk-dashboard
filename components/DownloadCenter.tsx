@@ -65,8 +65,10 @@ export function DownloadCenter({
 
   const assetList = assets.length > 0 ? assets : defaultAssets;
 
-  const handleDownload = (asset: DownloadableAsset) => {
+  const handleDownload = async (asset: DownloadableAsset) => {
     setDownloadingId(asset.id);
+    // Re-fetch dossier data before generating HTML to get the latest edits
+    await loadDossier();
     setTimeout(() => {
       if (asset.url) {
         window.open(asset.url, "_blank");

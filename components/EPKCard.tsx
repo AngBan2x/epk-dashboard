@@ -25,7 +25,6 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   const title = safeString(track.title);
   const artistName = safeString(track.artist_name);
   const duration = formatDuration(track.duration);
-  const streams = formatNumber(track.metrics?.streams ?? 0);
   const releaseDate = track.release_date ? new Date(track.release_date).toLocaleDateString("es-ES", {
     year: "numeric",
     month: "short",
@@ -35,14 +34,21 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [ytLikes, setYtLikes] = useState(0);
+  const [ytViews, setYtViews] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [loading, setLoading] = useState(false);
+  const streams = formatNumber((track.metrics?.streams ?? 0) + ytViews);
 
   useEffect(() => {
     if (track.youtube_video_id) {
       fetch(`/api/youtube/stats?videoId=${track.youtube_video_id}`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((data) => { if (data) setYtLikes(data.likeCount); })
+        .then((data) => {
+          if (data) {
+            setYtLikes(data.likeCount);
+            setYtViews(data.viewCount);
+          }
+        })
         .catch(() => {});
     }
   }, [track.youtube_video_id]);

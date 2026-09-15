@@ -1,25 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTracks, createTrack, updateTrack, deleteTrack } from "@/lib/db";
+import { getAllTracks, createTrack, updateTrack, deleteTrack, getDbWrite, isTursoConfigured } from "@/lib/db";
+import { getTursoClient } from "@/lib/turso";
+import { decodeSessionToken, isSessionValid } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
   const sessionCookie = req.cookies.get("auth_session");
   if (!sessionCookie) return null;
-
-  try {
-    const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; role?: string };
-    return { userId: session.userId, role: session.role || "artist" };
-  } catch {
-    return null;
-  }
+  const session = decodeSessionToken(sessionCookie.value);
+  if (!session || !isSessionValid(session)) return null;
+  return { userId: session.userId, role: session.role };
 }
 
-// GET /api/tracks — Listar todos los tracks (público)
-export async function GET() {
+// GET /api/tracks — Listar tracks: admin ve todos, público solo aprobados
+export async function GET(req: NextRequest) {
   try {
-    const tracks = await getAllTracks();
+    const session = validateSession(req);
+    const isAdmin = session?.role === "admin";
+
+    let tracks;
+    if (isAdmin) {
+      // Admin sees all tracks
+      tracks = await getAllTracks();
+    } else {
+      // Public/non-admin: only approved tracks
+      if (isTursoConfigured()) {
+        const client = getTursoClient();
+        if (!client) throw new Error("Turso client not available");
+        const result = await client.execute({
+          sql: "SELECT * FROM tracks WHERE status = 'approved' ORDER BY created_at DESC",
+          args: [],
+        });
+        tracks = result.rows;
+      } else {
+        const db = getDbWrite();
+        tracks = db.prepare("SELECT * FROM tracks WHERE status = 'approved' ORDER BY created_at DESC").all();
+      }
+    }
+
     return NextResponse.json({ tracks }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
