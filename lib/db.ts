@@ -89,12 +89,13 @@ function getLocalDbWrite(): import("better-sqlite3").Database {
 }
 
 // ─── Turso client (remote) ──────────────────────────────────────────────────
-// Fresh client per request. No singleton, no require cache, no HTTP transport
-// pooling. Each createClient() call creates an independent connection.
+// Fresh client per request. No singleton caching. Each call creates a new
+// @libsql/client instance with independent HTTP connection pool.
 
-async function getTursoClient(): Promise<import("@libsql/client").Client | null> {
+function getTursoClientSync(): import("@libsql/client").Client | null {
   if (!isTursoEnabled()) return null;
-  const { createClient } = await import("@libsql/client");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createClient } = require("@libsql/client");
   return createClient({ url: getTursoUrl()!, authToken: getTursoToken()! });
 }
 
@@ -113,7 +114,7 @@ function bustSelectCache(sql: string): string {
 }
 
 async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
-  const client = await getTursoClient();
+  const client = getTursoClientSync();
   if (!client) throw new Error("Turso client not available");
   const result = await client.execute({ sql: bustSelectCache(sql), args: (args ?? []) as import("@libsql/client").InValue[] });
   return result.rows as unknown[];
@@ -125,7 +126,7 @@ async function tursoExecSingle(sql: string, args?: unknown[]): Promise<Record<st
 }
 
 async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
-  const client = await getTursoClient();
+  const client = getTursoClientSync();
   if (!client) throw new Error("Turso client not available");
   const result = await client.execute({ sql, args: (args ?? []) as import("@libsql/client").InValue[] });
   return result.rowsAffected;
@@ -1907,7 +1908,7 @@ export function getDbWrite() {
   return getLocalDbWrite();
 }
 
-export { getTursoClient as getTurso };
+export { getTursoClientSync as getTurso };
 
 // ─── Dossiers (P3 Batch 2 Hotfix) ──────────────────────────────────────────
 
