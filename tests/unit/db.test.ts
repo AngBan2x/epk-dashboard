@@ -1,8 +1,62 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { getAllTracks, getTrackById, DOSSIER_DEFAULTS } from "@/lib/db";
 import { parseMetrics } from "@/lib/db";
+import path from "path";
+
+const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
+
+function seedTestData() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Database = require("better-sqlite3");
+  const db = new Database(DB_PATH);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tracks (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, artist_name TEXT,
+      release_type TEXT, release_date TEXT, duration TEXT, cover_image TEXT,
+      audio_preview_url TEXT, spotify_url TEXT, youtube_video_id TEXT,
+      metrics TEXT, production_details TEXT, lyrics TEXT, itunes_track_id TEXT,
+      stems_urls TEXT, video_embed_url TEXT, gallery_images TEXT, external_links TEXT,
+      disc_number INTEGER DEFAULT 1, is_double_single INTEGER DEFAULT 0, sides_b TEXT,
+      isrc TEXT, composers TEXT, genre TEXT, description TEXT,
+      streams INTEGER DEFAULT 0, status TEXT DEFAULT 'draft', updated_at TEXT,
+      release_id TEXT, start_time REAL DEFAULT 0, end_time REAL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  const insert = db.prepare(`
+    INSERT OR REPLACE INTO tracks (id, title, artist_name, release_type, release_date, status, metrics, production_details, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `);
+
+  insert.run("trk-001", "Bohemian Rhapsody", "Queen", "single", "1975-10-31", "approved",
+    JSON.stringify({ streams: 2000000, saves: 150000, playlist_additions: 45, top_countries: [{ country: "US", pct: 35 }, { country: "GB", pct: 25 }] }),
+    JSON.stringify({ daw: "Pro Tools", guitars: "Red Special replica", bass: "Fender Precision", drums: "Ludwig", producers: ["Roy Thomas Baker"] })
+  );
+  insert.run("trk-002", "Smells Like Teen Spirit", "Nirvana", "single", "1991-09-10", "approved",
+    JSON.stringify({ streams: 1800000, saves: 120000, playlist_additions: 40, top_countries: [{ country: "US", pct: 30 }, { country: "GB", pct: 20 }] }),
+    JSON.stringify({ daw: "Pro Tools", guitars: "Fender Mustang", bass: "Fender Precision", drums: "Pearl", producers: ["Butch Vig"] })
+  );
+  insert.run("trk-003", "Blinding Lights", "The Weeknd", "single", "2019-11-29", "approved",
+    JSON.stringify({ streams: 3500000, saves: 200000, playlist_additions: 55, top_countries: [{ country: "US", pct: 40 }, { country: "CA", pct: 15 }] }),
+    JSON.stringify({ daw: "Ableton Live", guitars: "None", bass: "None", drums: "Electronic", producers: ["Max Martin", "Oscar Holter"] })
+  );
+
+  db.close();
+}
 
 describe("Database", () => {
+  beforeAll(() => { seedTestData(); });
+  afterAll(() => {
+    // Clean test data but don't delete the DB (other tests may need it)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require("better-sqlite3");
+    const db = new Database(DB_PATH);
+    db.exec("DELETE FROM tracks WHERE id LIKE 'trk-%'");
+    db.close();
+  });
+
   it("getAllTracks returns tracks", async () => {
     const tracks = await getAllTracks();
     expect(tracks.length).toBeGreaterThan(0);
@@ -72,7 +126,7 @@ describe("parseMetrics", () => {
   });
 
   it("handles partial metrics object with missing fields", () => {
-    const obj = { streams: 500 }; // missing saves, playlist_additions, top_countries
+    const obj = { streams: 500 };
     const result = parseMetrics(obj);
     expect(result.streams).toBe(500);
     expect(result.saves).toBe(0);

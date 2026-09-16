@@ -6,6 +6,7 @@
  * All exported functions are async to support both backends uniformly.
  */
 import path from "path";
+import fs from "fs";
 import type {
   Track,
   RawTrackRow,
@@ -80,30 +81,21 @@ function getLocalDbWrite(): import("better-sqlite3").Database {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require("better-sqlite3") as typeof import("better-sqlite3");
     const DB_PATH = path.join(process.cwd(), "data", "music_catalog.db");
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     _dbWrite = new Database(DB_PATH);
   }
   return _dbWrite;
 }
 
 // ─── Turso client (remote) ──────────────────────────────────────────────────
-// NOTE: Singleton pattern causes UPDATE writes to not persist on Vercel HTTP
-// transport. The singleton's execute() reports rowsAffected>0 but the write
-// is never committed to Turso. Creating a fresh client per request fixes this.
+// Fresh client per request. No singleton, no require cache, no HTTP transport
+// pooling. Each createClient() call creates an independent connection.
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-let _tursoLib: typeof import("@libsql/client") | null = null;
-
-function getTursoLib(): typeof import("@libsql/client") {
-  if (!_tursoLib) {
-    _tursoLib = require("@libsql/client") as typeof import("@libsql/client");
-  }
-  return _tursoLib;
-}
-
-function getTursoClient(): import("@libsql/client").Client | null {
+async function getTursoClient(): Promise<import("@libsql/client").Client | null> {
   if (!isTursoEnabled()) return null;
-  const lib = getTursoLib();
-  return lib.createClient({ url: getTursoUrl()!, authToken: getTursoToken()! });
+  const { createClient } = await import("@libsql/client");
+  return createClient({ url: getTursoUrl()!, authToken: getTursoToken()! });
 }
 
 // ─── Turso: Execute helper ──────────────────────────────────────────────────
@@ -121,7 +113,7 @@ function bustSelectCache(sql: string): string {
 }
 
 async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
-  const client = getTursoClient();
+  const client = await getTursoClient();
   if (!client) throw new Error("Turso client not available");
   const result = await client.execute({ sql: bustSelectCache(sql), args: (args ?? []) as import("@libsql/client").InValue[] });
   return result.rows as unknown[];
@@ -133,18 +125,56 @@ async function tursoExecSingle(sql: string, args?: unknown[]): Promise<Record<st
 }
 
 async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
-  const client = getTursoClient();
+  const client = await getTursoClient();
   if (!client) throw new Error("Turso client not available");
   const result = await client.execute({ sql, args: (args ?? []) as import("@libsql/client").InValue[] });
   return result.rowsAffected;
 }
 
 // ─── Initialize tables (local only; Turso schema via ensureTursoSchema) ─────
+// NOTE: Always runs (IF NOT EXISTS is idempotent). The isTursoEnabled() check
+// happens at call-time in read/write functions, not at module-load time.
 
 function initLocalTables(): void {
-  if (isTursoEnabled()) return; // Turso schema is managed via turso.ts
 
   const db = getLocalDbWrite();
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tracks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      artist_name TEXT,
+      release_type TEXT,
+      release_date TEXT,
+      duration TEXT,
+      cover_image TEXT,
+      audio_preview_url TEXT,
+      spotify_url TEXT,
+      youtube_video_id TEXT,
+      metrics TEXT,
+      production_details TEXT,
+      lyrics TEXT,
+      itunes_track_id TEXT,
+      stems_urls TEXT,
+      video_embed_url TEXT,
+      gallery_images TEXT,
+      external_links TEXT,
+      disc_number INTEGER DEFAULT 1,
+      is_double_single INTEGER DEFAULT 0,
+      sides_b TEXT,
+      isrc TEXT,
+      composers TEXT,
+      genre TEXT,
+      description TEXT,
+      streams INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'draft',
+      updated_at TEXT,
+      release_id TEXT,
+      start_time REAL DEFAULT 0,
+      end_time REAL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -390,10 +420,10 @@ function initLocalTables(): void {
   try { db.exec(`ALTER TABLE dossiers ADD COLUMN description TEXT`); } catch {}
 }
 
-// Initialize local tables on module load (only when not using Turso)
-if (!isTursoEnabled()) {
-  initLocalTables();
-}
+// Initialize local tables on module load.
+// Always runs — uses CREATE TABLE IF NOT EXISTS (idempotent).
+// In production with Turso active, the local file is harmless (never read).
+initLocalTables();
 
 // ─── Parsers ────────────────────────────────────────────────────────────────
 
