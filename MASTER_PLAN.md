@@ -638,6 +638,7 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P3.45 | Fix Sad Winter Song release_date → YouTube publishedAt (2025-12-27) | ✅ Completado |
 | P3.3-FULL | ITunesSearch component + integración en /releases/new y /releases/[id]/edit | ✅ Completado |
 | P3.6-FULL | ShowForm reutilizable + página /shows pública + refactor dashboard/admin + BookingModule API real | ✅ Completado |
+| P3.46 | Fix POST /api/shows 500 — tursoExec error handling + FK validation | 🔄 En Progreso |
 
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción | Estado |
