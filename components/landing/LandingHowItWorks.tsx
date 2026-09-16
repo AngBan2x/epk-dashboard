@@ -27,8 +27,7 @@ export default function LandingHowItWorks() {
         <motion.div
           className="text-center mb-14"
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
@@ -45,8 +44,7 @@ export default function LandingHowItWorks() {
               key={step.number}
               className="relative flex flex-col items-center text-center"
               initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: idx * 0.15 }}
             >
               {/* Connector line (desktop only, not on last item) */}
