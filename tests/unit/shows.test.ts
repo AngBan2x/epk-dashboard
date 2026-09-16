@@ -66,7 +66,7 @@ function createTestShowInput(artistId: string, overrides: Partial<CreateShowInpu
     status: "proximamente" as ShowStatus,
     ticket_url: "https://example.com/tickets",
     payment_methods: [{ type: "ticket_platform", platform_url: "https://example.com" }],
-    postponement_reason: null,
+    postponement_reason: undefined,
     flyer_url: "https://example.com/flyer.jpg",
     ticket_link: "https://example.com/ticket-link",
     description: "Test show description",
