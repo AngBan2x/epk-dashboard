@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow } from "@/lib/db";
+import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById } from "@/lib/db";
 import { decodeSessionToken, isSessionValid } from "@/lib/auth";
 import type { ShowStatus } from "@/types/music";
 
@@ -101,13 +101,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
+    // FK validation: verify artist_id exists
+    const artist = await getArtistById(validated.artist_id);
+    if (!artist) {
+      return NextResponse.json({ error: "Artista no encontrado" }, { status: 400 });
+    }
+
     const show = await createShow(validated);
     return NextResponse.json(show, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
-    console.error("POST shows error:", error);
+    const err = error as Error & { stack?: string; cause?: unknown };
+    console.error("POST shows error:", err, err.stack, err.cause);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
