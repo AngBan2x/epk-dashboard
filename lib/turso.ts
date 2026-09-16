@@ -228,6 +228,17 @@ export async function ensureTursoSchema(): Promise<boolean> {
       FOREIGN KEY (artist_id) REFERENCES artists(id)
     )
   `);
+  // Migrate: add missing columns to existing shows table (P2.4 + P3)
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN payment_methods TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN postponement_reason TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN flyer_url TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN ticket_link TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN description TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN guest_artists TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN notes TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN deleted_at TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN updated_at TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`); } catch {}
 
   // 9. subscriptions (P2.3)
   await client.execute(`
