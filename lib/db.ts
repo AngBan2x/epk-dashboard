@@ -46,10 +46,18 @@ import type {
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
 // ─── Environment detection ──────────────────────────────────────────────────
+// NOTE: process.env is evaluated at build time by Webpack. Use a getter function
+// so it's evaluated at runtime instead. This ensures isTursoEnabled() is true on Vercel.
 
-const TURSO_URL = process.env.TURSO_DATABASE_URL;
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
-const USE_TURSO = Boolean(TURSO_URL && TURSO_TOKEN);
+function getTursoUrl(): string | undefined {
+  return process.env.TURSO_DATABASE_URL;
+}
+function getTursoToken(): string | undefined {
+  return process.env.TURSO_AUTH_TOKEN;
+}
+function isTursoEnabled(): boolean {
+  return Boolean(getTursoUrl() && getTursoToken());
+}
 
 // ─── Better-sqlite3 (local) ─────────────────────────────────────────────────
 
@@ -93,9 +101,9 @@ function getTursoLib(): typeof import("@libsql/client") {
 }
 
 function getTursoClient(): import("@libsql/client").Client | null {
-  if (!USE_TURSO) return null;
+  if (!isTursoEnabled()) return null;
   const lib = getTursoLib();
-  return lib.createClient({ url: TURSO_URL!, authToken: TURSO_TOKEN! });
+  return lib.createClient({ url: getTursoUrl()!, authToken: getTursoToken()! });
 }
 
 // ─── Turso: Execute helper ──────────────────────────────────────────────────
@@ -134,7 +142,7 @@ async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
 // ─── Initialize tables (local only; Turso schema via ensureTursoSchema) ─────
 
 function initLocalTables(): void {
-  if (USE_TURSO) return; // Turso schema is managed via turso.ts
+  if (isTursoEnabled()) return; // Turso schema is managed via turso.ts
 
   const db = getLocalDbWrite();
 
@@ -383,7 +391,7 @@ function initLocalTables(): void {
 }
 
 // Initialize local tables on module load (only when not using Turso)
-if (!USE_TURSO) {
+if (!isTursoEnabled()) {
   initLocalTables();
 }
 
@@ -605,7 +613,7 @@ function parseShow(row: Record<string, unknown>): Show {
 // ─── Users CRUD ─────────────────────────────────────────────────────────────
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM users WHERE email = ?", [email]);
     return row ? parseUser(row) : null;
   }
@@ -615,7 +623,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 export async function getUserById(id: string): Promise<User | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM users WHERE id = ?", [id]);
     return row ? parseUser(row) : null;
   }
@@ -625,7 +633,7 @@ export async function getUserById(id: string): Promise<User | null> {
 }
 
 export async function createUser(user: Omit<User, "id" | "created_at"> & { id: string }): Promise<User> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       `INSERT INTO users (id, name, email, password_hash, role, preferences, avatar, email_verified, deleted_at, last_login)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -673,7 +681,7 @@ export async function verifyUserPassword(email: string, _password: string): Prom
 }
 
 export async function deleteUser(userId: string): Promise<boolean> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     // Delete related data first
     await tursoExec("DELETE FROM likes WHERE user_id = ?", [userId]);
     await tursoExec("DELETE FROM notifications WHERE user_id = ?", [userId]);
@@ -709,7 +717,7 @@ export async function deleteUser(userId: string): Promise<boolean> {
 export async function createTrackSubmission(
   submission: Omit<TrackSubmission, "id" | "created_at" | "updated_at"> & { id: string }
 ): Promise<TrackSubmission> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       `INSERT INTO track_submissions (id, user_id, track_data, status, admin_notes, submission_type, metadata, admin_id, reviewed_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -750,7 +758,7 @@ export async function createTrackSubmission(
 }
 
 export async function getTrackSubmissionById(id: string): Promise<TrackSubmission | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM track_submissions WHERE id = ?", [id]);
     return row ? parseTrackSubmission(row) : null;
   }
@@ -760,7 +768,7 @@ export async function getTrackSubmissionById(id: string): Promise<TrackSubmissio
 }
 
 export async function getTrackSubmissionsByUser(userId: string): Promise<TrackSubmission[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM track_submissions WHERE user_id = ? ORDER BY created_at DESC", [userId]);
     return rows.map((r) => parseTrackSubmission(r as Record<string, unknown>));
   }
@@ -770,7 +778,7 @@ export async function getTrackSubmissionsByUser(userId: string): Promise<TrackSu
 }
 
 export async function getAllTrackSubmissions(): Promise<TrackSubmission[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM track_submissions ORDER BY created_at DESC");
     return rows.map((r) => parseTrackSubmission(r as Record<string, unknown>));
   }
@@ -780,7 +788,7 @@ export async function getAllTrackSubmissions(): Promise<TrackSubmission[]> {
 }
 
 export async function getTrackSubmissionsByStatus(status: SubmissionStatus): Promise<TrackSubmission[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM track_submissions WHERE status = ? ORDER BY created_at DESC", [status]);
     return rows.map((r) => parseTrackSubmission(r as Record<string, unknown>));
   }
@@ -795,7 +803,7 @@ export async function updateTrackSubmissionStatus(
   adminNotes?: string,
   adminId?: string
 ): Promise<TrackSubmission | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const now = new Date().toISOString();
     if (adminNotes !== undefined) {
       await tursoExec(
@@ -836,7 +844,7 @@ function parseSubscription(row: Record<string, unknown>): Subscription {
 export async function createSubscription(
   subscription: Omit<Subscription, "id" | "created_at"> & { id: string }
 ): Promise<Subscription> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       "INSERT INTO subscriptions (id, subscriber_id, artist_id, notify_releases, notify_shows) VALUES (?, ?, ?, ?, ?)",
       [subscription.id, subscription.subscriber_id, subscription.artist_id, subscription.notify_releases ? 1 : 0, subscription.notify_shows ? 1 : 0]
@@ -855,7 +863,7 @@ export async function createSubscription(
 }
 
 export async function getSubscriptionById(id: string): Promise<Subscription | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM subscriptions WHERE id = ?", [id]);
     return row ? parseSubscription(row) : null;
   }
@@ -865,7 +873,7 @@ export async function getSubscriptionById(id: string): Promise<Subscription | nu
 }
 
 export async function getSubscriptionByUserAndArtist(subscriberId: string, artistId: string): Promise<Subscription | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM subscriptions WHERE subscriber_id = ? AND artist_id = ?", [subscriberId, artistId]);
     return row ? parseSubscription(row) : null;
   }
@@ -875,7 +883,7 @@ export async function getSubscriptionByUserAndArtist(subscriberId: string, artis
 }
 
 export async function getSubscriptionsBySubscriber(subscriberId: string): Promise<Subscription[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC", [subscriberId]);
     return rows.map((r) => parseSubscription(r as Record<string, unknown>));
   }
@@ -885,7 +893,7 @@ export async function getSubscriptionsBySubscriber(subscriberId: string): Promis
 }
 
 export async function getSubscriptionsByArtist(artistId: string): Promise<Subscription[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM subscriptions WHERE artist_id = ? ORDER BY created_at DESC", [artistId]);
     return rows.map((r) => parseSubscription(r as Record<string, unknown>));
   }
@@ -905,7 +913,7 @@ export async function updateSubscription(id: string, data: Partial<Omit<Subscrip
 
   values.push(id);
 
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rowsAffected = await tursoExecUpdate(`UPDATE subscriptions SET ${updates.join(", ")} WHERE id = ?`, values);
     if (rowsAffected === 0) return null;
     return getSubscriptionById(id);
@@ -918,7 +926,7 @@ export async function updateSubscription(id: string, data: Partial<Omit<Subscrip
 }
 
 export async function deleteSubscription(id: string): Promise<boolean> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec("DELETE FROM subscriptions WHERE id = ?", [id]);
     return true;
   }
@@ -930,7 +938,7 @@ export async function deleteSubscription(id: string): Promise<boolean> {
 // ─── Likes CRUD ─────────────────────────────────────────────────────────────
 
 export async function toggleLike(userId: string, trackId: string): Promise<{ liked: boolean; count: number }> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const existing = await tursoExecSingle(
       "SELECT * FROM likes WHERE user_id = ? AND track_id = ?",
       [userId, trackId]
@@ -963,7 +971,7 @@ export async function toggleLike(userId: string, trackId: string): Promise<{ lik
 }
 
 export async function getLikeCount(trackId: string): Promise<number> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT COUNT(*) as count FROM likes WHERE track_id = ?", [trackId]);
     return row ? Number(row.count) : 0;
   }
@@ -973,7 +981,7 @@ export async function getLikeCount(trackId: string): Promise<number> {
 }
 
 export async function getUserLikes(userId: string): Promise<Like[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM likes WHERE user_id = ? ORDER BY created_at DESC", [userId]);
     return rows.map((r) => parseLike(r as Record<string, unknown>));
   }
@@ -983,7 +991,7 @@ export async function getUserLikes(userId: string): Promise<Like[]> {
 }
 
 export async function hasUserLikedTrack(userId: string, trackId: string): Promise<boolean> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT 1 FROM likes WHERE user_id = ? AND track_id = ?", [userId, trackId]);
     return row !== undefined;
   }
@@ -997,7 +1005,7 @@ export async function hasUserLikedTrack(userId: string, trackId: string): Promis
 export async function createNotification(
   notification: Omit<Notification, "id" | "created_at"> & { id: string }
 ): Promise<Notification> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       "INSERT INTO notifications (id, user_id, type, title, message, data, read) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
@@ -1032,7 +1040,7 @@ export async function createNotification(
 }
 
 export async function getNotificationById(id: string): Promise<Notification | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM notifications WHERE id = ?", [id]);
     return row ? parseNotification(row) : null;
   }
@@ -1042,7 +1050,7 @@ export async function getNotificationById(id: string): Promise<Notification | nu
 }
 
 export async function getUserNotifications(userId: string, unreadOnly = false): Promise<Notification[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     let query = "SELECT * FROM notifications WHERE user_id = ?";
     const args: unknown[] = [userId];
     if (unreadOnly) {
@@ -1063,7 +1071,7 @@ export async function getUserNotifications(userId: string, unreadOnly = false): 
 }
 
 export async function markNotificationAsRead(id: string): Promise<Notification | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec("UPDATE notifications SET read = 1 WHERE id = ?", [id]);
     return getNotificationById(id);
   }
@@ -1073,7 +1081,7 @@ export async function markNotificationAsRead(id: string): Promise<Notification |
 }
 
 export async function markAllNotificationsAsRead(userId: string): Promise<void> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec("UPDATE notifications SET read = 1 WHERE user_id = ?", [userId]);
     return;
   }
@@ -1082,7 +1090,7 @@ export async function markAllNotificationsAsRead(userId: string): Promise<void> 
 }
 
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle(
       "SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0",
       [userId]
@@ -1099,7 +1107,7 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
 export async function createMetricsHistory(
   metrics: Omit<MetricsHistory, "id" | "created_at"> & { id: string }
 ): Promise<MetricsHistory> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       "INSERT INTO metrics_history (id, track_id, date, streams, saves, playlist_additions, top_countries, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [metrics.id, metrics.track_id, metrics.date, metrics.streams, metrics.saves, metrics.playlist_additions, JSON.stringify(metrics.top_countries), metrics.source]
@@ -1118,7 +1126,7 @@ export async function createMetricsHistory(
 }
 
 export async function getMetricsHistoryById(id: string): Promise<MetricsHistory | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM metrics_history WHERE id = ?", [id]);
     return row ? parseMetricsHistory(row) : null;
   }
@@ -1128,7 +1136,7 @@ export async function getMetricsHistoryById(id: string): Promise<MetricsHistory 
 }
 
 export async function getMetricsHistoryByTrack(trackId: string): Promise<MetricsHistory[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM metrics_history WHERE track_id = ? ORDER BY date DESC", [trackId]);
     return rows.map((r) => parseMetricsHistory(r as Record<string, unknown>));
   }
@@ -1138,7 +1146,7 @@ export async function getMetricsHistoryByTrack(trackId: string): Promise<Metrics
 }
 
 export async function getMetricsHistoryByTrackAndDate(trackId: string, date: string): Promise<MetricsHistory | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle(
       "SELECT * FROM metrics_history WHERE track_id = ? AND date = ?",
       [trackId, date]
@@ -1153,7 +1161,7 @@ export async function getMetricsHistoryByTrackAndDate(trackId: string, date: str
 export async function upsertMetricsHistory(
   metrics: Omit<MetricsHistory, "id" | "created_at"> & { id: string }
 ): Promise<MetricsHistory> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const existing = await getMetricsHistoryByTrackAndDate(metrics.track_id, metrics.date);
     if (existing) {
       await tursoExec(
@@ -1180,7 +1188,7 @@ export async function upsertMetricsHistory(
 // ─── Artists CRUD ───────────────────────────────────────────────────────────
 
 export async function getArtistByName(name: string): Promise<ArtistProfile | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM artists WHERE name = ?", [name]);
     return row ? parseArtist(row) : null;
   }
@@ -1190,7 +1198,7 @@ export async function getArtistByName(name: string): Promise<ArtistProfile | nul
 }
 
 export async function getArtistByUserId(userId: string): Promise<ArtistProfile | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM artists WHERE user_id = ?", [userId]);
     return row ? parseArtist(row) : null;
   }
@@ -1200,7 +1208,7 @@ export async function getArtistByUserId(userId: string): Promise<ArtistProfile |
 }
 
 export async function getArtistById(id: string): Promise<ArtistProfile | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM artists WHERE id = ?", [id]);
     return row ? parseArtist(row) : null;
   }
@@ -1216,7 +1224,7 @@ export async function createArtist(data: CreateArtistInput): Promise<ArtistProfi
   const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   const socialLinks = data.socialLinks ? JSON.stringify(data.socialLinks) : "[]";
 
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       `INSERT INTO artists (id, name, user_id, biography, press_text, press_highlights, genre, location, monthly_listeners, social_links, profile_image, banner_image, slug, is_active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1270,7 +1278,7 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
 
   console.log("[updateArtist] id:", id, "name:", name, "biography:", biography?.substring(0, 30), "genre:", genre, "location:", location, "monthly_listeners:", monthlyListeners);
 
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const updates: string[] = [];
     const values: unknown[] = [];
 
@@ -1331,7 +1339,7 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
 }
 
 export async function deleteArtist(id: string): Promise<{ success: boolean }> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec("DELETE FROM shows WHERE artist_id = ?", [id]);
     const rowsAffected = await tursoExecUpdate("DELETE FROM artists WHERE id = ?", [id]);
     return { success: rowsAffected > 0 };
@@ -1343,7 +1351,7 @@ export async function deleteArtist(id: string): Promise<{ success: boolean }> {
 }
 
 export async function getAllArtists(): Promise<ArtistProfile[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM artists ORDER BY name");
     return rows.map((r) => parseArtist(r as Record<string, unknown>));
   }
@@ -1355,7 +1363,7 @@ export async function getAllArtists(): Promise<ArtistProfile[]> {
 // ─── Shows CRUD ─────────────────────────────────────────────────────────────
 
 export async function getAllShows(): Promise<Show[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM shows ORDER BY date ASC");
     return rows.map((r) => parseShow(r as Record<string, unknown>));
   }
@@ -1365,7 +1373,7 @@ export async function getAllShows(): Promise<Show[]> {
 }
 
 export async function getShowsByArtist(artistId: string): Promise<Show[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM shows WHERE artist_id = ? ORDER BY date ASC", [artistId]);
     return rows.map((r) => parseShow(r as Record<string, unknown>));
   }
@@ -1375,7 +1383,7 @@ export async function getShowsByArtist(artistId: string): Promise<Show[]> {
 }
 
 export async function getShowById(id: string): Promise<Show | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM shows WHERE id = ?", [id]);
     return row ? parseShow(row) : null;
   }
@@ -1390,7 +1398,7 @@ export async function createShow(data: CreateShowInput): Promise<Show> {
   const paymentMethods = data.payment_methods ? JSON.stringify(data.payment_methods) : "[]";
   const guestArtists = data.guest_artists ? JSON.stringify(data.guest_artists) : "[]";
 
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       `INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1431,7 +1439,7 @@ export async function createShow(data: CreateShowInput): Promise<Show> {
 }
 
 export async function updateShow(id: string, data: Partial<CreateShowInput>): Promise<Show | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const updates: string[] = [];
     const values: (string | null)[] = [];
 
@@ -1496,7 +1504,7 @@ export async function updateShow(id: string, data: Partial<CreateShowInput>): Pr
 }
 
 export async function deleteShow(id: string): Promise<boolean> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec("DELETE FROM shows WHERE id = ?", [id]);
     return true;
   }
@@ -1508,7 +1516,7 @@ export async function deleteShow(id: string): Promise<boolean> {
 // ─── Tracks CRUD ────────────────────────────────────────────────────────────
 
 export async function getAllTracks(): Promise<Track[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     try {
       const rows = await tursoExec("SELECT * FROM tracks");
       return rows.map((r) => parseTrack(r as Record<string, unknown>));
@@ -1523,7 +1531,7 @@ export async function getAllTracks(): Promise<Track[]> {
 }
 
 export async function getTrackById(id: string): Promise<Track | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     try {
       const row = await tursoExecSingle("SELECT * FROM tracks WHERE id = ?", [id]);
       return row ? parseTrack(row) : null;
@@ -1538,7 +1546,7 @@ export async function getTrackById(id: string): Promise<Track | null> {
 }
 
 export async function getTrackCount(): Promise<number> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT COUNT(*) as count FROM tracks");
     return row ? Number(row.count) : 0;
   }
@@ -1548,7 +1556,7 @@ export async function getTrackCount(): Promise<number> {
 }
 
 export async function getTracksByReleaseType(releaseType: string): Promise<Track[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM tracks WHERE release_type = ?", [releaseType]);
     return rows.map((r) => parseTrack(r as Record<string, unknown>));
   }
@@ -1559,7 +1567,7 @@ export async function getTracksByReleaseType(releaseType: string): Promise<Track
 
 export async function searchTracks(query: string): Promise<Track[]> {
   const pattern = `%${query}%`;
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec(
       "SELECT * FROM tracks WHERE title LIKE ? OR artist_name LIKE ? OR release_type LIKE ? OR lyrics LIKE ?",
       [pattern, pattern, pattern, pattern]
@@ -1575,7 +1583,7 @@ export async function searchTracks(query: string): Promise<Track[]> {
 
 // P3 Batch 2: Multi-track releases — tracks by release_id
 export async function getTracksByReleaseId(releaseId: string): Promise<Track[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec(
       "SELECT * FROM tracks WHERE release_id = ? ORDER BY start_time ASC",
       [releaseId]
@@ -1591,7 +1599,7 @@ export async function getTracksByReleaseId(releaseId: string): Promise<Track[]> 
 
 // P3 Batch 2: Dashboard — only parent releases (release_id IS NULL)
 export async function getParentReleases(): Promise<Track[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec(
       "SELECT * FROM tracks WHERE release_id IS NULL"
     );
@@ -1606,7 +1614,7 @@ export async function getParentReleases(): Promise<Track[]> {
 
 // P3 Batch 2: Catalog — only approved parent releases
 export async function getApprovedReleases(): Promise<Track[]> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec(
       "SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved'"
     );
@@ -1674,7 +1682,7 @@ export async function createTrack(data: {
     is_instrumental: data.is_instrumental ?? false,
   };
 
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(
       `INSERT OR REPLACE INTO tracks (
         id, title, artist_name, release_type, release_date, duration, cover_image,
@@ -1762,7 +1770,7 @@ export async function updateTrack(id: string, updates: Partial<{
     return v;
   });
 
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExec(`UPDATE tracks SET ${setClause} WHERE id = ?`, [...values, id]);
   } else {
     const db = getLocalDbWrite();
@@ -1773,7 +1781,7 @@ export async function updateTrack(id: string, updates: Partial<{
 }
 
 export async function deleteTrack(id: string): Promise<boolean> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const result = await tursoExec("DELETE FROM tracks WHERE id = ?", [id]);
     return result.length > 0 || true;
   }
@@ -1783,7 +1791,7 @@ export async function deleteTrack(id: string): Promise<boolean> {
 }
 
 export async function incrementTrackStreams(id: string): Promise<number> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     // Increment streams column (atomic)
     await tursoExec("UPDATE tracks SET streams = COALESCE(streams, 0) + 1 WHERE id = ?", [id]);
     // Read back the updated value
@@ -1860,7 +1868,7 @@ export async function syncAllToTurso(): Promise<Record<string, SyncResult>> {
 }
 
 export function isTursoConfigured(): boolean {
-  return USE_TURSO;
+  return isTursoEnabled();
 }
 
 // ─── Exports for direct access (scripts, etc.) ──────────────────────────────
@@ -1952,7 +1960,7 @@ function parseDossier(row: Record<string, unknown>): DossierData {
 }
 
 export async function getDossierByArtistId(artistId: string): Promise<DossierData | null> {
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM dossiers WHERE artist_id = ?", [artistId]);
     if (rows.length === 0) return null;
     return parseDossier(rows[0] as Record<string, unknown>);
@@ -1972,7 +1980,7 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
     const setClauses = fields.map(k => `${k} = ?`).join(", ");
     const values = fields.map(k => (data as any)[k] ?? null);
 
-    if (USE_TURSO) {
+    if (isTursoEnabled()) {
       await tursoExecUpdate(`UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`, [...values, now, artistId]);
     } else {
       const db = getLocalDbWrite();
@@ -1990,7 +1998,7 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
     return (data as any)[k] ?? null;
   });
 
-  if (USE_TURSO) {
+  if (isTursoEnabled()) {
     await tursoExecUpdate(`INSERT INTO dossiers (${allFields.join(", ")}, created_at, updated_at) VALUES (${placeholders}, ?, ?)`, [...values, now, now]);
   } else {
     const db = getLocalDbWrite();

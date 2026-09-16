@@ -9,8 +9,6 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
 
-    // P3 Batch 2: Only parent releases (release_id IS NULL) — filter client-side
-    // to avoid Turso issues with new columns
     const allTracks = await getAllTracks();
     const tracks = allTracks.filter(t => !t.release_id);
     const artists = await getAllArtists();
@@ -30,7 +28,8 @@ export async function GET(req: NextRequest) {
       showsByArtist[art.id] = await getShowsByArtist(art.id);
     }
 
-    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist }, {
+    const testTracks = tracks.filter(t => t.title.toLowerCase().includes("test"));
+    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist, _debug: { total: tracks.length, testCount: testTracks.length, testTitles: testTracks.map(t => t.title) } }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",

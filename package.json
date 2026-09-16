@@ -4,6 +4,7 @@
   "private": true,
   "description": "PressPlay - Donde la música se presenta",
   "scripts": {
+    "prebuild": "rm -f data/*.db data/*.db-shm data/*.db-wal",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
