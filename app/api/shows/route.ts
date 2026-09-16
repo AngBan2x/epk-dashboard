@@ -113,8 +113,6 @@ export async function POST(req: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
-    const err = error as Error & { stack?: string; cause?: unknown };
-    console.error("POST shows error:", err, err.stack, err.cause);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

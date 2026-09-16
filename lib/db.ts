@@ -120,7 +120,6 @@ async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
     const result = await client.execute({ sql: bustSelectCache(sql), args: (args ?? []) as import("@libsql/client").InValue[] });
     return result.rows as unknown[];
   } catch (err) {
-    console.error("TURSO EXEC ERROR:", err, "SQL:", sql, "ARGS:", args);
     throw err;
   }
 }
@@ -137,7 +136,6 @@ async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
     const result = await client.execute({ sql, args: (args ?? []) as import("@libsql/client").InValue[] });
     return result.rowsAffected;
   } catch (err) {
-    console.error("TURSO EXECUPDATE ERROR:", err, "SQL:", sql, "ARGS:", args);
     throw err;
   }
 }
