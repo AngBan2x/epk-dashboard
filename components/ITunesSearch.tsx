@@ -35,6 +35,7 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -44,6 +45,10 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
       clearTimeout(debounceTimeout.current);
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     debounceTimeout.current = setTimeout(async () => {
       if (value.trim().length < 2) {
         setResults([]);
@@ -51,12 +56,15 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
         return;
       }
       setLoading(true);
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
       try {
-        const res = await fetch(`/api/itunes-search?term=${encodeURIComponent(value)}&entity=song&limit=5`);
+        const res = await fetch(`/api/itunes-search?term=${encodeURIComponent(value)}&entity=song&limit=5`, { signal: controller.signal });
         const data = await res.json();
         setResults(data.results || []);
         setOpen(true);
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setResults([]);
       } finally {
         setLoading(false);
@@ -84,7 +92,10 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, [handleKeyDown]);
 
   useEffect(() => {

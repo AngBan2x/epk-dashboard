@@ -1417,6 +1417,19 @@ export async function getShowsByArtist(artistId: string): Promise<Show[]> {
   return rows.map(parseShow);
 }
 
+export async function getShowsByArtists(artistIds: string[]): Promise<Show[]> {
+  if (artistIds.length === 0) return [];
+  if (isTursoEnabled()) {
+    const placeholders = artistIds.map(() => "?").join(", ");
+    const rows = await tursoExec(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) ORDER BY date ASC`, artistIds);
+    return rows.map((r) => parseShow(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const placeholders = artistIds.map(() => "?").join(", ");
+  const rows = db.prepare(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) ORDER BY date ASC`).all(...artistIds) as Record<string, unknown>[];
+  return rows.map(parseShow);
+}
+
 export async function getShowById(id: string): Promise<Show | null> {
   if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT * FROM shows WHERE id = ?", [id]);

@@ -177,10 +177,22 @@ export async function PUT(req: NextRequest) {
       updates.external_links = JSON.stringify(updates.external_links);
     }
 
-    const fields = Object.keys(updates)
-      .map((key) => `${key} = ?`)
-      .join(", ");
-    const values = Object.values(updates);
+    const ALLOWED_COLUMNS = new Set([
+      "title", "artist_name", "release_date", "cover_image", "release_type",
+      "genre", "description", "duration", "youtube_video_id", "external_links",
+      "status", "spotify_url", "audio_preview_url", "itunes_track_id",
+      "stems_urls", "video_embed_url", "gallery_images", "disc_number",
+      "is_double_single", "sides_b", "isrc", "composers", "is_instrumental",
+      "streams", "metrics", "production_details", "lyrics",
+    ]);
+
+    const safeKeys = Object.keys(updates).filter((k) => ALLOWED_COLUMNS.has(k));
+    if (safeKeys.length === 0) {
+      return NextResponse.json({ error: "Sin campos válidos para actualizar" }, { status: 400 });
+    }
+
+    const fields = safeKeys.map((key) => `${key} = ?`).join(", ");
+    const values = safeKeys.map((key) => updates[key]);
 
     await dbRun(`UPDATE tracks SET ${fields} WHERE id = ?`, [...values, id]);
     return NextResponse.json({ message: "Release actualizado" });

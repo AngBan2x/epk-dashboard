@@ -29,6 +29,7 @@ export function BookingModule({
 }: BookingModuleProps) {
   const [shows, setShows] = useState<Show[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!artistId) {
@@ -36,9 +37,9 @@ export function BookingModule({
       return;
     }
     fetch(`/api/shows?artist_id=${artistId}`)
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error("Error al cargar shows"); return r.json(); })
       .then((data) => setShows(data.shows || []))
-      .catch(() => {})
+      .catch((err) => setError(err.message || "Error al cargar shows"))
       .finally(() => setLoading(false));
   }, [artistId]);
 
@@ -66,6 +67,10 @@ export function BookingModule({
       <AnimatePresence mode="wait">
         {loading ? (
           <div className="p-8 text-center text-slate-400">Cargando shows...</div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-400">
+            <p>{error}</p>
+          </div>
         ) : shows.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
             <p>No hay shows registrados para este artista.</p>
