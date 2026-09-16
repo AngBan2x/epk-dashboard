@@ -82,7 +82,7 @@ describe("iTunes Search Utilities", () => {
 
         // Verify fetch was called with correct URL
         expect(global.fetch).toHaveBeenCalledTimes(1);
-        const callArgs = (global.fetch as vi.Mock).mock.calls[0];
+        const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
         const url = callArgs[0] as string;
         expect(url).toContain("itunes.apple.com/search");
         expect(url).toContain("term=test+query"); // URLSearchParams uses + for spaces
