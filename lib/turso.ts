@@ -31,14 +31,10 @@ import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-saf
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
-let _turso: Client | null = null;
-
+// Fresh client per request — singleton causes stale HTTP transport cache on Vercel
 export function getTursoClient(): Client | null {
   if (!TURSO_URL || !TURSO_TOKEN) return null;
-  if (!_turso) {
-    _turso = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN });
-  }
-  return _turso;
+  return createClient({ url: TURSO_URL, authToken: TURSO_TOKEN });
 }
 
 // Keep legacy alias
