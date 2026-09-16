@@ -15,6 +15,21 @@ export async function GET(req: NextRequest) {
 
     const allTracks = await getAllTracks();
     const tracks = allTracks.filter(t => !t.release_id);
+
+    // Direct Turso query for debug comparison
+    let directCount = -1;
+    let directTitles: string[] = [];
+    try {
+      const { getTursoClient } = await import("@/lib/turso");
+      const client = getTursoClient();
+      if (client) {
+        const result = await client.execute("SELECT title, status FROM tracks ORDER BY title");
+        directCount = result.rows.length;
+        directTitles = result.rows.map(r => `[${r.status}] ${r.title}` as string);
+      }
+    } catch (e) {
+      directCount = -999;
+    }
     const artists = await getAllArtists();
 
     let artistProfile = null;
@@ -33,7 +48,7 @@ export async function GET(req: NextRequest) {
     }
 
     const testTracks = tracks.filter(t => t.title.toLowerCase().includes("test"));
-    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist, _debug: { total: tracks.length, testCount: testTracks.length, testTitles: testTracks.map(t => t.title), tursoActive, tursoUrl: tursoUrl.substring(0, 50), tursoToken } }, {
+    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist, _debug: { total: tracks.length, testCount: testTracks.length, testTitles: testTracks.map(t => t.title), tursoActive, tursoUrl: tursoUrl.substring(0, 50), tursoToken, directCount, directTitles } }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",
