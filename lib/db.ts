@@ -424,7 +424,11 @@ function initLocalTables(): void {
 // Initialize local tables on module load.
 // Always runs — uses CREATE TABLE IF NOT EXISTS (idempotent).
 // In production with Turso active, the local file is harmless (never read).
-initLocalTables();
+try {
+  initLocalTables();
+} catch {
+  // Ignore errors on serverless environments where local SQLite isn't needed
+}
 
 // ─── Parsers ────────────────────────────────────────────────────────────────
 
