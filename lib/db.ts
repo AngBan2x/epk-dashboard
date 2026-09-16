@@ -116,8 +116,13 @@ function bustSelectCache(sql: string): string {
 async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
   const client = getTursoClientSync();
   if (!client) throw new Error("Turso client not available");
-  const result = await client.execute({ sql: bustSelectCache(sql), args: (args ?? []) as import("@libsql/client").InValue[] });
-  return result.rows as unknown[];
+  try {
+    const result = await client.execute({ sql: bustSelectCache(sql), args: (args ?? []) as import("@libsql/client").InValue[] });
+    return result.rows as unknown[];
+  } catch (err) {
+    console.error("TURSO EXEC ERROR:", err, "SQL:", sql, "ARGS:", args);
+    throw err;
+  }
 }
 
 async function tursoExecSingle(sql: string, args?: unknown[]): Promise<Record<string, unknown> | undefined> {
@@ -128,8 +133,13 @@ async function tursoExecSingle(sql: string, args?: unknown[]): Promise<Record<st
 async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
   const client = getTursoClientSync();
   if (!client) throw new Error("Turso client not available");
-  const result = await client.execute({ sql, args: (args ?? []) as import("@libsql/client").InValue[] });
-  return result.rowsAffected;
+  try {
+    const result = await client.execute({ sql, args: (args ?? []) as import("@libsql/client").InValue[] });
+    return result.rowsAffected;
+  } catch (err) {
+    console.error("TURSO EXECUPDATE ERROR:", err, "SQL:", sql, "ARGS:", args);
+    throw err;
+  }
 }
 
 // ─── Initialize tables (local only; Turso schema via ensureTursoSchema) ─────
