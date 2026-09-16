@@ -3726,3 +3726,42 @@ Ejecutamos 14 fixes reportados por el usuario, organizados por componente. Fixes
 
 ### Commit: `eb5347c` — feat: P3.6 CRUD Shows + P3.3 iTunes auto-complete
 ### Deploy: https://epk-dashboard.vercel.app (production)
+
+---
+
+## Fix: Test Releases visibles en producción — SQLite local en git
+
+**Fecha:** 2026-09-16
+**Modelo:** MiMo v2.5 Free (opencode)
+
+### Problema
+Test Releases (Test Release, Test Release 2-4) aparecían en la UI de producción a pesar de haber sido eliminados de Turso.
+
+### Causa raíz
+1. `data/music_catalog.db` (SQLite local con datos de testing) estaba **tracked en git** y se desplegaba a Vercel
+2. El singleton `_turso` en `lib/turso.ts` cacheaba el cliente HTTP de Turso, sirviendo datos stale
+3. Cuando Turso retornaba datos stale o fallaba, Vercel caía al SQLite local con datos viejos
+
+### Fixes implementados
+1. `.gitignore` — agregado `data/*.db*` para excluir SQLite del tracking
+2. `git rm --cached` — removido `data/music_catalog.db*` del index de git
+3. `lib/turso.ts` — eliminado singleton `_turso`, fresh client por request (consistente con `lib/db.ts`)
+4. `lib/db.ts` — safety guard en `getAllTracks()`: si Turso falla lanza error explícito en vez de fallback silencioso
+5. Turso DB — eliminados 8 test tracks (Test Release 1-4, Test Track 1-4) y duplicado Sad Winter Song
+6. Turso DB — corregido release_type casing (`Single`→`single`) y tipo (`Album`→`single` para Hotel California, Running Up That Hill)
+7. Turso DB — Sad Winter Song status `draft`→`approved`
+
+### Archivos modificados
+- `.gitignore` — +1 línea (`data/*.db*`)
+- `lib/turso.ts` — singleton eliminado, fresh client por request
+- `lib/db.ts` — safety guard en `getAllTracks()` y `getTrackById()`
+- `docs/AI_LOG.md` — esta documentación
+
+### Quality Gates:
+- TSC: 0 errors
+- Unit tests: 110/110 pass
+- Build: success
+- Turso DB: 9 tracks (approved), 0 test data
+
+### Commit: pendiente
+### Deploy: pendiente

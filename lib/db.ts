@@ -1509,8 +1509,13 @@ export async function deleteShow(id: string): Promise<boolean> {
 
 export async function getAllTracks(): Promise<Track[]> {
   if (USE_TURSO) {
-    const rows = await tursoExec("SELECT * FROM tracks");
-    return rows.map((r) => parseTrack(r as Record<string, unknown>));
+    try {
+      const rows = await tursoExec("SELECT * FROM tracks");
+      return rows.map((r) => parseTrack(r as Record<string, unknown>));
+    } catch (error) {
+      console.error("Turso getAllTracks failed — production MUST use Turso:", error);
+      throw new Error("Database error: Turso connection failed. No local fallback in production.");
+    }
   }
   const db = getLocalDb();
   const rows = db.prepare("SELECT * FROM tracks").all() as Record<string, unknown>[];
@@ -1519,8 +1524,13 @@ export async function getAllTracks(): Promise<Track[]> {
 
 export async function getTrackById(id: string): Promise<Track | null> {
   if (USE_TURSO) {
-    const row = await tursoExecSingle("SELECT * FROM tracks WHERE id = ?", [id]);
-    return row ? parseTrack(row) : null;
+    try {
+      const row = await tursoExecSingle("SELECT * FROM tracks WHERE id = ?", [id]);
+      return row ? parseTrack(row) : null;
+    } catch (error) {
+      console.error("Turso getTrackById failed:", error);
+      throw new Error("Database error: Turso connection failed.");
+    }
   }
   const db = getLocalDb();
   const row = db.prepare("SELECT * FROM tracks WHERE id = ?").get(id) as Record<string, unknown> | undefined;
