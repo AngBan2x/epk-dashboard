@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtist } from "@/lib/db";
+import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtist, isTursoConfigured } from "@/lib/db";
 import type { Show } from "@/types/music";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,10 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
+
+    const tursoActive = isTursoConfigured();
+    const tursoUrl = process.env.TURSO_DATABASE_URL ?? "UNDEFINED";
+    const tursoToken = process.env.TURSO_AUTH_TOKEN ? "SET" : "UNDEFINED";
 
     const allTracks = await getAllTracks();
     const tracks = allTracks.filter(t => !t.release_id);
@@ -29,7 +33,7 @@ export async function GET(req: NextRequest) {
     }
 
     const testTracks = tracks.filter(t => t.title.toLowerCase().includes("test"));
-    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist, _debug: { total: tracks.length, testCount: testTracks.length, testTitles: testTracks.map(t => t.title) } }, {
+    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist, _debug: { total: tracks.length, testCount: testTracks.length, testTitles: testTracks.map(t => t.title), tursoActive, tursoUrl: tursoUrl.substring(0, 50), tursoToken } }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",
