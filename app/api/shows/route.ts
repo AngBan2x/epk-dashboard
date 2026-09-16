@@ -96,15 +96,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = CreateShowSchema.parse(body);
 
-    // Artists can only create shows for themselves; admins can create for anyone
-    if (session.role === "artist" && validated.artist_id !== session.userId) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
-
     // FK validation: verify artist_id exists
     const artist = await getArtistById(validated.artist_id);
     if (!artist) {
       return NextResponse.json({ error: "Artista no encontrado" }, { status: 400 });
+    }
+
+    // Artists can only create shows for themselves; admins can create for anyone
+    if (session.role === "artist" && artist.user_id !== session.userId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const show = await createShow(validated);
