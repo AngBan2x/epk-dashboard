@@ -3912,5 +3912,52 @@ POST `/api/shows` retorna 500 Internal Server Error en producción para admin y 
 - `lib/db.ts` - tursoExec, tursoExecUpdate, createShow
 - `app/api/shows/route.ts` - FK validation, error handling
 
+### Commits: `4a86a7c` (schema migration + ownership), `0285cce` (cleanup)
+### Deploy: ✅ v4.0.0-rc.6
+
+### Resultado Final
+**Error real encontrado**: `SQLITE_UNKNOWN: table shows has no column named payment_methods` — Turso schema missing columns.
+
+**Fixes aplicados**:
+1. `lib/turso.ts` — ALTER TABLE shows ADD COLUMN para payment_methods, guest_artists, postponement_reason, flyer_url, ticket_link, description, notes, deleted_at, updated_at, created_at
+2. `lib/db.ts` — Cleaned up temp logging in tursoExec/tursoExecUpdate
+3. `app/api/shows/route.ts` — Fixed ownership check (artist.user_id vs session.userId), added FK validation with getArtistById, cleaned temp logging
+
+**Tests producción**: 5/5 PASS
+- Admin POST → 201
+- Artist POST (own) → 201
+- Artist POST (other) → 403
+- No auth → 401
+- Non-existent artist → 400
+
+**Quality Gates**: TSC 0 errors, Build success, Deploy v4.0.0-rc.6
+
+---
+
+## Fix: MCP Servers not loading in opencode Desktop
+
+**Fecha:** 2026-09-16
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Fase:** Infra — MCP Configuration
+
+### Problema
+MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en CLI.
+
+### Causa Raíz
+`npx` y `uvx` no estaban en PATH del shell que opencode Desktop usa para spawnear MCP servers. PATH del sistema no incluía NVM (`/home/angel/.nvm/versions/node/v24.13.0/bin`) ni user local bin (`/home/angel/.local/bin`).
+
+### Fix
+1. **`opencode.json`** — Agregado `environment.PATH` a 6 MCP servers locales:
+   - filesystem, sqlite, github, playwright, fetch, git
+   - PATH: `/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
+
+2. **`~/.config/opencode/opencode.jsonc`** — Agregado `GITHUB_PERSONAL_ACCESS_TOKEN` en `env` global (gitignored, seguro)
+
+3. **`.gitignore`** — `.env*.local` ya existía, no se necesitó cambio
+
+### Resultado
+- 6/6 MCP servers pasaron de 🔴 a 🟢 después de reiniciar opencode Desktop
+- `github` MCP autenticado con token
+
 ### Commits: pendiente
-### Deploy: pendiente
+### Deploy: N/A (config local, no afecta producción)
