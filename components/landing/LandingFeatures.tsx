@@ -39,8 +39,7 @@ export default function LandingFeatures() {
         <motion.div
           className="text-center mb-14"
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
@@ -57,8 +56,7 @@ export default function LandingFeatures() {
               key={feature.title}
               className="group bg-slate-50 dark:bg-slate-800 rounded-2xl p-8 border border-slate-100 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-600 hover:shadow-lg transition-all duration-300"
               initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: idx * 0.15 }}
             >
               <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
