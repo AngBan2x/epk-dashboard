@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtist } from "@/lib/db";
+import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtists } from "@/lib/db";
 import type { Show } from "@/types/music";
 
 export const dynamic = "force-dynamic";
@@ -14,18 +14,24 @@ export async function GET(req: NextRequest) {
     const artists = await getAllArtists();
 
     let artistProfile = null;
-    let artistShows: Show[] = [];
+    let allShows: Show[] = [];
 
+    if (artists.length > 0) {
+      allShows = await getShowsByArtists(artists.map(a => a.id));
+    }
+
+    let artistShows: Show[] = [];
     if (userId) {
-      artistProfile = await getArtistByUserId(userId);
-      if (artistProfile) {
-        artistShows = await getShowsByArtist(artistProfile.id);
+      const profile = await getArtistByUserId(userId);
+      if (profile) {
+        artistProfile = profile;
+        artistShows = allShows.filter(s => s.artist_id === profile.id);
       }
     }
 
     const showsByArtist: Record<string, Show[]> = {};
     for (const art of artists) {
-      showsByArtist[art.id] = await getShowsByArtist(art.id);
+      showsByArtist[art.id] = allShows.filter(s => s.artist_id === art.id);
     }
 
     return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist }, {
