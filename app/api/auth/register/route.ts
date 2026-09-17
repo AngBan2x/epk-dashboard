@@ -22,7 +22,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Cuerpo de solicitud inválido" },
+        { status: 400 }
+      );
+    }
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "Cuerpo de solicitud inválido" },
+        { status: 400 }
+      );
+    }
     const validated = RegisterSchema.parse(body);
 
     // Verificar si el email ya existe
@@ -86,7 +100,15 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("[API/auth/register] Error:", error);
+    // Detect UNIQUE constraint violations (email already exists — race condition)
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes("UNIQUE constraint failed") || msg.includes("UNIQUE")) {
+      return NextResponse.json(
+        { error: "Este email ya está registrado" },
+        { status: 409 }
+      );
+    }
+    console.error("[API/auth/register] Error:", error instanceof Error ? error.message : String(error), error instanceof Error ? error.stack : "");
     return NextResponse.json(
       { error: "Error al registrar usuario" },
       { status: 500 }

@@ -19,6 +19,9 @@ const STATUS_LABELS: Record<ShowStatus, string> = {
   confirmado: "Confirmado",
   en_venta: "En Venta",
   agotado: "Agotado",
+  reprogramado: "Reprogramado",
+  disponible: "Disponible",
+  finalizado: "Finalizado",
 };
 
 const PAYMENT_TYPE_LABELS: Record<string, string> = {

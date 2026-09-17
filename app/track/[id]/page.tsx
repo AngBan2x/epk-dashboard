@@ -170,6 +170,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                   lyrics={track.lyrics}
                   isInstrumental={track.is_instrumental}
                   trackId={track.id}
+                  artistName={track.artist_name}
                 />
               </SlideIn>
 
@@ -271,6 +272,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                   <ProductionDetailsWrapper
                     details={track.production_details}
                     trackId={track.id}
+                    artistName={track.artist_name}
                   />
                 </section>
               </SlideIn>

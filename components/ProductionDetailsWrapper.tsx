@@ -8,32 +8,29 @@ interface ProductionDetailsWrapperProps {
   details: ProductionDetailsType;
   className?: string;
   trackId: string;
+  artistName: string;
 }
 
 export function ProductionDetailsWrapper({
   details,
   className,
   trackId,
+  artistName,
 }: ProductionDetailsWrapperProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [currentDetails, setCurrentDetails] = useState(details);
 
   useEffect(() => {
-    try {
-      const cookie = document.cookie
-        .split("; ")
-        .find((c) => c.startsWith("auth_session="));
-      if (cookie) {
-        const decoded = atob(cookie.split("=")[1]);
-        const session = JSON.parse(decoded) as { role?: string };
-        if (session.role === "admin" || session.role === "artist") {
+    fetch('/api/auth/me')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        if (data.role === 'admin' || data.name === artistName) {
           setIsOwner(true);
         }
-      }
-    } catch {
-      // Not logged in or invalid session
-    }
-  }, []);
+      })
+      .catch(() => {});
+  }, [artistName]);
 
   return (
     <ProductionDetails

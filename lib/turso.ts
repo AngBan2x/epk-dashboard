@@ -240,6 +240,14 @@ export async function ensureTursoSchema(): Promise<boolean> {
   try { await client.execute(`ALTER TABLE shows ADD COLUMN updated_at TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE shows ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`); } catch {}
 
+  // users schema drift fixes
+  try { await client.execute(`ALTER TABLE users ADD COLUMN preferences TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE users ADD COLUMN avatar TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0`); } catch {}
+  try { await client.execute(`ALTER TABLE users ADD COLUMN deleted_at TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE users ADD COLUMN last_login TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE users ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`); } catch {}
+
   // 9. subscriptions (P2.3)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS subscriptions (

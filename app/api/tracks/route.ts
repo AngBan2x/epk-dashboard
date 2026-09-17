@@ -37,7 +37,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ tracks }, {
+    // Pagination: ?page=1&limit=10
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10) || 50));
+    const total = tracks.length;
+    const start = (page - 1) * limit;
+    const paginatedTracks = start >= total ? [] : tracks.slice(start, start + limit);
+
+    return NextResponse.json({ tracks: paginatedTracks, total, page, limit }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",
@@ -55,8 +63,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = validateSession(req);
-    if (!session || session.role !== "admin") {
+    if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const body = await req.json();
@@ -78,8 +89,11 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = validateSession(req);
-    if (!session || session.role !== "admin") {
+    if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const body = await req.json();
@@ -105,8 +119,11 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = validateSession(req);
-    if (!session || session.role !== "admin") {
+    if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);

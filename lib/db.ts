@@ -99,6 +99,30 @@ function getTursoClientSync(): import("@libsql/client").Client | null {
   return createClient({ url: getTursoUrl()!, authToken: getTursoToken()! });
 }
 
+// ─── Turso: Lazy schema initialization ─────────────────────────────────────
+// Ensures all tables exist in Turso before first write. Called once, then cached.
+
+let _tursoSchemaEnsured = false;
+let _tursoSchemaPromise: Promise<void> | null = null;
+
+async function ensureTursoSchemaIfNeeded(): Promise<void> {
+  if (_tursoSchemaEnsured) return;
+  if (!isTursoEnabled()) return;
+  // Deduplicate concurrent calls
+  if (_tursoSchemaPromise) return _tursoSchemaPromise;
+  _tursoSchemaPromise = (async () => {
+    try {
+      const { ensureTursoSchema } = await import("./turso");
+      await ensureTursoSchema();
+      _tursoSchemaEnsured = true;
+    } catch (err) {
+      console.error("[lib/db] Failed to ensure Turso schema:", err);
+      _tursoSchemaPromise = null; // retry next time
+    }
+  })();
+  return _tursoSchemaPromise;
+}
+
 // ─── Turso: Execute helper ──────────────────────────────────────────────────
 // NOTE: The @libsql/client HTTP transport caches query results by exact SQL
 // string. Stale cached reads cause UPDATE writes to appear not to persist.
@@ -657,6 +681,7 @@ function parseShow(row: Record<string, unknown>): Show {
 
 export async function getUserByEmail(email: string): Promise<User | null> {
   if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
     const row = await tursoExecSingle("SELECT * FROM users WHERE email = ?", [email]);
     return row ? parseUser(row) : null;
   }
@@ -677,6 +702,7 @@ export async function getUserById(id: string): Promise<User | null> {
 
 export async function createUser(user: Omit<User, "id" | "created_at"> & { id: string }): Promise<User> {
   if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
     await tursoExec(
       `INSERT INTO users (id, name, email, password_hash, role, preferences, avatar, email_verified, deleted_at, last_login)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
