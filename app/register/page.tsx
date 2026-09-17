@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { safeString } from "@/lib/null-safe";
 
@@ -48,7 +49,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-700">
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="PressPlay" className="w-12 h-12 mx-auto mb-4" />
+          <Image src="/logo.svg" alt="PressPlay" width={48} height={48} unoptimized className="w-12 h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Crear Cuenta</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Únete a PressPlay</p>
         </div>

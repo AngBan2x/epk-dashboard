@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { safeString, capitalizeReleaseType } from "@/lib/null-safe";
 import type { Track, ArtistProfile, Show, ShowStatus, ReleaseStatus } from "@/types/music";
+import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ShowForm } from "@/components/ShowForm";
@@ -690,7 +691,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
                               {track.cover_image ? (
-                                <img src={track.cover_image} alt="" className="w-full h-full object-cover" />
+                                <Image src={track.cover_image} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                               )}
@@ -782,7 +783,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
                               {release.cover_image ? (
-                                <img src={release.cover_image} alt="" className="w-full h-full object-cover" />
+                                <Image src={release.cover_image} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                               )}
@@ -887,7 +888,7 @@ export default function AdminPage() {
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
                                 {trackData.cover_image ? (
-                                  <img src={trackData.cover_image} alt="" className="w-full h-full object-cover" />
+                                  <Image src={trackData.cover_image} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                                 )}
@@ -1451,7 +1452,7 @@ onSubmit={async (e) => {
                   return (
                     <>
                       <div className="flex items-center gap-4">
-                        <img src={trackData.cover_image} alt="" className="w-24 h-24 rounded-lg object-cover" />
+                        <Image src={trackData.cover_image} alt="" width={96} height={96} unoptimized className="w-24 h-24 rounded-lg object-cover" />
                         <div>
                           <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{trackData.title}</h3>
                           <p className="text-slate-600 dark:text-slate-400">{trackData.artist_name}</p>

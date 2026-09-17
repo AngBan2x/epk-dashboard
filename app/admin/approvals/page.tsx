@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { capitalizeReleaseType } from '@/lib/null-safe';
 
 interface Submission {
@@ -240,7 +241,7 @@ export default function ApprovalsPage() {
                       {data.cover_image && (
                         <div>
                           <span className="text-slate-500">Portada:</span>
-                          <img src={data.cover_image} alt="Cover" className="mt-2 w-full h-40 object-cover rounded-lg" />
+                          <Image src={data.cover_image} alt="Cover" width={600} height={160} unoptimized className="mt-2 w-full h-40 object-cover rounded-lg" />
                         </div>
                       )}
                       {data.lyrics && (
