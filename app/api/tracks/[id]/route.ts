@@ -1,18 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateTrack, getTrackById } from "@/lib/db";
+import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
+  const session = validateRequest(req);
+  if (!session) return null;
+  return { userId: session.userId, role: session.role || "artist" };
+}
 
+// GET /api/tracks/:id — Get track by ID
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; role?: string };
-    return { userId: session.userId, role: session.role || "artist" };
-  } catch {
-    return null;
+    const { id } = await params;
+    const track = await getTrackById(id);
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
+    return NextResponse.json(track);
+  } catch (error) {
+    console.error("[API/tracks/:id] Error GET:", error);
+    return NextResponse.json({ error: "Error al obtener track" }, { status: 500 });
   }
 }
 

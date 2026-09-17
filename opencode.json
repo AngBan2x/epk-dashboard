@@ -13,9 +13,10 @@
     },
     "sqlite": {
       "type": "local",
-      "command": ["npx", "-y", "mcp-server-sqlite", "--db", "/home/angel/sistinf/epk-dashboard-v2/data/music_catalog.db"],
+      "command": ["npx", "-y", "mcp-server-sqlite"],
       "environment": {
-        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "SQLITE_DB_PATH": "/home/angel/sistinf/epk-dashboard-v2/data/music_catalog.db"
       },
       "enabled": true
     },

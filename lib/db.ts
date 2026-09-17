@@ -1319,8 +1319,6 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
   const slug = data.slug as string | undefined;
   const isActive = (data.isActive ?? data.is_active) as boolean | undefined;
 
-  console.log("[updateArtist] id:", id, "name:", name, "biography:", biography?.substring(0, 30), "genre:", genre, "location:", location, "monthly_listeners:", monthlyListeners);
-
   if (isTursoEnabled()) {
     const updates: string[] = [];
     const values: unknown[] = [];
@@ -1345,9 +1343,7 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
     // NOTE: Do NOT use client.batch() — it silently fails to commit on Vercel HTTP transport.
     // Individual execute() calls persist correctly (verified via direct Turso test).
     const rowsAffected = await tursoExecUpdate(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`, values);
-    console.log("[updateArtist Turso] rowsAffected:", rowsAffected, "updates:", updates.length);
     if (rowsAffected === 0) {
-      console.log("[updateArtist Turso] no rows affected, artist may not exist");
       return null;
     }
     return getArtistById(id);
@@ -1376,7 +1372,6 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
 
   values.push(id);
   const localResult = db.prepare(`UPDATE artists SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-  console.log("[updateArtist Local] changes:", localResult.changes);
   if (localResult.changes === 0) return null;
   return getArtistById(id);
 }

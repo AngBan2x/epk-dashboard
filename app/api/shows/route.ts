@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById } from "@/lib/db";
-import { decodeSessionToken, isSessionValid } from "@/lib/auth";
+import { validateRequest } from "@/lib/auth";
 import type { ShowStatus } from "@/types/music";
 
 export const dynamic = "force-dynamic";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
-  const session = decodeSessionToken(sessionCookie.value);
-  if (!session || !isSessionValid(session)) return null;
+  const session = validateRequest(req);
+  if (!session) return null;
   return { userId: session.userId, role: session.role };
 }
 

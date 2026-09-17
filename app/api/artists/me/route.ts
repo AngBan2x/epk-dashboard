@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArtistByUserId, updateArtist, getDbWrite } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
+import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
-  try {
-    const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; role?: string };
-    return { userId: session.userId, role: session.role || "artist" };
-  } catch {
-    return null;
-  }
+  const session = validateRequest(req);
+  if (!session) return null;
+  return { userId: session.userId, role: session.role || "artist" };
 }
 
 export async function GET(req: NextRequest) {

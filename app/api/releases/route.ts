@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
-import { decodeSessionToken, isSessionValid } from "@/lib/auth";
+import { validateRequest } from "@/lib/auth";
+
+const CreateReleaseSchema = z.object({
+  title: z.string().min(1, "title requerido"),
+  artist_name: z.string().min(1, "artist_name requerido"),
+  release_date: z.string().optional(),
+  cover_image: z.string().optional(),
+  type: z.string().optional(),
+  external_links: z.record(z.unknown()).optional(),
+  tracks: z.array(z.object({ title: z.string(), duration: z.string().optional(), isrc: z.string().optional(), start_time: z.number().optional(), end_time: z.number().optional() })).optional(),
+  genre: z.string().optional(),
+  description: z.string().optional(),
+  duration: z.string().optional(),
+});
 
 export const dynamic = "force-dynamic";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
-  const session = decodeSessionToken(sessionCookie.value);
-  if (!session || !isSessionValid(session)) return null;
+  const session = validateRequest(req);
+  if (!session) return null;
   return { userId: session.userId, role: session.role };
 }
 
@@ -81,6 +93,11 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
+    const parsed = CreateReleaseSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
     const id = crypto.randomUUID();
     const {
       title,
@@ -93,7 +110,7 @@ export async function POST(req: NextRequest) {
       genre,
       description,
       duration,
-    } = body;
+    } = parsed.data;
 
     const youtubeVideoId = external_links?.youtube_video_id;
 

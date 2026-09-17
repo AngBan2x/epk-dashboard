@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { createUser, getUserByEmail, createArtist } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const RegisterSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -12,6 +13,15 @@ const RegisterSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    const rateLimit = checkRateLimit(`register:${ip}`, 3, 60_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Try again later." },
+        { status: 429, headers: { "X-RateLimit-Remaining": "0", "X-RateLimit-Reset": String(rateLimit.resetAt) } }
+      );
+    }
+
     const body = await req.json();
     const validated = RegisterSchema.parse(body);
 
