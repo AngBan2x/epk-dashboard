@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getUserByEmail, getDbWrite } from "@/lib/db";
+import { createSessionToken } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const LoginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -11,6 +13,15 @@ const LoginSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    const rateLimit = checkRateLimit(`login:${ip}`, 5, 60_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Try again later." },
+        { status: 429, headers: { "X-RateLimit-Remaining": "0", "X-RateLimit-Reset": String(rateLimit.resetAt) } }
+      );
+    }
+
     const body = await req.json();
     const validated = LoginSchema.parse(body);
 
@@ -34,13 +45,13 @@ export async function POST(req: NextRequest) {
 
     // Crear sesión con timestamp de emisión y expiración condicional
     const now = Date.now();
-    const sessionToken = btoa(JSON.stringify({
+    const sessionToken = createSessionToken({
       userId: user.id,
       email: user.email,
       role: user.role,
       iat: now,
       ...(validated.rememberMe ? {} : { exp: now + 24 * 60 * 60 * 1000 }),
-    }));
+    });
 
     const response = NextResponse.json({
       user: {

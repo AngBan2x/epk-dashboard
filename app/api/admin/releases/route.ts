@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
-import { decodeSessionToken, isSessionValid } from "@/lib/auth";
+import { validateRequest } from "@/lib/auth";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -8,11 +8,8 @@ const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 export const dynamic = "force-dynamic";
 
 function validateAdminSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
-  const session = decodeSessionToken(sessionCookie.value);
-  if (!session || !isSessionValid(session)) return null;
-  if (session.role !== "admin") return null;
+  const session = validateRequest(req);
+  if (!session || session.role !== "admin") return null;
   return { userId: session.userId, role: session.role };
 }
 

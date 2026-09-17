@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteArtist, updateArtist } from "@/lib/db";
+import { validateRequest } from "@/lib/auth";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
-  try {
-    const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; role?: string };
-    return { userId: session.userId, role: session.role || "artist" };
-  } catch {
-    return null;
-  }
+  const session = validateRequest(req);
+  if (!session) return null;
+  return { userId: session.userId, role: session.role || "artist" };
 }
 
 // PUT /api/artists/:id — Actualizar artista (solo admin)
@@ -26,9 +21,7 @@ export async function PUT(
 
     const { id } = params;
     const body = await req.json();
-    console.log("[PUT /api/artists/:id] id:", id, "body:", JSON.stringify(body).substring(0, 200));
     const updated = await updateArtist(id, body);
-    console.log("[PUT /api/artists/:id] result:", updated ? "OK" : "NULL");
     if (!updated) {
       return NextResponse.json({ error: "Artista no encontrado" }, { status: 404 });
     }

@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllTrackSubmissions, getTrackSubmissionsByStatus } from "@/lib/db";
+import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 function validateAdminSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
-  try {
-    const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; role?: string };
-    if (session.role !== "admin") return null;
-    return { userId: session.userId, role: session.role };
-  } catch {
-    return null;
-  }
+  const session = validateRequest(req);
+  if (!session || session.role !== "admin") return null;
+  return { userId: session.userId, role: session.role };
 }
 
 export async function GET(req: NextRequest) {

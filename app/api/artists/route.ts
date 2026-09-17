@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllArtists, getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
-import { decodeSessionToken, isSessionValid } from "@/lib/auth";
+import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
-  const session = decodeSessionToken(sessionCookie.value);
-  if (!session || !isSessionValid(session)) return null;
+  const session = validateRequest(req);
+  if (!session) return null;
   return { userId: session.userId, role: session.role };
 }
 

@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { resend, FROM_EMAIL } from "@/lib/resend";
 import { getEmailTemplate, type NotificationType } from "@/lib/email-templates";
 import { createNotification, getUserById } from "@/lib/db";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const SendNotificationSchema = z.object({
   user_id: z.string().min(1, "user_id requerido"),
@@ -16,6 +17,15 @@ const SendNotificationSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    const rateLimit = checkRateLimit(`notifications:${ip}`, 10, 60_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Try again later." },
+        { status: 429, headers: { "X-RateLimit-Remaining": "0", "X-RateLimit-Reset": String(rateLimit.resetAt) } }
+      );
+    }
+
     const body = await req.json();
     const validated = SendNotificationSchema.parse(body);
 

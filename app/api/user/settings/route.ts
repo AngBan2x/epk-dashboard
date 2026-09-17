@@ -1,17 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { validateRequest } from "@/lib/auth";
+import { getUserById } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const sessionCookie = req.cookies.get("auth_session");
-  if (!sessionCookie) return null;
+  const session = validateRequest(req);
+  if (!session) return null;
+  return { userId: session.userId, role: session.role || "artist" };
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const decoded = atob(sessionCookie.value);
-    const session = JSON.parse(decoded) as { userId: string; role?: string };
-    return { userId: session.userId, role: session.role || "artist" };
-  } catch {
-    return null;
+    const session = validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
+    const user = await getUserById(session.userId);
+    if (!user) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+    }
+
+    const { password_hash, ...safeUser } = user as any;
+    return NextResponse.json(safeUser);
+  } catch (error) {
+    console.error("GET user settings error:", error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
 

@@ -1,30 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserById, deleteUser } from "@/lib/db";
-import { decodeSessionToken, isSessionValid } from "@/lib/auth";
+import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const sessionCookie = req.cookies.get("auth_session");
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: "No autenticado" },
-        { status: 401 }
-      );
-    }
-
-    const session = decodeSessionToken(sessionCookie.value);
+    const session = validateRequest(req);
     if (!session) {
       return NextResponse.json(
-        { error: "Sesión inválida" },
-        { status: 401 }
-      );
-    }
-
-    if (!isSessionValid(session)) {
-      return NextResponse.json(
-        { error: "Sesión expirada" },
+        { error: "No autenticado" },
         { status: 401 }
       );
     }
@@ -57,25 +42,10 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const sessionCookie = req.cookies.get("auth_session");
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: "No autenticado" },
-        { status: 401 }
-      );
-    }
-
-    const session = decodeSessionToken(sessionCookie.value);
+    const session = validateRequest(req);
     if (!session) {
       return NextResponse.json(
-        { error: "Sesión inválida" },
-        { status: 401 }
-      );
-    }
-
-    if (!isSessionValid(session)) {
-      return NextResponse.json(
-        { error: "Sesión expirada" },
+        { error: "No autenticado" },
         { status: 401 }
       );
     }
