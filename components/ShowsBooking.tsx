@@ -24,6 +24,9 @@ const statusConfig: Record<ShowStatus, { color: string; bg: string; border: stri
   confirmado: { color: "text-purple-700 dark:text-purple-300", bg: "bg-purple-100 dark:bg-purple-900/30", border: "border-purple-300 dark:border-purple-700", label: "Confirmado" },
   en_venta: { color: "text-indigo-700 dark:text-indigo-300", bg: "bg-indigo-100 dark:bg-indigo-900/30", border: "border-indigo-300 dark:border-indigo-700", label: "En Venta" },
   agotado: { color: "text-red-700 dark:text-red-300", bg: "bg-red-100 dark:bg-red-900/30", border: "border-red-300 dark:border-red-700", label: "Agotado" },
+  reprogramado: { color: "text-cyan-700 dark:text-cyan-300", bg: "bg-cyan-100 dark:bg-cyan-900/30", border: "border-cyan-300 dark:border-cyan-700", label: "Reprogramado" },
+  disponible: { color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-900/30", border: "border-emerald-300 dark:border-emerald-700", label: "Disponible" },
+  finalizado: { color: "text-slate-700 dark:text-slate-300", bg: "bg-slate-100 dark:bg-slate-800", border: "border-slate-300 dark:border-slate-600", label: "Finalizado" },
 };
 
 function formatDate(dateStr: string | null): string {

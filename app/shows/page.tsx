@@ -4,17 +4,22 @@ import { useState, useEffect } from 'react';
 import type { Show, ShowStatus } from '@/types/music';
 import { safeString } from '@/lib/null-safe';
 
+const defaultStatus = { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Desconocido' };
+
 const statusConfig: Record<ShowStatus, { color: string; bg: string; border: string; label: string }> = {
   proximamente: { color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-300 dark:border-yellow-700', label: 'Próximamente' },
   activo: { color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-300 dark:border-green-700', label: 'Activo' },
-  pospuesto: { color: 'text-orange-700 dark:text-orange-300', bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-300 dark:border-orange-700', label: 'Pospuesto' },
-  hoy: { color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-300 dark:border-blue-700', label: 'Hoy' },
-  pasado: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Pasado' },
-  cancelado: { color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-300 dark:border-red-700', label: 'Cancelado' },
-  suspendido: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Suspendido' },
   confirmado: { color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-300 dark:border-purple-700', label: 'Confirmado' },
   en_venta: { color: 'text-indigo-700 dark:text-indigo-300', bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-300 dark:border-indigo-700', label: 'En Venta' },
   agotado: { color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-300 dark:border-red-700', label: 'Agotado' },
+  cancelado: { color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-300 dark:border-red-700', label: 'Cancelado' },
+  pospuesto: { color: 'text-orange-700 dark:text-orange-300', bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-300 dark:border-orange-700', label: 'Pospuesto' },
+  reprogramado: { color: 'text-cyan-700 dark:text-cyan-300', bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-300 dark:border-cyan-700', label: 'Reprogramado' },
+  disponible: { color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-100 dark:bg-emerald-900/30', border: 'border-emerald-300 dark:border-emerald-700', label: 'Disponible' },
+  pasado: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Pasado' },
+  hoy: { color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-300 dark:border-blue-700', label: 'Hoy' },
+  suspendido: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Suspendido' },
+  finalizado: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Finalizado' },
 };
 
 function formatDateSpanish(dateStr: string | null): string {
@@ -108,7 +113,7 @@ export default function ShowsPage() {
               className="w-full rounded-lg border border-border bg-input px-3 py-2 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
             >
               <option value="">Todos</option>
-              {(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado"] as ShowStatus[]).map((status) => (
+              {(["proximamente", "activo", "confirmado", "en_venta", "agotado", "cancelado", "pospuesto", "reprogramado", "disponible", "pasado", "hoy", "suspendido", "finalizado"] as ShowStatus[]).map((status) => (
                 <option key={status} value={status}>
                   {status}
                 </option>
@@ -176,6 +181,7 @@ function SkeletonCard() {
 
 function ShowCard({ show, statusConfig }: { show: Show; statusConfig: Record<ShowStatus, { color: string; bg: string; border: string; label: string }> }) {
   const formattedDate = formatDateSpanish(show.date);
+  const status = statusConfig[show.status] ?? defaultStatus;
 
   return (
     <div
@@ -232,8 +238,8 @@ function ShowCard({ show, statusConfig }: { show: Show; statusConfig: Record<Sho
       {/* Status badge */}
       <div className="mt-2 flex items-center gap-1 text-xs font-medium">
         <span
-          className={`inline-flex px-2 py-0.5 rounded-full ${statusConfig[show.status].bg} ${statusConfig[show.status].color} ${statusConfig[show.status].border}`}>
-          {statusConfig[show.status].label}
+          className={`inline-flex px-2 py-0.5 rounded-full ${status.bg} ${status.color} ${status.border}`}>
+          {status.label}
         </span>
       </div>
     </div>

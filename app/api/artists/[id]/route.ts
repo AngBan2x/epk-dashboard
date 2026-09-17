@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteArtist, updateArtist } from "@/lib/db";
+import { deleteArtist, updateArtist, getArtistById } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 function validateSession(req: NextRequest): { userId: string; role: string } | null {
   const session = validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role || "artist" };
+}
+
+// GET /api/artists/:id — Obtener artista por ID (público)
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const artist = await getArtistById(id);
+    if (!artist) {
+      return NextResponse.json({ error: "Artista no encontrado" }, { status: 404 });
+    }
+    return NextResponse.json(artist);
+  } catch (error) {
+    console.error("[API/artists/[id]] Error GET:", error);
+    return NextResponse.json({ error: "Error al obtener artista" }, { status: 500 });
+  }
 }
 
 // PUT /api/artists/:id — Actualizar artista (solo admin)

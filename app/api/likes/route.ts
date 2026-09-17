@@ -18,6 +18,10 @@ export async function GET(req: NextRequest) {
     const trackId = searchParams.get("track_id");
     const userId = searchParams.get("user_id") || getUserIdFromSession(req);
 
+    if (!trackId && !userId) {
+      return NextResponse.json({ error: "Autenticación requerida" }, { status: 401 });
+    }
+
     if (trackId && userId) {
       const [count, liked] = await Promise.all([
         getLikeCount(trackId),
@@ -31,12 +35,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ track_id: trackId, count });
     }
 
-    if (userId) {
-      const likes = await getUserLikes(userId);
-      return NextResponse.json(likes);
-    }
-
-    return NextResponse.json({ error: "track_id o user_id requerido" }, { status: 400 });
+    const likes = await getUserLikes(userId!);
+    return NextResponse.json(likes);
   } catch (error) {
     console.error("GET likes error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

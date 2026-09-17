@@ -7,33 +7,30 @@ interface LyricsSectionWrapperProps {
   lyrics: string | null;
   isInstrumental?: boolean;
   trackId: string;
+  artistName: string;
 }
 
 export function LyricsSectionWrapper({
   lyrics,
   isInstrumental = false,
   trackId,
+  artistName,
 }: LyricsSectionWrapperProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [currentLyrics, setCurrentLyrics] = useState(lyrics);
   const [currentInstrumental, setCurrentInstrumental] = useState(isInstrumental);
 
   useEffect(() => {
-    try {
-      const cookie = document.cookie
-        .split("; ")
-        .find((c) => c.startsWith("auth_session="));
-      if (cookie) {
-        const decoded = atob(cookie.split("=")[1]);
-        const session = JSON.parse(decoded) as { role?: string };
-        if (session.role === "admin" || session.role === "artist") {
+    fetch('/api/auth/me')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        if (data.role === 'admin' || data.name === artistName) {
           setIsOwner(true);
         }
-      }
-    } catch {
-      // Not logged in or invalid session
-    }
-  }, []);
+      })
+      .catch(() => {});
+  }, [artistName]);
 
   return (
     <LyricsSection

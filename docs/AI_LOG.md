@@ -4047,5 +4047,82 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 | Shows POST create → 201 | ✅ |
 | Shows GET verify → 200 | ✅ |
 
+### Commits: `82262e7`
+### Deploy: ✅ v4.0.0-rc.7
+
+---
+
+## Exhaustive Audit Round 2 + Critical Fixes
+
+**Fecha:** 2026-09-17
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Fase:** P3 — Deep Audit + Production Hardening
+
+### Test Results
+- MCP Servers: 8/8
+- TSC: 0 errors
+- Unit Tests: 110/110
+- Build: success
+- Production API: 18/18 PASS
+
+### Critical Fixes Applied
+
+**1. /shows page crash — FIXED**
+- Status badge color mapping missing for `activo`, `hoy`, `suspendido`
+- Added typed `Record<ShowStatus, ...>` for compile-time enforcement
+- Files: `app/shows/page.tsx`, `components/ShowsBooking.tsx`, `components/ShowForm.tsx`
+
+**2. Client-side atob() auth bypass — FIXED**
+- `ProductionDetailsWrapper.tsx` and `LyricsSectionWrapper.tsx` already used fetch to `/api/auth/me`
+- Fixed owner check: compare `data.name === artistName` (admin still bypasses)
+- Files: `components/ProductionDetailsWrapper.tsx`, `components/LyricsSectionWrapper.tsx`, `app/track/[id]/page.tsx`
+
+**3. /api/dashboard user_id leak — FIXED**
+- Removed `user_id` query parameter — unauthenticated callers can no longer fetch any artist profile
+- Only `session.userId` is used for authenticated artist profile lookup
+
+**4. /api/auth/register 500 — FIXED**
+- Root cause: Turso `users` table missing `preferences`, `avatar`, `email_verified`, `deleted_at`, `last_login`, `created_at` columns
+- Fix: Added ALTER TABLE migrations for users table in `lib/turso.ts`
+- Added `ensureTursoSchemaIfNeeded()` lazy init in `lib/db.ts`
+
+**5. /api/tracks pagination — FIXED**
+- page=999 now returns empty array instead of all tracks
+- Added explicit bounds check: `start >= total ? [] : tracks.slice(...)`
+
+**6. /api/likes 401 — FIXED**
+- No-auth check now at top of GET handler, returns 401 not 400
+
+**7. SESSION_SECRET in Vercel — SET**
+- Added `SESSION_SECRET` env var to Vercel production via `vercel env add`
+
+**8. Error boundaries — ADDED**
+- 6 files: `app/error.tsx`, `app/dashboard/error.tsx`, `app/admin/error.tsx`, `app/shows/error.tsx`, `app/profile/error.tsx`, `app/account/error.tsx`
+
+**9. 404 page — CREATED**
+- `app/not-found.tsx` — PressPlay branded with gradient 404, links to Home/Dashboard
+
+### Production Test Results (18/18 PASS)
+| Test | Status |
+|------|--------|
+| Login (valid) | 200 PASS |
+| Register (new user) | 201 PASS |
+| Auth/me (signed cookie) | 200 PASS |
+| Dashboard | 200 PASS |
+| Shows | 200 PASS |
+| Tracks | 200 PASS |
+| Tracks pagination (page=999) | 200 empty PASS |
+| Artists | 200 PASS |
+| Artists/[id] | 200 PASS |
+| Releases | 200 PASS |
+| Likes (auth) | 200 PASS |
+| Notifications/read | 200 PASS |
+| User settings | 200 PASS |
+| Submissions | 200 PASS |
+| 404 page | 404 PASS |
+| Rate limiting | 429 PASS |
+| Releases validation | 400 PASS |
+| Shows no auth | 401 PASS |
+
 ### Commits: pendiente
-### Deploy: ✅ Production verified
+### Deploy: ✅ Production verified (v4.0.0-rc.8 pending)

@@ -1,37 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtists } from "@/lib/db";
+import { validateRequest } from "@/lib/auth";
 import type { Show } from "@/types/music";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("user_id");
+    const session = validateRequest(req);
 
     const allTracks = await getAllTracks();
     const tracks = allTracks.filter(t => !t.release_id);
     const artists = await getAllArtists();
 
-    let artistProfile = null;
-    let allShows: Show[] = [];
-
+    const showsByArtist: Record<string, Show[]> = {};
     if (artists.length > 0) {
-      allShows = await getShowsByArtists(artists.map(a => a.id));
-    }
-
-    let artistShows: Show[] = [];
-    if (userId) {
-      const profile = await getArtistByUserId(userId);
-      if (profile) {
-        artistProfile = profile;
-        artistShows = allShows.filter(s => s.artist_id === profile.id);
+      const allShows = await getShowsByArtists(artists.map(a => a.id));
+      for (const art of artists) {
+        showsByArtist[art.id] = allShows.filter(s => s.artist_id === art.id);
       }
     }
 
-    const showsByArtist: Record<string, Show[]> = {};
-    for (const art of artists) {
-      showsByArtist[art.id] = allShows.filter(s => s.artist_id === art.id);
+    if (!session) {
+      return NextResponse.json({ tracks, artists, artistProfile: null, artistShows: [], showsByArtist }, {
+        headers: {
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          "Surrogate-Control": "no-store",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      });
+    }
+
+    let artistProfile = null;
+    let artistShows: Show[] = [];
+    if (session.userId) {
+      const profile = await getArtistByUserId(session.userId);
+      if (profile) {
+        artistProfile = profile;
+        artistShows = (showsByArtist[profile.id] ?? []);
+      }
     }
 
     return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist }, {
