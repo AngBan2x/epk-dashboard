@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -163,7 +164,7 @@ export default function ProfilePage() {
             {/* Banner Preview */}
             {bannerImage && (
               <div className="relative h-40 rounded-xl overflow-hidden">
-                <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
+                <Image src={bannerImage} alt="Banner" width={1200} height={400} unoptimized className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
               </div>
             )}
@@ -174,7 +175,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0">
                   {profileImage ? (
-                    <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                    <Image src={profileImage} alt="Profile" width={80} height={80} unoptimized className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-slate-400">
                       {name?.[0]?.toUpperCase() || '?'}

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 
 export function Footer() {
@@ -13,7 +14,7 @@ export function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <img src="/logo.svg" alt="PressPlay" className="w-6 h-6" />
+              <Image src="/logo.svg" alt="PressPlay" width={24} height={24} unoptimized className="w-6 h-6" />
               <span className="font-bold text-slate-900 dark:text-slate-100">PressPlay</span>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">

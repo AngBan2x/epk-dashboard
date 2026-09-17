@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LoginModal } from "@/components/LoginModal";
+import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 
 export function Header() {
@@ -20,7 +21,7 @@ export function Header() {
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <img src="/logo.svg" alt="PressPlay" className="w-7 h-7" />
+            <Image src="/logo.svg" alt="PressPlay" width={28} height={28} unoptimized className="w-7 h-7" />
             <span className="font-bold text-xl text-slate-900 dark:text-slate-100">PressPlay</span>
           </Link>
 

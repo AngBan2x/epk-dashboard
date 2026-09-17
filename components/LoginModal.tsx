@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { safeString } from "@/lib/null-safe";
@@ -73,7 +74,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         </button>
 
         <div className="text-center mb-6">
-          <img src="/logo.svg" alt="PressPlay" className="w-10 h-10 mx-auto mb-3" />
+          <Image src="/logo.svg" alt="PressPlay" width={40} height={40} unoptimized className="w-10 h-10 mx-auto mb-3" />
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
             {isLogin ? "Iniciar Sesión" : "Crear Cuenta"}
           </h2>
