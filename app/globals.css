@@ -10,14 +10,28 @@ html {
   --foreground-rgb: 15, 23, 42;
   --background-start-rgb: 248, 250, 252;
   --background-end-rgb: 248, 250, 252;
+
+  /* shadcn/ui CSS variables — light mode (comma-separated RGB) */
+  --input: 199, 206, 215;
+  --card: 255, 255, 255;
+  --card-hover: 241, 243, 245;
+  --border: 226, 230, 237;
+  --ring: 236, 72, 153;
+  --muted-foreground: 100, 116, 139;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 248, 250, 252;
-    --background-start-rgb: 15, 23, 42;
-    --background-end-rgb: 15, 23, 42;
-  }
+.dark {
+  --foreground-rgb: 248, 250, 252;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 15, 23, 42;
+
+  /* shadcn/ui CSS variables — dark mode (comma-separated RGB) */
+  --input: 33, 47, 66;
+  --card: 3, 9, 21;
+  --card-hover: 18, 35, 49;
+  --border: 33, 47, 66;
+  --ring: 236, 72, 153;
+  --muted-foreground: 100, 125, 150;
 }
 
 body {
