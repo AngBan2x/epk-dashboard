@@ -4420,6 +4420,182 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 - Login redirect: ✅ Navega de /login → /dashboard después de submit
 - Dashboard invitado: ✅ 9 tracks, 7 artists visibles
 
-### Commits: `310b73d`
+### Commits: `310b73d` + `661e54c`
 ### Deploy: ✅ Production verified (https://epk-dashboard.vercel.app)
 ### Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.13
+
+---
+
+## v4.0.0-rc.14→rc.18 — P3 Batch 3: Fixes + Rediseño + Features
+
+**Fecha:** 2026-09-18
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Fase:** P3 Batch 3 — Full Platform Fixes + Track Detail Redesign + Gallery Upload + Shows Workflow
+**Storage:** Cloudflare R2 para galería de prensa (seleccionado sobre Imgur/AWS S3/Vercel Blob)
+
+### Issues Reportados (14)
+
+| # | Issue | Severidad | Fase | Estado |
+|---|-------|-----------|------|--------|
+| 1 | Shows: `artistId={user?.id}` usa user ID en vez de artist profile ID | CRÍTICO | A | Pendiente |
+| 2 | Shows: Errores silenciosos al crear (sin feedback) | ALTO | A | Pendiente |
+| 3 | Shows: Update/Delete ownership check compara artist_id con userId (nunca coincide) | ALTO | A | Pendiente |
+| 4 | Shows: Zod schema falta 3 status values (reprogramado, disponible, finalizado) | MEDIO | A | Pendiente |
+| 5 | Admin redirect: race condition AuthContext — user=null redirige a /dashboard | ALTO | A | Pendiente |
+| 6 | Likes en dashboard = 0 siempre — API no retorna campo likes | ALTO | A | Pendiente |
+| 7 | Visualizer: fftSize=64 solo produce 32 bins, barCount=48 — barras inconsistentes | ALTO | B | Pendiente |
+| 8 | Visualizer: texto "Paused"/"Live Spectrum" tapado por botón X | MEDIO | B | Pendiente |
+| 9 | Visualizer: bg-slate-900/60 hardcodeado — sin light mode | MEDIO | B | Pendiente |
+| 10 | YouTube: "Cargando..." no aparece (setIsLoading nunca se llama para YT) | MEDIO | B | Pendiente |
+| 11 | YouTube: sin límite 30s (start_time/end_time existen en schema pero no se usan) | MEDIO | B | Pendiente |
+| 12 | Ficha de Producción: 4 campos read-only (DAW, Guitarras, Efectos, Afinación) no editables | MEDIO | C | Pendiente |
+| 13 | Centro de Descargas: badges solapados en mobile | MEDIO | C | Pendiente |
+| 14 | Rediseño track detail: reordenar secciones + unificar diseño + galería con upload R2 | MEDIO→ALTO | C | Pendiente |
+
+### Análisis de Storage: Imgur vs Cloudflare R2
+
+**Decisión: Cloudflare R2**
+
+| Criterio | Imgur API | Cloudflare R2 |
+|----------|-----------|---------------|
+| Almacenamiento gratis | ~1,250 imágenes/mes | 10 GB |
+| Bandwidth gratis | ~12,500 views/mes | Ilimitado (sin egress fees) |
+| Privacidad | Público por defecto | Privado por defecto, control total |
+| Dependencia | ALTA (puede cambiar TOS/banear) | BAJA (es tu bucket) |
+| Eliminar imágenes | DELETE con API key | DELETE via SDK |
+| Límite por imagen | 20 MB | 5 GB |
+| Integración Next.js | Fetch API nativa | @aws-sdk/client-s3 (~50 líneas) |
+
+R2 es superior por: control total, sin egress fees, imágenes privadas para approval workflow, S3-compatible para migración futura.
+
+### Almacenamiento de Galería: Arquitectura
+
+```
+Cloudflare R2 Bucket: epk-gallery
+├── {artistId}/
+│   ├── {trackId}/
+│   │   ├── {timestamp}-{filename}.jpg
+```
+
+**Env vars necesarias:**
+```
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=epk-gallery
+R2_PUBLIC_URL=https://pub-{hash}.r2.dev
+```
+
+**Approval workflow:**
+1. Artista sube imagen → `/api/upload/image` → R2 → URL guardada en `tracks.gallery_images` con `pending: true`
+2. Admin aprueba/rechaza en `/admin/approvals` (extender `submission_type`)
+3. Solo imágenes sin `pending` se muestran públicamente
+
+---
+
+### FASE A — Fixes Críticos
+
+| # | Fix | Archivo(s) | Línea(s) | Descripción |
+|---|-----|-----------|----------|-------------|
+| A1 | artistId | `app/dashboard/page.tsx` | 367 | `user?.id` → `artistProfile?.id` |
+| A2 | Error handling shows | `app/dashboard/page.tsx`, `app/admin/page.tsx` | 385-396, 1343-1357 | Agregar `else` con error message |
+| A3 | Ownership check shows | `app/api/shows/route.ts` | 135, 173 | Buscar artist por artist_id, verificar user_id |
+| A4 | Zod schema status | `app/api/shows/route.ts` | 23, 42 | +3 statuses: reprogramado, disponible, finalizado |
+| A5 | Admin redirect | `app/admin/page.tsx` | 129-133 | Verificar authLoading antes de redirect |
+| A6 | Likes dashboard | `app/api/dashboard/route.ts` | 1-57 | Importar getLikeCount, agregar likes al response |
+
+**Commit:** `fix(shows): artistId fix + error handling + ownership check + Zod schema + admin redirect + likes count`
+**Release:** v4.0.0-rc.14
+
+---
+
+### FASE B — Player & Visualizer
+
+| # | Fix | Archivo(s) | Línea(s) | Descripción |
+|---|-----|-----------|----------|-------------|
+| B1 | Visualizer bar count | `components/AudioVisualizer.tsx` | 62 | fftSize=64 → 128 (64 bins) |
+| B2 | Frequency mapping | `components/AudioVisualizer.tsx` | 100 | Mapeo logarítmico por octavas |
+| B3 | Status text padding | `components/AudioVisualizer.tsx` | 147-149 | pr-10 para evitar overlap con X |
+| B4 | Light mode | `components/AudioVisualizer.tsx` | 142 | bg-slate-100 dark:bg-slate-900/60 + adaptar colores |
+| B5 | YouTube loading | `context/AudioPlayerContext.tsx` | 129-164 | setIsLoading(true/false) durante yt.init |
+| B6 | 30s limit | `components/AudioPlayer.tsx` | 130-138 | Pasar startTimestamp/endTimestamp al player |
+
+**Commit:** `fix(player): visualizer bars + light mode + YouTube loading + 30s limit`
+**Release:** v4.0.0-rc.15
+
+---
+
+### FASE C — Track Detail Rediseño + Gallery Upload
+
+| # | Fix | Archivo(s) | Descripción |
+|---|-----|-----------|-------------|
+| C1 | Reordenar secciones | `app/track/[id]/page.tsx` | Letra → Videoclip → Biografía & Prensa |
+| C2 | Ficha Producción editable | `components/ProductionDetails.tsx` | +4 campos editables (DAW, Guitarras, Efectos, Afinación) |
+| C3 | Centro Descargas overlap | `components/DownloadCenter.tsx` | flex-wrap gap-2, stackear en mobile |
+| C4 | Unificar diseño | 5 componentes | Eliminar doble-nesting de cards |
+| C5 | Gallery upload R2 | Nuevos: `ImageUploader.tsx`, `app/api/upload/image/route.ts` | Upload + approval workflow |
+
+**Commit:** `feat(gallery): R2 upload + approval workflow + track detail redesign`
+**Release:** v4.0.0-rc.16
+
+---
+
+### FASE D — Shows: Estados + Aprobación
+
+| # | Fix | Archivo(s) | Descripción |
+|---|-----|-----------|-------------|
+| D1 | Campo approved | `lib/db.ts`, `lib/turso.ts`, `types/music.ts` | ALTER TABLE + type update |
+| D2 | Estados automáticos | `app/api/shows/route.ts` | getDynamicStatus() basado en fecha |
+| D3 | Admin approval shows | `app/admin/page.tsx`, `app/api/admin/shows/route.ts` (nuevo) | Panel de shows pendientes |
+| D4 | Notificaciones | `lib/db.ts` | createNotification al approve/reject |
+
+**Commit:** `feat(shows): approval workflow + automatic status + admin panel`
+**Release:** v4.0.0-rc.17
+
+---
+
+### FASE E — Testing Exhaustivo + Limpieza
+
+| Tipo | Cobertura | Herramienta |
+|------|-----------|-------------|
+| Unit Tests | 14 fixes individuales | Vitest |
+| Integration Tests | Shows CRUD, Gallery upload/approval, Login flows | Vitest |
+| E2E Tests | Login, Shows, Track detail, Visualizer, Light/Dark, Mobile | Playwright |
+| Visual Tests | Cada página, light/dark, mobile | Playwright screenshots |
+| Security Tests | Auth bypass, ownership, R2 URLs, rate limiting | Manual + automated |
+| Code Quality | TSC + build + lint + secrets check | CLI |
+| Limpieza datos | Eliminar todos los datos de prueba + verificar | Post-test cleanup |
+
+**Commit:** `test(exhaustive): P3 Batch 3 full test suite`
+**Release:** v4.0.0-rc.18
+
+---
+
+### Datos de Prueba (y limpieza)
+
+| Qué crear | Endpoint | Cómo eliminar | Verificar limpieza |
+|-----------|----------|---------------|-------------------|
+| Show de prueba | POST /api/shows | DELETE /api/shows/[id] | GET → 404 |
+| Submission de prueba | POST /api/submissions | DELETE /api/admin/approvals/[id] | GET → no existe |
+| Imagen R2 de prueba | POST /api/upload/image | DELETE object R2 | GET URL → 404 |
+| Likes de prueba | POST /api/likes | DELETE FROM likes WHERE... | Dashboard → 0 likes |
+
+### Workflow de Ejecución
+
+```
+Pre-FASE: Documentar plan completo en AI_LOG.md
+    ↓
+FASE A: Fixes críticos → commit → tsc → build → push → production test → rc.14
+    ↓
+FASE B: Player/visualizer → commit → tsc → build → push → production test → rc.15
+    ↓
+FASE C: Rediseño + upload R2 → commit → tsc → build → push → production test → rc.16
+    ↓
+FASE D: Shows workflow → commit → tsc → build → push → production test → rc.17
+    ↓
+FASE E: Testing exhaustivo → quality gates → limpieza datos → rc.18
+```
+
+### Commits pendientes
+### Deploy pendiente
+### Releases pendientes
