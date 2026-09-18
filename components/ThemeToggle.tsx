@@ -8,17 +8,14 @@ export function ThemeToggle() {
   const [isDark, setIsDark] = useState(true);
   const [mounted, setMounted] = useState(false);
 
-  // Evita Hydration Mismatch: el estado real se lee solo en cliente
+  // Evita Hydration Mismatch: el estado real se lee del DOM (ya sincronizado por script anti-FOUC)
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem("epk-theme");
     if (savedTheme === "light") {
       setIsDark(false);
-      document.documentElement.classList.remove("dark");
     } else {
-      // Por defecto: dark
       setIsDark(true);
-      document.documentElement.classList.add("dark");
     }
   }, []);
 

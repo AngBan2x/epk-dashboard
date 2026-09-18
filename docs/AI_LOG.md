@@ -4353,3 +4353,35 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 ### Commits: `90c7e00`
 ### Deploy: ✅ Production verified (5/5 routes → 307 redirect)
 ### Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.11
+
+---
+
+## v4.0.0-rc.12 — Dark Mode Consistency Fix
+
+**Fecha:** 2026-09-17
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Fase:** P3 — UI Polish
+
+### Problemas Identificados
+
+| # | Problema | Causa |
+|---|----------|-------|
+| 1 | Inputs con fondo blanco en dark mode | `bg-input`, `bg-card`, `border-border` no definidos como CSS variables |
+| 2 | Screenshots "light" muestran dark mode | ThemeToggle defaulta isDark=true; Playwright no tiene localStorage |
+| 3 | Dos sistemas de dark mode conflictivos | globals.css usa @media (prefers-color-scheme) pero Tailwind usa darkMode:"class" |
+| 4 | Body background no respeta dark class | CSS media query solo funciona con preferencia del OS |
+
+### Solución
+
+**Archivo: app/globals.css**
+- Reemplazar `@media (prefers-color-scheme: dark)` con selector `.dark`
+- Agregar CSS variables para shadcn/ui compatibility: `--input`, `--card`, `--border`, `--ring`, `--muted-foreground`, `--card-hover`
+
+### Quality Gates
+- TSC: 0 errors
+- Unit tests: 93 passed (2 files failed — better-sqlite3 pre-existing env issue)
+- Build: success
+- Visual: ✅ Light/Dark mode consistent on shows, artists, home, login
+
+### Commits: pendiente
+### Deploy: pendiente
