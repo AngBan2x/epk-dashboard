@@ -4311,3 +4311,44 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 ### Commits: `d10aa06`, `5b8382b`
 ### Deploy: ✅ Production verified
 ### Total Score: 30/30 PASS
+
+---
+
+## v4.0.0-rc.11 — Middleware Expansion + Dark Mode Fixes
+
+**Fecha:** 2026-09-17
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Fase:** P3 — Security + UI Polish
+
+### Critical: Access Control Gap Fixed
+
+**Problem**: 4 protected pages (`/dashboard`, `/profile`, `/account`, `/releases/new`) had NO server-side middleware protection. HTML was served to unauthenticated users before client-side redirect.
+
+**Fix**: Expanded `middleware.ts` matcher to include all protected routes:
+- `/dashboard` — any authenticated user
+- `/profile` — any authenticated user
+- `/account` — any authenticated user
+- `/releases/new` — any authenticated user
+- `/admin` — admin only (existing)
+
+**Architecture**: Refactored middleware with `requireAuth()` and `clearExpiredSession()` helper functions to eliminate code duplication.
+
+### Dark Mode Fixes (6 files, 9 edits)
+
+| File | Fix |
+|------|-----|
+| `components/ImageGallery.tsx:72` | `text-slate-500` → `text-slate-500 dark:text-slate-400` |
+| `components/VideoShowcase.tsx:42` | `text-slate-500` → `text-slate-500 dark:text-slate-400` |
+| `app/admin/approvals/page.tsx:234` | Close button: added `dark:hover:text-slate-300` |
+| `app/admin/approvals/page.tsx:237-240` | Labels: `text-slate-500` → `text-slate-500 dark:text-slate-400` |
+| `components/DossierEditor.tsx:197` | Loading text: `text-slate-500` → `text-slate-500 dark:text-slate-400` |
+| `components/ITunesSearch.tsx:141,188` | Empty state: `text-slate-500` → `text-slate-500 dark:text-slate-400` |
+
+### Quality Gates
+- TSC: 0 errors
+- Unit tests: 110/110
+- Build: success
+- Lint: 0 errors
+
+### Commits: pendiente
+### Deploy: pendiente

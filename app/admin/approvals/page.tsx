@@ -231,22 +231,22 @@ export default function ApprovalsPage() {
                   <>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-xl font-bold text-slate-900 dark:text-white">{data.title || 'Sin título'}</h2>
-                      <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+                      <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">✕</button>
                     </div>
                     <div className="space-y-3 text-sm">
-                      <div><span className="text-slate-500">Artista:</span> <span className="text-slate-900 dark:text-white">{data.artist_name}</span></div>
-                      <div><span className="text-slate-500">Tipo:</span> <span className="text-slate-900 dark:text-white">{capitalizeReleaseType(data.release_type)}</span></div>
-                      <div><span className="text-slate-500">Fecha:</span> <span className="text-slate-900 dark:text-white">{data.release_date}</span></div>
-                      <div><span className="text-slate-500">Duración:</span> <span className="text-slate-900 dark:text-white">{data.duration}</span></div>
+                      <div><span className="text-slate-500 dark:text-slate-400">Artista:</span> <span className="text-slate-900 dark:text-white">{data.artist_name}</span></div>
+                      <div><span className="text-slate-500 dark:text-slate-400">Tipo:</span> <span className="text-slate-900 dark:text-white">{capitalizeReleaseType(data.release_type)}</span></div>
+                      <div><span className="text-slate-500 dark:text-slate-400">Fecha:</span> <span className="text-slate-900 dark:text-white">{data.release_date}</span></div>
+                      <div><span className="text-slate-500 dark:text-slate-400">Duración:</span> <span className="text-slate-900 dark:text-white">{data.duration}</span></div>
                       {data.cover_image && (
                         <div>
-                          <span className="text-slate-500">Portada:</span>
+                          <span className="text-slate-500 dark:text-slate-400">Portada:</span>
                           <Image src={data.cover_image} alt="Cover" width={600} height={160} unoptimized className="mt-2 w-full h-40 object-cover rounded-lg" />
                         </div>
                       )}
                       {data.lyrics && (
                         <div>
-                          <span className="text-slate-500">Letra:</span>
+                          <span className="text-slate-500 dark:text-slate-400">Letra:</span>
                           <p className="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-line max-h-32 overflow-y-auto">{data.lyrics}</p>
                         </div>
                       )}

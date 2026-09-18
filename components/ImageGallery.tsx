@@ -69,7 +69,7 @@ export function ImageGallery({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Recursos gráficos en alta resolución para prensa y promotores
           </p>
         </div>

@@ -39,7 +39,7 @@ export function VideoShowcase({
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <span>🎬</span> {resolvedTitle}
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Material audiovisual oficial en alta definición
           </p>
         </div>

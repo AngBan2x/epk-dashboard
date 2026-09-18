@@ -194,7 +194,7 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-2 text-sm text-slate-500">Cargando dossier...</span>
+            <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">Cargando dossier...</span>
           </div>
         ) : (
           <>
