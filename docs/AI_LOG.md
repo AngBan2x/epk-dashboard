@@ -4383,5 +4383,6 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 - Build: success
 - Visual: ✅ Light/Dark mode consistent on shows, artists, home, login
 
-### Commits: pendiente
-### Deploy: pendiente
+### Commits: `af36234`
+### Deploy: ✅ Production verified (visual consistency confirmed)
+### Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.12
