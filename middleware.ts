@@ -57,7 +57,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Proteger rutas autenticadas — cualquier rol
-  const protectedPaths = ["/dashboard", "/profile", "/account", "/releases/new"];
+  const protectedPaths = ["/profile", "/account", "/releases/new"];
   if (protectedPaths.some((p) => path === p || path.startsWith(p + "/"))) {
     const redirect = requireAuth(request);
     if (redirect) return redirect;
@@ -82,5 +82,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/login", "/register", "/dashboard", "/profile", "/account", "/releases/new"],
+  matcher: ["/admin/:path*", "/login", "/register", "/profile", "/account", "/releases/new"],
 };
