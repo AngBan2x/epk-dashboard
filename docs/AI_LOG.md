@@ -4411,8 +4411,15 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 **components/Header.tsx:** Logo → `/`, nav links adaptados para guests
 
 ### Quality Gates
-- TSC: pendiente
-- Build: pendiente
+- TSC: 0 errores
+- Build: ✅ success
+- Login API: ✅ 200 (admin@epk.local / admin123)
+- Cookie auth: ✅ httpOnly cookie set + /api/auth/me retorna user data
+- Dashboard público: ✅ 200 sin auth (era 307 redirect)
+- Protected routes: ✅ 307 → /login?redirect= para /profile, /account, /admin, /releases/new
+- Login redirect: ✅ Navega de /login → /dashboard después de submit
+- Dashboard invitado: ✅ 9 tracks, 7 artists visibles
 
-### Commits: pendiente
-### Deploy: pendiente
+### Commits: `310b73d`
+### Deploy: ✅ Production verified (https://epk-dashboard.vercel.app)
+### Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.13
