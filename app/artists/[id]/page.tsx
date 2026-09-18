@@ -2,6 +2,8 @@ import { getArtistById } from "@/lib/db";
 import { BioSection } from "@/components/BioSection";
 import { notFound } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function ArtistDetailPage({ params }: { params: { id: string } }) {
   const artist = await getArtistById(params.id);
 

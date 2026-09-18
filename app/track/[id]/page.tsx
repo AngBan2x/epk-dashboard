@@ -8,6 +8,8 @@ import { LyricsSectionWrapper } from "@/components/LyricsSectionWrapper";
 import { ImageGallery } from "@/components/ImageGallery";
 import { DownloadCenter } from "@/components/DownloadCenter";
 import { VideoShowcase } from "@/components/VideoShowcase";
+
+export const dynamic = "force-dynamic";
 import { BioSection } from "@/components/BioSection";
 import LastfmMetrics from "@/components/LastfmMetrics";
 import { UnifiedMetrics } from "@/components/UnifiedMetrics";
