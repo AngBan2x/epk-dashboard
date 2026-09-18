@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useState } from "react";
 import { safeString } from "@/lib/null-safe";
 import { VideoPlayerModal } from "./VideoPlayerModal";
@@ -60,11 +61,13 @@ export function VideoShowcase({
           hasVideo ? "cursor-pointer" : "opacity-75 cursor-not-allowed"
         }`}
       >
-        <img
+        <Image
           src={thumbnail}
           alt={resolvedTitle}
+          width={640}
+          height={360}
+          unoptimized
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
         />
 
         <div className="absolute inset-0 bg-black/40 group-hover:bg-black/25 transition-colors flex items-center justify-center">

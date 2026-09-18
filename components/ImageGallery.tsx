@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useState } from "react";
 import { safeArray, safeString } from "@/lib/null-safe";
 
@@ -84,16 +85,13 @@ export function ImageGallery({
             onClick={() => setSelectedImage(item.url)}
             className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 transition-all hover:scale-[1.02] hover:shadow-xl"
           >
-            <img
+            <Image
               src={item.url}
               alt={safeString(item.title)}
+              width={640}
+              height={360}
+              unoptimized
               className="w-full h-full object-cover transition duration-300 group-hover:brightness-110"
-              loading="lazy"
-              onError={(e) => {
-                // Fallback silencioso en caso de URL rota
-                (e.target as HTMLImageElement).src =
-                  "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80";
-              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
               <span className="text-xs font-semibold text-primary-300">
@@ -124,9 +122,12 @@ export function ImageGallery({
             >
               ✕ Cerrar
             </button>
-            <img
+            <Image
               src={selectedImage}
               alt="Vista previa"
+              width={1200}
+              height={800}
+              unoptimized
               className="max-h-[80vh] w-auto rounded-lg shadow-2xl object-contain"
             />
           </div>

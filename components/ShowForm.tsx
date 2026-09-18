@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import type { Show, ShowStatus, PaymentMethod, GuestArtist } from "@/types/music";
 
@@ -308,13 +309,13 @@ export function ShowForm({ show, artistId = "", artists, onSave, onCancel }: Sho
           placeholder="https://..."
         />
         {form.flyer_url && (
-          <img
+          <Image
             src={form.flyer_url}
             alt="Preview del flyer"
+            width={128}
+            height={128}
+            unoptimized
             className="mt-2 h-32 w-32 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
           />
         )}
       </div>

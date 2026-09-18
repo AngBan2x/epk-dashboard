@@ -49,3 +49,6 @@ session-*.md
 data/*.db
 data/*.db-shm
 data/*.db-wal
+
+# playwright mcp artifacts
+.playwright-mcp/

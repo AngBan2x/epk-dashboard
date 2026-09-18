@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -76,9 +77,12 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 <div className="sm:w-56 md:w-64 lg:w-72 flex-shrink-0">
                   <div className="aspect-square sm:aspect-auto sm:h-full">
                     {getCoverImage(track) ? (
-                      <img
+                      <Image
                         src={getCoverImage(track)!}
                         alt={safeString(track.title)}
+                        width={288}
+                        height={288}
+                        unoptimized
                         className="w-full h-full object-cover"
                       />
                     ) : (

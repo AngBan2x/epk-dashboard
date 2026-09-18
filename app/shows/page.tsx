@@ -1,5 +1,6 @@
 'use client';
 
+import Image from "next/image";
 import { useState, useEffect } from 'react';
 import type { Show, ShowStatus } from '@/types/music';
 import { safeString } from '@/lib/null-safe';
@@ -190,9 +191,12 @@ function ShowCard({ show, statusConfig }: { show: Show; statusConfig: Record<Sho
     >
       {/* Flyer image header */}
       {show.flyer_url && (
-        <img
+        <Image
           src={show.flyer_url}
           alt={safeString(show.venue_name)}
+          width={768}
+          height={192}
+          unoptimized
           className="h-48 w-full rounded-t-lg object-cover mb-3"
         />
       )}

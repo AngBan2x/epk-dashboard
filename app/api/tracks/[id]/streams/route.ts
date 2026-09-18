@@ -1,42 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTrackById, incrementTrackStreams } from "@/lib/db";
+import { getTrackById, incrementTrackStreams, getMetricsHistoryByTrack } from "@/lib/db";
 
-export const dynamic = "force-dynamic";
-
-// POST /api/tracks/[id]/streams — Increment stream count for a track (public, debounced client-side)
-export async function POST(
+// GET /api/tracks/:id/streams — Return stream data for a track
+export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-
-    if (!id) {
-      return NextResponse.json({ error: "Track id is required" }, { status: 400 });
-    }
-
-    // Validate track exists
+    const { id } = params;
     const track = await getTrackById(id);
     if (!track) {
-      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+      return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
     }
 
-    // Increment stream count
-    const updatedStreams = await incrementTrackStreams(id);
+    const metricsHistory = await getMetricsHistoryByTrack(id);
 
-    return NextResponse.json(
-      { streams: updatedStreams },
-      {
-        headers: {
-          "Cache-Control": "private, no-cache, no-store, must-revalidate",
-        },
-      }
-    );
+    return NextResponse.json({
+      track_id: id,
+      streams: track.streams,
+      metrics_history: metricsHistory,
+    });
   } catch (error) {
-    console.error("[API/tracks/[id]/streams] Error:", error);
-    return NextResponse.json(
-      { error: "Error incrementing stream count" },
-      { status: 500 }
-    );
+    console.error("[API/tracks/[id]/streams] Error GET:", error);
+    return NextResponse.json({ error: "Error al obtener streams" }, { status: 500 });
+  }
+}
+
+// POST /api/tracks/:id/streams — Increment stream count (play event)
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const track = await getTrackById(id);
+    if (!track) {
+      return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
+    }
+
+    const newCount = await incrementTrackStreams(id);
+
+    return NextResponse.json({ track_id: id, streams: newCount });
+  } catch (error) {
+    console.error("[API/tracks/[id]/streams] Error POST:", error);
+    return NextResponse.json({ error: "Error al incrementar streams" }, { status: 500 });
   }
 }

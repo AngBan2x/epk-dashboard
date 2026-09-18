@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/Card";
 import type { Track } from "@/types/music";
 import {
@@ -123,11 +124,13 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
     <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
       <div className="aspect-square bg-slate-100 dark:bg-slate-700 relative overflow-hidden flex-shrink-0">
         {coverImage ? (
-          <img
+          <Image
             src={coverImage}
             alt={title}
+            width={400}
+            height={400}
+            unoptimized
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-            loading="lazy"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-3xl">
