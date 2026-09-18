@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 interface ITunesResult {
@@ -153,9 +154,12 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
               onClick={() => handleSelect(track)}
             >
               {track.artworkUrl100 && (
-                <img
+                <Image
                   src={track.artworkUrl100}
                   alt={track.trackName}
+                  width={40}
+                  height={40}
+                  unoptimized
                   className="w-10 h-10 rounded object-contain object-center mb-2"
                 />
               )}

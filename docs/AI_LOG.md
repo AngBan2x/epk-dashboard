@@ -4188,3 +4188,67 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 ### Commits: `1cbcd4d`
 ### Deploy: ✅ Production verified
 ### Total Score: 30/30 PASS
+
+---
+
+## v4.0.0-rc.10 — Critical Build Fix + Production Cleanup
+
+**Fecha:** 2026-09-17
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Fase:** P3 — Build Recovery + Production Hygiene
+
+### Problema Detectado
+- **Vercel deploy fallando** — `types/music.ts` tenía cambios sin commitear
+- `ShowStatus` type: 10 estados en git, 13 localmente (faltaban `reprogramado|disponible|finalizado`)
+- Subagentes modificaron archivos localmente pero no los commitearon
+- **Causa raíz**: subagentes ejecutaron `tsc` y `build` local (donde los archivos existen) pero Vercel construye desde git
+
+### Archivos fuente SIN commitear (descubiertos en auditoría)
+| Archivo | Cambio | Impacto |
+|---------|--------|---------|
+| `types/music.ts` | +3 estados ShowStatus | **Build failure** |
+| `lib/auth.ts` | getSecretKey(), remove legacy token | Seguridad rota |
+| `app/api/notifications/read-all/route.ts` | validateRequest auth | Auth |
+| `app/api/notifications/read/route.ts` | GET + POST handlers | Notifications |
+| `app/api/notifications/send/route.ts` | Auth + admin check | Notifications |
+| `app/api/tracks/[id]/streams/route.ts` | GET handler + refactor | Streams |
+
+### Archivos basura detectados (~17MB)
+| Qué | Tamaño | Archivos | Acción |
+|-----|--------|----------|--------|
+| `.playwright-mcp/` | 1.2MB | 162 | DELETE + gitignore |
+| Root screenshots | ~13MB | 22 | DELETE untracked |
+| `tree.txt` | 9KB | 1 | DELETE from git |
+| `session-ses_fb76.md` | 436KB | 1 | DELETE from git |
+| `database.db` at root | 4KB | 1 | DELETE |
+| `tsconfig.tsbuildinfo` | 451KB | 1 | DELETE from git |
+| Empty dirs | 0 | 4 | DELETE |
+| `eslint.config.js` | 714B | 1 | DELETE (duplicate of .eslintrc.json) |
+| `screenshots/prod-*` | varies | 7 | DELETE untracked |
+
+### Producción — Datos de test detectados (~90% de la DB)
+| Tipo | Total | Real | Test | Seed |
+|------|-------|------|------|------|
+| Artists | 8 | 1 | 2 | 5 |
+| Tracks | 11 | 3 | 2 | 6 |
+| Shows | 7 | 0 | 7 | 0 |
+| Releases | 2 | 0 | 2 | 0 |
+
+**Plan**: Seed artists/tracks se mantienen (demo). Solo se eliminan test artists, test releases, test shows, test users.
+
+### Plan de Ejecución
+1. Documentation before ✅ (este entry)
+2. Fix build (next.config.js, types/music.ts, lib/auth.ts, API routes)
+3. Limpieza archivos basura (~17MB)
+4. Migrar <img> restantes (6 archivos, ~9 tags)
+5. Quality gates (TSC + tests + build + lint)
+6. Commit + Push + Deploy
+7. Limpiar datos test en producción
+8. Verificar limpieza (API smoke tests)
+9. API tests completos (18+ endpoints)
+10. Visual tests (12 páginas, screenshots)
+11. Release v4.0.0-rc.10
+12. Documentation after
+
+### Commits: pendiente
+### Deploy: pendiente

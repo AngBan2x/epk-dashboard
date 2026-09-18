@@ -9,10 +9,19 @@ export interface SessionData {
   exp?: number;
 }
 
-const SECRET_KEY = process.env.SESSION_SECRET || "epk-dashboard-dev-secret-change-in-production-32b";
+function getSecretKey(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SESSION_SECRET must be set in production");
+    }
+    return "epk-dashboard-dev-secret-change-in-production-32b";
+  }
+  return secret;
+}
 
 function getKey(): Buffer {
-  return Buffer.from(SECRET_KEY, "utf-8");
+  return Buffer.from(getSecretKey(), "utf-8");
 }
 
 function signPayload(payload: string): string {
@@ -31,7 +40,7 @@ export function decodeSessionToken(token: string): SessionData | null {
   try {
     const dotIndex = token.lastIndexOf(".");
     if (dotIndex === -1) {
-      return decodeLegacyToken(token);
+      return null;
     }
 
     const encoded = token.slice(0, dotIndex);
@@ -46,17 +55,6 @@ export function decodeSessionToken(token: string): SessionData | null {
     }
 
     const decoded = atob(encoded);
-    const data = JSON.parse(decoded);
-    if (!data.userId) return null;
-    return data as SessionData;
-  } catch {
-    return null;
-  }
-}
-
-function decodeLegacyToken(token: string): SessionData | null {
-  try {
-    const decoded = atob(token);
     const data = JSON.parse(decoded);
     if (!data.userId) return null;
     return data as SessionData;

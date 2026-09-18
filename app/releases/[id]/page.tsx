@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { getTrackById, getTracksByReleaseId } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
@@ -48,9 +49,12 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           {/* Cover Image */}
           {release.cover_image && (
             <div className="w-full md:w-64 flex-shrink-0">
-              <img
+              <Image
                 src={release.cover_image}
                 alt={release.title}
+                width={256}
+                height={256}
+                unoptimized
                 className="w-full aspect-square object-cover rounded-xl shadow-lg"
               />
             </div>
