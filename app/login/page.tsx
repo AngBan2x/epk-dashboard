@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { safeString } from "@/lib/null-safe";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/dashboard";
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,8 +26,8 @@ export default function LoginPage() {
 
     try {
       await login(email, password, rememberMe);
-      router.push("/dashboard");
-      router.refresh();
+      // Full reload via window.location to ensure cookie is available on next request
+      window.location.href = redirectTo;
     } catch (err) {
       setError(safeString(err instanceof Error ? err.message : "Error al iniciar sesión"));
     } finally {
@@ -106,5 +108,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

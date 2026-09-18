@@ -4386,3 +4386,33 @@ MCP servers no cargan en opencode Desktop (6 servidores en rojo). Funcionaban en
 ### Commits: `af36234`
 ### Deploy: ✅ Production verified (visual consistency confirmed)
 ### Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.12
+
+---
+
+## v4.0.0-rc.13 — Login Fix + Dashboard Público
+
+**Fecha:** 2026-09-18
+**Modelo:** Nemotron 3 Ultra (opencode)
+**Fase:** P3 — Auth + UX Critical Fix
+
+### Problemas Identificados
+
+| # | Problema | Causa |
+|---|----------|-------|
+| 1 | Login redirect falla — usuario atascado en /login | `/dashboard` en protectedPaths + router.push race condition |
+| 2 | Dashboard debería ser público para invitados | `/dashboard` incorrectly protected by middleware |
+| 3 | Header logo va a /dashboard (protegido) en vez de / | Should go to landing page |
+| 4 | Login ignora query parameter `?redirect=` | Always redirects to /dashboard |
+
+### Solución
+
+**middleware.ts:** Quitar `/dashboard` de protectedPaths
+**app/login/page.tsx:** Usar `useSearchParams()` para redirect + `window.location.href`
+**components/Header.tsx:** Logo → `/`, nav links adaptados para guests
+
+### Quality Gates
+- TSC: pendiente
+- Build: pendiente
+
+### Commits: pendiente
+### Deploy: pendiente

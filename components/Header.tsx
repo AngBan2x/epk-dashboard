@@ -20,19 +20,28 @@ export function Header() {
     <>
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <Image src="/logo.svg" alt="PressPlay" width={28} height={28} unoptimized className="w-7 h-7" />
             <span className="font-bold text-xl text-slate-900 dark:text-slate-100">PressPlay</span>
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/dashboard"
-              className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
-            >
-              Dashboard
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/artists"
+                className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+              >
+                Explorar
+              </Link>
+            )}
             {user?.role === "admin" && (
               <Link
                 href="/admin"
@@ -85,13 +94,23 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <nav className="px-4 py-4 space-y-3">
-            <Link
-              href="/dashboard"
-              className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Dashboard
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/artists"
+                className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Explorar
+              </Link>
+            )}
             {user?.role === "admin" && (
               <Link
                 href="/admin"
