@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtists } from "@/lib/db";
+import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtists, getLikeCount } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import type { Show } from "@/types/music";
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!session) {
-      return NextResponse.json({ tracks, artists, artistProfile: null, artistShows: [], showsByArtist }, {
+      return NextResponse.json({ tracks, artists, artistProfile: null, artistShows: [], showsByArtist, likes: 0 }, {
         headers: {
           "Cache-Control": "private, no-cache, no-store, must-revalidate",
           "Surrogate-Control": "no-store",
@@ -34,15 +34,26 @@ export async function GET(req: NextRequest) {
 
     let artistProfile = null;
     let artistShows: Show[] = [];
+    let totalLikes = 0;
     if (session.userId) {
       const profile = await getArtistByUserId(session.userId);
       if (profile) {
         artistProfile = profile;
         artistShows = (showsByArtist[profile.id] ?? []);
+        // Count likes for artist's tracks
+        const artistTracks = tracks.filter(t => t.artist_name === profile.name);
+        for (const track of artistTracks) {
+          totalLikes += await getLikeCount(track.id);
+        }
+      } else {
+        // Admin: count all likes
+        for (const track of tracks) {
+          totalLikes += await getLikeCount(track.id);
+        }
       }
     }
 
-    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist }, {
+    return NextResponse.json({ tracks, artists, artistProfile, artistShows, showsByArtist, likes: totalLikes }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",

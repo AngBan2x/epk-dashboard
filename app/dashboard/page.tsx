@@ -364,7 +364,7 @@ export default function DashboardPage() {
     <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-full max-w-2xl m-6 p-8 max-h-[90vh] overflow-y-auto">
       <ShowForm
         show={editingShow ?? undefined}
-        artistId={user?.id}
+        artistId={artistProfile?.id}
         artists={artists.map(a => ({ id: a.id, name: a.name }))}
         onSave={async (data) => {
           try {
@@ -393,6 +393,9 @@ export default function DashboardPage() {
                 const url = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
                 fetch(url).then(r => r.json()).then(json => setData(json));
                 setMessage({ type: "success", text: "Show creado" });
+              } else {
+                const err = await res.text();
+                setMessage({ type: "error", text: err || "Error al crear show" });
               }
             }
           } catch {

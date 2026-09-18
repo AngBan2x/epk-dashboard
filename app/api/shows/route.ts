@@ -20,7 +20,7 @@ const CreateShowSchema = z.object({
   date: z.string().optional(),
   time: z.string().optional(),
   price_range: z.string().optional(),
-  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado"]).optional(),
+  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
   ticket_url: z.string().optional(),
   payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).optional(),
   postponement_reason: z.string().optional(),
@@ -39,7 +39,7 @@ const UpdateShowSchema = z.object({
   date: z.string().optional(),
   time: z.string().optional(),
   price_range: z.string().optional(),
-  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado"]).optional(),
+  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
   ticket_url: z.string().optional(),
   payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).optional(),
   postponement_reason: z.string().optional(),
@@ -132,7 +132,8 @@ export async function PUT(req: NextRequest) {
       if (!existing) {
         return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
       }
-      if (existing.artist_id !== session.userId) {
+      const artist = await getArtistById(existing.artist_id);
+      if (!artist || artist.user_id !== session.userId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
     }
@@ -170,7 +171,8 @@ export async function DELETE(req: NextRequest) {
       if (!existing) {
         return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
       }
-      if (existing.artist_id !== session.userId) {
+      const artist = await getArtistById(existing.artist_id);
+      if (!artist || artist.user_id !== session.userId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
     }

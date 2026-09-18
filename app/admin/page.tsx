@@ -1351,6 +1351,9 @@ onSubmit={async (e) => {
               setShowFormOpen(false);
               fetchShows();
               setMessage({ type: "success", text: "Show creado" });
+            } else {
+              const err = await res.text();
+              setMessage({ type: "error", text: err || "Error al crear show" });
             }
           } catch {
             setMessage({ type: "error", text: "Error al guardar show" });
