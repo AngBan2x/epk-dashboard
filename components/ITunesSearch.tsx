@@ -138,7 +138,7 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
               <span className="spinner spinner-spin spinner-lg text-primary-600" />
             </div>
           ) : results.length === 0 ? query.trim().length >= 2 ? (
-            <div className="p-4 text-center text-slate-500">
+            <div className="p-4 text-center text-slate-500 dark:text-slate-400">
               Sin resultados
             </div>
           ) : (
@@ -185,7 +185,7 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
           ))}
 
           {results.length === 0 && query.trim().length >= 2 && (
-            <div className="p-4 text-center text-slate-500">
+            <div className="p-4 text-center text-slate-500 dark:text-slate-400">
               Sin resultados
             </div>
           )}
