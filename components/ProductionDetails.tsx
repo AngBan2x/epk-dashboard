@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { safeString, hasValue } from "@/lib/null-safe";
+import { safeString } from "@/lib/null-safe";
 import type { ProductionDetails as ProductionDetailsType } from "@/types/music";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,10 @@ export function ProductionDetails({
   const [error, setError] = useState<string | null>(null);
 
   const [editData, setEditData] = useState({
+    daw: details.daw ?? "",
+    guitars: details.guitars ?? "",
+    effects_chain: details.effects_chain ?? "",
+    tuning: details.tuning ?? "",
     genre: details.genre ?? "",
     sub_genre: details.sub_genre ?? "",
     bpm: details.bpm?.toString() ?? "",
@@ -36,14 +40,11 @@ export function ProductionDetails({
     production_credits: details.production_credits ?? "",
   });
 
-  const readOnlyFields = [
-    { label: "DAW", key: "daw" as const },
-    { label: "Guitarras", key: "guitars" as const },
-    { label: "Efectos", key: "effects_chain" as const },
-    { label: "Afinación", key: "tuning" as const },
-  ];
-
   const editableFields = [
+    { label: "DAW", key: "daw" as const, type: "text" },
+    { label: "Guitarras", key: "guitars" as const, type: "text" },
+    { label: "Efectos", key: "effects_chain" as const, type: "text" },
+    { label: "Afinación", key: "tuning" as const, type: "text" },
     { label: "Género", key: "genre" as const, type: "text" },
     { label: "Sub-género", key: "sub_genre" as const, type: "text" },
     { label: "BPM", key: "bpm" as const, type: "number" },
@@ -67,6 +68,10 @@ export function ProductionDetails({
     setError(null);
     try {
       const payload: Partial<ProductionDetailsType> = {
+        daw: editData.daw || null,
+        guitars: editData.guitars || null,
+        effects_chain: editData.effects_chain || null,
+        tuning: editData.tuning || null,
         genre: editData.genre || null,
         sub_genre: editData.sub_genre || null,
         bpm: editData.bpm ? parseInt(editData.bpm, 10) : null,
@@ -101,6 +106,10 @@ export function ProductionDetails({
 
   const handleCancel = () => {
     setEditData({
+      daw: details.daw ?? "",
+      guitars: details.guitars ?? "",
+      effects_chain: details.effects_chain ?? "",
+      tuning: details.tuning ?? "",
       genre: details.genre ?? "",
       sub_genre: details.sub_genre ?? "",
       bpm: details.bpm?.toString() ?? "",
@@ -238,14 +247,6 @@ export function ProductionDetails({
             className="overflow-hidden"
           >
             <dl className="grid grid-cols-2 gap-2">
-              {readOnlyFields.map(({ label, key }) => (
-                <div key={key}>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase">{label}</dt>
-                  <dd className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {hasValue(details, key) ? safeString(details[key]) : <span className="text-slate-300 dark:text-slate-600">—</span>}
-                  </dd>
-                </div>
-              ))}
               {editableFields.map(({ label, key }) => (
                 <div key={key}>
                   <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase">{label}</dt>

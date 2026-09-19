@@ -3,6 +3,7 @@
 import Image from "next/image";
 import React, { useState } from "react";
 import { safeArray, safeString } from "@/lib/null-safe";
+import { ImageUploader } from "./ImageUploader";
 
 export interface GalleryItem {
   id: string;
@@ -14,13 +15,20 @@ export interface GalleryItem {
 interface ImageGalleryProps {
   images?: (string | GalleryItem)[];
   title?: string;
+  trackId?: string;
+  isOwner?: boolean;
+  onImageAdded?: (url: string) => void;
 }
 
 export function ImageGallery({
   images = [],
   title = "Galería de Prensa & Assets Visuales",
+  trackId,
+  isOwner = false,
+  onImageAdded,
 }: ImageGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showUploader, setShowUploader] = useState(false);
 
   const normalizedImages: GalleryItem[] = safeArray<string | GalleryItem>(images).map((img, idx) => {
     if (typeof img === "string") {
@@ -38,6 +46,11 @@ export function ImageGallery({
       category: img.category || "Prensa",
     };
   });
+
+  const handleUploadComplete = (url: string) => {
+    setShowUploader(false);
+    onImageAdded?.(url);
+  };
 
   // Fallbacks elegantes en caso de que el artista no tenga imágenes
   const displayImages =
@@ -73,10 +86,29 @@ export function ImageGallery({
             Recursos gráficos en alta resolución para prensa y promotores
           </p>
         </div>
-        <span className="text-xs bg-primary-100 dark:bg-primary-950 text-primary-600 dark:text-primary-300 font-semibold px-2.5 py-1 rounded-full border border-primary-300 dark:border-primary-800">
-          {displayImages.length} Assets HD
-        </span>
+        <div className="flex items-center gap-2">
+          {isOwner && trackId && (
+            <button
+              onClick={() => setShowUploader(!showUploader)}
+              className="text-xs bg-primary-100 dark:bg-primary-950 text-primary-600 dark:text-primary-300 font-semibold px-2.5 py-1 rounded-full border border-primary-300 dark:border-primary-800 hover:bg-primary-200 dark:hover:bg-primary-900 transition-colors"
+            >
+              {showUploader ? "Cerrar" : "+ Subir"}
+            </button>
+          )}
+          <span className="text-xs bg-primary-100 dark:bg-primary-950 text-primary-600 dark:text-primary-300 font-semibold px-2.5 py-1 rounded-full border border-primary-300 dark:border-primary-800">
+            {displayImages.length} Assets HD
+          </span>
+        </div>
       </div>
+
+      {showUploader && trackId && (
+        <div className="mb-4 p-4 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+          <ImageUploader
+            trackId={trackId}
+            onUploadComplete={handleUploadComplete}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {displayImages.map((item) => (

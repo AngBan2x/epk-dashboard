@@ -112,8 +112,8 @@ export function DownloadCenter({
   };
 
   return (
-    <section className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800">
-      <div className="flex items-center justify-between mb-4">
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
             Centro de Descargas
@@ -122,12 +122,14 @@ export function DownloadCenter({
             Assets para prensa y venues
           </p>
         </div>
-        <span className="flex-shrink-0 text-[10px] bg-emerald-800 text-emerald-50 font-semibold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
-          Disponibles
-        </span>
-        <span className="flex-shrink-0 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold px-2 py-0.5 rounded-full border border-slate-300 dark:border-slate-600">
-          {trackCount || 0} tracks incluidos
-        </span>
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+          <span className="text-[10px] bg-emerald-800 text-emerald-50 font-semibold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+            Disponibles
+          </span>
+          <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold px-2 py-0.5 rounded-full border border-slate-300 dark:border-slate-600">
+            {trackCount || 0} tracks incluidos
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3">
@@ -163,6 +165,6 @@ export function DownloadCenter({
           </div>
         ))}
       </div>
-    </section>
+    </div>
   );
 }

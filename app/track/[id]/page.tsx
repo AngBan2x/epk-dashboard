@@ -5,7 +5,7 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper";
 import { LyricsSectionWrapper } from "@/components/LyricsSectionWrapper";
 
-import { ImageGallery } from "@/components/ImageGallery";
+import { ImageGalleryWrapper } from "@/components/ImageGalleryWrapper";
 import { DownloadCenter } from "@/components/DownloadCenter";
 import { VideoShowcase } from "@/components/VideoShowcase";
 
@@ -155,23 +155,8 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Main Column (left, 2/3 width) */}
             <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-              {/* Bio Section */}
-              <SlideIn index={2}>
-                {artist && (
-                  <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
-                    <BioSection
-                      artistName={artist.name}
-                      genre={artist.genre ?? undefined}
-                      location={artist.location ?? undefined}
-                      biography={artist.biography ?? undefined}
-                      monthlyListeners={artist.monthly_listeners}
-                    />
-                  </section>
-                )}
-              </SlideIn>
-
               {/* Lyrics Section */}
-              <SlideIn index={3}>
+              <SlideIn index={2}>
                 <LyricsSectionWrapper
                   lyrics={track.lyrics}
                   isInstrumental={track.is_instrumental}
@@ -181,24 +166,35 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
               </SlideIn>
 
               {/* Video Showcase */}
+              <SlideIn index={3}>
+                <VideoShowcase
+                  youtubeVideoId={track.youtube_video_id}
+                  videoEmbedUrl={track.video_embed_url}
+                  title="Videoclip Oficial"
+                />
+              </SlideIn>
+
+              {/* Bio Section */}
               <SlideIn index={4}>
-                <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
-                  <VideoShowcase
-                    youtubeVideoId={track.youtube_video_id}
-                    videoEmbedUrl={track.video_embed_url}
-                    title="Videoclip Oficial"
+                {artist && (
+                  <BioSection
+                    artistName={artist.name}
+                    genre={artist.genre ?? undefined}
+                    location={artist.location ?? undefined}
+                    biography={artist.biography ?? undefined}
+                    monthlyListeners={artist.monthly_listeners}
                   />
-                </section>
+                )}
               </SlideIn>
 
               {/* Image Gallery */}
               <SlideIn index={5}>
-                <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
-                  <ImageGallery
-                    images={track.gallery_images ?? undefined}
-                    title="Galería de Prensa"
-                  />
-                </section>
+                <ImageGalleryWrapper
+                  images={track.gallery_images ?? undefined}
+                  title="Galería de Prensa"
+                  trackId={track.id}
+                  artistName={track.artist_name}
+                />
               </SlideIn>
             </div>
 
@@ -290,9 +286,7 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
 
               {/* Download Center */}
               <SlideIn index={7}>
-                <section className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
-                  <DownloadCenter artistName={track.artist_name} trackTitle={track.title} trackCount={1} />
-                </section>
+                <DownloadCenter artistName={track.artist_name} trackTitle={track.title} trackCount={1} />
               </SlideIn>
             </div>
           </div>
