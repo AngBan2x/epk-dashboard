@@ -331,6 +331,7 @@ export interface Show {
   description: string | null;
   guest_artists: GuestArtist[] | null;
   notes: string | null;
+  approved: boolean;
   deleted_at: string | null;
   updated_at: string | null;
   created_at: string;
@@ -365,6 +366,7 @@ export interface RawShowRow {
   description: string | null;
   guest_artists: string | null;
   notes: string | null;
+  approved: number;
   deleted_at: string | null;
   updated_at: string | null;
   created_at: string;
@@ -387,6 +389,7 @@ export interface CreateShowInput {
   description?: string;
   guest_artists?: GuestArtist[];
   notes?: string;
+  approved?: boolean;
 }
 
 // P2.3: Subscriptions
