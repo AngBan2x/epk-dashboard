@@ -19,8 +19,8 @@ const CreateReleaseSchema = z.object({
 
 export const dynamic = "force-dynamic";
 
-function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const session = validateRequest(req);
+async function validateSession(req: NextRequest) {
+  const session = await validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role };
 }
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
@@ -221,7 +221,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }

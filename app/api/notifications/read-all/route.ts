@@ -4,7 +4,7 @@ import { validateRequest } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = validateRequest(req);
+    const session = await validateRequest(req);
     if (!session) {
       return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
     }

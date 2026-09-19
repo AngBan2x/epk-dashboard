@@ -5,8 +5,8 @@ import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const session = validateRequest(req);
+async function validateSession(req: NextRequest) {
+  const session = await validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role };
 }
@@ -14,7 +14,7 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
 // GET /api/artists — Listar artistas: admin ve todos, público solo aprobados
 export async function GET(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     const isAdmin = session?.role === "admin";
 
     let artists;

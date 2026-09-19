@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     // Crear sesión con timestamp de emisión y expiración condicional
     const now = Date.now();
-    const sessionToken = createSessionToken({
+    const sessionToken = await createSessionToken({
       userId: user.id,
       email: user.email,
       role: user.role,

@@ -7,8 +7,8 @@ const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
 export const dynamic = "force-dynamic";
 
-function validateAdminSession(req: NextRequest): { userId: string; role: string } | null {
-  const session = validateRequest(req);
+async function validateAdminSession(req: NextRequest) {
+  const session = await validateRequest(req);
   if (!session || session.role !== "admin") return null;
   return { userId: session.userId, role: session.role };
 }
@@ -47,7 +47,7 @@ async function dbRun(sql: string, params?: unknown[]): Promise<void> {
 // GET: List all releases with artist info (admin only)
 export async function GET(req: NextRequest) {
   try {
-    const session = validateAdminSession(req);
+    const session = await validateAdminSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autorizado - Se requiere rol de admin" }, { status: 403 });
     }
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
 // PUT: Update release status (admin only)
 export async function PUT(req: NextRequest) {
   try {
-    const session = validateAdminSession(req);
+    const session = await validateAdminSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autorizado - Se requiere rol de admin" }, { status: 403 });
     }

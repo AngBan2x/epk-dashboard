@@ -7,8 +7,8 @@ const ToggleLikeSchema = z.object({
   track_id: z.string().min(1, "track_id requerido"),
 });
 
-function getUserIdFromSession(req: NextRequest): string | null {
-  const session = validateRequest(req);
+async function getUserIdFromSession(req: NextRequest) {
+  const session = await validateRequest(req);
   return session?.userId ?? null;
 }
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const trackId = searchParams.get("track_id");
-    const userId = searchParams.get("user_id") || getUserIdFromSession(req);
+    const userId = searchParams.get("user_id") || (await getUserIdFromSession(req));
 
     if (!trackId && !userId) {
       return NextResponse.json({ error: "Autenticación requerida" }, { status: 401 });
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = ToggleLikeSchema.parse(body);
 
-    const userId = getUserIdFromSession(req);
+    const userId = await getUserIdFromSession(req);
     if (!userId) {
       return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
     }
