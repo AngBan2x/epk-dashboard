@@ -38,13 +38,15 @@ export function createSessionToken(sessionData: Omit<SessionData, "iat"> & { iat
 
 export function decodeSessionToken(token: string): SessionData | null {
   try {
-    const dotIndex = token.lastIndexOf(".");
+    // URL-decode cookie value (%3D → =, %2F → /) — browsers may encode base64 chars
+    const decoded = decodeURIComponent(token);
+    const dotIndex = decoded.lastIndexOf(".");
     if (dotIndex === -1) {
       return null;
     }
 
-    const encoded = token.slice(0, dotIndex);
-    const providedSig = token.slice(dotIndex + 1);
+    const encoded = decoded.slice(0, dotIndex);
+    const providedSig = decoded.slice(dotIndex + 1);
     const expectedSig = signPayload(encoded);
 
     const expectedBuf = Buffer.from(expectedSig, "base64url");
@@ -54,8 +56,8 @@ export function decodeSessionToken(token: string): SessionData | null {
       return null;
     }
 
-    const decoded = atob(encoded);
-    const data = JSON.parse(decoded);
+    const decodedPayload = atob(encoded);
+    const data = JSON.parse(decodedPayload);
     if (!data.userId) return null;
     return data as SessionData;
   } catch {
