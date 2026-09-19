@@ -128,9 +128,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
     if (isYT) {
       // YouTube mode
+      setIsLoading(true);
       const yt = getYouTubePlayer();
       yt.init(track.youtubeVideoId!, {
         onReady: () => {
+          setIsLoading(false);
           yt.setVolume(volume);
           // Seek to startTimestamp if provided
           if (track.startTimestamp && track.startTimestamp > 0) {
@@ -275,7 +277,14 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      // P3 Batch 2: Stop at endTimestamp for HTML5 audio
+      if (endTimestampRef.current > 0 && audio.currentTime >= endTimestampRef.current) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    };
     const handleLoadedMetadata = () => setDuration(audio.duration || 0);
     const handleEnded = () => setIsPlaying(false);
     const handleLoadingStart = () => setIsLoading(true);
