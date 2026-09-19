@@ -4625,3 +4625,78 @@ FASE E: Testing exhaustivo → quality gates → limpieza datos → rc.18
 - https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.15
 - https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.16
 - https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.17
+- https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.18
+
+---
+
+## rc.19 — Auth Edge Runtime Fix (CRITICAL)
+
+**Fecha:** 2026-09-19
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Problema Detectado
+
+Todas las páginas protegidas (admin, profile, account, releases/new) redirigían a login automáticamente. El middleware de Next.js fallaba silenciosamente.
+
+### Root Cause
+
+`lib/auth.ts` usaba `import { createHmac, timingSafeEqual } from "crypto"` (Node.js crypto module). El middleware de Next.js corre en **Edge Runtime**, que **NO soporta módulos Node.js**. El `catch` en `decodeSessionToken()` devolvía `null` silenciosamente → redirect a login.
+
+**Por qué no se detectó antes:**
+- API routes (`/api/auth/me`, etc.) corren en Node.js → crypto funciona
+- Solo el middleware de páginas corre en Edge Runtime → crypto falla
+- El catch bloque devolvía null sin log → redirect silencioso
+
+### Solución
+
+Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
+
+| Archivo | Cambio |
+|---------|--------|
+| `lib/auth.ts` | `createHmac` → `crypto.subtle.importKey` + `sign`/`verify` |
+| `lib/auth.ts` | `Buffer` → custom `base64UrlEncode`/`base64UrlDecode` |
+| `lib/auth.ts` | `timingSafeEqual` → `crypto.subtle.verify` |
+| `middleware.ts` | Convertido a `async function middleware()` |
+| `app/api/auth/login/route.ts` | `await createSessionToken()` |
+| 22 API routes | `validateRequest(req)` → `await validateRequest(req)` |
+| Helper functions | `validateSession`, `validateAdminSession`, `getUserIdFromSession` → async |
+
+### Commits
+
+- `d393fe1` — fix(auth): URL-decode cookie value before HMAC validation
+- `a63964a` — fix(auth): migrate to Web Crypto API for Edge Runtime compatibility
+
+### Quality Gates
+
+| Check | Result |
+|-------|--------|
+| TSC | ✅ 0 errors |
+| Build | ✅ 27 kB middleware |
+| Unit tests | ✅ 93 passed (2 pre-existing env failures) |
+| Local Playwright | ✅ admin, profile, account, releases/new all accessible |
+| Production Playwright | ✅ All 4 protected pages load correctly |
+
+### Protected Page Screenshots
+
+| Page | Dark | Light | Mobile |
+|------|------|-------|--------|
+| Admin | ✅ | ✅ | ✅ |
+| Profile | ✅ | ✅ | — |
+| Account | ✅ | ✅ | — |
+| Releases/New | ✅ | ✅ | — |
+
+### Production Tests
+
+| Route | Auth Required | Without Cookie | With Cookie |
+|-------|---------------|----------------|-------------|
+| /admin | admin only | 307 → /login | 200 ✅ |
+| /profile | any user | 307 → /login | 200 ✅ |
+| /account | any user | 307 → /login | 200 ✅ |
+| /releases/new | any user | 307 → /login | 200 ✅ |
+| /api/auth/me | session | 401 | 200 ✅ |
+
+### Release
+
+- https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.19
+- Deploy: ✅ Production verified
