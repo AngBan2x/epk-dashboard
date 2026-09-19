@@ -50,6 +50,18 @@ const UpdateShowSchema = z.object({
   notes: z.string().optional(),
 });
 
+function computeDynamicStatus(show: { status: string; date: string | null }): string {
+  if (show.status === "cancelado" || show.status === "suspendido") return show.status;
+  if (!show.date) return show.status || "proximamente";
+  const now = new Date();
+  const showDate = new Date(show.date);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (showDate >= todayStart && showDate < todayEnd) return "hoy";
+  if (showDate < todayStart) return "pasado";
+  return show.status || "proximamente";
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -61,16 +73,16 @@ export async function GET(req: NextRequest) {
       if (!show) {
         return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
       }
-      return NextResponse.json(show);
+      return NextResponse.json({ ...show, status: computeDynamicStatus(show) as ShowStatus });
     }
 
     if (artistId) {
       const shows = await getShowsByArtist(artistId);
-      return NextResponse.json({ shows });
+      return NextResponse.json({ shows: shows.map(s => ({ ...s, status: computeDynamicStatus(s) as ShowStatus })) });
     }
 
     const shows = await getAllShows();
-    return NextResponse.json({ shows }, {
+    return NextResponse.json({ shows: shows.map(s => ({ ...s, status: computeDynamicStatus(s) as ShowStatus })) }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",

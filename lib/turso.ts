@@ -222,6 +222,7 @@ export async function ensureTursoSchema(): Promise<boolean> {
       description TEXT,
       guest_artists TEXT,
       notes TEXT,
+      approved INTEGER DEFAULT 0,
       deleted_at TEXT,
       updated_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
@@ -239,6 +240,8 @@ export async function ensureTursoSchema(): Promise<boolean> {
   try { await client.execute(`ALTER TABLE shows ADD COLUMN deleted_at TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE shows ADD COLUMN updated_at TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE shows ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`); } catch {}
+  // D1: Add approved column for show approval workflow
+  try { await client.execute(`ALTER TABLE shows ADD COLUMN approved INTEGER DEFAULT 0`); } catch {}
 
   // users schema drift fixes
   try { await client.execute(`ALTER TABLE users ADD COLUMN preferences TEXT`); } catch {}
@@ -625,8 +628,8 @@ export async function syncShowsToTurso(shows: Show[]): Promise<SyncResult> {
         sql: `INSERT OR REPLACE INTO shows
               (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url,
                payment_methods, postponement_reason, flyer_url, ticket_link, description,
-               guest_artists, notes, deleted_at, updated_at, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               guest_artists, notes, approved, deleted_at, updated_at, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           show.id,
           show.artist_id,
@@ -645,6 +648,7 @@ export async function syncShowsToTurso(shows: Show[]): Promise<SyncResult> {
           show.description ?? null,
           JSON.stringify(show.guest_artists ?? []),
           show.notes ?? null,
+          show.approved ? 1 : 0,
           show.deleted_at ?? null,
           show.updated_at ?? null,
           show.created_at,

@@ -92,6 +92,7 @@ export default function AdminPage() {
   const editFormRef = useRef<HTMLDivElement>(null);
   const trackEditRef = useRef<HTMLDivElement>(null);
   const [shows, setShows] = useState<Show[]>([]);
+  const [pendingShows, setPendingShows] = useState<Show[]>([]);
   const [editingShow, setEditingShow] = useState<Show | null>(null);
   const [showFormOpen, setShowFormOpen] = useState(false);
   const [artistForm, setArtistForm] = useState({
@@ -139,6 +140,7 @@ export default function AdminPage() {
     fetchNotifications();
     fetchArtists();
     fetchShows();
+    fetchPendingShows();
   }, []);
 
   useEffect(() => {
@@ -223,6 +225,44 @@ export default function AdminPage() {
       }
     } catch {
       console.error("Error fetching shows");
+    }
+  };
+
+  const fetchPendingShows = async () => {
+    try {
+      const res = await fetch("/api/admin/shows?pending=1");
+      if (res.ok) {
+        const data = await res.json();
+        setPendingShows(data.shows || []);
+      }
+    } catch {
+      console.error("Error fetching pending shows");
+    }
+  };
+
+  const handleShowApproval = async (showId: string, approved: boolean) => {
+    setActionLoading(showId);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`/api/admin/shows/${showId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approved }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: approved ? "Show aprobado" : "Show rechazado" });
+        fetchPendingShows();
+        fetchShows();
+      } else {
+        const error = await res.json();
+        setMessage({ type: "error", text: error.error || "Error al actualizar" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Error de conexión" });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -1300,7 +1340,7 @@ onSubmit={async (e) => {
         {activeTab === "shows" && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Shows ({shows.length})
+              Shows ({shows.length}{pendingShows.length > 0 ? `, ${pendingShows.length} pendientes` : ""})
               </h3>
 
             {/* Show Form */}
@@ -1345,7 +1385,7 @@ onSubmit={async (e) => {
             const res = await fetch("/api/shows", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(data),
+              body: JSON.stringify({ ...data, approved: true }),
             });
             if (res.ok) {
               setShowFormOpen(false);
@@ -1366,6 +1406,61 @@ onSubmit={async (e) => {
     </div>
   </div>
 ) : null}
+
+            {/* Shows Pendientes */}
+            {pendingShows.length > 0 && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-amber-200 dark:border-amber-800 overflow-hidden mb-4">
+                <div className="p-4 border-b border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+                  <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                    Shows Pendientes de Aprobación ({pendingShows.length})
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800">
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Lugar</th>
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Artista</th>
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Ciudad</th>
+                        <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Fecha</th>
+                        <th className="text-right p-3 font-semibold text-slate-700 dark:text-slate-300">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingShows.map((show) => {
+                        const artist = artists.find((a) => a.id === show.artist_id);
+                        return (
+                          <tr key={show.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                            <td className="p-3 font-medium text-slate-900 dark:text-slate-100">{show.venue_name}</td>
+                            <td className="p-3 text-slate-600 dark:text-slate-400">{artist?.name || "—"}</td>
+                            <td className="p-3 text-slate-600 dark:text-slate-400">{[show.city, show.country].filter(Boolean).join(", ") || "—"}</td>
+                            <td className="p-3 text-slate-600 dark:text-slate-400">{show.date || "—"}</td>
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => handleShowApproval(show.id, true)}
+                                  disabled={actionLoading === show.id}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950 transition disabled:opacity-50"
+                                >
+                                  ✅ Aprobar
+                                </button>
+                                <button
+                                  onClick={() => handleShowApproval(show.id, false)}
+                                  disabled={actionLoading === show.id}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition disabled:opacity-50"
+                                >
+                                  ❌ Rechazar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Shows Table */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">

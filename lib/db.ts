@@ -355,6 +355,7 @@ function initLocalTables(): void {
       description TEXT,
       guest_artists TEXT,
       notes TEXT,
+      approved INTEGER DEFAULT 0,
       deleted_at TEXT,
       updated_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
@@ -374,6 +375,8 @@ function initLocalTables(): void {
   try { db.exec(`ALTER TABLE shows ADD COLUMN notes TEXT`); } catch {}
   try { db.exec(`ALTER TABLE shows ADD COLUMN deleted_at TEXT`); } catch {}
   try { db.exec(`ALTER TABLE shows ADD COLUMN updated_at TEXT`); } catch {}
+  // D1: Add approved column for show approval workflow
+  try { db.exec(`ALTER TABLE shows ADD COLUMN approved INTEGER DEFAULT 0`); } catch {}
 
   // P2.3: Create subscriptions table
   db.exec(`
@@ -671,6 +674,7 @@ function parseShow(row: Record<string, unknown>): Show {
     description: (row.description as string) ?? null,
     guest_artists: safeParseJSON<GuestArtist[]>((row.guest_artists as string) ?? null, []),
     notes: (row.notes as string) ?? null,
+    approved: Number(row.approved) === 1,
     deleted_at: (row.deleted_at as string) ?? null,
     updated_at: (row.updated_at as string) ?? null,
     created_at: String(row.created_at),
@@ -1450,12 +1454,12 @@ export async function getShowsByArtists(artistIds: string[]): Promise<Show[]> {
   if (artistIds.length === 0) return [];
   if (isTursoEnabled()) {
     const placeholders = artistIds.map(() => "?").join(", ");
-    const rows = await tursoExec(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) ORDER BY date ASC`, artistIds);
+    const rows = await tursoExec(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) AND approved = 1 ORDER BY date ASC`, artistIds);
     return rows.map((r) => parseShow(r as Record<string, unknown>));
   }
   const db = getLocalDb();
   const placeholders = artistIds.map(() => "?").join(", ");
-  const rows = db.prepare(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) ORDER BY date ASC`).all(...artistIds) as Record<string, unknown>[];
+  const rows = db.prepare(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) AND approved = 1 ORDER BY date ASC`).all(...artistIds) as Record<string, unknown>[];
   return rows.map(parseShow);
 }
 
@@ -1474,11 +1478,12 @@ export async function createShow(data: CreateShowInput): Promise<Show> {
   const now = new Date().toISOString();
   const paymentMethods = data.payment_methods ? JSON.stringify(data.payment_methods) : "[]";
   const guestArtists = data.guest_artists ? JSON.stringify(data.guest_artists) : "[]";
+  const approved = data.approved ? 1 : 0;
 
   if (isTursoEnabled()) {
     await tursoExec(
-      `INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, approved, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.artist_id,
@@ -1497,6 +1502,7 @@ export async function createShow(data: CreateShowInput): Promise<Show> {
         data.description || null,
         guestArtists,
         data.notes || null,
+        approved,
         now,
       ]
     );
@@ -1507,9 +1513,9 @@ export async function createShow(data: CreateShowInput): Promise<Show> {
 
   const db = getLocalDbWrite();
   db.prepare(
-    `INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, data.artist_id, data.venue_name, data.city || null, data.country || null, data.date || null, data.time || null, data.price_range || null, data.status || "disponible", data.ticket_url || null, paymentMethods, data.postponement_reason || null, data.flyer_url || null, data.ticket_link || null, data.description || null, guestArtists, data.notes || null, now);
+    `INSERT INTO shows (id, artist_id, venue_name, city, country, date, time, price_range, status, ticket_url, payment_methods, postponement_reason, flyer_url, ticket_link, description, guest_artists, notes, approved, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, data.artist_id, data.venue_name, data.city || null, data.country || null, data.date || null, data.time || null, data.price_range || null, data.status || "disponible", data.ticket_url || null, paymentMethods, data.postponement_reason || null, data.flyer_url || null, data.ticket_link || null, data.description || null, guestArtists, data.notes || null, approved, now);
   const created = await getShowById(id);
   if (!created) throw new Error("Failed to create show");
   return created;
@@ -1535,6 +1541,7 @@ export async function updateShow(id: string, data: Partial<CreateShowInput>): Pr
     if (data.description !== undefined) { updates.push("description = ?"); values.push(data.description || null); }
     if (data.guest_artists !== undefined) { updates.push("guest_artists = ?"); values.push(JSON.stringify(data.guest_artists)); }
     if (data.notes !== undefined) { updates.push("notes = ?"); values.push(data.notes || null); }
+    if (data.approved !== undefined) { updates.push("approved = ?"); values.push(data.approved ? "1" : "0"); }
 
     // Always update updated_at
     updates.push("updated_at = ?");
@@ -1567,6 +1574,7 @@ export async function updateShow(id: string, data: Partial<CreateShowInput>): Pr
   if (data.description !== undefined) { updates.push("description = ?"); values.push(data.description || null); }
   if (data.guest_artists !== undefined) { updates.push("guest_artists = ?"); values.push(JSON.stringify(data.guest_artists)); }
   if (data.notes !== undefined) { updates.push("notes = ?"); values.push(data.notes || null); }
+  if (data.approved !== undefined) { updates.push("approved = ?"); values.push(data.approved ? "1" : "0"); }
 
   // Always update updated_at
   updates.push("updated_at = ?");
