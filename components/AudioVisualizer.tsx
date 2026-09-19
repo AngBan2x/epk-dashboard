@@ -59,7 +59,7 @@ export function AudioVisualizer({
       if (cancelled) return;
       try {
         if (audioRef.current && !cancelled) {
-          visualizerNode = await createAudioVisualizer(audioRef.current, 64);
+          visualizerNode = await createAudioVisualizer(audioRef.current, 128);
         }
       } catch {
         // CORS or other error — will use synthetic frequencies
@@ -82,19 +82,37 @@ export function AudioVisualizer({
       if (isPlayingRef.current) {
         if (visualizerNode) {
           const data = visualizerNode.getFrequencyData();
-          frequencies = Array.from(data).slice(0, barCount);
+          const binCount = data.length;
+          // Logarithmic frequency grouping: low octaves get more bins
+          const logMin = Math.log(1);
+          const logMax = Math.log(binCount);
+          for (let i = 0; i < barCount; i++) {
+            const lo = Math.exp(logMin + (logMax - logMin) * (i / barCount));
+            const hi = Math.exp(logMin + (logMax - logMin) * ((i + 1) / barCount));
+            const binLo = Math.max(0, Math.floor(lo));
+            const binHi = Math.min(binCount - 1, Math.floor(hi));
+            let sum = 0;
+            let count = 0;
+            for (let b = binLo; b <= binHi; b++) {
+              sum += data[b];
+              count++;
+            }
+            frequencies.push(count > 0 ? sum / count : 0);
+          }
         } else {
           frequencies = generateSyntheticFrequencies(barCount, 0.9);
         }
       } else {
-      const time = Date.now() / 1000;
-      frequencies = Array.from({ length: barCount }, (_, i) =>
-        Math.sin(time * 0.8 + i * 0.4) * 15 + 20
-      );
-    }
+        const time = Date.now() / 1000;
+        frequencies = Array.from({ length: barCount }, (_, i) =>
+          Math.sin(time * 0.8 + i * 0.4) * 15 + 20
+        );
+      }
 
       const barWidth = (width / barCount) * 0.65;
       const gap = (width / barCount) * 0.35;
+
+      const isDark = document.documentElement.classList.contains("dark");
 
       frequencies.forEach((value, i) => {
         const percent = value / 255;
@@ -103,9 +121,15 @@ export function AudioVisualizer({
         const y = canvasHeight - barHeight;
 
         const gradient = ctx.createLinearGradient(0, canvasHeight, 0, y);
-        gradient.addColorStop(0, `rgba(79, 70, 229, ${0.4 + percent * 0.6})`);
-        gradient.addColorStop(0.5, `rgba(139, 92, 246, ${0.5 + percent * 0.5})`);
-        gradient.addColorStop(1, `rgba(236, 72, 153, ${0.6 + percent * 0.4})`);
+        if (isDark) {
+          gradient.addColorStop(0, `rgba(79, 70, 229, ${0.4 + percent * 0.6})`);
+          gradient.addColorStop(0.5, `rgba(139, 92, 246, ${0.5 + percent * 0.5})`);
+          gradient.addColorStop(1, `rgba(236, 72, 153, ${0.6 + percent * 0.4})`);
+        } else {
+          gradient.addColorStop(0, `rgba(99, 90, 235, ${0.5 + percent * 0.5})`);
+          gradient.addColorStop(0.5, `rgba(155, 110, 252, ${0.6 + percent * 0.4})`);
+          gradient.addColorStop(1, `rgba(244, 90, 170, ${0.7 + percent * 0.3})`);
+        }
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -117,7 +141,7 @@ export function AudioVisualizer({
         }
 
         if (percent > 0.3) {
-          ctx.shadowColor = "#8b5cf6";
+          ctx.shadowColor = isDark ? "#8b5cf6" : "#7c3aed";
           ctx.shadowBlur = 4 * dpr;
           ctx.fill();
           ctx.shadowBlur = 0;
@@ -139,12 +163,12 @@ export function AudioVisualizer({
   }, [audioRef, barCount, updateCanvasSize]);
 
   return (
-    <div ref={containerRef} className={`w-full overflow-hidden rounded-xl bg-slate-900/60 dark:bg-slate-900/60 p-4 border border-slate-700/50 dark:border-slate-700/50 backdrop-blur-md ${className}`}>
+    <div ref={containerRef} className={`w-full overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900/60 p-4 border border-slate-200 dark:border-slate-700/50 backdrop-blur-md ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-purple-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">
           Audio Frequency Visualizer
         </span>
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-slate-500 dark:text-slate-400 pr-10">
           {isPlaying ? "Live Spectrum" : "Paused"}
         </span>
       </div>

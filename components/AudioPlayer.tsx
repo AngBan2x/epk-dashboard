@@ -17,6 +17,8 @@ interface AudioPlayerProps {
     apple_music_url?: string | null;
     youtube_video_id?: string | null;
     external_links?: Record<string, unknown> | null;
+    start_time?: number | null;
+    end_time?: number | null;
   };
 }
 
@@ -135,6 +137,8 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
           coverImage,
           isYouTube: isYouTubeOnly,
           youtubeVideoId: track?.youtube_video_id || undefined,
+          startTimestamp: track?.start_time || 0,
+          endTimestamp: track?.end_time || 0,
         });
       }
       return;
