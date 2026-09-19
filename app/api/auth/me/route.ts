@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = validateRequest(req);
+    const session = await validateRequest(req);
     if (!session) {
       return NextResponse.json(
         { error: "No autenticado" },
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session = validateRequest(req);
+    const session = await validateRequest(req);
     if (!session) {
       return NextResponse.json(
         { error: "No autenticado" },

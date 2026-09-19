@@ -5,8 +5,8 @@ import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-function validateAdminSession(req: NextRequest): { userId: string; role: string } | null {
-  const session = validateRequest(req);
+async function validateAdminSession(req: NextRequest) {
+  const session = await validateRequest(req);
   if (!session || session.role !== "admin") return null;
   return { userId: session.userId, role: session.role };
 }
@@ -21,7 +21,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const admin = validateAdminSession(req);
+    const admin = await validateAdminSession(req);
     if (!admin) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -43,7 +43,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const admin = validateAdminSession(req);
+    const admin = await validateAdminSession(req);
     if (!admin) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }

@@ -5,8 +5,8 @@ import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const session = validateRequest(req);
+async function validateSession(req: NextRequest) {
+  const session = await validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role };
 }
@@ -14,7 +14,7 @@ function validateSession(req: NextRequest): { userId: string; role: string } | n
 // GET /api/tracks — Listar tracks: admin ve todos, público solo aprobados
 export async function GET(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     const isAdmin = session?.role === "admin";
 
     let tracks;
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 // POST /api/tracks — Crear un track nuevo (solo admin)
 export async function POST(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 // PUT /api/tracks — Actualizar un track existente (solo admin)
 export async function PUT(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -118,7 +118,7 @@ export async function PUT(req: NextRequest) {
 // DELETE /api/tracks?id=xxx — Eliminar un track (solo admin)
 export async function DELETE(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }

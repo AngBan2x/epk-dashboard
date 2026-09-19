@@ -18,7 +18,7 @@ const SendNotificationSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const session = validateRequest(req);
+    const session = await validateRequest(req);
     if (!session) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }

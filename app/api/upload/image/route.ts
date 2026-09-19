@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const session = validateRequest(req);
+async function validateSession(req: NextRequest) {
+  const session = await validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role || "artist" };
 }
@@ -68,7 +68,7 @@ async function dbRun(sql: string, params?: unknown[]): Promise<void> {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }

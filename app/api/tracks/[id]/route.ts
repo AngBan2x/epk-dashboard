@@ -4,8 +4,8 @@ import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-function validateSession(req: NextRequest): { userId: string; role: string } | null {
-  const session = validateRequest(req);
+async function validateSession(req: NextRequest) {
+  const session = await validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role || "artist" };
 }
@@ -34,7 +34,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = validateSession(req);
+    const session = await validateSession(req);
     if (!session || (session.role !== "admin" && session.role !== "artist")) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }

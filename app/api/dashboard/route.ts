@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = validateRequest(req);
+    const session = await validateRequest(req);
 
     const allTracks = await getAllTracks();
     const tracks = allTracks.filter(t => !t.release_id);

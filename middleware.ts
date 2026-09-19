@@ -20,7 +20,7 @@ function clearExpiredSession(request: NextRequest) {
   return response;
 }
 
-function requireAuth(request: NextRequest): NextResponse | null {
+async function requireAuth(request: NextRequest): Promise<NextResponse | null> {
   const sessionCookie = request.cookies.get("auth_session");
   const path = request.nextUrl.pathname;
 
@@ -28,7 +28,7 @@ function requireAuth(request: NextRequest): NextResponse | null {
     return redirectToLogin(request, path);
   }
 
-  const session = decodeSessionToken(sessionCookie.value);
+  const session = await decodeSessionToken(sessionCookie.value);
 
   if (!session) {
     return redirectToLogin(request, path);
@@ -38,35 +38,32 @@ function requireAuth(request: NextRequest): NextResponse | null {
     return clearExpiredSession(request);
   }
 
-  return null; // OK
+  return null;
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get("auth_session");
   const path = request.nextUrl.pathname;
 
-  // Proteger /admin — solo admin
   if (path.startsWith("/admin")) {
-    const redirect = requireAuth(request);
+    const redirect = await requireAuth(request);
     if (redirect) return redirect;
 
-    const session = decodeSessionToken(sessionCookie!.value);
+    const session = await decodeSessionToken(sessionCookie!.value);
     if (session!.role !== "admin") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
-  // Proteger rutas autenticadas — cualquier rol
   const protectedPaths = ["/profile", "/account", "/releases/new"];
   if (protectedPaths.some((p) => path === p || path.startsWith(p + "/"))) {
-    const redirect = requireAuth(request);
+    const redirect = await requireAuth(request);
     if (redirect) return redirect;
   }
 
-  // Redirigir /login y /register si ya autenticado
   if (path === "/login" || path === "/register") {
     if (sessionCookie) {
-      const session = decodeSessionToken(sessionCookie.value);
+      const session = await decodeSessionToken(sessionCookie.value);
 
       if (session) {
         if (!isSessionValid(session)) {
