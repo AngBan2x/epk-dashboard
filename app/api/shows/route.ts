@@ -15,39 +15,39 @@ async function validateSession(req: NextRequest) {
 const CreateShowSchema = z.object({
   artist_id: z.string().min(1, "artist_id requerido"),
   venue_name: z.string().min(1, "venue_name requerido"),
-  city: z.string().optional(),
-  country: z.string().optional(),
-  date: z.string().optional(),
-  time: z.string().optional(),
-  price_range: z.string().optional(),
+  city: z.string().nullish(),
+  country: z.string().nullish(),
+  date: z.string().nullish(),
+  time: z.string().nullish(),
+  price_range: z.string().nullish(),
   status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
-  ticket_url: z.string().optional(),
-  payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).optional(),
-  postponement_reason: z.string().optional(),
-  flyer_url: z.string().optional(),
-  ticket_link: z.string().optional(),
-  description: z.string().optional(),
-  guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).optional(),
-  notes: z.string().optional(),
+  ticket_url: z.string().nullish(),
+  payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).nullish(),
+  postponement_reason: z.string().nullish(),
+  flyer_url: z.string().nullish(),
+  ticket_link: z.string().nullish(),
+  description: z.string().nullish(),
+  guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).nullish(),
+  notes: z.string().nullish(),
 });
 
 const UpdateShowSchema = z.object({
   id: z.string().min(1, "id requerido"),
-  venue_name: z.string().optional(),
-  city: z.string().optional(),
-  country: z.string().optional(),
-  date: z.string().optional(),
-  time: z.string().optional(),
-  price_range: z.string().optional(),
+  venue_name: z.string().nullish(),
+  city: z.string().nullish(),
+  country: z.string().nullish(),
+  date: z.string().nullish(),
+  time: z.string().nullish(),
+  price_range: z.string().nullish(),
   status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
-  ticket_url: z.string().optional(),
-  payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).optional(),
-  postponement_reason: z.string().optional(),
-  flyer_url: z.string().optional(),
-  ticket_link: z.string().optional(),
-  description: z.string().optional(),
-  guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).optional(),
-  notes: z.string().optional(),
+  ticket_url: z.string().nullish(),
+  payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).nullish(),
+  postponement_reason: z.string().nullish(),
+  flyer_url: z.string().nullish(),
+  ticket_link: z.string().nullish(),
+  description: z.string().nullish(),
+  guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).nullish(),
+  notes: z.string().nullish(),
 });
 
 function computeDynamicStatus(show: { status: string; date: string | null }): string {
@@ -136,7 +136,9 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json();
     const validated = UpdateShowSchema.parse(body);
-    const { id, ...data } = validated;
+    const { id, ...rawData } = validated;
+    // Strip null values — DB functions expect undefined for missing fields
+    const data = Object.fromEntries(Object.entries(rawData).filter(([, v]) => v !== null));
 
     // Ownership check: artists can only update their own shows; admins can update any
     if (session.role === "artist") {

@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Set httpOnly cookie — session-only by default, 30 days if rememberMe
-    const maxAge = validated.rememberMe ? 30 * 24 * 60 * 60 : undefined; // 30 days in seconds
+    const maxAge = validated.rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60; // 30 days or 24h
     response.cookies.set("auth_session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -127,6 +127,15 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     endTimestampRef.current = track.endTimestamp || 0;
 
     if (isYT) {
+      // Pause HTML5 audio if playing and reset src to prevent conflicts
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current.load();
+      }
+      // Stop any existing YouTube sync interval before initializing new one
+      stopYouTubeSync();
+
       // YouTube mode
       setIsLoading(true);
       const yt = getYouTubePlayer();
@@ -227,10 +236,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   }, [isYouTubeMode, stopYouTubeSync]);
 
   const clearTrack = useCallback(() => {
-    if (isYouTubeMode) {
-      destroyYouTubePlayer();
-      stopYouTubeSync();
-    } else if (audioRef.current) {
+    // Always clean up YouTube player and sync regardless of current mode
+    stopYouTubeSync();
+    destroyYouTubePlayer();
+
+    if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = "";
       audioRef.current.load();
@@ -241,7 +251,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setDuration(0);
     setIsVisualizerOpen(false);
     setIsYouTubeMode(false);
-  }, [isYouTubeMode, stopYouTubeSync]);
+  }, [stopYouTubeSync, destroyYouTubePlayer]);
 
   const seek = useCallback((time: number) => {
     if (!Number.isFinite(time)) return;

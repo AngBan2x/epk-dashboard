@@ -375,20 +375,20 @@ export interface RawShowRow {
 export interface CreateShowInput {
   artist_id: string;
   venue_name: string;
-  city?: string;
-  country?: string;
-  date?: string;
-  time?: string;
-  price_range?: string;
+  city?: string | null;
+  country?: string | null;
+  date?: string | null;
+  time?: string | null;
+  price_range?: string | null;
   status?: ShowStatus;
-  ticket_url?: string;
-  payment_methods?: PaymentMethod[];
-  postponement_reason?: string;
-  flyer_url?: string;
-  ticket_link?: string;
-  description?: string;
-  guest_artists?: GuestArtist[];
-  notes?: string;
+  ticket_url?: string | null;
+  payment_methods?: PaymentMethod[] | null;
+  postponement_reason?: string | null;
+  flyer_url?: string | null;
+  ticket_link?: string | null;
+  description?: string | null;
+  guest_artists?: GuestArtist[] | null;
+  notes?: string | null;
   approved?: boolean;
 }
 

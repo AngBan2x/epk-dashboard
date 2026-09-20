@@ -27,21 +27,37 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            {user ? (
-              <Link
-                href="/dashboard"
-                className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <Link
-                href="/artists"
-                className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
-              >
-                Explorar
-              </Link>
-            )}
+{user ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    className="text-sm text-slate-600 hover:text-slate-900 mx-2 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    Catálogo
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/artists"
+                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    Explorar
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    className="text-sm text-slate-600 hover:text-slate-900 mx-2 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    Catálogo
+                  </Link>
+                </>
+              )}
             {user?.role === "admin" && (
               <Link
                 href="/admin"
@@ -95,21 +111,39 @@ export function Header() {
         <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <nav className="px-4 py-4 space-y-3">
             {user ? (
-              <Link
-                href="/dashboard"
-                className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  href="/dashboard"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Catálogo
+                </Link>
+              </>
             ) : (
-              <Link
-                href="/artists"
-                className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Explorar
-              </Link>
+              <>
+                <Link
+                  href="/artists"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Explorar
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Catálogo
+                </Link>
+              </>
             )}
             {user?.role === "admin" && (
               <Link
