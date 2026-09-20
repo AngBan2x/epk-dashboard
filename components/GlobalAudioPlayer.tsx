@@ -128,22 +128,30 @@ export function GlobalAudioPlayer() {
             </div>
           )}
 
-          {/* Progress bar — below visualizer when expanded, above controls when collapsed */}
-          {isExpanded ? (
-            <div className="mt-4 bg-slate-200 dark:bg-slate-700 h-1">
-              <motion.div
-                className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
-                style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
-              />
-            </div>
-          ) : (
-            <div className="mt-2 bg-slate-200 dark:bg-slate-700 h-1">
-              <motion.div
-                className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
-                style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
-              />
-            </div>
-          )}
+          {/* P3.27: Progress bar — segment-aware for timestamped tracks */}
+          {(() => {
+            const start = activeTrack.startTimestamp || 0;
+            const end = activeTrack.endTimestamp || duration;
+            const segmentDuration = Math.max(end - start, 0);
+            const segmentProgress = segmentDuration > 0
+              ? Math.max(0, Math.min(100, ((currentTime - start) / segmentDuration) * 100))
+              : duration > 0 ? (currentTime / duration) * 100 : 0;
+            return isExpanded ? (
+              <div className="mt-4 bg-slate-200 dark:bg-slate-700 h-1">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
+                  style={{ width: `${segmentProgress}%` }}
+                />
+              </div>
+            ) : (
+              <div className="mt-2 bg-slate-200 dark:bg-slate-700 h-1">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
+                  style={{ width: `${segmentProgress}%` }}
+                />
+              </div>
+            );
+          })()}
 
           <AnimatePresence mode="wait">
             {isExpanded ? (
@@ -205,21 +213,32 @@ export function GlobalAudioPlayer() {
                   </button>
 
                   <div className="flex items-center gap-2 flex-1 justify-center max-w-xl">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 w-10 text-right font-mono">{formatTime(currentTime)}</span>
-
-                    <div className="flex-1 relative group">
-                      <input
-                        type="range"
-                        min={0}
-                        max={duration || 0}
-                        step={0.1}
-                        value={currentTime}
-                        onChange={(e) => seek(parseFloat(e.target.value))}
-                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-primary-500 group-hover:h-2 transition-all"
-                      />
-                    </div>
-
-                    <span className="text-xs text-slate-500 dark:text-slate-400 w-10 font-mono">{formatTime(duration)}</span>
+                    {(() => {
+                      const start = activeTrack.startTimestamp || 0;
+                      const end = activeTrack.endTimestamp || duration;
+                      const segmentDuration = Math.max(end - start, 0);
+                      return (
+                        <>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 w-10 text-right font-mono">{formatTime(currentTime)}</span>
+                          <div className="flex-1 relative group">
+                            <input
+                              type="range"
+                              min={start}
+                              max={end || duration || 0}
+                              step={0.1}
+                              value={Math.max(start, Math.min(end || duration, currentTime))}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const clamped = Math.max(start, Math.min(end || duration, val));
+                                seek(clamped);
+                              }}
+                              className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-primary-500 group-hover:h-2 transition-all"
+                            />
+                          </div>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 w-10 font-mono">{formatTime(end || duration)}</span>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* P3.34: Loading indicator */}
