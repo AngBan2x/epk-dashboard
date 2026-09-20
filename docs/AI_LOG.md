@@ -4732,11 +4732,65 @@ Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
 
 ### Workflow
 
-1. Document plan (before) ← current
+1. Document plan (before) ← done
 2. Execute fixes (5 phases)
 3. TSC + Build + Unit tests
 4. Commit + Push
 5. Production test (curl + Playwright)
 6. Screenshots (all pages, dark/light/mobile)
-7. Document results (after)
+7. Document results (after) ← current
 8. Release rc.20
+
+### Execution Results
+
+**Commits:**
+- `2ae4f7e` — fix(rc.20): player persistence, zod nullish, cookie maxAge, header catálogo, artist releases, dashboard unified design
+- `6d2423f` — fix: artist detail page crash — wrap tracks in async error boundary
+- `595bdd9` — fix: remove onLoginPrompt from server→client EPKCard call
+
+**Files Changed (13):**
+- `app/admin/page.tsx` — "Nuevo Show" button moved inside shows tab
+- `app/api/auth/login/route.ts` — Cookie maxAge 24h when rememberMe=false
+- `app/api/shows/route.ts` — Zod `.nullish()` + null-stripping for update handler
+- `app/artists/[id]/page.tsx` — Shows artist releases via EPKCard (async boundary)
+- `app/dashboard/page.tsx` — Unified card design
+- `components/AudioPlayer.tsx` — Loading spinner only on active track
+- `components/GlobalAudioPlayer.tsx` — Minimized empty state instead of return null
+- `components/Header.tsx` — "Catálogo" link + typo fix
+- `context/AudioPlayerContext.tsx` — Pause HTML5 before YouTube init + always cleanup
+- `lib/db.ts` — New `getTracksByArtist()` function
+- `types/music.ts` — CreateShowInput fields accept null
+- `tailwind.config.ts` — Scrollbar-hide utility plugin
+- `docs/AI_LOG.md` — Documentation
+
+**Quality Gates:**
+- TSC: ✅ 0 errors
+- Build: ✅ Production build successful
+- Unit tests: 93 ✅ / 2 pre-existing env failures / 17 skipped
+
+**Production Tests (28 screenshots):**
+| Page | Dark | Light |
+|------|------|-------|
+| Landing | ✅ | ✅ |
+| Artists list | ✅ | ✅ |
+| Artist detail | ✅ | ✅ |
+| Login | ✅ | ✅ |
+| Register | ✅ | ✅ |
+| Dashboard (admin) | ✅ | ✅ |
+| Admin panel | ✅ | ✅ |
+| Dashboard (artist) | ✅ | ✅ |
+| Profile | ✅ | ✅ |
+| Account | ✅ | ✅ |
+| Releases new | ✅ | ✅ |
+| Mobile landing | ✅ | — |
+| Mobile artists | ✅ | — |
+
+**Console Errors:** 0
+
+**Bug Fixed During Testing:**
+- Artist detail page crashed in production (500) — `onLoginPrompt` function passed from server component to client component (EPKCard). Fix: removed function prop, used optional chaining inside EPKCard.
+
+### Results
+
+- Deploy: ✅ https://epk-dashboard.vercel.app (auto-deployed from main)
+- Release: pending
