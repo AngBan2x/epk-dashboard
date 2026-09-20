@@ -4793,4 +4793,149 @@ Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
 ### Results
 
 - Deploy: ✅ https://epk-dashboard.vercel.app (auto-deployed from main)
-- Release: pending
+- Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.20
+
+---
+
+## rc.21 — Exhaustive Testing + Player Empty State Fix
+
+**Fecha:** 2026-09-20
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Plan
+
+1. Fix player empty state (return null when no track)
+2. Execute 62 exhaustive tests across 10 categories
+3. Document results
+
+### Fix: Player Empty State
+
+**File:** `components/GlobalAudioPlayer.tsx:94-111`
+**Change:** Replace animated empty state block with `if (!activeTrack) return null;`
+
+### Test Categories (62 Tests)
+
+#### A. Public Pages (6)
+| # | Page | States |
+|---|------|--------|
+| A1 | Landing `/` | Dark, Light, Mobile 375px |
+| A2 | Artists list `/artists` | Dark, Light, with data |
+| A3 | Artist detail `/artists/[id]` | Dark, Light, with/without tracks |
+| A4 | Track detail `/track/[id]` | Dark, Light, audio preview, YouTube-only |
+| A5 | Login `/login` | Dark, Light, correct/incorrect/empty credentials |
+| A6 | Register `/register` | Dark, Light, valid, duplicate email, short password |
+
+#### B. Auth Flow (6)
+| # | Test | Steps |
+|---|------|-------|
+| B1 | Admin login → dashboard | Login admin → verify nav → logout |
+| B2 | Artist login → dashboard | Login artist → verify nav → logout |
+| B3 | No "Remember me" | Login → close tab → reopen → session expired |
+| B4 | With "Remember me" | Login → close → reopen → session active |
+| B5 | Register auto-login | Register → redirect to dashboard |
+| B6 | Unauthorized access | Navigate to `/admin` as artist → redirect/403 |
+
+#### C. CRUD Releases — YouTube/iTunes + EP/Album (10)
+> iTunes search hardcoded to `entity=song`. API supports `album` but frontend doesn't expose it. For EPs/Albums, each track searched individually.
+
+| # | Test | Steps |
+|---|------|-------|
+| C1 | Single — YouTube autofill | Paste YouTube URL → verify title, date, cover, duration populated |
+| C2 | EP — YouTube autofill + chapters | Select "EP" → YouTube URL → "Detectar chapters" → verify multiple tracks with start/end_time |
+| C3 | Album — YouTube autofill + chapters | Select "Album" → YouTube URL → "Detectar chapters" → verify tracks with calculated durations |
+| C4 | EP — iTunes autofill per track | Select "EP" → search & select 3 different iTunes tracks → verify each has title, duration |
+| C5 | Album — iTunes autofill per track | Select "Album" → search 4 tracks → verify same behavior |
+| C6 | EP — Add/remove tracks | EP with 4 tracks → remove 2 → add 1 → verify unique IDs |
+| C7 | YouTube timestamps visual | Verify tracks with start_time/end_time show "1:30 — 4:00" |
+| C8 | YouTube overwrites date | Enter manual date → paste YouTube URL → verify date changes |
+| C9 | Create Album parent/child | Create Album with 3 tracks → verify parent + 3 child rows |
+| C10 | Delete release | Create → delete → verify parent + children removed |
+
+#### D. CRUD Shows (5)
+| # | Test | Steps |
+|---|------|-------|
+| D1 | Create complete show | All fields |
+| D2 | Create with required only | artist_id + venue_name |
+| D3 | Edit show | Change status, date, venue |
+| D4 | Nullable fields | Send null optional → verify Zod .nullish() |
+| D5 | Delete show | Create → delete |
+
+#### E. Admin Panel (6)
+| # | Tab | States |
+|---|-----|--------|
+| E1 | Tracks | List, edit, delete |
+| E2 | Releases | List |
+| E3 | Submissions | Pending → approve → reject |
+| E4 | Notifications | Unread → mark read |
+| E5 | Artists | List, edit |
+| E6 | Shows | List, "Nuevo Show" button only here |
+
+#### F. Profile/Account (4)
+| # | Test | Steps |
+|---|------|-------|
+| F1 | Edit profile | Name, bio, genre, location, slug |
+| F2 | Upload profile image | Upload → verify URL |
+| F3 | Change email | New email → verify |
+| F4 | Delete account | Click delete → verify redirect |
+
+#### G. Player Mode Switching — No Pause + With Pause (8)
+> Direct switching: click play on another track WITHOUT pausing first. Tests that internal cleanup works correctly.
+
+| # | Test | Steps |
+|---|------|-------|
+| G1 | iTunes → YouTube (no pause) | Play iTunes → without pausing, play YouTube-only → verify: iTunes paused+src cleared, YT init, YT playing |
+| G2 | YouTube → iTunes (no pause) | Play YT → without pausing, play iTunes → verify: YT sync stopped, YT destroyed, iTunes playing |
+| G3 | YouTube → YouTube (no pause) | Play YT1 → without pausing, play YT2 → verify: YT1 destroyed, YT2 init |
+| G4 | iTunes → iTunes (no pause) | Play track1 → without pausing, play track2 → verify: track2 playing |
+| G5 | iTunes → YouTube (with pause) | Play iTunes → pause → play YouTube → verify clean transition |
+| G6 | YouTube → iTunes (with pause) | Play YT → pause → play iTunes → verify clean transition |
+| G7 | Clear during iTunes | Play iTunes → click X → verify: audio paused, src="", bar hidden |
+| G8 | Clear during YouTube | Play YT → click X → verify: YT destroyed, bar hidden |
+
+#### H. Player 30s YouTube + Timestamps (6)
+| # | Test | Steps |
+|---|------|-------|
+| H1 | 30s YouTube — start/end | Track with start=60, end=90 → play → verify starts ~1:00, stops ~1:30 |
+| H2 | Progress bar for timestamped | During H1 → verify bar shows % (BUG: shows % of full video) |
+| H3 | Seek outside range | During H1 → seek to second 10 → verify if allowed (BUG: not clamped) |
+| H4 | YouTube without timestamps | Track with no start/end → play → verify full video plays, bar reaches 100% |
+| H5 | YT badge | Play YouTube-only → "YT" badge visible → play iTunes → badge disappears |
+| H6 | YouTube volume | Play YouTube → change volume → verify applied |
+
+#### I. Player Loading/Error/Persistence (5)
+| # | Test | Steps |
+|---|------|-------|
+| I1 | Loading state | Click play → "Cargando..." only on that button |
+| I2 | Persistence across pages | Play track → navigate to `/artists` → verify still playing |
+| I3 | Auto-collapse | Play → wait 5s → mini-bar → mouse enter → expand |
+| I4 | Visualizer | Play iTunes → open visualizer → play YouTube → verify visualizer disabled |
+| I5 | Rapid clicks | Click play 5 times fast → verify no crash |
+
+#### J. API Security + Edge Cases (6)
+| # | Test | Expected |
+|---|------|----------|
+| J1 | DELETE /api/shows no auth | 401 |
+| J2 | POST /api/tracks no auth | 401 |
+| J3 | GET /api/auth/me no cookie | 401 |
+| J4 | Nonexistent artist `/artists/nonexistent` | 404 |
+| J5 | Dark/Light persistence | Toggle → navigate → verify persists |
+| J6 | Console errors | 0 errors across all pages |
+
+### Known Bugs (not fixed in rc.21)
+| Bug | Severity | Description |
+|-----|----------|-------------|
+| Progress bar % for timestamped YT | Medium | Shows % of full video, not of 30s window |
+| Seek not clamped to timestamp window | High | User can seek outside [startTimestamp, endTimestamp] |
+| Volume not synced cross-mode | Low | HTML5 audio volume may differ from context volume |
+
+### Workflow
+
+1. Document plan (before) ← current
+2. Fix player empty state
+3. TSC + Build + Unit tests
+4. Commit + Push + Deploy
+5. Execute 62 tests (Playwright + curl)
+6. Screenshot all states
+7. Document results (after)
+8. Release rc.21
