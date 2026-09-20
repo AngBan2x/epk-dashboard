@@ -52,6 +52,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const youtubeSyncRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimestampRef = useRef<number>(0);
   const endTimestampRef = useRef<number>(0);
 
   // Sync YouTube player state with context
@@ -123,7 +124,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setActiveTrack(track);
     setIsYouTubeMode(isYT);
 
-    // P3 Batch 2: Set endTimestamp for multi-track YouTube
+    // P3 Batch 2: Set timestamps for multi-track YouTube
+    startTimestampRef.current = track.startTimestamp || 0;
     endTimestampRef.current = track.endTimestamp || 0;
 
     if (isYT) {
@@ -251,18 +253,30 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setDuration(0);
     setIsVisualizerOpen(false);
     setIsYouTubeMode(false);
+    startTimestampRef.current = 0;
+    endTimestampRef.current = 0;
   }, [stopYouTubeSync, destroyYouTubePlayer]);
 
   const seek = useCallback((time: number) => {
     if (!Number.isFinite(time)) return;
 
+    // P3.27: Clamp to [startTimestamp, endTimestamp] for timestamped tracks
+    const start = startTimestampRef.current;
+    const end = endTimestampRef.current;
+    let clamped = time;
+    if (end > 0) {
+      clamped = Math.max(start, Math.min(end, time));
+    } else if (start > 0) {
+      clamped = Math.max(start, time);
+    }
+
     if (isYouTubeMode) {
       const yt = getYouTubePlayer();
-      yt.seek(time);
-      setCurrentTime(time);
+      yt.seek(clamped);
+      setCurrentTime(clamped);
     } else if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
+      audioRef.current.currentTime = clamped;
+      setCurrentTime(clamped);
     }
   }, [isYouTubeMode]);
 
