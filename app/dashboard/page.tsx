@@ -69,7 +69,7 @@ function QuickAction({ label, icon, href, onClick, color }: QuickActionProps) {
   return (
     <Wrapper
       {...props}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition ${color}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 transition ${color}`}
     >
       <span className="text-amber-500 dark:text-amber-400">{icon}</span>
       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
@@ -126,9 +126,9 @@ export default function DashboardPage() {
         <PageTransition>
           {/* ===== ADMIN VIEW ===== */}
           {isAdmin ? (
-            <section className="mb-10">
+            <section className="mb-8">
               <PitchHeading>
-                <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                   Panel de Administración
                 </h1>
                 <p className="text-slate-600 dark:text-slate-400 text-base mb-4">
@@ -142,8 +142,8 @@ export default function DashboardPage() {
                 🛠️ Abrir Panel Admin
               </a>
 
-              {/* Show all tracks in grid */}
-              <section className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+{/* Show all tracks in grid */}
+              <section className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
                 {tracks.map((track, i) => (
                   <SlideIn key={track.id} index={i}>
                     <a href={`/track/${track.id}`} className="block h-full">
@@ -156,9 +156,9 @@ export default function DashboardPage() {
           ) : artistProfile ? (
             /* ===== ARTIST VIEW ===== */
             <>
-              <section className="mb-10">
+              <section className="mb-8">
                 <PitchHeading>
-                  <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                     Mi Dashboard
                   </h1>
                   <p className="text-slate-600 dark:text-slate-400 text-base">
@@ -197,7 +197,7 @@ export default function DashboardPage() {
 
               {/* Quick Actions */}
               <section className="mb-8">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Acciones Rápidas</h2>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Acciones Rápidas</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <QuickAction
                     label="Nuevo Release"
@@ -221,8 +221,8 @@ export default function DashboardPage() {
               </section>
 
               {/* Recent Activity */}
-              <section className="mb-8">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Actividad Reciente</h2>
+<section className="mb-8">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Actividad Reciente</h2>
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
                   {artistTracks.slice(0, 3).map((track) => (
                     <div key={track.id} className="px-4 py-3 flex items-center gap-3 group">
@@ -263,7 +263,7 @@ export default function DashboardPage() {
               </section>
 
               {/* Artist's tracks */}
-              <section className="mb-12">
+              <section className="mb-8">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Mis Tracks</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {artistTracks.map((track, i) => (
@@ -292,7 +292,7 @@ export default function DashboardPage() {
 
               {/* P3 Batch 2: Dossier / Rider Section */}
               {artistProfile && (
-                <section className="mb-12">
+                <section className="mb-8">
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">📄 Dossier / Rider</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                     Personaliza tu biografía y datos de contacto para generar documentos profesionales descargables.
@@ -316,7 +316,7 @@ export default function DashboardPage() {
               )}
 
               {/* Artist's Bio + Shows */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 <SlideIn index={artistTracks.length}>
                   <BioSection
                     artistName={artistProfile.name}
@@ -352,7 +352,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Last.fm Metrics */}
-              <div className="mb-12">
+              <div className="mb-8">
                 <SlideIn index={artistTracks.length + 2}>
                   <LastfmMetrics artist={artistProfile.name} />
                 </SlideIn>
@@ -418,9 +418,9 @@ export default function DashboardPage() {
           ) : (
             /* ===== GUEST VIEW ===== */
             <>
-              <section className="mb-10">
+              <section className="mb-8">
                 <PitchHeading>
-                  <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                     PressPlay
                   </h1>
                   <p className="text-slate-600 dark:text-slate-400 text-base">
@@ -438,7 +438,7 @@ export default function DashboardPage() {
               </section>
 
               {/* All tracks */}
-              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
                 {tracks.map((track, i) => (
                   <SlideIn key={track.id} index={i}>
                     <a href={`/track/${track.id}`} className="block h-full">
@@ -455,8 +455,8 @@ export default function DashboardPage() {
 
               {/* Carousel of all artists' Bio + Shows */}
               {artists.length > 0 && (
-                <section className="mb-12">
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Artistas</h2>
+                <section className="mb-8">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Artistas</h2>
                   <div className="space-y-8">
                     {artists.map((art, i) => {
                       const artShows = data.showsByArtist[art.id] || [];

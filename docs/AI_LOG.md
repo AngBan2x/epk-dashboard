@@ -4700,3 +4700,43 @@ Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
 
 - https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.19
 - Deploy: ✅ Production verified
+
+---
+
+## rc.20 — Bug Fixes + Phase P Verification
+
+**Fecha:** 2026-09-20
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Bugs Reportados por el Usuario
+
+| # | Issue | Root Cause | Fix |
+|---|-------|-----------|-----|
+| 1 | Show creation fails with required fields only | Zod `.optional()` rejects `null` from form | Change to `.nullish()` |
+| 2 | "Nuevo Show" visible on all admin tabs | Button rendered above tab conditionals | Move inside `activeTab === "shows"` |
+| 3 | Player breaks switching iTunes→YouTube | HTML5 `<audio>` not paused before YouTube init | Pause/reset `<audio>` before YouTube init |
+| 4 | Loading spinner on ALL play buttons | `globalIsLoading` not gated by `isCurrentGlobal` | Add `isCurrentGlobal` guard |
+| 5 | No loading indicator on track detail | Same root cause as #4 | Resolved by fix #4 |
+| 6 | Player doesn't persist across pages | Investigate GlobalAudioPlayer rendering | Verify + fix |
+| 7 | YouTube-only 30s range doesn't work | Range UI missing for YouTube-only tracks | Wire up start/end timestamp controls |
+| 8 | Inconsistent dashboard design | Mixed card styles/spacing | Unify classes |
+| 9 | Guest header missing catalog button | No "Catálogo" link for logged-out users | Add link to `/dashboard` |
+| 10 | Cookie persists without "Remember me" | Session cookie behavior varies by browser | Add explicit expiry + cleanup |
+
+### Phase P Verification
+
+- Landing page, social links, release CRUD, shows CRUD
+- Approval workflow, notifications, subscribers, account management
+- Search, carousels, header improvements
+
+### Workflow
+
+1. Document plan (before) ← current
+2. Execute fixes (5 phases)
+3. TSC + Build + Unit tests
+4. Commit + Push
+5. Production test (curl + Playwright)
+6. Screenshots (all pages, dark/light/mobile)
+7. Document results (after)
+8. Release rc.20

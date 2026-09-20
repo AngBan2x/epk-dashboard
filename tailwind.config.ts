@@ -45,7 +45,20 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function ({ addUtilities }: any) {
+      const scrollbarHide = {
+        '.scrollbar-hide': {
+          '-ms-overflow-style': 'none',
+          'scrollbar-width': 'none',
+        },
+        '.scrollbar-hide::-webkit-scrollbar': {
+          display: 'none',
+        },
+      };
+      addUtilities(scrollbarHide, ['responsive', 'hover']);
+    },
+  ],
 };
 
 export default config;

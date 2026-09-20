@@ -566,14 +566,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Nuevo Show button */}
-        <button
-          onClick={() => setShowFormOpen(true)}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition mr-4"
-        >
-          Nuevo Show
-        </button>
-
         {/* Track Form */}
         {activeTab === "tracks" && editingTrack && (
           <div ref={trackEditRef} className="mb-8 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800">
@@ -1339,9 +1331,17 @@ onSubmit={async (e) => {
         {/* Shows Tab */}
         {activeTab === "shows" && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Shows ({shows.length}{pendingShows.length > 0 ? `, ${pendingShows.length} pendientes` : ""})
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Shows ({shows.length}{pendingShows.length > 0 ? `, ${pendingShows.length} pendientes` : ""})
               </h3>
+              <button
+                onClick={() => setShowFormOpen(true)}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition"
+              >
+                + Nuevo Show
+              </button>
+            </div>
 
             {/* Show Form */}
             {editingShow ? (

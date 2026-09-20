@@ -1666,6 +1666,22 @@ export async function searchTracks(query: string): Promise<Track[]> {
   return rows.map(parseTrack);
 }
 
+// ─── Tracks by Artist ──────────────────────────────────────────────────────────
+export async function getTracksByArtist(artistId: string): Promise<Track[]> {
+  if (isTursoEnabled()) {
+    const rows = await tursoExec(
+      "SELECT * FROM tracks WHERE artist_name = (SELECT name FROM artists WHERE id = ?) ORDER BY title",
+      [artistId]
+    );
+    return rows.map((r) => parseTrack(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db
+    .prepare("SELECT * FROM tracks WHERE artist_name = (SELECT name FROM artists WHERE id = ?) ORDER BY title")
+    .all(artistId) as Record<string, unknown>[];
+  return rows.map(parseTrack);
+}
+
 // P3 Batch 2: Multi-track releases — tracks by release_id
 export async function getTracksByReleaseId(releaseId: string): Promise<Track[]> {
   if (isTursoEnabled()) {
