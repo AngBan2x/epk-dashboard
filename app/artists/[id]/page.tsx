@@ -1,9 +1,37 @@
 import { getArtistById, getTracksByArtist } from "@/lib/db";
 import { BioSection } from "@/components/BioSection";
-import { EPKCard } from "@/components/EPKCard";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
+
+async function TracksSection({ artistId }: { artistId: string }) {
+  let tracks: any[] = [];
+  try {
+    tracks = await getTracksByArtist(artistId);
+  } catch (e) {
+    console.error("Failed to fetch tracks for artist:", artistId, e);
+    return null;
+  }
+
+  if (tracks.length === 0) return null;
+
+  const { EPKCard } = await import("@/components/EPKCard");
+
+  return (
+    <section className="mt-8">
+      <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Lanzamientos</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {tracks.map((track) => (
+          <EPKCard
+            key={track.id}
+            track={track}
+            onLoginPrompt={() => {}}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default async function ArtistDetailPage({ params }: { params: { id: string } }) {
   const artist = await getArtistById(params.id);
@@ -11,9 +39,6 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
   if (!artist) {
     notFound();
   }
-
-  // Fetch tracks for this artist
-  const tracks = await getTracksByArtist(params.id);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -41,24 +66,7 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
           pressHighlights={artist.press_highlights}
         />
 
-        {/* Tracks / Releases Section */}
-        <section className="mt-8">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Lanzamientos</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {tracks.map((track, i) => (
-              <EPKCard
-                key={track.id}
-                track={track}
-                onLoginPrompt={() => {}}
-              />
-            ))}
-            {tracks.length === 0 && (
-              <div className="col-span-4 text-center py-12 text-slate-400">
-                <p>No hay lanzamientos aún.</p>
-              </div>
-            )}
-          </div>
-        </section>
+        <TracksSection artistId={params.id} />
       </main>
     </div>
   );
