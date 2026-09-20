@@ -91,24 +91,7 @@ export function GlobalAudioPlayer() {
     }
   };
 
-  if (!activeTrack) {
-    return (
-      <AnimatePresence>
-        <motion.div
-          key="global-audio-player-empty"
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 shadow-2xl"
-        >
-          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center">
-            <p className="text-xs text-slate-400 dark:text-slate-500">Selecciona un release para reproducir</p>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
+  if (!activeTrack) return null;
 
   const formatTime = (s: number) => {
     if (!Number.isFinite(s)) return "0:00";
