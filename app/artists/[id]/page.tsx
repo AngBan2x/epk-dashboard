@@ -25,7 +25,6 @@ async function TracksSection({ artistId }: { artistId: string }) {
           <EPKCard
             key={track.id}
             track={track}
-            onLoginPrompt={() => {}}
           />
         ))}
       </div>
