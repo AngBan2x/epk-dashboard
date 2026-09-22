@@ -246,10 +246,10 @@ export function ProductionDetails({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <dl className="grid grid-cols-2 gap-2">
+            <dl className="grid grid-cols-2 gap-3">
               {editableFields.map(({ label, key }) => (
                 <div key={key}>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase">{label}</dt>
+                  <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">{label}</dt>
                   <dd className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     {key === "bpm" 
                       ? (details[key] != null ? `${details[key]} BPM` : <span className="text-slate-300 dark:text-slate-600">—</span>)

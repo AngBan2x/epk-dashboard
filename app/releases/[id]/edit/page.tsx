@@ -14,6 +14,8 @@ interface TrackInput {
   title: string;
   duration: string;
   isrc: string;
+  start_time: number;
+  end_time: number;
 }
 
 export default function EditReleasePage() {
@@ -41,7 +43,7 @@ export default function EditReleasePage() {
     status: "draft" as ReleaseStatus,
   });
 
-  const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "" }]);
+  const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "", start_time: 0, end_time: 0 }]);
   const [lyrics, setLyrics] = useState("");
   const [productionDetails, setProductionDetails] = useState({
     daw: "",
@@ -49,6 +51,12 @@ export default function EditReleasePage() {
     effects_chain: "",
     tuning: "",
     key: "",
+    genre: "",
+    sub_genre: "",
+    bpm: "",
+    mood: "",
+    recording_date: "",
+    production_credits: "",
   });
 
   // Fetch release data on mount
@@ -88,12 +96,20 @@ export default function EditReleasePage() {
             effects_chain: pd.effects_chain || pd.effects || "",
             tuning: pd.tuning || "",
             key: pd.key || "",
+            genre: pd.genre || "",
+            sub_genre: pd.sub_genre || "",
+            bpm: pd.bpm?.toString() || "",
+            mood: pd.mood || "",
+            recording_date: pd.recording_date || "",
+            production_credits: pd.production_credits || "",
           });
           if (data.tracks) {
             setTracks(data.tracks.map((t: any) => ({
               title: t.title,
               duration: t.duration,
               isrc: t.isrc || "",
+              start_time: t.start_time ?? 0,
+              end_time: t.end_time ?? 0,
             })));
           }
         }
@@ -235,11 +251,11 @@ export default function EditReleasePage() {
     }
   };
 
-  const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "" }]);
+  const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "", start_time: 0, end_time: 0 }]);
   const removeTrack = (index: number) => setTracks(tracks.filter((_, i) => i !== index));
-  const updateTrack = (index: number, field: keyof TrackInput, value: string) => {
+  const updateTrack = (index: number, field: keyof TrackInput, value: string | number) => {
     const newTracks = [...tracks];
-    newTracks[index][field] = value;
+    (newTracks[index] as unknown as Record<string, string | number>)[field] = value;
     setTracks(newTracks);
   };
 
@@ -451,32 +467,53 @@ export default function EditReleasePage() {
               </div>
               <div className="space-y-3">
                 {tracks.map((track, index) => (
-                  <div key={index} className="flex gap-2 items-start">
-                    <input
-                      type="text"
-                      value={track.title}
-                      onChange={(e) => updateTrack(index, "title", e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      placeholder={`Track ${index + 1}`}
-                    />
-                    <input
-                      type="text"
-                      value={track.duration}
-                      onChange={(e) => updateTrack(index, "duration", e.target.value)}
-                      className="w-20 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      placeholder="3:45"
-                    />
-                    <input
-                      type="text"
-                      value={track.isrc}
-                      onChange={(e) => updateTrack(index, "isrc", e.target.value)}
-                      className="w-32 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                      placeholder="ISRC"
-                    />
-                    {tracks.length > 1 && (
-                      <button type="button" onClick={() => removeTrack(index)} className="p-2 text-red-500 hover:text-red-600">✕</button>
-                    )}
-                  </div>
+                  <>
+                    <div key={index} className="flex gap-2 items-start">
+                      <input
+                        type="text"
+                        value={track.title}
+                        onChange={(e) => updateTrack(index, "title", e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                        placeholder={`Track ${index + 1}`}
+                      />
+                      <input
+                        type="text"
+                        value={track.duration}
+                        onChange={(e) => updateTrack(index, "duration", e.target.value)}
+                        className="w-20 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                        placeholder="3:45"
+                      />
+                      <input
+                        type="text"
+                        value={track.isrc}
+                        onChange={(e) => updateTrack(index, "isrc", e.target.value)}
+                        className="w-32 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                        placeholder="ISRC"
+                      />
+                      {tracks.length > 1 && (
+                        <button type="button" onClick={() => removeTrack(index)} className="p-2 text-red-500 hover:text-red-600">✕</button>
+                      )}
+                    </div>
+                    <div className="flex gap-2 ml-4 pt-1">
+                      <input
+                        type="number"
+                        value={track.start_time}
+                        onChange={(e) => updateTrack(index, "start_time", parseInt(e.target.value) || 0)}
+                        className="w-24 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs"
+                        placeholder="Start (s)"
+                        min="0"
+                      />
+                      <input
+                        type="number"
+                        value={track.end_time}
+                        onChange={(e) => updateTrack(index, "end_time", parseInt(e.target.value) || 0)}
+                        className="w-24 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs"
+                        placeholder="End (s)"
+                        min="0"
+                      />
+                      <span className="text-xs text-slate-400 mt-1">segundos</span>
+                    </div>
+                  </>
                 ))}
               </div>
             </div>
@@ -547,6 +584,67 @@ export default function EditReleasePage() {
                     placeholder="C major, A minor..."
                   />
                 </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Género</label>
+                  <input
+                    type="text"
+                    value={productionDetails.genre}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, genre: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="Rock, Pop, Electrónica..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Sub-género</label>
+                  <input
+                    type="text"
+                    value={productionDetails.sub_genre}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, sub_genre: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="Indie Rock, Synthpop..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">BPM</label>
+                  <input
+                    type="number"
+                    value={productionDetails.bpm}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, bpm: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="120"
+                    min="1"
+                    max="999"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Mood</label>
+                  <input
+                    type="text"
+                    value={productionDetails.mood}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, mood: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                    placeholder="Energético, Melancólico, Alegre..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Fecha de grabación</label>
+                  <input
+                    type="date"
+                    value={productionDetails.recording_date}
+                    onChange={(e) => setProductionDetails({ ...productionDetails, recording_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Créditos de producción</label>
+                <textarea
+                  value={productionDetails.production_credits}
+                  onChange={(e) => setProductionDetails({ ...productionDetails, production_credits: e.target.value })}
+                  rows={3}
+                  placeholder="Productor, ingeniero de mezcla, masterización..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                />
               </div>
             </div>
 

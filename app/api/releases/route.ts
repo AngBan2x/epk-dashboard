@@ -201,6 +201,7 @@ export async function PUT(req: NextRequest) {
       "stems_urls", "video_embed_url", "gallery_images", "disc_number",
       "is_double_single", "sides_b", "isrc", "composers", "is_instrumental",
       "streams", "metrics", "production_details", "lyrics",
+      "start_time", "end_time",
     ]);
 
     const safeKeys = Object.keys(updates).filter((k) => ALLOWED_COLUMNS.has(k));

@@ -218,7 +218,7 @@ export interface RawLikeRow {
   created_at: string;
 }
 
-export type NotificationType = "submission_approved" | "submission_rejected" | "new_release" | "track_liked" | "system";
+export type NotificationType = "submission_approved" | "submission_rejected" | "new_release" | "track_liked" | "system" | "show_pending_review";
 
 export interface Notification {
   id: string;

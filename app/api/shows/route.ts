@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById } from "@/lib/db";
+import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById, createNotification } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import type { ShowStatus } from "@/types/music";
+import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,21 @@ export async function POST(req: NextRequest) {
     }
 
     const show = await createShow(validated);
+
+    // Create notification for the artist
+    const artistForNotification = await getArtistById(validated.artist_id);
+    if (artistForNotification && artistForNotification.user_id) {
+      await createNotification({
+        id: randomUUID(),
+        user_id: artistForNotification.user_id,
+        type: "show_pending_review",
+        title: "Show enviado para revisión",
+        message: `Tu show en ${validated.venue_name} ha sido enviado para revisión. Será publicado tras aprobación del equipo.`,
+        data: JSON.stringify({ show_id: show.id, venue_name: validated.venue_name }),
+        read: false,
+      });
+    }
+
     return NextResponse.json(show, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

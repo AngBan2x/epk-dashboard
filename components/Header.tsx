@@ -35,12 +35,6 @@ export function Header() {
                   >
                     Dashboard
                   </Link>
-                  <Link
-                    href="/dashboard"
-                    className="text-sm text-slate-600 hover:text-slate-900 mx-2 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
-                  >
-                    Catálogo
-                  </Link>
                 </>
               ) : (
                 <>
@@ -118,13 +112,6 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Dashboard
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Catálogo
                 </Link>
               </>
             ) : (

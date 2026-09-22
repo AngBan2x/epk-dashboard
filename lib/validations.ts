@@ -18,6 +18,12 @@ export const ProductionDetailsSchema = z.object({
   effects_chain: z.string().nullable(),
   tuning: z.string().nullable(),
   key: z.string().nullable(),
+  genre: z.string().nullable().optional(),
+  sub_genre: z.string().nullable().optional(),
+  bpm: z.number().int().min(1).max(999).nullable().optional(),
+  mood: z.string().nullable().optional(),
+  recording_date: z.string().nullable().optional(),
+  production_credits: z.string().nullable().optional(),
 });
 
 export const StemsUrlsSchema = z

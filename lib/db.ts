@@ -578,7 +578,19 @@ export function parseMetrics(raw: string | Record<string, unknown> | null): Metr
 }
 
 function parseProductionDetails(raw: string | null): ProductionDetails {
-  const fallback: ProductionDetails = { daw: null, guitars: null, effects_chain: null, tuning: null, key: null };
+  const fallback: ProductionDetails = {
+    daw: null,
+    guitars: null,
+    effects_chain: null,
+    tuning: null,
+    key: null,
+    genre: null,
+    sub_genre: null,
+    bpm: null,
+    mood: null,
+    recording_date: null,
+    production_credits: null,
+  };
   if (!raw) return fallback;
 
   const parsed = safeParseJSON<Record<string, unknown> | null>(raw, null);
@@ -590,6 +602,12 @@ function parseProductionDetails(raw: string | null): ProductionDetails {
     effects_chain: typeof parsed.effects_chain === "string" ? parsed.effects_chain : null,
     tuning: typeof parsed.tuning === "string" ? parsed.tuning : null,
     key: typeof parsed.key === "string" ? parsed.key : null,
+    genre: typeof parsed.genre === "string" ? parsed.genre : null,
+    sub_genre: typeof parsed.sub_genre === "string" ? parsed.sub_genre : null,
+    bpm: typeof parsed.bpm === "number" ? parsed.bpm : null,
+    mood: typeof parsed.mood === "string" ? parsed.mood : null,
+    recording_date: typeof parsed.recording_date === "string" ? parsed.recording_date : null,
+    production_credits: typeof parsed.production_credits === "string" ? parsed.production_credits : null,
   };
 }
 
