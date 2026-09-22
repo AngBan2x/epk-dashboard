@@ -5101,6 +5101,68 @@ Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
 - 16 test shows deleted from production DB after testing
 
 ### Results
-- Commit: `1038aaf` — `fix(rc.23): phantom error, YouTube 30s segments, loading indicator`
+- Commit: `fd5a257` — `fix(rc.23): 30s default YouTube preview + loading indicator visible`
+- Deploy: ✅ https://epk-dashboard.vercel.app
+- Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.23
+
+---
+
+## RC.23 Final — YouTube Player Fixes (Complete)
+
+**Fecha:** 2026-09-22
+**Modelo:** MiMo v2.5 Free (opencode)
+**Modo:** Build
+
+### Fixes Aplicados
+
+#### Bug 1: Phantom Error (Error fantasma)
+- **Problema**: Al cambiar a YouTube, `audioRef.current.src = ""` + `.load()` disparaba evento `error` nativo del browser. El banner "Error de reproducción — archivo no disponible" se mostraba aunque el audio SÍ se reproducía.
+- **Causa raíz**: `handleError` en `AudioPlayerContext.tsx` línea 321 capturaba `isYouTubeMode` via closure (stale value).
+- **Fix**: Agregado `isYouTubeModeRef` (ref, no state) para que `handleError` pueda verificar el modo actual sin stale closure.
+
+#### Bug 2: YouTube 30s Segments
+- **Problema**: Videos YouTube se reproducían COMPLETOS en vez de 30s de preview. Las tracks en la DB tienen `start_time: 0, end_time: 0`.
+- **Causa raíz**: Sin timestamps explícitos, no había restricción de segmento.
+- **Fix**: 
+  1. `effectiveEnd = isYT && (!track.endTimestamp || track.endTimestamp === 0) ? 30 : track.endTimestamp`
+  2. `setActiveTrack({ ...track, endTimestamp: effectiveEnd })` — actualizar UI con el end real
+  3. `playerVars: { end: effectiveEnd }` — pasar a YouTube IFrame API nativamente
+  4. Sync loop en línea 74 ya pausa en `endTimestampRef`
+
+#### Bug 3: Loading Indicator
+- **Problema**: "Cargando..." no era visible — `onReady` disparaba `setIsLoading(false)` demasiado rápido.
+- **Fix**: Mínimo 500ms antes de `doPlay()` cuando no hay seek explícito.
+- **Verificación**: Test G3 confirmó "Cargando visible" en el DOM.
+
+#### Fix adicional: Seek/Play Race Condition
+- **Problema**: `yt.seek()` + `yt.play()` inmediato causaba que el video empezara desde posición 0.
+- **Fix**: `setTimeout(doPlay, 300)` después del seek para dar tiempo al IFrame API.
+
+### Quality Gates
+- TSC: ✅ 0 errors
+- Build: ✅ Production build successful  
+- Unit tests: 93 ✅ / 2 pre-existing env failures / 17 skipped
+
+### Test Results (38/38 PASS — Local, Visible Browser)
+
+| Category | Tests | Pass | Fail |
+|----------|-------|------|------|
+| A. Public Pages | 6 | 6 | 0 |
+| B. Auth Flow | 5 | 5 | 0 |
+| C. CRUD Releases | 1 | 1 | 0 |
+| D. CRUD Shows | 5 | 5 | 0 |
+| E. Admin Panel | 6 | 6 | 0 |
+| F. Profile/Account | 2 | 2 | 0 |
+| G. Player | 7 | 7 | 0 |
+| J. API Security | 6 | 6 | 0 |
+| **TOTAL** | **38** | **38** | **0** |
+
+### Key Test Evidence
+- **G1**: Player shows "Sad Winter Song" at **0:00 / 0:30** (NOT 4:38)
+- **G3**: "Cargando..." detected in DOM text
+- **G2**: No phantom error banner visible
+
+### Results
+- Commits: `1038aaf`, `4c0ebd8`, `fd5a257`
 - Deploy: ✅ https://epk-dashboard.vercel.app
 - Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.23
