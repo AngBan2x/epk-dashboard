@@ -18,6 +18,8 @@ interface ImageGalleryProps {
   trackId?: string;
   isOwner?: boolean;
   onImageAdded?: (url: string) => void;
+  onImageRemoved?: (id: string) => void;
+  onImageEdited?: (id: string, title: string, category: string) => void;
 }
 
 export function ImageGallery({
@@ -26,6 +28,8 @@ export function ImageGallery({
   trackId,
   isOwner = false,
   onImageAdded,
+  onImageRemoved,
+  onImageEdited,
 }: ImageGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
@@ -132,6 +136,35 @@ export function ImageGallery({
               <p className="text-sm font-medium text-white truncate">
                 {item.title}
               </p>
+              {isOwner && trackId && (
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newTitle = prompt("Editar título:", item.title || "");
+                      if (newTitle !== null && onImageEdited) {
+                        onImageEdited(item.id, newTitle, item.category || "Prensa");
+                      }
+                    }}
+                    className="text-xs bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded border border-white/30 transition-colors"
+                    aria-label="Editar"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm("¿Eliminar esta imagen de la galería?")) {
+                        onImageRemoved?.(item.id);
+                      }
+                    }}
+                    className="text-xs bg-red-500/20 hover:bg-red-500/30 text-white px-2 py-1 rounded border border-red-500/30 transition-colors"
+                    aria-label="Eliminar"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}

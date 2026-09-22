@@ -5166,3 +5166,26 @@ Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
 - Commits: `1038aaf`, `4c0ebd8`, `fd5a257`
 - Deploy: ✅ https://epk-dashboard.vercel.app
 - Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.23
+
+---
+
+## Batch Fixes — 8 Issues (Iniciado)
+
+**Fecha:** 2026-09-22
+**Estado:** Plan inicial documentado — Ejecución en progreso
+**Modelo:** Nemotron 3 Ultra Free (opencode)
+**Release objetivo:** v4.0.0-rc.24
+
+### Issues Planificados
+1. **Fix 1: Ficha de Producción** — Data loss (6 campos dropeados) + styling inconsistency
+2. **Fix 2: YouTube Timestamps** — 5 bugs en release edit (TrackInput, DB load, API whitelist ×2, UI)
+3. **Fix 3: Test Show Cleanup + Notification** — Delete test shows + artist notification on submit
+4. **Fix 4: Header Nav** — Remove duplicate "Catálogo" for logged-in users
+5. **Fix 5: Admin Press Fields** — Verify press_text/press_highlights persistence
+6. **Fix 6: Centro de Descargas Overlap** — Title/badge overlap in narrow sidebar
+7. **Fix 7: Like Button Login** — Artist detail page Server Component blocks login prompt
+8. **Fix 8: Press Gallery CRUD** — Add edit/delete buttons + DELETE API + R2 cleanup
+
+### Documentación
+- Plan completo en `docs/FIXES_BATCH_1.md`
+- Tracking en este AI_LOG.md

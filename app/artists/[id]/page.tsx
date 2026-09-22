@@ -1,42 +1,22 @@
 import { getArtistById, getTracksByArtist } from "@/lib/db";
 import { BioSection } from "@/components/BioSection";
+import { ArtistTracksSection } from "@/components/ArtistTracksSection";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-
-async function TracksSection({ artistId }: { artistId: string }) {
-  let tracks: any[] = [];
-  try {
-    tracks = await getTracksByArtist(artistId);
-  } catch (e) {
-    console.error("Failed to fetch tracks for artist:", artistId, e);
-    return null;
-  }
-
-  if (tracks.length === 0) return null;
-
-  const { EPKCard } = await import("@/components/EPKCard");
-
-  return (
-    <section className="mt-8">
-      <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Lanzamientos</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {tracks.map((track) => (
-          <EPKCard
-            key={track.id}
-            track={track}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
 
 export default async function ArtistDetailPage({ params }: { params: { id: string } }) {
   const artist = await getArtistById(params.id);
 
   if (!artist) {
     notFound();
+  }
+
+  let tracks: any[] = [];
+  try {
+    tracks = await getTracksByArtist(params.id);
+  } catch (e) {
+    console.error("Failed to fetch tracks for artist:", params.id, e);
   }
 
   return (
@@ -65,7 +45,7 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
           pressHighlights={artist.press_highlights}
         />
 
-        <TracksSection artistId={params.id} />
+        <ArtistTracksSection tracks={tracks} />
       </main>
     </div>
   );

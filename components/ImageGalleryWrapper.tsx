@@ -40,6 +40,25 @@ export function ImageGalleryWrapper({
       onImageAdded={(url) => {
         setCurrentImages((prev) => [...(prev ?? []), url]);
       }}
+      onImageRemoved={(id) => {
+        setCurrentImages((prev) =>
+          (prev ?? []).filter((img) => {
+            if (typeof img === "string") return true;
+            return img.id !== id;
+          })
+        );
+      }}
+      onImageEdited={(id, newTitle, category) => {
+        setCurrentImages((prev) =>
+          (prev ?? []).map((img) => {
+            if (typeof img === "string") return img;
+            if (img.id === id) {
+              return { ...img, title: newTitle, category: category as GalleryItem["category"] };
+            }
+            return img;
+          })
+        );
+      }}
     />
   );
 }

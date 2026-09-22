@@ -49,7 +49,7 @@ export async function PATCH(
     }
 
     // Only allow specific fields to be patched
-    const allowedFields = ["lyrics", "is_instrumental", "production_details"];
+    const allowedFields = ["lyrics", "is_instrumental", "production_details", "start_time", "end_time", "gallery_images"];
     const updates: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (field in body) {

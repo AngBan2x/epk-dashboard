@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateRequest } from "@/lib/auth";
 import { getTrackById, getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 export const dynamic = "force-dynamic";
 
@@ -170,6 +170,87 @@ export async function POST(req: NextRequest) {
     console.error("[API/upload/image] Error:", error);
     return NextResponse.json(
       { error: "Error al subir la imagen" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const trackId = searchParams.get("trackId");
+    const imageUrl = searchParams.get("url");
+
+    if (!trackId || !imageUrl) {
+      return NextResponse.json({ error: "trackId y url requeridos" }, { status: 400 });
+    }
+
+    const track = await getTrackById(trackId);
+    if (!track) {
+      return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
+    }
+
+    // Verify ownership
+    const artistRow = await dbQuery(
+      "SELECT user_id FROM artists WHERE name = ?",
+      [track.artist_name]
+    ) as { user_id: string }[];
+    const ownsTrack = artistRow.length > 0 && artistRow[0].user_id === session.userId;
+
+    if (!ownsTrack && session.role !== "admin") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    // Remove URL from gallery_images
+    const existing = await dbQuery(
+      "SELECT gallery_images FROM tracks WHERE id = ?",
+      [trackId]
+    ) as { gallery_images: string | null }[];
+
+    let galleryImages: string[] = [];
+    if (existing.length > 0 && existing[0].gallery_images) {
+      try {
+        const parsed = JSON.parse(existing[0].gallery_images);
+        if (Array.isArray(parsed)) {
+          galleryImages = parsed.filter((item: unknown) => typeof item === "string");
+        }
+      } catch {
+        galleryImages = [];
+      }
+    }
+
+    const filteredImages = galleryImages.filter((img) => img !== imageUrl);
+
+    await dbRun(
+      "UPDATE tracks SET gallery_images = ? WHERE id = ?",
+      [JSON.stringify(filteredImages), trackId]
+    );
+
+    // Delete from R2
+    try {
+      const bucket = process.env.R2_BUCKET_NAME;
+      if (bucket) {
+        const publicUrl = process.env.R2_PUBLIC_URL || `https://${bucket}.${process.env.R2_ACCOUNT_ID}.r2.dev`;
+        const key = imageUrl.replace(`${publicUrl}/`, "");
+        if (key && key !== imageUrl) {
+          const s3 = getS3Client();
+          await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+        }
+      }
+    } catch (r2Error) {
+      console.error("[API/upload/image] R2 delete error (non-fatal):", r2Error);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[API/upload/image DELETE] Error:", error);
+    return NextResponse.json(
+      { error: "Error al eliminar la imagen" },
       { status: 500 }
     );
   }
