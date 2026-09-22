@@ -68,7 +68,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="animate-pulse space-y-3">
           <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
           <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3" />
@@ -79,13 +79,13 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-      <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
             Shows & Booking
           </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {shows.length} {shows.length === 1 ? "show programado" : "shows programados"}
           </p>
         </div>
