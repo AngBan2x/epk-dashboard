@@ -5056,3 +5056,51 @@ Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
 ### Results
 - Deploy: ✅ https://epk-dashboard.vercel.app (auto-deployed from main)
 - Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.22
+
+---
+
+## RC.23 — Player YouTube Fixes
+
+**Fecha:** 2026-09-21
+**Modelo:** MiMo v2.5 Free (opencode)
+
+### Bugs Fixed
+
+1. **Phantom error banner** (`context/AudioPlayerContext.tsx`)
+   - **Root cause:** When switching to YouTube mode, `audioRef.current.src = ""` + `.load()` fires browser's native `error` event. `handleError` catches it and sets error state even though YouTube plays fine.
+   - **Fix:** Added `isYouTubeModeRef` (ref, not state) to avoid stale closure issues. `handleError` now returns early when `isYouTubeModeRef.current === true`.
+
+2. **YouTube 30s segments not working** (`lib/youtube-player.ts`, `context/AudioPlayerContext.tsx`)
+   - **Root cause:** `yt.seek()` is async but `yt.play()` was called immediately after, causing playback to start from 0 before seek completes.
+   - **Fix:** Added `start`/`end` playerVars to YouTube IFrame API initialization. Added 300ms `setTimeout` between `seek()` and `play()` when `startTimestamp > 0`.
+
+3. **No "Cargando..." loading indicator** (`context/AudioPlayerContext.tsx`)
+   - **Root cause:** `isPlaying` was not reset at start of new track, so condition `isLoading && !isPlaying` was never true.
+   - **Fix:** Added `setIsPlaying(false)` at beginning of `playTrack` for new tracks.
+
+### Quality Gates
+- TSC: ✅ 0 errors
+- Build: ✅ Production build successful
+- Unit tests: 93 ✅ / 2 pre-existing env failures / 17 skipped
+
+### Test Results (44/44 PASS — Production, Visible Browser)
+
+| Category | Tests | Pass | Fail |
+|----------|-------|------|------|
+| A. Public Pages | 6 | 6 | 0 |
+| B. Auth Flow | 7 | 7 | 0 |
+| C. CRUD Releases | 5 | 5 | 0 |
+| D. CRUD Shows | 5 | 5 | 0 |
+| E. Admin Panel | 6 | 6 | 0 |
+| F. Profile/Account | 3 | 3 | 0 |
+| G. Player | 6 | 6 | 0 |
+| J. API Security | 6 | 6 | 0 |
+| **TOTAL** | **44** | **44** | **0** |
+
+### Test Data Cleanup
+- 16 test shows deleted from production DB after testing
+
+### Results
+- Commit: `1038aaf` — `fix(rc.23): phantom error, YouTube 30s segments, loading indicator`
+- Deploy: ✅ https://epk-dashboard.vercel.app
+- Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.23
