@@ -123,13 +123,17 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
     // New track
     setIsPlaying(false);
-    setActiveTrack(track);
+    // Default 30s preview for YouTube tracks without explicit timestamps
+    const effectiveEnd = isYT && (!track.endTimestamp || track.endTimestamp === 0)
+      ? 30
+      : (track.endTimestamp || 0);
+    setActiveTrack({ ...track, endTimestamp: effectiveEnd });
     setIsYouTubeMode(isYT);
     isYouTubeModeRef.current = isYT;
 
     // P3 Batch 2: Set timestamps for multi-track YouTube
     startTimestampRef.current = track.startTimestamp || 0;
-    endTimestampRef.current = track.endTimestamp || 0;
+    endTimestampRef.current = effectiveEnd;
 
     if (isYT) {
       // Pause HTML5 audio if playing and reset src to prevent conflicts
@@ -146,19 +150,19 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       const yt = getYouTubePlayer();
       yt.init(track.youtubeVideoId!, {
         onReady: () => {
-          setIsLoading(false);
           yt.setVolume(volume);
-          if (track.startTimestamp && track.startTimestamp > 0) {
-            yt.seek(track.startTimestamp);
-            setTimeout(() => {
-              yt.play();
-              setIsPlaying(true);
-              startYouTubeSync();
-            }, 300);
-          } else {
+          const doPlay = () => {
+            setIsLoading(false);
             yt.play();
             setIsPlaying(true);
             startYouTubeSync();
+          };
+          if (track.startTimestamp && track.startTimestamp > 0) {
+            yt.seek(track.startTimestamp);
+            setTimeout(doPlay, 300);
+          } else {
+            // Minimum 500ms so "Cargando..." is visible
+            setTimeout(doPlay, 500);
           }
         },
         onStateChange: (state) => {
@@ -184,7 +188,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         },
       }, {
         start: track.startTimestamp || undefined,
-        end: track.endTimestamp || undefined,
+        end: effectiveEnd > 0 ? effectiveEnd : undefined,
       });
     } else {
       // HTML5 audio mode
