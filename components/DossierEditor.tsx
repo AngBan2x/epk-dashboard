@@ -145,21 +145,16 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
     return (
       <button
         onClick={() => setExpanded(true)}
-        className="w-full p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-left hover:border-primary-400 dark:hover:border-primary-600 transition-colors group"
+        className="w-full p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-left hover:border-primary-400 dark:hover:border-primary-600 transition-colors group"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-lg">
-            📄
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-              Dossier / Rider
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Personaliza tu biography, press kit y rider tecnico para {safeString(artistName)}
-            </p>
-          </div>
+        <div className="flex items-center gap-3 mb-2">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-2">
+            <span>📄</span> Dossier / Rider
+          </h3>
         </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Personaliza tu biography, press kit y rider tecnico para {safeString(artistName)}
+        </p>
       </button>
     );
   }

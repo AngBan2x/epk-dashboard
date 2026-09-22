@@ -115,8 +115,8 @@ export function DownloadCenter({
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-            Centro de Descargas
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <span>📥</span> Centro de Descargas
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Assets para prensa y venues

@@ -82,8 +82,8 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
       <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-            Shows & Booking
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <span>🎤</span> Shows & Booking
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {shows.length} {shows.length === 1 ? "show programado" : "shows programados"}
@@ -92,7 +92,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
         {editable && onAdd && (
           <button
             onClick={onAdd}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-500 text-white transition"
           >
             + Nuevo Show
           </button>
@@ -106,7 +106,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
           {editable && onAdd && (
             <button
               onClick={onAdd}
-              className="mt-3 text-sm text-emerald-600 dark:text-emerald-400 hover:underline"
+              className="mt-3 text-sm text-primary-600 dark:text-primary-400 hover:underline"
             >
               Agregar el primer show
             </button>
@@ -156,7 +156,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                         href={show.ticket_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-500 text-white transition"
                       >
                         🎟️ Tickets
                       </a>
