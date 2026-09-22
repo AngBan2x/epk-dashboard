@@ -290,29 +290,23 @@ export default function DashboardPage() {
                 </div>
               </section>
 
-              {/* P3 Batch 2: Dossier / Rider Section */}
+              {/* Dossier / Rider + Centro de Descargas */}
               {artistProfile && (
-                <section className="mb-8">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">📄 Dossier / Rider</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                    Personaliza tu biografía y datos de contacto para generar documentos profesionales descargables.
-                  </p>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <SlideIn index={artistTracks.length + 2}>
-                      <DossierEditor
-                        artistId={artistProfile.id}
-                        artistName={artistProfile.name}
-                      />
-                    </SlideIn>
-                    <SlideIn index={artistTracks.length + 3}>
-                      <DownloadCenter
-                        artistId={artistProfile.id}
-                        artistName={artistProfile.name}
-                        trackCount={artistTracks.length}
-                      />
-                    </SlideIn>
-                  </div>
-                </section>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                  <SlideIn index={artistTracks.length + 2}>
+                    <DossierEditor
+                      artistId={artistProfile.id}
+                      artistName={artistProfile.name}
+                    />
+                  </SlideIn>
+                  <SlideIn index={artistTracks.length + 3}>
+                    <DownloadCenter
+                      artistId={artistProfile.id}
+                      artistName={artistProfile.name}
+                      trackCount={artistTracks.length}
+                    />
+                  </SlideIn>
+                </div>
               )}
 
               {/* Artist's Bio + Shows */}
