@@ -145,10 +145,10 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
     return (
       <button
         onClick={() => setExpanded(true)}
-        className="w-full p-4 bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 text-left hover:border-primary-400 dark:hover:border-primary-600 transition-colors group"
+        className="w-full p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-left hover:border-primary-400 dark:hover:border-primary-600 transition-colors group"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-lg">
+          <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-lg">
             📄
           </div>
           <div>
@@ -165,7 +165,7 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-700">
         <button

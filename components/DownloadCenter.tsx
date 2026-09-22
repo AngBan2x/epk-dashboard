@@ -112,7 +112,7 @@ export function DownloadCenter({
   };
 
   return (
-    <div>
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
