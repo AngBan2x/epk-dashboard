@@ -102,7 +102,7 @@ export class YouTubePlayerManager {
   private currentVideoId: string | null = null;
   private ready = false;
 
-  async init(videoId: string, events: YouTubePlayerEvents = {}): Promise<void> {
+  async init(videoId: string, events: YouTubePlayerEvents = {}, options?: { start?: number; end?: number }): Promise<void> {
     this.events = events;
     this.currentVideoId = videoId;
 
@@ -147,6 +147,8 @@ export class YouTubePlayerManager {
         modestbranding: 1,
         rel: 0,
         showinfo: 0,
+        ...(options?.start != null && options.start > 0 && { start: Math.floor(options.start) }),
+        ...(options?.end != null && options.end > 0 && { end: Math.ceil(options.end) }),
       },
       events: {
         onReady: () => {
@@ -163,12 +165,12 @@ export class YouTubePlayerManager {
     });
   }
 
-  async loadVideo(videoId: string): Promise<void> {
+  async loadVideo(videoId: string, options?: { start?: number; end?: number }): Promise<void> {
     if (videoId === this.currentVideoId && this.player && this.ready) {
       return;
     }
 
-    await this.init(videoId, this.events);
+    await this.init(videoId, this.events, options);
   }
 
   play(): void {

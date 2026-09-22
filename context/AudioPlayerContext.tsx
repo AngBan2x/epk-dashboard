@@ -54,6 +54,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const youtubeSyncRef = useRef<NodeJS.Timeout | null>(null);
   const startTimestampRef = useRef<number>(0);
   const endTimestampRef = useRef<number>(0);
+  const isYouTubeModeRef = useRef(false);
 
   // Sync YouTube player state with context
   const startYouTubeSync = useCallback(() => {
@@ -121,8 +122,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     }
 
     // New track
+    setIsPlaying(false);
     setActiveTrack(track);
     setIsYouTubeMode(isYT);
+    isYouTubeModeRef.current = isYT;
 
     // P3 Batch 2: Set timestamps for multi-track YouTube
     startTimestampRef.current = track.startTimestamp || 0;
@@ -145,13 +148,18 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         onReady: () => {
           setIsLoading(false);
           yt.setVolume(volume);
-          // Seek to startTimestamp if provided
           if (track.startTimestamp && track.startTimestamp > 0) {
             yt.seek(track.startTimestamp);
+            setTimeout(() => {
+              yt.play();
+              setIsPlaying(true);
+              startYouTubeSync();
+            }, 300);
+          } else {
+            yt.play();
+            setIsPlaying(true);
+            startYouTubeSync();
           }
-          yt.play();
-          setIsPlaying(true);
-          startYouTubeSync();
         },
         onStateChange: (state) => {
           if (state === YT_STATE.ENDED) {
@@ -174,6 +182,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
           setError(errorMessages[errorCode] || "Error de YouTube desconocido");
           setIsPlaying(false);
         },
+      }, {
+        start: track.startTimestamp || undefined,
+        end: track.endTimestamp || undefined,
       });
     } else {
       // HTML5 audio mode
@@ -253,6 +264,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setDuration(0);
     setIsVisualizerOpen(false);
     setIsYouTubeMode(false);
+    isYouTubeModeRef.current = false;
     startTimestampRef.current = 0;
     endTimestampRef.current = 0;
   }, [stopYouTubeSync, destroyYouTubePlayer]);
@@ -319,6 +331,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     };
     // P3.34: Error event handlers
     const handleError = () => {
+      if (isYouTubeModeRef.current) return;
       setIsLoading(false);
       setError("Error de reproducción — archivo no disponible");
       setIsPlaying(false);
