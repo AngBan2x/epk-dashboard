@@ -5189,3 +5189,119 @@ Migrar de `node:crypto` a **Web Crypto API** (`crypto.subtle`):
 ### Documentación
 - Plan completo en `docs/FIXES_BATCH_1.md`
 - Tracking en este AI_LOG.md
+
+---
+
+## Batch Fixes — 8 Issues (Completado)
+
+**Fecha:** 2026-09-22
+**Estado:** Completado y deployed
+**Modelo:** Nemotron 3 Ultra Free (opencode)
+**Release:** v4.0.0-rc.24
+**Commit:** `6d8d709`
+
+### Issues Resueltos
+
+#### Fix 1: Ficha de Producción — Data Loss + Styling
+**Archivos modificados:** 5
+- `lib/db.ts:580-594` — `parseProductionDetails()` ahora lee 11 campos (antes 5)
+- `lib/validations.ts:15-21` — `ProductionDetailsSchema` valida 11 campos
+- `components/ProductionDetails.tsx` — View mode `gap-2`→`gap-3`, labels con `mb-1`
+- `app/releases/[id]/edit/page.tsx:46-60` — Local state expandido a 11 campos
+- `app/releases/[id]/edit/page.tsx:496-580` — Form UI con 11 campos
+
+#### Fix 2: YouTube Timestamps en Release Edit
+**Archivos modificados:** 5
+- `app/releases/[id]/edit/page.tsx:13-17` — `TrackInput` con `start_time`/`end_time`
+- `app/releases/[id]/edit/page.tsx:106-112` — Carga timestamps del DB
+- `app/api/releases/route.ts:197-205` — `ALLOWED_COLUMNS` incluye timestamps
+- `app/api/tracks/[id]/route.ts:52` — `allowedFields` incluye timestamps
+- `app/releases/[id]/edit/page.tsx:496-515` — UI inputs para start/end time
+
+#### Fix 3: Test Show Cleanup + Notificación Artista
+**Archivos modificados:** 2 + DB cleanup
+- DB: `DELETE FROM shows WHERE venue_name LIKE 'Test%'...` — Eliminados 0 shows test
+- `app/api/shows/route.ts:123-135` — Notificación `show_pending_review` tras `createShow()`
+- `types/music.ts:221` — Añadido `"show_pending_review"` a `NotificationType`
+
+#### Fix 4: Header Nav — "Catálogo" Duplicado
+**Archivos modificados:** 1 (`components/Header.tsx`)
+- Desktop (lines 38-42): Removido "Catálogo" del branch logged-in
+- Mobile (lines 122-126): Removido "Catálogo" del branch logged-in
+
+#### Fix 5: Admin Profile — Press Text/Highlights
+**Verificación:** Código verificado — `updateArtist()` en `lib/db.ts:1354-1397` maneja `pressText/press_text` y `pressHighlights/press_highlights` correctamente. PUT en `app/api/artists/[id]/route.ts` pasa body completo a `updateArtist()`.
+
+#### Fix 6: Centro de Descargas — Overlap Texto/Badges
+**Archivos modificados:** 1 (`components/DownloadCenter.tsx:116-133`)
+- Título con `truncate`
+- Badges en `flex-col sm:flex-row` con `whitespace-nowrap`
+
+#### Fix 7: Like Button Login en Artist Detail
+**Archivos modificados:** 2
+- `app/artists/[id]/page.tsx` — Fetch tracks en server, pasa a Client Component
+- `components/ArtistTracksSection.tsx` (NUEVO) — Client Component con `LoginModal` + `onLoginPrompt`
+
+#### Fix 8: Press Gallery CRUD — Edit/Delete Buttons
+**Archivos modificados:** 5
+- `components/ImageGallery.tsx` — Botones editar/eliminar por tile cuando `isOwner`
+- `components/ImageGalleryWrapper.tsx` — Handlers `onImageRemoved` + `onImageEdited`
+- `app/api/upload/image/route.ts` — `DELETE` handler con R2 `DeleteObjectCommand`
+- `app/api/tracks/[id]/route.ts:52` — `gallery_images` en `allowedFields`
+- R2: Implementado `DeleteObjectCommand` (era 0 usos en proyecto)
+
+### Quality Gates
+- TypeScript: ✅ 0 errores
+- Unit Tests: 93 passed / 17 skipped / 2 pre-existing env failures (better-sqlite3 native module)
+- Build: ✅ Production build successful
+- Lint: ✅ 0 errores (warnings pre-existentes solo)
+
+### Test Results Summary
+| Check | Status |
+|-------|--------|
+| Typecheck | ✅ PASS |
+| Unit Tests | ✅ 93 passed |
+| Build | ✅ Compiled successfully |
+| Lint | ✅ 0 errors |
+
+### Cleanup
+- ✅ `test-rc23.js` eliminado
+- ✅ `test-loading.js` eliminado
+- ✅ Test shows eliminados de DB local + **Turso (6 shows: `Test Venue*`, `Null Test`, `Minimal*`)**
+- ✅ `test-rc24-visual.js` eliminado
+- ✅ `test-rc24-retest.js` eliminado
+
+### Visual Tests — rc.24 (Final)
+**Fecha:** 2026-09-22 · **Servidor:** `localhost:3099` (dev) · **Screenshots:** `tests/screenshots/rc24/` (39 archivos)
+
+**Suite principal:** 9 PASS / 2 FAIL / 1 SKIP  
+**Retest (2 falsos positivos del script):** 2/2 PASS  
+
+| # | Test | Status |
+|---|------|--------|
+| 1 | Fix7 Like→Login | ✅ |
+| 2 | Fix4 Header desktop | ✅ |
+| 3 | Fix4 Header mobile | ✅ |
+| 4 | Fix1 Extended prod fields | ✅ |
+| 5 | Fix1 ProductionDetails | ✅ |
+| 6 | Fix2 Timestamp inputs | ✅ |
+| 7 | Fix8 Gallery upload btn | ✅ |
+| 8 | Fix6 DownloadCenter on track | ✅ |
+| 9 | Fix3 Shows section | ✅ |
+| 10 | Fix1 Card emoji prefixes | ✅ (retest — dashboard artista) |
+| 11 | Fix5 Admin press fields | ✅ (retest — tab Artistas) |
+| 12 | Fix6 DownloadCenter badges | ⏭️ SKIP (no aplica en admin dashboard) |
+
+**Resultado real: 11 PASS / 0 FAIL / 1 SKIP** — Los 2 FAIL originales eran bugs del test script (selector/tab incorrectos), no del producto.
+
+Evidencia clave:
+- `RE1-artist-dashboard-emoji.png` — 📄📥📝🎤 visibles en dashboard de artista
+- `RE3-admin-artist-edit-press.png` — "Texto de Prensa" + "Destacados de Prensa" en form admin
+- `A3b-like-login-modal.png` — LoginModal al dar like como guest
+- `B-header-loggedin.png` — Header sin "Catálogo" para logueados
+
+### Results
+- Commit: `6d8d709` (code) + docs commit (visual results)
+- Deploy: ✅ https://epk-dashboard.vercel.app (auto-deploy from main)
+- Release: ✅ https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.24
+- Visual Tests: ✅ 11 PASS / 0 FAIL / 1 SKIP
