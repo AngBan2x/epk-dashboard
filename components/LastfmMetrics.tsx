@@ -57,7 +57,7 @@ export default function LastfmMetrics({ artist, trackTitle }: LastfmMetricsProps
   if (loading) return <Skeleton />;
   if (!data?.artist && !data?.track && (!data?.topTracks || data.topTracks.length === 0)) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
         <SectionHeader
           emoji="📈"
           title="Métricas Last.fm"
