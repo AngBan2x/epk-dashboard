@@ -4,15 +4,21 @@ import React, { useRef, useState, useCallback } from "react";
 import Image from "next/image";
 
 interface ImageUploaderProps {
-  trackId: string;
-  onUploadComplete: (url: string) => void;
+  trackId?: string;
+  /** DOM id suffix (defaults to trackId). Required when trackId is absent. */
+  uploadId?: string;
+  /** Profile/banner mode: sent as kind+artistId instead of trackId. */
+  kind?: "profile" | "banner";
+  artistId?: string;
+  onUploadComplete: (url: string, meta?: { id?: string; title?: string; category?: string }) => void;
   onError?: (message: string) => void;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = "image/jpeg,image/png,image/webp";
 
-export function ImageUploader({ trackId, onUploadComplete, onError }: ImageUploaderProps) {
+export function ImageUploader({ trackId, uploadId, kind, artistId, onUploadComplete, onError }: ImageUploaderProps) {
+  const inputId = `upload-${uploadId ?? trackId ?? kind ?? "file"}`;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -76,7 +82,9 @@ export function ImageUploader({ trackId, onUploadComplete, onError }: ImageUploa
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      formData.append("trackId", trackId);
+      if (trackId) formData.append("trackId", trackId);
+      if (kind) formData.append("kind", kind);
+      if (artistId) formData.append("artistId", artistId);
 
       // Simulate progress since XHR upload progress isn't available with fetch
       const progressInterval = setInterval(() => {
@@ -97,7 +105,7 @@ export function ImageUploader({ trackId, onUploadComplete, onError }: ImageUploa
 
       const data = await res.json();
       setProgress(100);
-      onUploadComplete(data.url);
+      onUploadComplete(data.url, { id: data.id, title: data.title, category: data.category });
 
       // Reset state
       setSelectedFile(null);
@@ -110,7 +118,7 @@ export function ImageUploader({ trackId, onUploadComplete, onError }: ImageUploa
     } finally {
       setUploading(false);
     }
-  }, [selectedFile, trackId, onUploadComplete, onError]);
+  }, [selectedFile, trackId, kind, artistId, onUploadComplete, onError]);
 
   const handleCancel = useCallback(() => {
     setSelectedFile(null);
@@ -130,12 +138,12 @@ export function ImageUploader({ trackId, onUploadComplete, onError }: ImageUploa
         accept={ACCEPTED_TYPES}
         onChange={handleFileInput}
         className="hidden"
-        id={`upload-${trackId}`}
+        id={inputId}
       />
 
       {!preview ? (
         <label
-          htmlFor={`upload-${trackId}`}
+          htmlFor={inputId}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}

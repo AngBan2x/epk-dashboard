@@ -42,7 +42,7 @@ export function Header() {
                     href="/artists"
                     className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
                   >
-                    Explorar
+                    Artistas
                   </Link>
                   <Link
                     href="/dashboard"
@@ -121,7 +121,7 @@ export function Header() {
                   className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Explorar
+                  Artistas
                 </Link>
                 <Link
                   href="/dashboard"

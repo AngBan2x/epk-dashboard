@@ -76,12 +76,14 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const trackId = formData.get("trackId") as string | null;
+    const kind = formData.get("kind") as string | null; // "profile" | "banner" (alternative to trackId)
+    const artistId = formData.get("artistId") as string | null;
 
     if (!file) {
       return NextResponse.json({ error: "No se proporcionó archivo" }, { status: 400 });
     }
-    if (!trackId) {
-      return NextResponse.json({ error: "trackId requerido" }, { status: 400 });
+    if (!trackId && !(kind && artistId)) {
+      return NextResponse.json({ error: "trackId o kind+artistId requeridos" }, { status: 400 });
     }
 
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -98,28 +100,50 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const track = await getTrackById(trackId);
-    if (!track) {
+    const track = trackId ? await getTrackById(trackId) : null;
+    if (trackId && !track) {
       return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
     }
 
-    // Verify ownership: user must be the artist who owns this track
-    const artistRow = await dbQuery(
-      "SELECT user_id FROM artists WHERE name = ?",
-      [track.artist_name]
-    ) as { user_id: string }[];
-    const ownsTrack = artistRow.length > 0 && artistRow[0].user_id === session.userId;
+    // Verify ownership: track owner (via artist name) or profile/banner owner (via artistId)
+    let ownerUserId = session.userId;
+    let r2KeyPrefix: string;
+    if (trackId && track) {
+      const artistRow = await dbQuery(
+        "SELECT id, user_id FROM artists WHERE name = ?",
+        [track.artist_name]
+      ) as { id: string; user_id: string }[];
+      const ownsTrack = artistRow.length > 0 && artistRow[0].user_id === session.userId;
 
-    if (!ownsTrack && session.role !== "admin") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      if (!ownsTrack && session.role !== "admin") {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+
+      ownerUserId = artistRow.length > 0 ? artistRow[0].user_id : session.userId;
+      r2KeyPrefix = `${ownerUserId}/${trackId}`;
+    } else {
+      // Profile/banner upload for an artist
+      if (kind !== "profile" && kind !== "banner") {
+        return NextResponse.json({ error: "kind debe ser profile o banner" }, { status: 400 });
+      }
+      const artistRow = await dbQuery(
+        "SELECT id, user_id FROM artists WHERE id = ?",
+        [artistId]
+      ) as { id: string; user_id: string }[];
+      if (artistRow.length === 0) {
+        return NextResponse.json({ error: "Artista no encontrado" }, { status: 404 });
+      }
+      if (artistRow[0].user_id !== session.userId && session.role !== "admin") {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      ownerUserId = artistRow[0].user_id;
+      r2KeyPrefix = `${ownerUserId}/profile`;
     }
-
-    const artistId = artistRow.length > 0 ? artistRow[0].user_id : session.userId;
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const timestamp = Date.now();
     const sanitizedName = sanitizeFilename(file.name);
-    const key = `${artistId}/${trackId}/${timestamp}-${sanitizedName}`;
+    const key = `${r2KeyPrefix}/${timestamp}-${sanitizedName}`;
 
     const bucket = process.env.R2_BUCKET_NAME;
     if (!bucket) {
@@ -140,32 +164,47 @@ export async function POST(req: NextRequest) {
     const publicUrl = process.env.R2_PUBLIC_URL || `https://${bucket}.${process.env.R2_ACCOUNT_ID}.r2.dev`;
     const imageUrl = `${publicUrl}/${key}`;
 
-    // Append to gallery_images in the tracks table
+    // Profile/banner uploads return the URL only (no tracks write)
+    if (!trackId) {
+      return NextResponse.json({ url: imageUrl, kind }, { status: 201 });
+    }
+
+    // Append to gallery_images in the tracks table (items are objects; legacy string URLs preserved)
     const existing = await dbQuery(
       "SELECT gallery_images FROM tracks WHERE id = ?",
       [trackId]
     ) as { gallery_images: string | null }[];
 
-    let galleryImages: string[] = [];
+    let galleryImages: Array<string | Record<string, unknown>> = [];
     if (existing.length > 0 && existing[0].gallery_images) {
       try {
         const parsed = JSON.parse(existing[0].gallery_images);
         if (Array.isArray(parsed)) {
-          galleryImages = parsed.filter((item: unknown) => typeof item === "string");
+          galleryImages = parsed.filter(
+            (item: unknown) =>
+              typeof item === "string" ||
+              (typeof item === "object" && item !== null && typeof (item as Record<string, unknown>).url === "string")
+          );
         }
       } catch {
         galleryImages = [];
       }
     }
 
-    galleryImages.push(imageUrl);
+    const newItem = {
+      id: `img-${Date.now()}`,
+      url: imageUrl,
+      title: sanitizedName.replace(/\.[a-z0-9]+$/i, "").replace(/_/g, " ") || "Asset de Prensa",
+      category: "Prensa",
+    };
+    galleryImages.push(newItem);
 
     await dbRun(
       "UPDATE tracks SET gallery_images = ? WHERE id = ?",
       [JSON.stringify(galleryImages), trackId]
     );
 
-    return NextResponse.json({ url: imageUrl }, { status: 201 });
+    return NextResponse.json(newItem, { status: 201 });
   } catch (error) {
     console.error("[API/upload/image] Error:", error);
     return NextResponse.json(
