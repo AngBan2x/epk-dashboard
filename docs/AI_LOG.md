@@ -5408,3 +5408,10 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 2. Admin fetch /api/notifications 404 (ruta real: /api/notifications/read, retorna array). Fix 1 linea. Commit 0d7cd6c.
 3. /api/artists/me 404 en profile admin = by design (sin artist profile -> blank form manejado). Tolerado en harness.
 **Iteracion final: 50 PASS / 0 FAIL.**
+
+### Batch 4 - Shows/Bio/Ficha (2026-09-23)
+**Fase 1 diseno (3680cd1):** shows filas uniformes + SVG + badge amber; actividad fechas/estado/editar; production-fields.ts canonico (vista sin Song).
+**Fase 2 datos (2327991, badf8d2):** fila show expandible; hero banner/avatar en artists/[id]; syncDossierToArtist presence-based + DossierEditor onSaved.
+**Verificacion:** tsc 0, unit 110, build OK, prod-exhaustive 50/50, fase2-functional local OK (expand+sync+cleanup).
+**Lecciones:** Turso replica lag (polling en tests); no mutar filas compartidas en prod sin restore; edicion humana concurrente detectada y convergida.
+**Docs:** docs/FIXES_BATCH_4.md. Scripts: prod-exhaustive.ts, fase2-functional.ts (con HEADED=1).
