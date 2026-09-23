@@ -5394,3 +5394,7 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 - Skill auditar-mcp actualizada a opencode.json + gh CLI
 - AGENTS.md: MCP 7 on/7 off; eliminadas secciones analyze-image/image-detector (no implementados)
 **Verificacion pendiente (usuario):** reiniciar opencode (config no recarga en caliente) -> panel MCP verde -> smoke sqlite + gh.
+
+### sqlite MCP - causa raiz + off (2026-09-23, path B)
+**Spawn real + handshake:** ajv faltante en cache npx corrupto (exit 1); tras limpiar cache, npx se atasca 4+min en EPERM cleanup + build nativo better-sqlite3. Paquete irrecuperable via npx en Windows.
+**Decision:** sqlite MCP enabled:false; queries via custom tool database-query. Bonus: paquete tiene verbose:console.log que corrompe stdio.

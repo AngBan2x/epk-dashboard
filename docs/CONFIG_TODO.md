@@ -25,8 +25,11 @@ Decisión usuario (2026-09-23): A+B ejecutados, C queda aquí documentado.
 - Usa `openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`.
 - Verificar que hay API key de OpenRouter en el auth de opencode; si no, el subagente fallará al invocarse.
 
-## Fallback sqlite (si sigue -32000 tras reiniciar)
+## Fallback sqlite — RESUELTO vía path B (2026-09-23)
 
-1. Cambiar `SQLITE_DB_PATH` relativo por flag `--db` con ruta absoluta en `command`.
-2. Verificar que `npx -y mcp-server-sqlite` arranca a mano (error visible en consola).
-3. Último recurso: custom tool `database-query` (better-sqlite3) ya cubre queries locales.
+**Diagnóstico con spawn real + handshake MCP:**
+1. Spawn directo: `Error: Cannot find module 'ajv'` — caché npx corrupto (`ajv/` sin `package.json`), exit 1 → -32000.
+2. Tras borrar caché corrupto: `npx -y mcp-server-sqlite` se atasca 4+ min en warnings EPERM de cleanup + descarga/compilación nativa de better-sqlite3. Servidor nunca arranca.
+3. Conclusión: paquete irrecuperable vía npx en Windows → **sqlite MCP deshabilitado** (`enabled: false`, comando conservado para reintentar).
+4. Queries locales vía custom tool `database-query` (better-sqlite3 del proyecto, probado OK).
+5. Bonus: el paquete tiene bug `verbose: console.log` → corrompe stdout/stdio en la primera query. Otra razón para no usarlo.

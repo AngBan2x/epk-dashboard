@@ -188,20 +188,20 @@ Cuando el usuario reporte un bug o pida un fix:
 
 ## MCP Servers (14)
 
-### Habilitados (7)
+### Habilitados (6)
 | Server | Tipo | Utilidad |
 |--------|------|----------|
 | filesystem | Local | Operaciones de archivos |
-| sqlite | Local | Consultas SQLite (`SQLITE_DB_PATH=data/music_catalog.db`) |
 | playwright | Local | Automatización navegador |
 | context7 | Remoto | Docs de frameworks |
 | gh_grep | Remoto | Buscar código en GitHub |
 | git | Local | Operaciones git |
 | fetch | Local | Fetch de contenido web |
 
-### Deshabilitados (7)
+### Deshabilitados (8)
 | Server | Tipo | Utilidad |
 |--------|------|----------|
+| sqlite | Local | **off** — `mcp-server-sqlite` irrecuperable vía npx en Windows (caché corrupto `ajv` sin package.json + EPERM en cleanup + build nativo lento). Usar custom tool `database-query` |
 | github | Local | GitHub API — **off, se usa `gh` CLI** (consume demasiado contexto) |
 | sentry | Remoto | Error tracking |
 | memory | Local | Memoria persistente |
