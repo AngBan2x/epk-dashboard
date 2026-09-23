@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { getTrackById, getTracksByReleaseId } from "@/lib/db";
+import { formatDateES } from "@/lib/null-safe";
 import { notFound } from "next/navigation";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import { ReleaseActions } from "@/components/ReleaseActions";
@@ -89,7 +90,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
 
             <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-400 mb-4">
               {release.release_date && (
-                <span>📅 {new Date(release.release_date).toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" })}</span>
+                <span>📅 {formatDateES(release.release_date, { month: "long" })}</span>
               )}
               {release.duration && (
                 <span>⏱️ {release.duration}</span>

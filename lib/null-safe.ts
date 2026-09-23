@@ -37,6 +37,32 @@ export const formatDuration = (duration: string): string => {
 export const formatNumber = (n: number): string =>
   new Intl.NumberFormat("es-VE").format(n);
 
+// Deterministic date formatting for SSR: pins timeZone UTC + explicit locale
+// so server (UTC) and client (any TZ) render identical strings.
+// Without this, date-only strings ("2025-12-27" = UTC midnight) render a
+// different calendar day in negative-offset timezones -> React hydration #425.
+export const formatDateES = (
+  v: unknown,
+  opts?: Intl.DateTimeFormatOptions
+): string => {
+  const d = safeDate(v);
+  if (!d) return "—";
+  return d.toLocaleDateString("es-ES", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    ...(opts ?? {}),
+  });
+};
+
+// UTC calendar-day difference (whole days), deterministic across timezones.
+export const diffDaysUTC = (from: Date, to: Date): number => {
+  const dayUTC = (d: Date) =>
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return Math.floor((dayUTC(to) - dayUTC(from)) / 86400000);
+};
+
 export const formatPercent = (n: number): string =>
   `${n.toFixed(1)}%`;
 

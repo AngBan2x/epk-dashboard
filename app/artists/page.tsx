@@ -1,4 +1,5 @@
 import { getAllArtists } from "@/lib/db";
+import { formatNumber } from "@/lib/null-safe";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export default async function ArtistsPage() {
                 )}
                 {artist.monthly_listeners > 0 && (
                   <p className="mt-4 text-xs text-slate-400">
-                    {artist.monthly_listeners.toLocaleString()} oyentes mensuales
+                    {formatNumber(artist.monthly_listeners)} oyentes mensuales
                   </p>
                 )}
               </Link>

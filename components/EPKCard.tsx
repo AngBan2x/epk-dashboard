@@ -7,6 +7,8 @@ import {
   safeString,
   formatDuration,
   formatNumber,
+  formatDateES,
+  diffDaysUTC,
   capitalizeReleaseType,
   getCoverImage,
 } from "@/lib/null-safe";
@@ -26,11 +28,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   const title = safeString(track.title);
   const artistName = safeString(track.artist_name);
   const duration = formatDuration(track.duration);
-  const releaseDate = track.release_date ? new Date(track.release_date).toLocaleDateString("es-ES", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }) : "—";
+  const releaseDate = track.release_date ? formatDateES(track.release_date) : "—";
   const isrc = safeString(track.isrc);
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialLikeCount);
@@ -54,13 +52,12 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
     }
   }, [track.youtube_video_id]);
 
-  // Badge "Nuevo Lanzamiento" — track released in the last 7 days
+  // Badge "Nuevo Lanzamiento" — track released in the last 7 days (UTC days, TZ-safe)
   const isNewRelease = (() => {
     if (!track.release_date) return false;
-    const releaseDateObj = new Date(track.release_date);
-    const now = new Date();
-    const diffMs = now.getTime() - releaseDateObj.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    const d = new Date(track.release_date);
+    if (isNaN(d.getTime())) return false;
+    const diffDays = diffDaysUTC(d, new Date());
     return diffDays >= 0 && diffDays <= 7;
   })();
 
