@@ -1393,6 +1393,11 @@ onSubmit={async (e) => {
               body: JSON.stringify({ ...data, approved: true }),
             });
             if (res.ok) {
+              const saved = await res.json().catch(() => null);
+              // Optimistic update (immune to replica lag) + re-fetch as backup
+              if (saved && saved.id) {
+                setShows((prev) => [...prev, saved]);
+              }
               setShowFormOpen(false);
               fetchShows();
               setMessage({ type: "success", text: "Show creado" });

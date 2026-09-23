@@ -3,28 +3,12 @@
 import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import type { Show, ShowStatus, PaymentMethod, GuestArtist } from "@/types/music";
-import { PAYMENT_TYPE_LABELS } from "@/lib/show-status";
+import { PAYMENT_TYPE_LABELS, SHOW_STATUS_OPTIONS } from "@/lib/show-status";
 
 const INPUT_CLASS =
   "w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm";
 
 const LABEL_CLASS = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1";
-
-const STATUS_LABELS: Record<ShowStatus, string> = {
-  proximamente: "Próximamente",
-  activo: "Activo",
-  pospuesto: "Pospuesto",
-  hoy: "Hoy",
-  pasado: "Pasado",
-  cancelado: "Cancelado",
-  suspendido: "Suspendido",
-  confirmado: "Confirmado",
-  en_venta: "En Venta",
-  agotado: "Agotado",
-  reprogramado: "Reprogramado",
-  disponible: "Disponible",
-  finalizado: "Finalizado",
-};
 
 interface ShowFormProps {
   show?: Show;
@@ -261,9 +245,9 @@ export function ShowForm({ show, artistId = "", artists, onSave, onCancel }: Sho
             onChange={(e) => update("status", e.target.value as ShowStatus)}
             className={INPUT_CLASS}
           >
-            {(Object.keys(STATUS_LABELS) as ShowStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
+            {SHOW_STATUS_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </select>

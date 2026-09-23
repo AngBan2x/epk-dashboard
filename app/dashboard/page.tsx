@@ -239,9 +239,11 @@ export default function DashboardPage() {
                       <span className="text-xs text-slate-400 mr-2">{track.release_date ? formatDateES(track.release_date) : "N/A"}</span>
                       <a
                         href={`/releases/${track.id}/edit`}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 whitespace-nowrap"
+                        title="Editar release"
+                        aria-label="Editar release"
+                        className="p-1.5 rounded-lg text-slate-400 opacity-60 group-hover:opacity-100 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 transition"
                       >
-                        Editar
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </a>
                     </div>
                   ))}
@@ -362,8 +364,19 @@ export default function DashboardPage() {
                     }}
                     onDelete={async (showId) => {
                       if (confirm("¿Eliminar este show?")) {
-                        await fetch(`/api/shows?id=${showId}`, { method: "DELETE" });
-                        window.location.reload();
+                        const res = await fetch(`/api/shows?id=${showId}`, { method: "DELETE" });
+                        if (res.ok) {
+                          setData((prev) => {
+                            const pid = prev.artistProfile?.id;
+                            const drop = (list: Show[]) => list.filter((s) => s.id !== showId);
+                            return {
+                              ...prev,
+                              artistShows: drop(prev.artistShows),
+                              showsByArtist: pid ? { ...prev.showsByArtist, [pid]: drop(prev.showsByArtist[pid] ?? []) } : prev.showsByArtist,
+                            };
+                          });
+                          setMessage({ type: "success", text: "Show eliminado" });
+                        }
                       }
                     }}
                   />
@@ -394,6 +407,20 @@ export default function DashboardPage() {
                 body: JSON.stringify({ id: editingShow.id, ...data }),
               });
               if (res.ok) {
+                const saved = await res.json().catch(() => null);
+                const showId = editingShow.id;
+                // Optimistic update (immune to replica lag) + re-fetch as backup
+                if (saved && saved.id) {
+                  setData((prev) => {
+                    const pid = prev.artistProfile?.id;
+                    const merge = (list: Show[]) => list.map((s) => (s.id === showId ? { ...s, ...saved } : s));
+                    return {
+                      ...prev,
+                      artistShows: merge(prev.artistShows),
+                      showsByArtist: pid ? { ...prev.showsByArtist, [pid]: merge(prev.showsByArtist[pid] ?? []) } : prev.showsByArtist,
+                    };
+                  });
+                }
                 setEditingShow(null);
                 setShowFormOpen(false);
                 // Refresh data
@@ -408,6 +435,17 @@ export default function DashboardPage() {
                 body: JSON.stringify(data),
               });
               if (res.ok) {
+                const saved = await res.json().catch(() => null);
+                if (saved && saved.id) {
+                  setData((prev) => {
+                    const pid = prev.artistProfile?.id;
+                    return {
+                      ...prev,
+                      artistShows: [...prev.artistShows, saved],
+                      showsByArtist: pid ? { ...prev.showsByArtist, [pid]: [...(prev.showsByArtist[pid] ?? []), saved] } : prev.showsByArtist,
+                    };
+                  });
+                }
                 setShowFormOpen(false);
                 const url = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
                 fetch(url).then(r => r.json()).then(json => setData(json));
