@@ -58,7 +58,9 @@ async function expectPage(page: Page, role: string, theme: string, name: string,
     if (norm.includes(t)) { fail(`${role}/${theme} ${name}`, `forbidden "${t}" present`); return; }
   }
   const fatal = errs.filter((e) => !/favicon|Failed to load resource.*401/i.test(e));
-  const real404 = bad.filter((b) => !/^404 \/favicon\.ico/.test(b));
+  // Expected noise: guest /api/auth/me 401 (no session) and profile /api/artists/me 404 (no artist yet — handled as blank form)
+  const tolerated = [/^401 \/api\/auth\/me$/, /^404 \/api\/artists\/me$/];
+  const real404 = bad.filter((b) => !/^404 \/favicon\.ico/.test(b) && !tolerated.some((t) => t.test(b)));
   await shot(page, role, theme, opts.shotName ?? name);
   if (real404.length) fail(`${role}/${theme} ${name}`, `HTTP errors: ${real404.slice(0, 3).join(" | ")}`);
   else if (fatal.length) fail(`${role}/${theme} ${name}`, `console errors: ${fatal.slice(0, 2).join(" | ")}`);
