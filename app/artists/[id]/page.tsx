@@ -1,4 +1,5 @@
 import { getArtistById, getTracksByArtist } from "@/lib/db";
+import { formatNumber } from "@/lib/null-safe";
 import { BioSection } from "@/components/BioSection";
 import { ArtistTracksSection } from "@/components/ArtistTracksSection";
 import { notFound } from "next/navigation";
@@ -30,7 +31,7 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
             {artist.genre && <span>🎵 {artist.genre}</span>}
             {artist.location && <span>📍 {artist.location}</span>}
             {artist.monthly_listeners > 0 && (
-              <span>🎧 {artist.monthly_listeners.toLocaleString()} oyentes mensuales</span>
+              <span>🎧 {formatNumber(artist.monthly_listeners)} oyentes mensuales</span>
             )}
           </div>
         </div>
