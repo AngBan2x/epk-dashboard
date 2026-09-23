@@ -28,7 +28,7 @@ async function watchErrors(page: Page): Promise<{ errs: string[]; bad: string[] 
 }
 
 async function expectPage(page: Page, role: string, theme: string, name: string, url: string,
-  opts: { mustContain?: string[]; mustNotContain?: string[]; expectRedirect?: string; shotName?: string }) {
+  opts: { mustContain?: string[]; mustNotContain?: string[]; expectRedirect?: string; shotName?: string; tolerateConsole404?: boolean }) {
   const { errs, bad } = await watchErrors(page);
   let resp = null;
   try {
@@ -57,7 +57,10 @@ async function expectPage(page: Page, role: string, theme: string, name: string,
   for (const t of opts.mustNotContain ?? []) {
     if (norm.includes(t)) { fail(`${role}/${theme} ${name}`, `forbidden "${t}" present`); return; }
   }
-  const fatal = errs.filter((e) => !/favicon|Failed to load resource.*401/i.test(e));
+  let fatal = errs.filter((e) => !/favicon|Failed to load resource.*401/i.test(e));
+  // admin has no artist profile: /api/artists/me 404 is by design (blank form).
+  // Response-level check already tolerates it; suppress its console duplicate only where flagged.
+  if (opts.tolerateConsole404) fatal = fatal.filter((e) => !/Failed to load resource[^]*404/.test(e));
   // Expected noise: guest /api/auth/me 401 (no session) and profile /api/artists/me 404 (no artist yet — handled as blank form)
   const tolerated = [/^401 \/api\/auth\/me$/, /^404 \/api\/artists\/me$/];
   const real404 = bad.filter((b) => !/^404 \/favicon\.ico/.test(b) && !tolerated.some((t) => t.test(b)));
@@ -161,7 +164,7 @@ async function main() {
     await expectPage(page, "admin", theme, "dashboard", "/dashboard", { mustContain: ["PressPlay"], shotName: "dashboard" });
     await expectPage(page, "admin", theme, "admin-panel", "/admin", { mustContain: ["Panel de Administración"], shotName: "admin-panel" });
     await expectPage(page, "admin", theme, "approvals", "/admin/approvals", { mustContain: ["PressPlay"], shotName: "approvals" });
-    await expectPage(page, "admin", theme, "profile", "/profile", { mustContain: ["PressPlay"], shotName: "profile" });
+    await expectPage(page, "admin", theme, "profile", "/profile", { mustContain: ["PressPlay"], shotName: "profile", tolerateConsole404: true });
     await expectPage(page, "admin", theme, "account", "/account", { mustContain: ["PressPlay"], shotName: "account" });
     await page.close(); await ctx.close();
   }
