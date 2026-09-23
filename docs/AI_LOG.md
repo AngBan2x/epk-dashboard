@@ -5305,3 +5305,55 @@ Evidencia clave:
 - Deploy: ✅ https://epk-dashboard.vercel.app (auto-deploy from main)
 - Release: ✅ https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.24
 - Visual Tests: ✅ 11 PASS / 0 FAIL / 1 SKIP
+### Batch 2 — Consistencia Diseño + Datos (2026-09-22)
+**Trigger:** Inconsistencia diseño/información en dashboard artista + form admin.
+**Migración:** WSL → Windows a mitad de tarea; re-verificación completa en Windows.
+
+**Batch 1 (Datos):**
+- lib/db.ts — getSubscriberCount(artistId) (linea 1029)
+- getShowsByArtists — filtro pproved=1 eliminado (shows pendientes ahora visibles al artista)
+- pp/api/dashboard/route.ts — retorna subscribers real
+
+**Batch 2 (Design + Admin):**
+- components/ui/Button.tsx — secondary con border
+- pp/admin/page.tsx — form Editar Artista: card rounded-2xl, SectionHeader, labels mb-1.5, focus:ring-2 primary, placeholders, boton primary-600/700
+
+**Batch 3 (Secciones):**
+- Primitivos nuevos: SectionHeader, EmptyState, Badge, lib/show-status
+- BioSection: fallbackBio eliminado, 1x Imprimir, SectionHeader
+- DownloadCenter: "Descargar" ES, CountBadge, hover:700
+- ShowsBooking/BookingModule: showStatusClass shared
+- DossierEditor/EPKExporter/LastfmMetrics: SectionHeader + estados vacios
+- dashboard/page: cards unificadas, col-span-full fix
+
+**Fixes post-migracion Windows:**
+- admin: artistProfile.biography → artistForm.biography (TS2304)
+- dashboard: interface DashboardData duplicada eliminada
+- LyricsSection/ProductionDetails/StemsPlayer: hover:500 → hover:700
+
+**Verificacion:** 
+px tsc --noEmit EXIT:0 (0 errores)
+
+### Batch 2 - Verificacion Final (2026-09-22)
+**Typecheck:** 
+px tsc --noEmit EXIT:0 (0 errores)
+**Build:** pnpm build PASS (prebuild cross-platform: rm Unix-only reescrito con node -e)
+**Unit tests:** pnpm test:unit PASS — 10 files / 110 tests
+**Visual test:** scripts/batch2-visual.ts PASS — 8/8:
+- C1 SectionHeaders (h2) x9 en dashboard artista
+- C2 Bio sin contenido fake (fallbackBio eliminado)
+- C3 "Descargar" en español
+- C4 Un solo botón Imprimir
+- C5 Stats visibles (Shows + Suscriptores)
+- C5b Shows stat value=2
+- C6 Admin form: Biografía + Texto de Prensa + Destacados de Prensa
+- C7 Admin Guardar button style primary-600/700
+Screenshots: 	ests/screenshots/batch2/{dark,light}/
+
+**Bugs extra corregidos (Windows + Auth):**
+- package.json prebuild m -f Unix-only → node -e cross-platform
+- /api/auth/me 401 sin cache headers → no-store en route + AuthContext.fetchUser
+- Contexto: after login cached 401 dejaba header en "Iniciar Sesión" hasta fix
+
+**Cleanup:** scripts batch2-debug/admin-debug/auth-debug/login-debug/admin-net eliminados; se conserva batch2-visual.ts
+**Commits:** fix: consistency batch — data + design system + sections + Windows fixes

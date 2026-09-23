@@ -4,6 +4,9 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeString } from "@/lib/null-safe";
 import type { Show } from "@/types/music";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { showStatusClass, showStatusLabel } from "@/lib/show-status";
 
 interface ShowDate {
   id: string;
@@ -43,26 +46,13 @@ export function BookingModule({
       .finally(() => setLoading(false));
   }, [artistId]);
 
-  const statusColors: Record<string, string> = {
-    proximamente: "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800",
-    activo: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
-    pospuesto: "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800",
-    hoy: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
-    pasado: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600",
-    cancelado: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800",
-    suspendido: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600",
-    confirmado: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
-    en_venta: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
-    agotado: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800",
-  };
-
   return (
-    <section className={`p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 ${className}`}>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span>🎫</span> Shows & Booking
-        </h2>
-      </div>
+    <section className={`p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 ${className}`}>
+      <SectionHeader
+        emoji="🎫"
+        title="Shows & Booking"
+        subtitle="Fechas y entradas del artista"
+      />
 
       <AnimatePresence mode="wait">
         {loading ? (
@@ -72,9 +62,7 @@ export function BookingModule({
             <p>{error}</p>
           </div>
         ) : shows.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
-            <p>No hay shows registrados para este artista.</p>
-          </div>
+          <EmptyState emoji="🎤" message="No hay shows registrados para este artista." />
         ) : (
           <motion.div
             key="shows"
@@ -105,15 +93,15 @@ export function BookingModule({
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-3 sm:mt-0">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusColors[show.status] || statusColors.proximamente}`}>
-                    {show.status}
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${showStatusClass(show.status)}`}>
+                    {showStatusLabel(show.status)}
                   </span>
                   {show.ticket_url && show.status !== "agotado" && (
                     <a
                       href={show.ticket_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-500 text-white transition"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white transition"
                     >
                       🎟️ Comprar
                     </a>

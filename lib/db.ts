@@ -1026,6 +1026,16 @@ export async function deleteSubscription(id: string): Promise<boolean> {
   return result.changes > 0;
 }
 
+export async function getSubscriberCount(artistId: string): Promise<number> {
+  if (isTursoEnabled()) {
+    const row = await tursoExecSingle("SELECT COUNT(*) as c FROM subscriptions WHERE artist_id = ?", [artistId]);
+    return row ? Number(row.c) : 0;
+  }
+  const db = getLocalDb();
+  const result = db.prepare("SELECT COUNT(*) as c FROM subscriptions WHERE artist_id = ?").get(artistId) as { c: number } | undefined;
+  return result?.c ?? 0;
+}
+
 // ─── Likes CRUD ─────────────────────────────────────────────────────────────
 
 export async function toggleLike(userId: string, trackId: string): Promise<{ liked: boolean; count: number }> {
@@ -1472,12 +1482,12 @@ export async function getShowsByArtists(artistIds: string[]): Promise<Show[]> {
   if (artistIds.length === 0) return [];
   if (isTursoEnabled()) {
     const placeholders = artistIds.map(() => "?").join(", ");
-    const rows = await tursoExec(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) AND approved = 1 ORDER BY date ASC`, artistIds);
+    const rows = await tursoExec(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) ORDER BY date ASC`, artistIds);
     return rows.map((r) => parseShow(r as Record<string, unknown>));
   }
   const db = getLocalDb();
   const placeholders = artistIds.map(() => "?").join(", ");
-  const rows = db.prepare(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) AND approved = 1 ORDER BY date ASC`).all(...artistIds) as Record<string, unknown>[];
+  const rows = db.prepare(`SELECT * FROM shows WHERE artist_id IN (${placeholders}) ORDER BY date ASC`).all(...artistIds) as Record<string, unknown>[];
   return rows.map(parseShow);
 }
 

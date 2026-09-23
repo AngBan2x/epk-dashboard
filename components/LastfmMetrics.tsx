@@ -7,6 +7,9 @@ import type {
   LastfmTopTrack,
 } from "@/lib/lastfm";
 import { formatNumber } from "@/lib/null-safe";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface LastfmMetricsProps {
   artist: string;
@@ -21,7 +24,7 @@ interface LastfmData {
 
 function Skeleton() {
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 animate-pulse">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 animate-pulse">
       <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded mb-4" />
       <div className="space-y-3">
         <div className="h-3 w-full bg-slate-200 dark:bg-slate-700 rounded" />
@@ -53,16 +56,27 @@ export default function LastfmMetrics({ artist, trackTitle }: LastfmMetricsProps
 
   if (loading) return <Skeleton />;
   if (!data?.artist && !data?.track && (!data?.topTracks || data.topTracks.length === 0)) {
-    return null;
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+        <SectionHeader
+          emoji="📈"
+          title="Métricas Last.fm"
+          subtitle="Listeners y reproducciones de tu catálogo"
+          badges={<Badge variant="rose">Last.fm</Badge>}
+        />
+        <EmptyState emoji="📈" message="Sin datos de Last.fm para este artista" />
+      </div>
+    );
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="inline-block px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-          Last.fm
-        </span>
-      </div>
+    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+      <SectionHeader
+        emoji="📈"
+        title="Métricas Last.fm"
+        subtitle="Listeners y reproducciones de tu catálogo"
+        badges={<Badge variant="rose">Last.fm</Badge>}
+      />
 
       {data.track && (
         <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-700/50">
