@@ -318,6 +318,10 @@ export default function DashboardPage() {
                     <DossierEditor
                       artistId={artistProfile.id}
                       artistName={artistProfile.name}
+                      onSaved={() => {
+                        const url = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
+                        fetch(url).then(r => r.json()).then(json => setData(json));
+                      }}
                     />
                   </SlideIn>
                   <SlideIn index={artistTracks.length + 3}>

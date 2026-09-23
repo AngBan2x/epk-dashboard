@@ -35,8 +35,7 @@ export function showStatusClass(status: string): string {
   );
 }
 
-export function showStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
+export function showStatusLabel(status: string): string {  const labels: Record<string, string> = {
     proximo: "Próximamente",
     confirmado: "Confirmado",
     pendiente: "Pendiente",
@@ -51,4 +50,16 @@ export function showStatusLabel(status: string): string {
     en_vivo: "En vivo",
   };
   return labels[status] || status;
+}
+
+export const PAYMENT_TYPE_LABELS: Record<string, string> = {
+  cash: "Efectivo",
+  card: "Tarjeta",
+  transfer: "Transferencia",
+  ticket_platform: "Plataforma de Tickets",
+  other: "Otro",
+};
+
+export function paymentMethodLabel(type: string): string {
+  return PAYMENT_TYPE_LABELS[type] || type;
 }

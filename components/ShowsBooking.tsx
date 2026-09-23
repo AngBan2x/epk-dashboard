@@ -5,7 +5,7 @@ import type { Show, ShowStatus } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { CountBadge, Badge } from "@/components/ui/Badge";
-import { showStatusClass, showStatusLabel } from "@/lib/show-status";
+import { showStatusClass, showStatusLabel, paymentMethodLabel } from "@/lib/show-status";
 
 interface ShowsBookingProps {
   artistId?: string;
@@ -29,6 +29,22 @@ function formatDate(dateStr: string | null): string {
 export function ShowsBooking({ artistId, shows: propShows, editable = false, onEdit, onDelete, onAdd }: ShowsBookingProps) {
   const [shows, setShows] = useState<Show[]>(propShows || []);
   const [loading, setLoading] = useState(!propShows);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const hasExtra = (show: Show) =>
+    !!(show.description || show.notes || show.flyer_url || show.ticket_link ||
+      (show.guest_artists && show.guest_artists.length > 0) ||
+      (show.payment_methods && show.payment_methods.length > 0) ||
+      (show.status === "pospuesto" && show.postponement_reason));
 
   useEffect(() => {
     if (propShows) {
@@ -137,6 +153,17 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {hasExtra(show) && (
+                      <button
+                        onClick={() => toggleExpanded(show.id)}
+                        title={expanded.has(show.id) ? "Ocultar detalles" : "Ver detalles"}
+                        aria-label={expanded.has(show.id) ? "Ocultar detalles" : "Ver detalles"}
+                        aria-expanded={expanded.has(show.id)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                      >
+                        <svg className={`w-4 h-4 transition-transform ${expanded.has(show.id) ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                      </button>
+                    )}
                     {show.ticket_url && (
                       <a
                         href={show.ticket_url}
@@ -173,6 +200,49 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                     )}
                   </div>
                 </div>
+                {expanded.has(show.id) && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-sm">
+                    {show.description && (
+                      <p className="text-slate-600 dark:text-slate-300">{show.description}</p>
+                    )}
+                    {show.guest_artists && show.guest_artists.length > 0 && (
+                      <p className="text-slate-500 dark:text-slate-400">
+                        <span className="font-medium text-slate-700 dark:text-slate-200">🎤 Invitados: </span>
+                        {show.guest_artists.map((g) => g.role ? `${g.name} (${g.role})` : g.name).join(" · ")}
+                      </p>
+                    )}
+                    {show.payment_methods && show.payment_methods.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">💳 Pago:</span>
+                        {show.payment_methods.map((pm, i) => (
+                          <Badge key={i}>{paymentMethodLabel(pm.type)}{pm.details ? ` — ${pm.details}` : ""}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {show.flyer_url && (
+                        <a href={show.flyer_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                          🖼️ Ver flyer
+                        </a>
+                      )}
+                      {show.ticket_link && show.ticket_link !== show.ticket_url && (
+                        <a href={show.ticket_link} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                          🎟️ Link alternativo de tickets
+                        </a>
+                      )}
+                    </div>
+                    {show.status === "pospuesto" && show.postponement_reason && (
+                      <p className="text-sm text-orange-700 dark:text-orange-300">
+                        ⏸️ Motivo de posposición: {show.postponement_reason}
+                      </p>
+                    )}
+                    {editable && show.notes && (
+                      <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                        🔒 Solo tú: {show.notes}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

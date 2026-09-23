@@ -59,11 +59,12 @@ const DEFAULTS: DossierData = {
 interface DossierEditorProps {
   artistId: string;
   artistName: string;
+  onSaved?: () => void;
 }
 
 type Tab = "dossier" | "rider";
 
-export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
+export function DossierEditor({ artistId, artistName, onSaved }: DossierEditorProps) {
   const [tab, setTab] = useState<Tab>("dossier");
   const [data, setData] = useState<DossierData>(DEFAULTS);
   const [loading, setLoading] = useState(true);
@@ -127,6 +128,7 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
       if (res.ok) {
         setMessage({ type: "success", text: "Dossier + Rider guardados exitosamente" });
         setTimeout(() => setMessage(null), 3000);
+        onSaved?.();
       } else {
         const err = await res.json();
         setMessage({ type: "error", text: err.error || "Error al guardar" });
