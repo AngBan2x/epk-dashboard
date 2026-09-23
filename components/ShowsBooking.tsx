@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import type { Show, ShowStatus } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { CountBadge } from "@/components/ui/Badge";
+import { CountBadge, Badge } from "@/components/ui/Badge";
 import { showStatusClass, showStatusLabel } from "@/lib/show-status";
 
 interface ShowsBookingProps {
@@ -101,41 +101,42 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
         </div>
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {shows.map((show) => (
+          {shows.map((show) => {
+            const isPast = !!show.date && new Date(show.date) < new Date();
+            return (
               <div
                 key={show.id}
                 className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h4 className="font-semibold text-slate-900 dark:text-white truncate">
                         {safeString(show.venue_name)}
                       </h4>
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${showStatusClass(show.status)}`}>
                         {showStatusLabel(show.status)}
                       </span>
+                      {isPast && (
+                        <Badge variant="amber">Pasado · se elimina en 48h</Badge>
+                      )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
-                      {(show.city || show.country) && (
-                        <span className="flex items-center gap-1">
-                          📍 {[show.city, show.country].filter(Boolean).join(", ")}
-                        </span>
-                      )}
-                      {show.date && (
-                        <span className="flex items-center gap-1">
-                          📅 {formatDate(show.date)}
-                          {show.time && ` • ${show.time}`}
-                        </span>
-                      )}
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      <p className="flex items-center gap-1">
+                        📍 {(show.city || show.country) ? [show.city, show.country].filter(Boolean).join(", ") : "Ubicación por confirmar"}
+                      </p>
+                      <p className="flex items-center gap-1">
+                        📅 {show.date ? formatDate(show.date) : "Fecha por confirmar"}
+                        {show.date && show.time && ` • ${show.time}`}
+                      </p>
                       {show.price_range && (
-                        <span className="flex items-center gap-1">
+                        <p className="flex items-center gap-1">
                           💰 {show.price_range}
-                        </span>
+                        </p>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 shrink-0">
                     {show.ticket_url && (
                       <a
                         href={show.ticket_url}
@@ -151,32 +152,30 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                         {onEdit && (
                           <button
                             onClick={() => onEdit(show)}
-                            className="px-2 py-1.5 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
+                            title="Editar show"
+                            aria-label="Editar show"
+                            className="p-2 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
                           >
-                            ✏️
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
                           </button>
                         )}
                         {onDelete && (
                           <button
                             onClick={() => onDelete(show.id)}
-                            className="px-2 py-1.5 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
+                            title="Eliminar show"
+                            aria-label="Eliminar show"
+                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
                           >
-                            🗑️
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                           </button>
                         )}
                       </>
                     )}
                   </div>
                 </div>
-                {show.date && new Date(show.date) < new Date() && (
-                  <div className="mt-2 px-3 py-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700">
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                      ⚠️ Este show ya pasó. Será eliminado automáticamente en 48 horas.
-                    </p>
-                  </div>
-                )}
               </div>
-            ))}
+            );
+          })}
         </div>
       )}
     </div>

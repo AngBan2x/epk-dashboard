@@ -18,6 +18,8 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ShowForm } from "@/components/ShowForm";
 import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
+import { formatDateES } from "@/lib/null-safe";
+import { showStatusLabel } from "@/lib/show-status";
 
 interface DashboardData {
   tracks: Track[];
@@ -234,7 +236,7 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{track.title}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">Release publicado</p>
                       </div>
-                      <span className="text-xs text-slate-400 mr-2">{track.release_date || "N/A"}</span>
+                      <span className="text-xs text-slate-400 mr-2">{track.release_date ? formatDateES(track.release_date) : "N/A"}</span>
                       <a
                         href={`/releases/${track.id}/edit`}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 whitespace-nowrap"
@@ -243,18 +245,32 @@ export default function DashboardPage() {
                       </a>
                     </div>
                   ))}
-                  {artistShows.slice(0, 2).map((show) => (
-                    <div key={show.id} className="px-4 py-3 flex items-center gap-3">
+                  {artistShows.slice(0, 2).map((show) => {
+                    const isPast = !!show.date && new Date(show.date) < new Date();
+                    return (
+                    <div key={show.id} className="px-4 py-3 flex items-center gap-3 group">
                       <div className="w-10 h-10 rounded bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
                         <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{show.venue_name}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Próximo show</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{isPast ? "Show finalizado" : showStatusLabel(show.status)}</p>
                       </div>
-                      <span className="text-xs text-slate-400">{show.date || "TBD"}</span>
+                      <span className="text-xs text-slate-400">{show.date ? formatDateES(show.date) : "TBD"}</span>
+                      <button
+                        onClick={() => {
+                          setEditingShow(show);
+                          setShowFormOpen(true);
+                        }}
+                        title="Editar show"
+                        aria-label="Editar show"
+                        className="p-1.5 rounded-lg text-slate-400 opacity-60 group-hover:opacity-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </button>
                     </div>
-                  ))}
+                    );
+                  })}
                   {artistTracks.length === 0 && artistShows.length === 0 && (
                     <div className="px-4 py-8 text-center text-slate-400">
                       <p className="text-sm">No hay actividad reciente</p>
