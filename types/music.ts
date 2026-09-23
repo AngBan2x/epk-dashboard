@@ -25,6 +25,13 @@ export interface ProductionDetails {
   production_credits?: string | null;
 }
 
+export interface GalleryImage {
+  id: string;
+  url: string;
+  title?: string;
+  category?: "Portada" | "Prensa" | "En Vivo" | "Estudio" | string;
+}
+
 export interface StemsUrls {
   drums?: string;
   bass?: string;
@@ -53,7 +60,7 @@ export interface Track {
   itunes_track_id?: string | null;
   stems_urls?: StemsUrls | null;
   video_embed_url?: string | null;
-  gallery_images?: string[] | null;
+  gallery_images?: Array<string | GalleryImage> | null;
   // P2.5: New fields
   external_links?: ExternalLinks | null;
   disc_number?: number;

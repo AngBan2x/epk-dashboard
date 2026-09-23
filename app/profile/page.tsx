@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { ImageUploader } from '@/components/ImageUploader';
 
 interface ArtistProfile {
   id: string;
@@ -191,6 +192,19 @@ export default function ProfilePage() {
                     placeholder="https://ejemplo.com/foto.jpg"
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
                   />
+                  <div className="mt-3">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">O sube un archivo (JPG/PNG/WebP, max 5MB)</p>
+                    {profile?.id ? (
+                      <ImageUploader
+                        kind="profile"
+                        artistId={profile.id}
+                        uploadId={`profile-${profile.id}`}
+                        onUploadComplete={(url) => setProfileImage(url)}
+                      />
+                    ) : (
+                      <p className="text-xs text-slate-400">Guarda el perfil primero para habilitar la subida.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -206,6 +220,19 @@ export default function ProfilePage() {
                 placeholder="https://ejemplo.com/banner.jpg (1200x400 recomendado)"
                 className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
               />
+              <div className="mt-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">O sube un archivo (JPG/PNG/WebP, max 5MB)</p>
+                {profile?.id ? (
+                  <ImageUploader
+                    kind="banner"
+                    artistId={profile.id}
+                    uploadId={`banner-${profile.id}`}
+                    onUploadComplete={(url) => setBannerImage(url)}
+                  />
+                ) : (
+                  <p className="text-xs text-slate-400">Guarda el perfil primero para habilitar la subida.</p>
+                )}
+              </div>
             </div>
 
             {/* Basic Info */}

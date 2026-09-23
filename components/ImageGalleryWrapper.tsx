@@ -31,33 +31,57 @@ export function ImageGalleryWrapper({
       .catch(() => {});
   }, [artistName]);
 
+  const persistGallery = async (next: (string | GalleryItem)[]) => {
+    try {
+      await fetch(`/api/tracks/${trackId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gallery_images: next }),
+      });
+    } catch {
+      console.error("Failed to persist gallery");
+    }
+  };
+
   return (
     <ImageGallery
       images={currentImages}
       title={title}
       trackId={trackId}
       isOwner={isOwner}
-      onImageAdded={(url) => {
-        setCurrentImages((prev) => [...(prev ?? []), url]);
+      onImageAdded={(item) => {
+        setCurrentImages((prev) => [...(prev ?? []), item]);
       }}
       onImageRemoved={(id) => {
-        setCurrentImages((prev) =>
-          (prev ?? []).filter((img) => {
+        setCurrentImages((prev) => {
+          const next = (prev ?? []).filter((img) => {
             if (typeof img === "string") return true;
             return img.id !== id;
-          })
+          });
+          return next;
+        });
+        const target = (currentImages ?? []).find(
+          (img) => typeof img !== "string" && img.id === id
         );
+        const url = typeof target === "object" ? target.url : null;
+        if (url) {
+          fetch(`/api/upload/image?trackId=${trackId}&url=${encodeURIComponent(url)}`, {
+            method: "DELETE",
+          }).catch(() => {});
+        }
       }}
       onImageEdited={(id, newTitle, category) => {
-        setCurrentImages((prev) =>
-          (prev ?? []).map((img) => {
+        setCurrentImages((prev) => {
+          const next = (prev ?? []).map((img) => {
             if (typeof img === "string") return img;
             if (img.id === id) {
               return { ...img, title: newTitle, category: category as GalleryItem["category"] };
             }
             return img;
-          })
-        );
+          });
+          persistGallery(next);
+          return next;
+        });
       }}
     />
   );

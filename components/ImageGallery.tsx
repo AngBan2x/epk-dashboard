@@ -4,20 +4,16 @@ import Image from "next/image";
 import React, { useState } from "react";
 import { safeArray, safeString } from "@/lib/null-safe";
 import { ImageUploader } from "./ImageUploader";
+import type { GalleryImage as GalleryItem } from "@/types/music";
 
-export interface GalleryItem {
-  id: string;
-  url: string;
-  title?: string;
-  category?: "Portada" | "Prensa" | "En Vivo" | "Estudio";
-}
+export type { GalleryImage as GalleryItem } from "@/types/music";
 
 interface ImageGalleryProps {
   images?: (string | GalleryItem)[];
   title?: string;
   trackId?: string;
   isOwner?: boolean;
-  onImageAdded?: (url: string) => void;
+  onImageAdded?: (item: GalleryItem) => void;
   onImageRemoved?: (id: string) => void;
   onImageEdited?: (id: string, title: string, category: string) => void;
 }
@@ -51,9 +47,17 @@ export function ImageGallery({
     };
   });
 
-  const handleUploadComplete = (url: string) => {
+  const handleUploadComplete = (
+    url: string,
+    meta?: { id?: string; title?: string; category?: string }
+  ) => {
     setShowUploader(false);
-    onImageAdded?.(url);
+    onImageAdded?.({
+      id: meta?.id || `img-${Date.now()}`,
+      url,
+      title: meta?.title,
+      category: (meta?.category as GalleryItem["category"]) || "Prensa",
+    });
   };
 
   // Fallbacks elegantes en caso de que el artista no tenga imágenes
