@@ -1,4 +1,7 @@
-# Batch Fixes — Consistencia Diseño + Datos (PLAN + RESULTADOS)
+# Batch 2 — Design System + Admin Form (PLAN + RESULTADOS)
+
+> **Alcance:** este doc cubre Batch 1 (datos) y Batch 2 (design + admin).
+> Batch 3 (secciones dashboard) documentado por separado en `docs/FIXES_BATCH_3.md`.
 
 **Fecha:** 2026-09-22
 **Modelo:** Nemotron 3 Ultra Free (opencode)
@@ -40,16 +43,7 @@
 - `app/admin/page.tsx` — form "Editar Artista" con estilo card consistente (labels, spacing, textarea)
 - **NO toca** Bio/Download/Shows/Dossier/EPK/Lastfm ni db/api
 
-### Batch 3 — Secciones dashboard
-- `components/BioSection.tsx` — SectionHeader, 1× botón Imprimir, EmptyState sin fallbackBio
-- `components/DownloadCenter.tsx` — SectionHeader, "Descargar", CountBadge shared
-- `components/ShowsBooking.tsx` — h2 + SectionHeader, StatusBadge de lib
-- `components/DossierEditor.tsx` — header en expandido, hover primary-700, SectionHeader
-- `components/EPKExporter.tsx` — text-lg, CountBadge, EmptyState/deshabilitar si 0 tracks
-- `components/LastfmMetrics.tsx` — SectionHeader completo
-- `components/BookingModule.tsx` — StatusBadge shared
-- `app/dashboard/page.tsx` — envolver secciones nativas en cards, col-span fix, SectionHeader
-- **NO toca** lib/db.ts ni app/api/*
+### Batch 3 — Secciones dashboard → ver `docs/FIXES_BATCH_3.md` (resultados finales ahí)
 
 ---
 

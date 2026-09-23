@@ -5357,3 +5357,22 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 
 **Cleanup:** scripts batch2-debug/admin-debug/auth-debug/login-debug/admin-net eliminados; se conserva batch2-visual.ts
 **Commits:** fix: consistency batch — data + design system + sections + Windows fixes
+
+### Batch 3 - Verificacion + Prerelease rc.25 (2026-09-23)
+**Modelo:** Muse Spark 1.3 Free (OpenCode Zen)
+**Doc:** docs/FIXES_BATCH_3.md creado; docs/FIXES_BATCH_2.md retitulado (Batch 2) con cross-ref.
+
+**Quality gates (Windows):**
+- npx tsc --noEmit EXIT:0
+- pnpm test:unit: 10 files / 110 tests PASS
+- pnpm build: PASS
+- scripts/batch2-visual.ts: 8 PASS / 0 FAIL (2a corrida corrreccion networkidle->domcontentloaded ok)
+
+**E2E smoke (dashboard.spec + auth-qa.spec): 5 passed / 7 failed - todos pre-existentes:**
+- dashboard.spec (2): h1 'PressPlay' desactualizado (real: 'Panel de Administracion'/saludo); '/' ya no redirige (landing page)
+- auth-qa.spec (5): BASE_URL hardcodeado a https://epk-dashboard.vercel.app + networkidle timeouts (prod, no local)
+- Follow-up: actualizar expectativas dashboard.spec; parametrizar BASE_URL. No bloquean rc.25.
+
+**opencode.json multiplataforma:** eliminados PATH WSL (/home/angel/...) y executable-path chromium-linux hardcodeado; sqlite/github/playwright/git/fetch usan resolucion default. Incluido en commit (sin screenshots por decision usuario).
+
+**Release:** gh release create v4.0.0-rc.25 --prerelease (Batch 2+3 + Windows + auth no-store). Deploy auto Vercel desde main.
