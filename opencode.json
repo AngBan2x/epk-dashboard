@@ -14,7 +14,7 @@
       "command": ["npx", "-y", "mcp-server-sqlite"],
       "cwd": ".",
       "environment": { "SQLITE_DB_PATH": "data/music_catalog.db" },
-      "enabled": true,
+      "enabled": false,
       "timeout": 15000
     },
     "github": {
