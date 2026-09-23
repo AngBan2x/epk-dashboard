@@ -52,3 +52,11 @@ data/*.db-wal
 
 # playwright mcp artifacts
 .playwright-mcp/
+
+# screenshots — local visual evidence, never commit (saves repo space)
+# convention: all suites output to tests/screenshots/<suite>/
+screenshots/
+tests/screenshots/
+
+# playwright storage-state temp files
+prod-*.json

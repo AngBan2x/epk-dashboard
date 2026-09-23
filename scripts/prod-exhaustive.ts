@@ -99,7 +99,9 @@ async function themedContext(browser: any, theme: "light" | "dark", storage?: st
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
+  const headed = process.env.HEADED === "1";
+  if (headed) console.log("HEADED mode: browser visible");
+  const browser = await chromium.launch({ headless: !headed });
   const themes: ("light" | "dark")[] = ["light", "dark"];
 
   // ---------- GUEST ----------
