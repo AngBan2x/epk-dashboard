@@ -5382,3 +5382,15 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 - Smoke prod: / (200), /login (200), /api/artists (200) en https://epk-dashboard.vercel.app
 - Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.25 (prerelease=true)
 - E2E pendiente (follow-up, no bloqueante): dashboard.spec expectativas + auth-qa BASE_URL param
+
+### MCP config fix -32000 (2026-09-23)
+**Modelo:** Muse Spark 1.3 Free (OpenCode Zen)
+**Sintoma:** github + sqlite 'MCP error -32000: Connection closed' (mismo que sesion Sept 8).
+**Causa:** al hacer opencode.json multiplataforma se quito el bloque environment completo: github quedo sin token y sqlite sin SQLITE_DB_PATH (procesos mueren al arrancar).
+**Fix (A+B ejecutado, C en docs/CONFIG_TODO.md):**
+- opencode.json: sqlite con cwd '.' + SQLITE_DB_PATH=data/music_catalog.db + timeout 15000; github enabled:false (solo gh CLI, consume menos contexto); timeout 15000 en filesystem/playwright/git/fetch
+- Global opencode.jsonc: eliminada clave top-level 'env' (invalida en schema) con PAT en claro - ya no se necesita (gh CLI usa keyring)
+- Borrado .mcp.json (formato Claude, paquete sqlite 404) y .opencode/config.json (schema invalido)
+- Skill auditar-mcp actualizada a opencode.json + gh CLI
+- AGENTS.md: MCP 7 on/7 off; eliminadas secciones analyze-image/image-detector (no implementados)
+**Verificacion pendiente (usuario):** reiniciar opencode (config no recarga en caliente) -> panel MCP verde -> smoke sqlite + gh.

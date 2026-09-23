@@ -6,22 +6,28 @@
     "filesystem": {
       "type": "local",
       "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
-      "enabled": true
+      "enabled": true,
+      "timeout": 15000
     },
     "sqlite": {
       "type": "local",
       "command": ["npx", "-y", "mcp-server-sqlite"],
-      "enabled": true
+      "cwd": ".",
+      "environment": { "SQLITE_DB_PATH": "data/music_catalog.db" },
+      "enabled": true,
+      "timeout": 15000
     },
     "github": {
       "type": "local",
       "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
-      "enabled": true
+      "enabled": false,
+      "timeout": 15000
     },
     "playwright": {
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp"],
-      "enabled": true
+      "enabled": true,
+      "timeout": 15000
     },
     "context7": {
       "type": "remote",
@@ -36,12 +42,14 @@
     "git": {
       "type": "local",
       "command": ["uvx", "mcp-server-git", "--repository", "."],
-      "enabled": true
+      "enabled": true,
+      "timeout": 15000
     },
     "fetch": {
       "type": "local",
       "command": ["npx", "-y", "@mokei/mcp-fetch"],
-      "enabled": true
+      "enabled": true,
+      "timeout": 15000
     },
     "sentry": {
       "type": "remote",
