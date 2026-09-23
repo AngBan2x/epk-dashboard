@@ -41,7 +41,9 @@ async function main() {
   mkdirSync(`${OUT}/dark`, { recursive: true });
   mkdirSync(`${OUT}/light`, { recursive: true });
 
-  const browser = await chromium.launch({ headless: true });
+  const headed = process.env.HEADED === "1";
+  if (headed) console.log("HEADED mode: browser visible");
+  const browser = await chromium.launch({ headless: !headed });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
 
