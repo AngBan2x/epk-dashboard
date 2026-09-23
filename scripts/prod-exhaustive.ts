@@ -139,7 +139,7 @@ async function main() {
   for (const theme of themes) {
     const ctx = await themedContext(browser, theme, "prod-artist.json");
     const page = await ctx.newPage();
-    await expectPage(page, "artist", theme, "dashboard", "/dashboard", { mustContain: ["PressPlay"], mustNotContain: ["Iniciar Sesión"], shotName: "dashboard" });
+    await expectPage(page, "artist", theme, "dashboard", "/dashboard", { mustContain: ["PressPlay", "Próximamente", "Valencia, Venezuela"], mustNotContain: ["Iniciar Sesión", "proximamente"], shotName: "dashboard" });
     await expectPage(page, "artist", theme, "profile", "/profile", { mustContain: ["PressPlay"], shotName: "profile" });
     await expectPage(page, "artist", theme, "account", "/account", { mustContain: ["PressPlay"], shotName: "account" });
     await expectPage(page, "artist", theme, "releases-new", "/releases/new", { mustContain: ["PressPlay"], shotName: "releases-new" });
