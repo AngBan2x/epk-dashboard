@@ -2115,7 +2115,9 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
       const db = getLocalDbWrite();
       db.prepare(`UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`).run(...values, now, artistId);
     }
-    return (await getDossierByArtistId(artistId))!;
+    const updated = (await getDossierByArtistId(artistId))!;
+    await syncDossierToArtist(artistId, data);
+    return updated;
   }
 
   const id = `dos-${Date.now()}`;
@@ -2133,5 +2135,27 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
     const db = getLocalDbWrite();
     db.prepare(`INSERT INTO dossiers (${allFields.join(", ")}, created_at, updated_at) VALUES (${placeholders}, ?, ?)`).run(...values, now, now);
   }
-  return (await getDossierByArtistId(artistId))!;
+  const created = (await getDossierByArtistId(artistId))!;
+  await syncDossierToArtist(artistId, data);
+  return created;
+}
+
+// Single source of truth: artists table is canonical for bio/press/genre/location
+// shown in BioSection + public artist page. DossierEditor writes dossiers, so sync
+// those fields back to artists on every dossier save (both Turso + SQLite via updateArtist).
+export async function syncDossierToArtist(
+  artistId: string,
+  data: Partial<{ biography: string | null; press_text: string | null; genre: string | null; location: string | null }>
+): Promise<void> {
+  const sync: Record<string, unknown> = {};
+  if (data.biography) sync.biography = data.biography;
+  if (data.press_text) sync.press_text = data.press_text;
+  if (data.genre) sync.genre = data.genre;
+  if (data.location) sync.location = data.location;
+  if (Object.keys(sync).length === 0) return;
+  try {
+    await updateArtist(artistId, sync);
+  } catch (error) {
+    console.error("syncDossierToArtist failed:", error);
+  }
 }

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import type { Show, ShowStatus, PaymentMethod, GuestArtist } from "@/types/music";
+import { PAYMENT_TYPE_LABELS } from "@/lib/show-status";
 
 const INPUT_CLASS =
   "w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm";
@@ -23,14 +24,6 @@ const STATUS_LABELS: Record<ShowStatus, string> = {
   reprogramado: "Reprogramado",
   disponible: "Disponible",
   finalizado: "Finalizado",
-};
-
-const PAYMENT_TYPE_LABELS: Record<string, string> = {
-  cash: "Efectivo",
-  card: "Tarjeta",
-  transfer: "Transferencia",
-  ticket_platform: "Plataforma de Tickets",
-  other: "Otro",
 };
 
 interface ShowFormProps {
