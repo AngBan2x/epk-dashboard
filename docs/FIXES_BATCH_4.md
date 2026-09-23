@@ -54,3 +54,32 @@
 - `artists` = canónico bio/press/genre/location (Bio + página pública).
 - `dossiers` = rider + snapshot de exportación (DownloadCenter).
 - Sync automático dossiers→artists en cada PUT.
+
+---
+
+## Batch 4b — Estados, optimista, exportar, actividad (2026-09-23, commit 33cbd5b)
+
+### A. Vocabulario unico de estados
+- show-status.ts reescrito con los 13 valores reales del enum DB + aliases legacy; SHOW_STATUS_OPTIONS compartido con el select de ShowForm (duplicado eliminado).
+- Efecto: badge 'Proximamente' (no 'proximamente' crudo) en Shows, Actividad y BookingModule.
+
+### B. Updates optimistas anti-lag
+- Dashboard onSave/delete + admin onSave actualizan estado local con la respuesta del API antes del re-fetch (respaldo). DELETE sin reload.
+- Causa del 'no se refleja': fetch-on-mount + Turso replica lag (hasta 60s+ medido).
+
+### C. Exportar Dossier EPK
+- Boton full-width XL -> primario compacto (mantiene estados idle/loading/success/error); toggle JSON/HTML -> estilo tabs DossierEditor.
+
+### D. Last.fm
+- Padding uniforme rama vacia (p-6). Icono: verificado en codigo (glyph texto, sin <img> roto); si persiste aspecto roto en algun browser -> swap a SVG.
+
+### E. Actividad: Editar icono unificado
+- Link texto ambar en tracks -> mismo boton lapiz que shows.
+
+### Verificacion
+- tsc 0, unit 110, build OK; prod-exhaustive 50/50 (con checks 'Proximamente' + 'Valencia, Venezuela' + sin 'proximamente');
+- fase2-functional local 8/8 (create/render/expand 5 strings/optimistic edit/sync/restore/cleanup). DB prod limpia.
+"; Add-Content -LiteralPath "docs/AI_LOG.md" -Value @"
+
+### Batch 4b (2026-09-23, 33cbd5b)
+Estados unificados, optimistic shows, exportar compacto, Last.fm padding, editar-icono. Matrix 50/50 + funcional 8/8. Leccion: reads Turso pueden ir a replicas distintas en segundos (poll + reload-loop en harness).
