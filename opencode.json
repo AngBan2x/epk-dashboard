@@ -6,35 +6,21 @@
     "filesystem": {
       "type": "local",
       "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
-      "environment": {
-        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      },
       "enabled": true
     },
     "sqlite": {
       "type": "local",
       "command": ["npx", "-y", "mcp-server-sqlite"],
-      "environment": {
-        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        "SQLITE_DB_PATH": "/home/angel/sistinf/epk-dashboard-v2/data/music_catalog.db"
-      },
       "enabled": true
     },
     "github": {
       "type": "local",
       "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
-      "environment": {
-        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
-      },
       "enabled": true
     },
     "playwright": {
       "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp", "--executable-path", "/home/angel/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome"],
-      "environment": {
-        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      },
+      "command": ["npx", "-y", "@playwright/mcp"],
       "enabled": true
     },
     "context7": {
@@ -50,17 +36,11 @@
     "git": {
       "type": "local",
       "command": ["uvx", "mcp-server-git", "--repository", "."],
-      "environment": {
-        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      },
       "enabled": true
     },
     "fetch": {
       "type": "local",
       "command": ["npx", "-y", "@mokei/mcp-fetch"],
-      "environment": {
-        "PATH": "/home/angel/.nvm/versions/node/v24.13.0/bin:/home/angel/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      },
       "enabled": true
     },
     "sentry": {
