@@ -5376,3 +5376,9 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 **opencode.json multiplataforma:** eliminados PATH WSL (/home/angel/...) y executable-path chromium-linux hardcodeado; sqlite/github/playwright/git/fetch usan resolucion default. Incluido en commit (sin screenshots por decision usuario).
 
 **Release:** gh release create v4.0.0-rc.25 --prerelease (Batch 2+3 + Windows + auth no-store). Deploy auto Vercel desde main.
+
+### rc.25 - Cierre (2026-09-23)
+- Commit docs/config: 1730ec5 (opencode.json multiplataforma + FIXES_BATCH_3 + FIXES_BATCH_2 + AI_LOG; sin screenshots)
+- Smoke prod: / (200), /login (200), /api/artists (200) en https://epk-dashboard.vercel.app
+- Release: https://github.com/AngBan2x/epk-dashboard/releases/tag/v4.0.0-rc.25 (prerelease=true)
+- E2E pendiente (follow-up, no bloqueante): dashboard.spec expectativas + auth-qa BASE_URL param
