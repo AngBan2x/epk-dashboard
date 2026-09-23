@@ -2143,15 +2143,16 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
 // Single source of truth: artists table is canonical for bio/press/genre/location
 // shown in BioSection + public artist page. DossierEditor writes dossiers, so sync
 // those fields back to artists on every dossier save (both Turso + SQLite via updateArtist).
+// Presence-based (not truthiness): clearing a field in the dossier clears it in artists too.
 export async function syncDossierToArtist(
   artistId: string,
   data: Partial<{ biography: string | null; press_text: string | null; genre: string | null; location: string | null }>
 ): Promise<void> {
   const sync: Record<string, unknown> = {};
-  if (data.biography) sync.biography = data.biography;
-  if (data.press_text) sync.press_text = data.press_text;
-  if (data.genre) sync.genre = data.genre;
-  if (data.location) sync.location = data.location;
+  if (data.biography !== undefined) sync.biography = data.biography ?? "";
+  if (data.press_text !== undefined) sync.press_text = data.press_text ?? "";
+  if (data.genre !== undefined) sync.genre = data.genre ?? "";
+  if (data.location !== undefined) sync.location = data.location ?? "";
   if (Object.keys(sync).length === 0) return;
   try {
     await updateArtist(artistId, sync);
