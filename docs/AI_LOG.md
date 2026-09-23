@@ -5398,3 +5398,13 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 ### sqlite MCP - causa raiz + off (2026-09-23, path B)
 **Spawn real + handshake:** ajv faltante en cache npx corrupto (exit 1); tras limpiar cache, npx se atasca 4+min en EPERM cleanup + build nativo better-sqlite3. Paquete irrecuperable via npx en Windows.
 **Decision:** sqlite MCP enabled:false; queries via custom tool database-query. Bonus: paquete tiene verbose:console.log que corrompe stdio.
+
+### Prod exhaustive visual 50/50 (2026-09-23)
+**Modelo:** Muse Spark 1.3 Free (OpenCode Zen)
+**Script:** scripts/prod-exhaustive.ts - 15 rutas x guest/artist/admin x light/dark = 50 checks (HTTP + contenido + consola/requests + screenshots en tests/screenshots/prod-exhaustive/).
+**Iteracion 1:** 27/50. Harness: init-script dark null-guard; /dashboard guest es publico por diseno (middleware no lo protege).
+**Bugs reales + fix:**
+1. Hydration React #425 en /artists/[id] prod: EPKCard toLocaleDateString en date-only strings (UTC midnight) difiere servidor UTC vs cliente UTC-4. Fix: formatDateES (timeZone UTC pinned) + diffDaysUTC + formatNumber explicito en artists list/detail + releases detail. Commit 763e115.
+2. Admin fetch /api/notifications 404 (ruta real: /api/notifications/read, retorna array). Fix 1 linea. Commit 0d7cd6c.
+3. /api/artists/me 404 en profile admin = by design (sin artist profile -> blank form manejado). Tolerado en harness.
+**Iteracion final: 50 PASS / 0 FAIL.**
