@@ -14,11 +14,13 @@ interface EPKExporterProps {
 }
 
 export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporterProps) {
-  const [exportStatus, setExportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [format, setFormat] = useState<"json" | "html">("json");
+  const [statusByFormat, setStatusByFormat] = useState<Record<"json" | "html", "idle" | "loading" | "success" | "error">>({
+    json: "idle",
+    html: "idle",
+  });
 
-  const handleExport = async () => {
-    setExportStatus("loading");
+  const handleExport = async (format: "json" | "html") => {
+    setStatusByFormat((prev) => ({ ...prev, [format]: "loading" }));
 
     try {
       const res = await fetch("/api/export", {
@@ -41,22 +43,21 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setExportStatus("success");
-      setTimeout(() => setExportStatus("idle"), 3000);
+      setStatusByFormat((prev) => ({ ...prev, [format]: "success" }));
+      setTimeout(() => setStatusByFormat((prev) => ({ ...prev, [format]: "idle" })), 3000);
     } catch {
-      setExportStatus("error");
-      setTimeout(() => setExportStatus("idle"), 3000);
+      setStatusByFormat((prev) => ({ ...prev, [format]: "error" }));
+      setTimeout(() => setStatusByFormat((prev) => ({ ...prev, [format]: "idle" })), 3000);
     }
   };
 
   const statusConfig = {
-    idle: { icon: "📥", label: "Exportar Dossier EPK", color: "bg-primary-600 hover:bg-primary-700" },
-    loading: { icon: "⏳", label: "Generando dossier...", color: "bg-slate-600 cursor-wait" },
+    idle: { icon: "📥", label: "Descargar", color: "bg-primary-600 hover:bg-primary-700" },
+    loading: { icon: "⏳", label: "Generando...", color: "bg-slate-600 cursor-wait" },
     success: { icon: "✅", label: "¡Descargado!", color: "bg-emerald-600" },
-    error: { icon: "⚠️", label: "Error al exportar", color: "bg-red-600" },
+    error: { icon: "⚠️", label: "Error", color: "bg-red-600" },
   };
 
-  const current = statusConfig[exportStatus];
   const hasTracks = tracks.length > 0;
 
   return (
@@ -78,43 +79,34 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
         </div>
       )}
 
-      {/* Selección de formato */}
-      <div className="flex border-b border-slate-200 dark:border-slate-700 mb-5">
-        {(["json", "html"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFormat(f)}
-            className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-              format === f
-                ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-primary-50 dark:bg-primary-950/20"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-            }`}
-          >
-            {f === "json" ? "📄 JSON" : "🌐 HTML"}
-          </button>
-        ))}
+      {/* Botones de descarga directa por formato */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {(["json", "html"] as const).map((f) => {
+          const current = statusConfig[statusByFormat[f]];
+          return (
+            <motion.button
+              key={f}
+              onClick={() => handleExport(f)}
+              disabled={statusByFormat[f] === "loading" || !hasTracks}
+              whileTap={{ scale: statusByFormat[f] === "loading" || !hasTracks ? 1 : 0.98 }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition flex items-center gap-2 ${current.color} disabled:opacity-50`}
+              aria-label={hasTracks ? `Descargar dossier en ${f.toUpperCase()}` : "Sin tracks para exportar"}
+            >
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={statusByFormat[f]}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="flex items-center gap-2"
+                >
+                  {f === "json" ? "📄" : "🌐"} {f.toUpperCase()} · {current.icon} {current.label}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
+          );
+        })}
       </div>
-
-      {/* Botón de exportación */}
-      <motion.button
-        onClick={handleExport}
-        disabled={exportStatus === "loading" || !hasTracks}
-        whileTap={{ scale: exportStatus === "loading" || !hasTracks ? 1 : 0.98 }}
-        className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition flex items-center gap-2 ${current.color} disabled:opacity-50`}
-        aria-label={hasTracks ? current.label : "Sin tracks para exportar"}
-      >
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={exportStatus}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            className="flex items-center gap-2"
-          >
-            {current.icon} {current.label}
-          </motion.span>
-        </AnimatePresence>
-      </motion.button>
     </section>
   );
 }
