@@ -196,7 +196,7 @@ export default function AdminPage() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch("/api/notifications");
+      const res = await fetch("/api/notifications/read");
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
