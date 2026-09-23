@@ -4,13 +4,20 @@ import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const noStore = {
+  "Cache-Control": "private, no-cache, no-store, must-revalidate",
+  "Surrogate-Control": "no-store",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
 export async function GET(req: NextRequest) {
   try {
     const session = await validateRequest(req);
     if (!session) {
       return NextResponse.json(
         { error: "No autenticado" },
-        { status: 401 }
+        { status: 401, headers: noStore }
       );
     }
 
@@ -18,24 +25,17 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: "Usuario no encontrado" },
-        { status: 404 }
+        { status: 404, headers: noStore }
       );
     }
 
     const { password_hash, ...userWithoutPassword } = user;
-    return NextResponse.json(userWithoutPassword, {
-      headers: {
-        "Cache-Control": "private, no-cache, no-store, must-revalidate",
-        "Surrogate-Control": "no-store",
-        "Pragma": "no-cache",
-        "Expires": "0",
-      },
-    });
+    return NextResponse.json(userWithoutPassword, { headers: noStore });
   } catch (error) {
     console.error("[API/auth/me] Error:", error);
     return NextResponse.json(
       { error: "Error al obtener usuario" },
-      { status: 500 }
+      { status: 500, headers: noStore }
     );
   }
 }

@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import type { Show, ShowStatus } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { CountBadge } from "@/components/ui/Badge";
+import { showStatusClass, showStatusLabel } from "@/lib/show-status";
 
 interface ShowsBookingProps {
   artistId?: string;
@@ -12,22 +15,6 @@ interface ShowsBookingProps {
   onDelete?: (showId: string) => void;
   onAdd?: () => void;
 }
-
-const statusConfig: Record<ShowStatus, { color: string; bg: string; border: string; label: string }> = {
-  proximamente: { color: "text-yellow-700 dark:text-yellow-300", bg: "bg-yellow-100 dark:bg-yellow-900/30", border: "border-yellow-300 dark:border-yellow-700", label: "Próximamente" },
-  activo: { color: "text-green-700 dark:text-green-300", bg: "bg-green-100 dark:bg-green-900/30", border: "border-green-300 dark:border-green-700", label: "Activo" },
-  pospuesto: { color: "text-orange-700 dark:text-orange-300", bg: "bg-orange-100 dark:bg-orange-900/30", border: "border-orange-300 dark:border-orange-700", label: "Pospuesto" },
-  hoy: { color: "text-blue-700 dark:text-blue-300", bg: "bg-blue-100 dark:bg-blue-900/30", border: "border-blue-300 dark:border-blue-700", label: "Hoy" },
-  pasado: { color: "text-slate-700 dark:text-slate-300", bg: "bg-slate-100 dark:bg-slate-800", border: "border-slate-300 dark:border-slate-600", label: "Pasado" },
-  cancelado: { color: "text-red-700 dark:text-red-300", bg: "bg-red-100 dark:bg-red-900/30", border: "border-red-300 dark:border-red-700", label: "Cancelado" },
-  suspendido: { color: "text-slate-700 dark:text-slate-300", bg: "bg-slate-100 dark:bg-slate-800", border: "border-slate-300 dark:border-slate-600", label: "Suspendido" },
-  confirmado: { color: "text-purple-700 dark:text-purple-300", bg: "bg-purple-100 dark:bg-purple-900/30", border: "border-purple-300 dark:border-purple-700", label: "Confirmado" },
-  en_venta: { color: "text-indigo-700 dark:text-indigo-300", bg: "bg-indigo-100 dark:bg-indigo-900/30", border: "border-indigo-300 dark:border-indigo-700", label: "En Venta" },
-  agotado: { color: "text-red-700 dark:text-red-300", bg: "bg-red-100 dark:bg-red-900/30", border: "border-red-300 dark:border-red-700", label: "Agotado" },
-  reprogramado: { color: "text-cyan-700 dark:text-cyan-300", bg: "bg-cyan-100 dark:bg-cyan-900/30", border: "border-cyan-300 dark:border-cyan-700", label: "Reprogramado" },
-  disponible: { color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-900/30", border: "border-emerald-300 dark:border-emerald-700", label: "Disponible" },
-  finalizado: { color: "text-slate-700 dark:text-slate-300", bg: "bg-slate-100 dark:bg-slate-800", border: "border-slate-300 dark:border-slate-600", label: "Finalizado" },
-};
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "Fecha por confirmar";
@@ -80,23 +67,23 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-      <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <span>🎤</span> Shows & Booking
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {shows.length} {shows.length === 1 ? "show programado" : "shows programados"}
-          </p>
-        </div>
-        {editable && onAdd && (
-          <button
-            onClick={onAdd}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-500 text-white transition"
-          >
-            + Nuevo Show
-          </button>
-        )}
+      <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+        <SectionHeader
+          emoji="🎤"
+          title="Shows & Booking"
+          subtitle="Gestiona tus conciertos y booking"
+          badges={<CountBadge>{shows.length} shows</CountBadge>}
+          action={
+            editable && onAdd ? (
+              <button
+                onClick={onAdd}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white transition"
+              >
+                + Nuevo Show
+              </button>
+            ) : undefined
+          }
+        />
       </div>
 
       {shows.length === 0 ? (
@@ -114,9 +101,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
         </div>
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {shows.map((show) => {
-            const config = statusConfig[show.status] || statusConfig.proximamente;
-            return (
+          {shows.map((show) => (
               <div
                 key={show.id}
                 className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -127,8 +112,8 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                       <h4 className="font-semibold text-slate-900 dark:text-white truncate">
                         {safeString(show.venue_name)}
                       </h4>
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${config.bg} ${config.color} ${config.border}`}>
-                        {config.label}
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${showStatusClass(show.status)}`}>
+                        {showStatusLabel(show.status)}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
@@ -156,7 +141,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                         href={show.ticket_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-500 text-white transition"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white transition"
                       >
                         🎟️ Tickets
                       </a>
@@ -191,8 +176,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                   </div>
                 )}
               </div>
-            );
-          })}
+            ))}
         </div>
       )}
     </div>

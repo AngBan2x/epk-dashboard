@@ -19,7 +19,7 @@ export function Button({
         "disabled:pointer-events-none disabled:opacity-50",
         {
           "bg-primary-600 text-white hover:bg-primary-700": variant === "primary",
-          "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600": variant === "secondary",
+          "bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600": variant === "secondary",
           "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300": variant === "ghost",
         },
         {

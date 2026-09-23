@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeString } from "@/lib/null-safe";
 import type { Track, Artist } from "@/types/music";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { CountBadge } from "@/components/ui/Badge";
 
 interface EPKExporterProps {
   artist?: Artist;
@@ -48,29 +50,23 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
   };
 
   const statusConfig = {
-    idle: { icon: "📥", label: "Exportar Dossier EPK", color: "bg-primary-600 hover:bg-primary-500" },
+    idle: { icon: "📥", label: "Exportar Dossier EPK", color: "bg-primary-600 hover:bg-primary-700" },
     loading: { icon: "⏳", label: "Generando dossier...", color: "bg-slate-600 cursor-wait" },
     success: { icon: "✅", label: "¡Descargado!", color: "bg-emerald-600" },
     error: { icon: "⚠️", label: "Error al exportar", color: "bg-red-600" },
   };
 
   const current = statusConfig[exportStatus];
+  const hasTracks = tracks.length > 0;
 
   return (
-    <section className={`p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 ${className}`}>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span>📄</span> Exportar Dossier EPK
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Genera y descarga la ficha técnica completa del catálogo para prensa o promotores.
-          </p>
-        </div>
-        <span className="text-xs bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-semibold px-2.5 py-1 rounded-full border border-indigo-300 dark:border-indigo-800">
-          {tracks.length} tracks incluidos
-        </span>
-      </div>
+    <section className={`p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 ${className}`}>
+      <SectionHeader
+        emoji="📄"
+        title="Exportar Dossier EPK"
+        subtitle="Genera y descarga la ficha técnica completa del catálogo para prensa o promotores."
+        badges={<CountBadge>{tracks.length} tracks incluidos</CountBadge>}
+      />
 
       {/* Vista previa */}
       {artist && (
@@ -102,11 +98,11 @@ export function EPKExporter({ artist, tracks = [], className = "" }: EPKExporter
       {/* Botón de exportación */}
       <motion.button
         onClick={handleExport}
-        disabled={exportStatus === "loading"}
-        whileHover={{ scale: exportStatus === "loading" ? 1 : 1.02 }}
-        whileTap={{ scale: exportStatus === "loading" ? 1 : 0.98 }}
-        className={`w-full py-3 rounded-xl text-white font-bold text-base transition-all duration-200 flex items-center justify-center gap-2 ${current.color} disabled:opacity-70`}
-        aria-label={current.label}
+        disabled={exportStatus === "loading" || !hasTracks}
+        whileHover={{ scale: exportStatus === "loading" || !hasTracks ? 1 : 1.02 }}
+        whileTap={{ scale: exportStatus === "loading" || !hasTracks ? 1 : 0.98 }}
+        className={`w-full py-3 rounded-xl text-white font-bold text-base transition-all duration-200 flex items-center justify-center gap-2 ${current.color} disabled:opacity-50`}
+        aria-label={hasTracks ? current.label : "Sin tracks para exportar"}
       >
         <AnimatePresence mode="wait">
           <motion.span

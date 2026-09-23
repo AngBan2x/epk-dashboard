@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { safeString } from "@/lib/null-safe";
 import { generateRiderHTML, generateDossierHTML } from "@/lib/downloadable-assets";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { Badge, CountBadge } from "@/components/ui/Badge";
 
 export interface DownloadableAsset {
   id: string;
@@ -113,24 +115,17 @@ export function DownloadCenter({
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-      <div className="flex items-start justify-between gap-2 mb-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate">
-            <span>📥</span> Centro de Descargas
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Assets para prensa y venues
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-shrink-0">
-          <span className="text-[10px] bg-emerald-800 text-emerald-50 font-semibold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800 whitespace-nowrap">
-            Disponibles
-          </span>
-          <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold px-2 py-0.5 rounded-full border border-slate-300 dark:border-slate-600 whitespace-nowrap">
-            {trackCount || 0} tracks incluidos
-          </span>
-        </div>
-      </div>
+      <SectionHeader
+        emoji="📥"
+        title="Centro de Descargas"
+        subtitle="Assets para prensa y venues"
+        badges={
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <Badge variant="emerald">Disponibles</Badge>
+            <CountBadge>{trackCount || 0} tracks incluidos</CountBadge>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-3">
         {assetList.map((asset) => (
@@ -153,13 +148,13 @@ export function DownloadCenter({
             <button
               onClick={() => handleDownload(asset)}
               disabled={downloadingId === asset.id}
-              className="flex-shrink-0 px-2 py-1 rounded-lg text-[10px] font-semibold bg-primary-600 hover:bg-primary-500 text-white transition flex items-center gap-1 disabled:opacity-50"
+              className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white transition flex items-center gap-1 disabled:opacity-50"
               aria-label={`Descargar ${asset.name}`}
             >
               {downloadingId === asset.id ? (
                 <>...</>
               ) : (
-                <>Download</>
+                <>Descargar</>
               )}
             </button>
           </div>

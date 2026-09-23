@@ -12,6 +12,7 @@ import LastfmMetrics from "@/components/LastfmMetrics";
 import { DossierEditor } from "@/components/DossierEditor";
 import { DownloadCenter } from "@/components/DownloadCenter";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -28,19 +29,12 @@ interface DashboardData {
   likes?: number;
 }
 
-interface StatCardProps {
-  label: string;
-  value: number | string;
-  icon: React.ReactNode;
-  color: string;
-}
-
 function StatCard({ label, value, icon, color }: StatCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6"
+      className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6"
     >
       <div className="flex items-center gap-4">
         <div className={`p-3 rounded-lg ${color}`}>
@@ -53,6 +47,13 @@ function StatCard({ label, value, icon, color }: StatCardProps) {
       </div>
     </motion.div>
   );
+}
+
+interface StatCardProps {
+  label: string;
+  value: number | string;
+  icon: React.ReactNode;
+  color: string;
 }
 
 interface QuickActionProps {
@@ -69,20 +70,12 @@ function QuickAction({ label, icon, href, onClick, color }: QuickActionProps) {
   return (
     <Wrapper
       {...props}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 transition ${color}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition ${color}`}
     >
       <span className="text-amber-500 dark:text-amber-400">{icon}</span>
       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
     </Wrapper>
   );
-}
-
-interface DashboardData {
-  tracks: Track[];
-  artists: ArtistProfile[];
-  artistProfile: ArtistProfile | null;
-  artistShows: Show[];
-  showsByArtist: Record<string, Show[]>;
 }
 
 export default function DashboardPage() {
@@ -196,8 +189,12 @@ export default function DashboardPage() {
               </section>
 
               {/* Quick Actions */}
-              <section className="mb-8">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Acciones Rápidas</h2>
+              <section className="mb-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                <SectionHeader
+                  emoji="🎯"
+                  title="Acciones Rápidas"
+                  subtitle="Atajos para gestionar tu EPK"
+                />
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <QuickAction
                     label="Nuevo Release"
@@ -221,9 +218,13 @@ export default function DashboardPage() {
               </section>
 
               {/* Recent Activity */}
-<section className="mb-8">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Actividad Reciente</h2>
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+              <section className="mb-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                <SectionHeader
+                  emoji="🕒"
+                  title="Actividad Reciente"
+                  subtitle="Últimos cambios en tu catálogo"
+                />
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {artistTracks.slice(0, 3).map((track) => (
                     <div key={track.id} className="px-4 py-3 flex items-center gap-3 group">
                       <div className="w-10 h-10 rounded bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
@@ -263,8 +264,12 @@ export default function DashboardPage() {
               </section>
 
               {/* Artist's tracks */}
-              <section className="mb-8">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Mis Tracks</h2>
+              <section className="mb-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                <SectionHeader
+                  emoji="🎵"
+                  title="Mis Tracks"
+                  subtitle="Tu catálogo musical"
+                />
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {artistTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
@@ -283,7 +288,7 @@ export default function DashboardPage() {
                     </SlideIn>
                   ))}
                   {artistTracks.length === 0 && (
-                    <div className="col-span-4 text-center py-12 text-slate-400">
+                    <div className="col-span-full text-center py-12 text-slate-400">
                       <p>No tienes tracks aún.</p>
                     </div>
                   )}
@@ -441,7 +446,7 @@ export default function DashboardPage() {
                   </SlideIn>
                 ))}
                 {tracks.length === 0 && (
-                  <div className="col-span-4 text-center py-12 text-slate-400">
+                  <div className="col-span-full text-center py-12 text-slate-400">
                     <p>No se encontraron tracks.</p>
                   </div>
                 )}
@@ -449,8 +454,12 @@ export default function DashboardPage() {
 
               {/* Carousel of all artists' Bio + Shows */}
               {artists.length > 0 && (
-                <section className="mb-8">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Artistas</h2>
+                <section className="mb-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                  <SectionHeader
+                    emoji="🎤"
+                    title="Artistas"
+                    subtitle="Bios y shows del catálogo"
+                  />
                   <div className="space-y-8">
                     {artists.map((art, i) => {
                       const artShows = data.showsByArtist[art.id] || [];

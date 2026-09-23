@@ -220,7 +220,7 @@ export function ProductionDetails({
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white transition"
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white transition"
                 >
                   {saving ? "Guardando..." : "Guardar"}
                 </button>

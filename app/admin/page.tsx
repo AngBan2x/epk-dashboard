@@ -7,6 +7,8 @@ import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ShowForm } from "@/components/ShowForm";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { Button } from "@/components/ui/Button";
 
 interface AdminTrack {
   id: string;
@@ -1168,8 +1170,8 @@ onClick={() => {
 
             {/* Formulario de edición de artista */}
             {editingArtist && (
-              <div className="mt-6 p-6 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800" ref={editFormRef}>
-                <h3 className="text-lg font-semibold mb-4">Editar Artista: {editingArtist.name}</h3>
+              <div className="mt-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6" ref={editFormRef}>
+                <SectionHeader emoji="✏️" title={`Editar Artista: ${editingArtist.name}`} subtitle="Actualiza la información pública del artista" />
                 <form
 onSubmit={async (e) => {
                   e.preventDefault();
@@ -1219,7 +1221,7 @@ onSubmit={async (e) => {
                   className="space-y-4"
                 >
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre *</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Nombre *</label>
                     <input
                       type="text"
                       required
@@ -1227,80 +1229,83 @@ onSubmit={async (e) => {
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, name: e.target.value })
                       }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Género</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Género</label>
                     <input
                       type="text"
                       value={artistForm.genre}
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, genre: e.target.value })
                       }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ubicación</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Ubicación</label>
                     <input
                       type="text"
                       value={artistForm.location}
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, location: e.target.value })
                       }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Biografía</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Biografía</label>
                     <textarea
                       value={artistForm.biography}
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, biography: e.target.value })
                       }
                       rows={4}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none"
+                      placeholder="Biografía pública del artista..."
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Texto de Prensa</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Texto de Prensa</label>
                     <textarea
                       value={artistForm.press_text}
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, press_text: e.target.value })
                       }
                       rows={3}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none"
+                      placeholder="Biografía de prensa para medios y promotores..."
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Destacados de Prensa</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Destacados de Prensa</label>
                     <textarea
                       value={artistForm.press_highlights}
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, press_highlights: e.target.value })
                       }
                       rows={3}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none"
+                      placeholder="Logros, citas, premios — uno por línea"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Oyentes Mensuales</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Oyentes Mensuales</label>
                     <input
                       type="number"
                       value={artistForm.monthly_listeners}
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, monthly_listeners: Number(e.target.value) })
                       }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 pt-2">
                     <button
                       type="submit"
                       disabled={saving}
-                      className={`px-6 py-2 rounded-lg text-sm font-semibold text-white transition ${saving ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500"}`}>
+                      className={`px-6 py-2 rounded-lg text-sm font-semibold text-white transition ${saving ? "bg-primary-400 cursor-not-allowed" : "bg-primary-600 hover:bg-primary-700"}`}>
                       {saving ? "Guardando..." : "Guardar"}
                     </button>
                     <button

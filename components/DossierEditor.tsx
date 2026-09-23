@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { safeString } from "@/lib/null-safe";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 
 interface DossierData {
   biography: string;
@@ -147,20 +148,24 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
         onClick={() => setExpanded(true)}
         className="w-full p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-left hover:border-primary-400 dark:hover:border-primary-600 transition-colors group"
       >
-        <div className="flex items-center gap-3 mb-2">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-2">
-            <span>📄</span> Dossier / Rider
-          </h3>
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Personaliza tu biography, press kit y rider tecnico para {safeString(artistName)}
-        </p>
+        <SectionHeader
+          emoji="📄"
+          title="Dossier / Rider"
+          subtitle={`Personaliza tu biography, press kit y rider tecnico para ${safeString(artistName)}`}
+        />
       </button>
     );
   }
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="p-6 pb-0">
+        <SectionHeader
+          emoji="📄"
+          title="Dossier / Rider"
+          subtitle={`Personaliza tu biography, press kit y rider tecnico para ${safeString(artistName)}`}
+        />
+      </div>
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-700">
         <button
@@ -218,7 +223,7 @@ export function DossierEditor({ artistId, artistName }: DossierEditorProps) {
           <button
             onClick={handleSave}
             disabled={saving || loading}
-            className="flex-1 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? "Guardando..." : "Guardar"}
           </button>

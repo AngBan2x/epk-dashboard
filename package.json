@@ -4,7 +4,7 @@
   "private": true,
   "description": "PressPlay - Donde la música se presenta",
   "scripts": {
-    "prebuild": "rm -f data/*.db data/*.db-shm data/*.db-wal",
+    "prebuild": "node -e \"const fs=require('fs');for(const f of fs.readdirSync('data').filter(x=>/^music_catalog\\.db(-shm|-wal)?$/.test(x))){fs.rmSync('data/'+f,{force:true})}\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
