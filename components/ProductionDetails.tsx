@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { safeString } from "@/lib/null-safe";
+import { safeString, formatDateES } from "@/lib/null-safe";
+import {
+  PRODUCTION_FIELDS,
+  PRODUCTION_INPUT_CLASS,
+  PRODUCTION_CREDITS_LABEL,
+  PRODUCTION_CREDITS_PLACEHOLDER,
+} from "@/lib/production-fields";
 import type { ProductionDetails as ProductionDetailsType } from "@/types/music";
 import { cn } from "@/lib/utils";
 
@@ -40,18 +46,7 @@ export function ProductionDetails({
     production_credits: details.production_credits ?? "",
   });
 
-  const editableFields = [
-    { label: "DAW", key: "daw" as const, type: "text" },
-    { label: "Guitarras", key: "guitars" as const, type: "text" },
-    { label: "Efectos", key: "effects_chain" as const, type: "text" },
-    { label: "Afinación", key: "tuning" as const, type: "text" },
-    { label: "Género", key: "genre" as const, type: "text" },
-    { label: "Sub-género", key: "sub_genre" as const, type: "text" },
-    { label: "BPM", key: "bpm" as const, type: "number" },
-    { label: "Tonalidad", key: "key" as const, type: "text" },
-    { label: "Mood", key: "mood" as const, type: "text" },
-    { label: "Fecha de grabación", key: "recording_date" as const, type: "date" },
-  ];
+  const editableFields = PRODUCTION_FIELDS;
 
   const getSummary = () => {
     const parts: string[] = [];
@@ -178,7 +173,7 @@ export function ProductionDetails({
             <div className="space-y-4">
               {/* Editable fields */}
               <dl className="grid grid-cols-2 gap-3">
-                {editableFields.map(({ label, key, type }) => (
+                {editableFields.map(({ label, key, type, placeholder }) => (
                   <div key={key}>
                     <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">{label}</dt>
                     <dd>
@@ -188,8 +183,8 @@ export function ProductionDetails({
                         onChange={(e) =>
                           setEditData((prev) => ({ ...prev, [key]: e.target.value }))
                         }
-                        className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        placeholder={label}
+                        className={PRODUCTION_INPUT_CLASS}
+                        placeholder={placeholder || label}
                       />
                     </dd>
                   </div>
@@ -199,7 +194,7 @@ export function ProductionDetails({
               {/* Production credits textarea */}
               <div>
                 <label className="block text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">
-                  Créditos de producción
+                  {PRODUCTION_CREDITS_LABEL}
                 </label>
                 <textarea
                   value={editData.production_credits}
@@ -207,8 +202,8 @@ export function ProductionDetails({
                     setEditData((prev) => ({ ...prev, production_credits: e.target.value }))
                   }
                   rows={3}
-                  placeholder="Productor, ingeniero de mezcla, masterización..."
-                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                  placeholder={PRODUCTION_CREDITS_PLACEHOLDER}
+                  className={`${PRODUCTION_INPUT_CLASS} resize-none`}
                 />
               </div>
 
@@ -247,13 +242,20 @@ export function ProductionDetails({
             className="overflow-hidden"
           >
             <dl className="grid grid-cols-2 gap-3">
-              {editableFields.map(({ label, key }) => (
+              {editableFields
+                .filter(({ key }) => {
+                  const v = details[key];
+                  return v !== null && v !== undefined && v !== "";
+                })
+                .map(({ label, key }) => (
                 <div key={key}>
                   <dt className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">{label}</dt>
                   <dd className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {key === "bpm" 
-                      ? (details[key] != null ? `${details[key]} BPM` : <span className="text-slate-300 dark:text-slate-600">—</span>)
-                      : (details[key] ? safeString(details[key]) : <span className="text-slate-300 dark:text-slate-600">—</span>)
+                    {key === "bpm"
+                      ? `${details[key]} BPM`
+                      : key === "recording_date"
+                        ? formatDateES(details[key])
+                        : safeString(details[key])
                     }
                   </dd>
                 </div>

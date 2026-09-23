@@ -5,6 +5,13 @@ import { useRouter, useParams } from "next/navigation";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { extractYouTubeId, getYouTubeThumbnail, fetchYouTubeVideo } from "@/lib/youtube";
+import {
+  PRODUCTION_FIELDS,
+  PRODUCTION_INPUT_CLASS,
+  PRODUCTION_CREDITS_LABEL,
+  PRODUCTION_CREDITS_PLACEHOLDER,
+  type ProductionFieldKey,
+} from "@/lib/production-fields";
 import type { ReleaseStatus } from "@/types/music";
 import { ITunesSearch } from "@/components/ITunesSearch";
 
@@ -534,116 +541,28 @@ export default function EditReleasePage() {
             <div>
               <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Ficha de Producción</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">DAW / Software</label>
-                  <input
-                    type="text"
-                    value={productionDetails.daw}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, daw: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="Pro Tools, Logic Pro, Ableton..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Guitarras / Instrumentos</label>
-                  <input
-                    type="text"
-                    value={productionDetails.guitars}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, guitars: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="Fender Stratocaster, Gibson Les Paul..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Cadena de Efectos</label>
-                  <input
-                    type="text"
-                    value={productionDetails.effects_chain}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, effects_chain: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="Reverb, Delay, Distortion..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Afinación</label>
-                  <input
-                    type="text"
-                    value={productionDetails.tuning}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, tuning: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="Standard E, Drop D..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Tonalidad</label>
-                  <input
-                    type="text"
-                    value={productionDetails.key}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, key: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="C major, A minor..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Género</label>
-                  <input
-                    type="text"
-                    value={productionDetails.genre}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, genre: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="Rock, Pop, Electrónica..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Sub-género</label>
-                  <input
-                    type="text"
-                    value={productionDetails.sub_genre}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, sub_genre: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="Indie Rock, Synthpop..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">BPM</label>
-                  <input
-                    type="number"
-                    value={productionDetails.bpm}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, bpm: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="120"
-                    min="1"
-                    max="999"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Mood</label>
-                  <input
-                    type="text"
-                    value={productionDetails.mood}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, mood: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                    placeholder="Energético, Melancólico, Alegre..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Fecha de grabación</label>
-                  <input
-                    type="date"
-                    value={productionDetails.recording_date}
-                    onChange={(e) => setProductionDetails({ ...productionDetails, recording_date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
-                  />
-                </div>
+                {PRODUCTION_FIELDS.map(({ key, label, placeholder, type }) => (
+                  <div key={key}>
+                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</label>
+                    <input
+                      type={type}
+                      value={productionDetails[key as ProductionFieldKey] ?? ""}
+                      onChange={(e) => setProductionDetails({ ...productionDetails, [key]: e.target.value })}
+                      className={PRODUCTION_INPUT_CLASS}
+                      placeholder={placeholder || undefined}
+                      {...(type === "number" ? { min: 1, max: 999 } : {})}
+                    />
+                  </div>
+                ))}
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Créditos de producción</label>
+              <div className="mt-4">
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{PRODUCTION_CREDITS_LABEL}</label>
                 <textarea
                   value={productionDetails.production_credits}
                   onChange={(e) => setProductionDetails({ ...productionDetails, production_credits: e.target.value })}
                   rows={3}
-                  placeholder="Productor, ingeniero de mezcla, masterización..."
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                  placeholder={PRODUCTION_CREDITS_PLACEHOLDER}
+                  className={`${PRODUCTION_INPUT_CLASS} resize-none placeholder-slate-400 dark:placeholder-slate-500`}
                 />
               </div>
             </div>
