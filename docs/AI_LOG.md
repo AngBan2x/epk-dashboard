@@ -5415,3 +5415,6 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 **Verificacion:** tsc 0, unit 110, build OK, prod-exhaustive 50/50, fase2-functional local OK (expand+sync+cleanup).
 **Lecciones:** Turso replica lag (polling en tests); no mutar filas compartidas en prod sin restore; edicion humana concurrente detectada y convergida.
 **Docs:** docs/FIXES_BATCH_4.md. Scripts: prod-exhaustive.ts, fase2-functional.ts (con HEADED=1).
+
+### Exportar 2 botones (2026-09-23, 6a1f498)
+Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 50/50 + download test 5/5 (EPK_Dossier_2026-09-23.json/.html). Script: export-download-test.ts.
