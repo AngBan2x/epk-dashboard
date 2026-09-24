@@ -151,13 +151,14 @@ export async function POST(req: NextRequest) {
     }
 
     const s3 = getS3Client();
+    // Note: no ACL param — R2 buckets with public dev URL / custom domain
+    // serve objects publicly; passing ACLs fails when the bucket blocks them.
     await s3.send(
       new PutObjectCommand({
         Bucket: bucket,
         Key: key,
         Body: buffer,
         ContentType: file.type,
-        ACL: "public-read",
       })
     );
 
@@ -208,7 +209,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[API/upload/image] Error:", error);
     return NextResponse.json(
-      { error: "Error al subir la imagen" },
+      { error: error instanceof Error ? `Error al subir la imagen: ${error.message}` : "Error al subir la imagen" },
       { status: 500 }
     );
   }
