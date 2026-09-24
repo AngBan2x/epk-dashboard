@@ -5435,3 +5435,7 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Bug1:** wrapper suscrito a useAuth (isOwner reactivo sin reload). **Bug2:** CRUD oculto en fallbacks decorativos.
 **Verificacion HEADED:** verify-gallery-headed.ts 4/4 (guest sin Subir, login same-page 200, Subir sin reload, fallbacks sin edit/delete) + revision visual de ambas capturas OK. Header 'Artistas' live en prod.
 
+### Gallery hint + R2 sin ACL (2026-09-23, 92c6fb8)
+**Aclaracion UX:** las 3 imagenes sin botones son placeholders (galeria vacia). Anadido aviso 'Mostrando imagenes de ejemplo...' solo para owner. Verificado headed con captura (4-gallery-hint.png OK).
+**R2:** quitado ACL public-read (falla si el bucket lo bloquea) + error detallado en 500. Upload prod sigue 500 handshake TLS hacia {account}.r2.cloudflarestorage.com (igual desde local y Vercel) -> revisar R2_ACCOUNT_ID/bucket en Cloudflare/Vercel.
+
