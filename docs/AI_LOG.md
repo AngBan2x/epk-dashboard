@@ -5444,3 +5444,9 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Cambio:** lib/blob.ts put/del + upload route POST/DELETE; R2_* inertes; DELETE filtra objetos+strings.
 **Verificacion prod:** probe 201 + PUBLIC-GET 200 image/png + DELETE 200; headed UI 3/3 (galeria upload + preview, perfil banner autofill) con capturas revisadas; matriz 50/50. Limpieza: galeria test -> [] directo-verificado.
 
+### Imagenes artistas corregidas (2026-09-23)
+**Problema:** seed anterior uso portadas de album (iTunes) + conciertos genericos (Unsplash por genero) — no eran los artistas.
+**Fuentes correctas:** retratos Last.fm artist.getinfo + Wikimedia Commons curado manual (Unsplash por nombre da basura: caballos, calles; Commons mete ruido y hasta contenido nazi en 'Eagles' — curaduria obligatoria).
+**Set final:** Kate Bush (1981 + Hounds of Love), Queen (Freddie 1977 + News of the World), Nirvana (1992 x2), Weeknd (Ziff + Paris 17), Eagles (concert 2010 x2; Last.fm sin foto = placeholder), Ed Sheeran (Philadelphia 02 + Bangalore).
+**Verificacion:** 6/6 en DB directo + capturas headed revisadas una por una (correctas). Angel skip (owner-managed via upload).
+
