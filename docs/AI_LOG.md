@@ -5418,3 +5418,14 @@ Screenshots: 	ests/screenshots/batch2/{dark,light}/
 
 ### Exportar 2 botones (2026-09-23, 6a1f498)
 Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 50/50 + download test 5/5 (EPK_Dossier_2026-09-23.json/.html). Script: export-download-test.ts.
+
+### Imagenes batch (2026-09-23)
+**Modelo:** Muse Spark 1.3 Free (OpenCode Zen)
+**1. Gallery CRUD real:** upload route guarda objetos {id,url,title,category} (legacy strings preservados); wrapper DELETE (API+R2) + PATCH titulos; tipo GalleryImage en types. Verificado funcional local 7/7 a nivel DB (reads directos; UI con reload-loop por lag).
+**2. Upload perfil/banner:** API kind=profile|banner con ownership (sin trackId, sin write a tracks, key userId/profile/); ImageUploader generalizado (trackId opcional, uploadId, kind, artistId); /profile con botones subir + URL fallback.
+**3. Header:** Explorar->Artistas desktop+movil.
+**4. Seed imagenes:** scripts/seed-artist-images.ts (iTunes 600x600 + Unsplash). 6/6 poblados en Turso (direct-verified); Angel skip (owner-managed). OJO: API reads con replica lag de horas - imagenes aparecen al converger.
+**BLOQUEADORES (no codigo):**
+- R2 en prod: falta R2_BUCKET_NAME (upload 500 'not configured'). ACCION USUARIO: agregar R2_* en Vercel.
+- R2 local: TLS handshake failure a *.r2.cloudflarestorage.com desde esta maquina (otros hosts OK).
+- Turso replica lag severo en reads API (hasta 1h+ medido); writes OK + optimistic UI compensa.
