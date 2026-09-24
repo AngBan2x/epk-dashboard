@@ -5429,3 +5429,9 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 - R2 en prod: falta R2_BUCKET_NAME (upload 500 'not configured'). ACCION USUARIO: agregar R2_* en Vercel.
 - R2 local: TLS handshake failure a *.r2.cloudflarestorage.com desde esta maquina (otros hosts OK).
 - Turso replica lag severo en reads API (hasta 1h+ medido); writes OK + optimistic UI compensa.
+
+### Gallery fixes visual headed (2026-09-23)
+**Deploy fix:** null-check getTursoClient en gallery-functional (tsc gap: commit sin re-correr tsc tras ultimo edit).
+**Bug1:** wrapper suscrito a useAuth (isOwner reactivo sin reload). **Bug2:** CRUD oculto en fallbacks decorativos.
+**Verificacion HEADED:** verify-gallery-headed.ts 4/4 (guest sin Subir, login same-page 200, Subir sin reload, fallbacks sin edit/delete) + revision visual de ambas capturas OK. Header 'Artistas' live en prod.
+
