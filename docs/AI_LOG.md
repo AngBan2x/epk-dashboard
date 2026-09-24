@@ -5450,3 +5450,8 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Set final:** Kate Bush (1981 + Hounds of Love), Queen (Freddie 1977 + News of the World), Nirvana (1992 x2), Weeknd (Ziff + Paris 17), Eagles (concert 2010 x2; Last.fm sin foto = placeholder), Ed Sheeran (Philadelphia 02 + Bangalore).
 **Verificacion:** 6/6 en DB directo + capturas headed revisadas una por una (correctas). Angel skip (owner-managed via upload).
 
+### Queen grupal + Ed centrado + lightbox (2026-09-24)
+**Fotos:** Queen perfil -> News of the World 02 (banda completa); Ed perfil -> Philadelphia 04 (cara grande, verificado visual entre 3 opciones).
+**Feature:** components/ArtistHero.tsx (client island): avatar/banner clicables abren lightbox estilo galeria (backdrop, ✕ Cerrar, Escape); sin imagenes no hay interaccion.
+**Verificacion:** tsc 0, unit 110, build OK, lightbox headed 5/5 (open/escape), matriz 50/50, capturas queen/ed revisadas.
+
