@@ -5439,3 +5439,8 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Aclaracion UX:** las 3 imagenes sin botones son placeholders (galeria vacia). Anadido aviso 'Mostrando imagenes de ejemplo...' solo para owner. Verificado headed con captura (4-gallery-hint.png OK).
 **R2:** quitado ACL public-read (falla si el bucket lo bloquea) + error detallado en 500. Upload prod sigue 500 handshake TLS hacia {account}.r2.cloudflarestorage.com (igual desde local y Vercel) -> revisar R2_ACCOUNT_ID/bucket en Cloudflare/Vercel.
 
+### Migracion R2 -> Vercel Blob (2026-09-23, 8688f4b)
+**Causa raiz R2:** sin suscripcion no hay backend (endpoint muerto -> handshake failure identico local/Vercel). Usuario sin tarjeta: migrado a Blob (tier Hobby, sin tarjeta adicional).
+**Cambio:** lib/blob.ts put/del + upload route POST/DELETE; R2_* inertes; DELETE filtra objetos+strings.
+**Verificacion prod:** probe 201 + PUBLIC-GET 200 image/png + DELETE 200; headed UI 3/3 (galeria upload + preview, perfil banner autofill) con capturas revisadas; matriz 50/50. Limpieza: galeria test -> [] directo-verificado.
+
