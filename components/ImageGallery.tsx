@@ -60,7 +60,9 @@ export function ImageGallery({
     });
   };
 
-  // Fallbacks elegantes en caso de que el artista no tenga imágenes
+  // Fallbacks elegantes en caso de que el artista no tenga imágenes.
+  // Son decorativos: sin CRUD (editar/borrar fallbacks no tiene efecto persistente).
+  const showingFallbacks = normalizedImages.length === 0;
   const displayImages =
     normalizedImages.length > 0
       ? normalizedImages
@@ -140,7 +142,7 @@ export function ImageGallery({
               <p className="text-sm font-medium text-white truncate">
                 {item.title}
               </p>
-              {isOwner && trackId && (
+              {isOwner && trackId && !showingFallbacks && (
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={(e) => {
