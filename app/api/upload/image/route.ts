@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateRequest } from "@/lib/auth";
 import { getTrackById, getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { uploadImage, deleteImage } from "@/lib/blob";
 
 export const dynamic = "force-dynamic";
 
@@ -13,33 +13,6 @@ async function validateSession(req: NextRequest) {
   const session = await validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role || "artist" };
-}
-
-function sanitizeFilename(filename: string): string {
-  return filename
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .replace(/_{2,}/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .toLowerCase();
-}
-
-function getS3Client(): S3Client {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error("R2 credentials not configured");
-  }
-
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-  });
 }
 
 async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
@@ -107,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     // Verify ownership: track owner (via artist name) or profile/banner owner (via artistId)
     let ownerUserId = session.userId;
-    let r2KeyPrefix: string;
+    let prefix: string;
     if (trackId && track) {
       const artistRow = await dbQuery(
         "SELECT id, user_id FROM artists WHERE name = ?",
@@ -120,7 +93,7 @@ export async function POST(req: NextRequest) {
       }
 
       ownerUserId = artistRow.length > 0 ? artistRow[0].user_id : session.userId;
-      r2KeyPrefix = `${ownerUserId}/${trackId}`;
+      prefix = `${ownerUserId}/${trackId}`;
     } else {
       // Profile/banner upload for an artist
       if (kind !== "profile" && kind !== "banner") {
@@ -137,33 +110,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
       ownerUserId = artistRow[0].user_id;
-      r2KeyPrefix = `${ownerUserId}/profile`;
-    }
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const timestamp = Date.now();
-    const sanitizedName = sanitizeFilename(file.name);
-    const key = `${r2KeyPrefix}/${timestamp}-${sanitizedName}`;
-
-    const bucket = process.env.R2_BUCKET_NAME;
-    if (!bucket) {
-      return NextResponse.json({ error: "R2 bucket not configured" }, { status: 500 });
+      prefix = `${ownerUserId}/profile`;
     }
 
-    const s3 = getS3Client();
-    // Note: no ACL param — R2 buckets with public dev URL / custom domain
-    // serve objects publicly; passing ACLs fails when the bucket blocks them.
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type,
-      })
-    );
-
-    const publicUrl = process.env.R2_PUBLIC_URL || `https://${bucket}.${process.env.R2_ACCOUNT_ID}.r2.dev`;
-    const imageUrl = `${publicUrl}/${key}`;
+    const { url: imageUrl, filename } = await uploadImage(file, prefix);
 
     // Profile/banner uploads return the URL only (no tracks write)
     if (!trackId) {
@@ -195,7 +145,7 @@ export async function POST(req: NextRequest) {
     const newItem = {
       id: `img-${Date.now()}`,
       url: imageUrl,
-      title: sanitizedName.replace(/\.[a-z0-9]+$/i, "").replace(/_/g, " ") || "Asset de Prensa",
+      title: filename.replace(/\.[a-z0-9]+$/i, "").replace(/_/g, " ") || "Asset de Prensa",
       category: "Prensa",
     };
     galleryImages.push(newItem);
@@ -252,45 +202,39 @@ export async function DELETE(req: NextRequest) {
       [trackId]
     ) as { gallery_images: string | null }[];
 
-    let galleryImages: string[] = [];
+    let galleryImages: Array<string | Record<string, unknown>> = [];
     if (existing.length > 0 && existing[0].gallery_images) {
       try {
         const parsed = JSON.parse(existing[0].gallery_images);
         if (Array.isArray(parsed)) {
-          galleryImages = parsed.filter((item: unknown) => typeof item === "string");
+          galleryImages = parsed.filter(
+            (item: unknown) =>
+              typeof item === "string" ||
+              (typeof item === "object" && item !== null && typeof (item as Record<string, unknown>).url === "string")
+          );
         }
       } catch {
         galleryImages = [];
       }
     }
 
-    const filteredImages = galleryImages.filter((img) => img !== imageUrl);
+    const filteredImages = galleryImages.filter((img) =>
+      typeof img === "string" ? img !== imageUrl : img.url !== imageUrl
+    );
 
     await dbRun(
       "UPDATE tracks SET gallery_images = ? WHERE id = ?",
       [JSON.stringify(filteredImages), trackId]
     );
 
-    // Delete from R2
-    try {
-      const bucket = process.env.R2_BUCKET_NAME;
-      if (bucket) {
-        const publicUrl = process.env.R2_PUBLIC_URL || `https://${bucket}.${process.env.R2_ACCOUNT_ID}.r2.dev`;
-        const key = imageUrl.replace(`${publicUrl}/`, "");
-        if (key && key !== imageUrl) {
-          const s3 = getS3Client();
-          await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-        }
-      }
-    } catch (r2Error) {
-      console.error("[API/upload/image] R2 delete error (non-fatal):", r2Error);
-    }
+    // Delete from Blob storage (best-effort)
+    await deleteImage(imageUrl);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[API/upload/image DELETE] Error:", error);
     return NextResponse.json(
-      { error: "Error al eliminar la imagen" },
+      { error: error instanceof Error ? `Error al eliminar la imagen: ${error.message}` : "Error al eliminar la imagen" },
       { status: 500 }
     );
   }
