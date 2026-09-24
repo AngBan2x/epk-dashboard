@@ -120,6 +120,12 @@ export function ImageGallery({
         </div>
       )}
 
+      {showingFallbacks && isOwner && trackId && (
+        <p className="mb-4 px-1 text-xs text-slate-500 dark:text-slate-400">
+          💡 Mostrando imágenes de ejemplo. Sube tus propias fotos con <span className="font-semibold">+ Subir</span> para gestionar tu galería (editar / eliminar aparecen sobre tus imágenes).
+        </p>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {displayImages.map((item) => (
           <div
