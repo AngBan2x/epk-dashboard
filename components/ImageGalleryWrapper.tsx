@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ImageGallery, GalleryItem } from "@/components/ImageGallery";
+import { useAuth } from "@/context/AuthContext";
 
 interface ImageGalleryWrapperProps {
   images?: (string | GalleryItem)[];
@@ -18,18 +19,34 @@ export function ImageGalleryWrapper({
 }: ImageGalleryWrapperProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [currentImages, setCurrentImages] = useState(images);
+  const { user } = useAuth();
 
   useEffect(() => {
+    // Re-evaluated on login/logout without reload (same-page LoginModal flow)
+    if (!user) {
+      setIsOwner(false);
+      return;
+    }
+    if (user.role === "admin" || user.name === artistName) {
+      setIsOwner(true);
+      return;
+    }
+    // Fallback: server check (covers name mismatches)
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!data) return;
+        if (!data) {
+          setIsOwner(false);
+          return;
+        }
         if (data.role === "admin" || data.name === artistName) {
           setIsOwner(true);
+        } else {
+          setIsOwner(false);
         }
       })
       .catch(() => {});
-  }, [artistName]);
+  }, [artistName, user]);
 
   const persistGallery = async (next: (string | GalleryItem)[]) => {
     try {
