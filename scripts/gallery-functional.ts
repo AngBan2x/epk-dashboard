@@ -35,6 +35,7 @@ async function getGallery(cookie: string, trackId: string): Promise<any[]> {
   // Direct Turso read (primary): API reads may lag on replicas for a long time.
   const { getTursoClient } = await import("../lib/turso");
   const client = getTursoClient();
+  if (!client) throw new Error("Turso client not configured (check .env.local)");
   const r = await client.execute({
     sql: "SELECT gallery_images FROM tracks WHERE id = ?",
     args: [trackId],
