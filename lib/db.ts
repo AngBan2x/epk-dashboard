@@ -1185,6 +1185,40 @@ export async function markNotificationAsRead(id: string): Promise<Notification |
   return getNotificationById(id);
 }
 
+export async function setNotificationRead(id: string, read: boolean): Promise<Notification | null> {
+  const flag = read ? 1 : 0;
+  if (isTursoEnabled()) {
+    await tursoExec("UPDATE notifications SET read = ? WHERE id = ?", [flag, id]);
+    return getNotificationById(id);
+  }
+  const db = getLocalDbWrite();
+  db.prepare("UPDATE notifications SET read = ? WHERE id = ?").run(flag, id);
+  return getNotificationById(id);
+}
+
+export async function updateUserPreferences(
+  userId: string,
+  preferences: UserPreferences
+): Promise<UserPreferences | null> {
+  const payload = JSON.stringify(preferences);
+  if (isTursoEnabled()) {
+    const row = await tursoExecSingle("UPDATE users SET preferences = ? WHERE id = ? RETURNING preferences", [
+      payload,
+      userId,
+    ]);
+    if (!row) return null;
+    return safeParseJSON<UserPreferences>(String(row.preferences ?? ""), preferences);
+  }
+  const db = getLocalDbWrite();
+  const result = db.prepare("UPDATE users SET preferences = ? WHERE id = ?").run(payload, userId);
+  if (result.changes === 0) return null;
+  const row = db.prepare("SELECT preferences FROM users WHERE id = ?").get(userId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!row) return null;
+  return safeParseJSON<UserPreferences>((row.preferences as string) ?? null, preferences);
+}
+
 export async function markAllNotificationsAsRead(userId: string): Promise<void> {
   if (isTursoEnabled()) {
     await tursoExec("UPDATE notifications SET read = 1 WHERE user_id = ?", [userId]);
