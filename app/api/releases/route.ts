@@ -91,11 +91,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
+    if (session.role !== "admin" && session.role !== "artist") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
     const body = await req.json();
 
     const parsed = CreateReleaseSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    if (session.role === "artist") {
+      const owner = await dbQuery("SELECT name FROM artists WHERE user_id = ?", [session.userId]) as { name: string }[];
+      if (!owner.length || owner[0].name !== parsed.data.artist_name) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
     }
 
     const id = crypto.randomUUID();

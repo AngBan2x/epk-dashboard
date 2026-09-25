@@ -144,7 +144,7 @@ export interface User {
   name: string;
   email: string;
   password_hash: string;
-  role: "admin" | "artist";
+  role: "admin" | "artist" | "subscriber";
   // P2.2: New fields
   preferences: UserPreferences | null;
   avatar: string | null;

@@ -104,6 +104,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
+    if (session.role !== "admin" && session.role !== "artist") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
     const body = await req.json();
     const validated = CreateShowSchema.parse(body);
 
@@ -156,6 +160,9 @@ export async function PUT(req: NextRequest) {
     // Strip null values — DB functions expect undefined for missing fields
     const data = Object.fromEntries(Object.entries(rawData).filter(([, v]) => v !== null));
 
+    if (session.role !== "admin" && session.role !== "artist") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
     // Ownership check: artists can only update their own shows; admins can update any
     if (session.role === "artist") {
       const existing = await getShowById(id);
@@ -195,6 +202,9 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "id requerido" }, { status: 400 });
     }
 
+    if (session.role !== "admin" && session.role !== "artist") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
     // Ownership check: artists can only delete their own shows; admins can delete any
     if (session.role === "artist") {
       const existing = await getShowById(id);

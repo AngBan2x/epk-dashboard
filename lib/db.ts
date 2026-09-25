@@ -473,7 +473,7 @@ function parseUser(row: Record<string, unknown>): User {
     name: String(row.name),
     email: String(row.email),
     password_hash: String(row.password_hash),
-    role: String(row.role) as "admin" | "artist",
+    role: String(row.role) as "admin" | "artist" | "subscriber",
     preferences: safeParseJSON<UserPreferences>((row.preferences as string) ?? null, {
       email_notifications: true,
       push_notifications: true,
