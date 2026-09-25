@@ -25,6 +25,8 @@ export default function NewReleasePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [artistProfileLoading, setArtistProfileLoading] = useState(true);
+  const [artistProfileError, setArtistProfileError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     type: "single" as ReleaseType,
@@ -135,6 +137,34 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
     }
   }, [user, authLoading, router]);
 
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === "admin") {
+      setArtistProfileLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/artists/me");
+        if (!res.ok) throw new Error("Perfil no encontrado");
+        const data = await res.json();
+        if (!data?.name) throw new Error("Perfil sin nombre");
+        if (cancelled) return;
+        setForm((prev) => ({ ...prev, artist_name: data.name }));
+      } catch {
+        if (!cancelled) {
+          setArtistProfileError("No se pudo cargar tu perfil de artista. Crea tu perfil para poder crear releases.");
+        }
+      } finally {
+        if (!cancelled) setArtistProfileLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   if (authLoading || !user) return null;
 
   const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "", start_time: 0, end_time: 0 }]);
@@ -192,6 +222,10 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
 
   const handleSubmit = async (e: React.FormEvent, submitForReview = false) => {
     e.preventDefault();
+    if (artistProfileLoading || artistProfileError) {
+      setMessage({ type: "error", text: artistProfileError || "Cargando tu perfil de artista..." });
+      return;
+    }
     setLoading(true);
     setMessage(null);
 
@@ -279,14 +313,33 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             {/* Artist Name */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre del Artista *</label>
-              <input
-                type="text"
-                required
-                value={form.artist_name}
-                onChange={(e) => setForm({ ...form, artist_name: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
-                placeholder="Nombre del artista"
-              />
+              {user.role === "admin" ? (
+                <input
+                  type="text"
+                  required
+                  value={form.artist_name}
+                  onChange={(e) => setForm({ ...form, artist_name: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                  placeholder="Nombre del artista"
+                />
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    required
+                    readOnly
+                    value={form.artist_name}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-not-allowed"
+                    placeholder={artistProfileLoading ? "Cargando tu perfil..." : "Nombre del artista"}
+                  />
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Se usa el nombre de tu perfil de artista.</p>
+                </>
+              )}
+              {artistProfileError && (
+                <div className="mt-2 p-3 rounded-lg bg-red-50 dark:bg-red-950 text-sm text-red-700 dark:text-red-300">
+                  {artistProfileError}
+                </div>
+              )}
             </div>
 
             {/* Release Date & Genre */}
@@ -425,7 +478,7 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || artistProfileLoading || !!artistProfileError}
                 className="px-6 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold transition disabled:opacity-50"
               >
                 {loading ? "Guardando..." : "Guardar como borrador"}
@@ -433,7 +486,7 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
               <button
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
-                disabled={loading}
+                disabled={loading || artistProfileLoading || !!artistProfileError}
                 className="px-6 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold transition disabled:opacity-50"
               >
                 {loading ? "Enviando..." : "Enviar para revisión"}

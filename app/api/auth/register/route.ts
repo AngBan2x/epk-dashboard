@@ -9,6 +9,7 @@ const RegisterSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   email: z.string().email("Email inválido"),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  role: z.enum(["artist", "subscriber"]).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const validated = RegisterSchema.parse(body);
+    const role = validated.role ?? "artist";
 
     // Verificar si el email ya existe
     const existingUser = await getUserByEmail(validated.email);
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
       name: validated.name,
       email: validated.email,
       password_hash: passwordHash,
-      role: "artist", // Por defecto artist, admin se asigna manualmente
+      role,
       preferences: {
         email_notifications: true,
         push_notifications: true,
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Auto-create artist profile for artists (use INSERT OR IGNORE for Turso)
-    if (user.role === "artist") {
+    if (role === "artist") {
       try {
         await createArtist({
           name: user.name,

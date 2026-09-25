@@ -5468,3 +5468,14 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Fix:** `timeout: 60000` en los 6 MCP locales (filesystem, playwright, context7, git, fetch, auditar) + `scripts/warm-mcp-cache.ts` (pre-calienta npx/uvx antes del arranque).
 **Verificacion:** usuario confirma "funciona perfectamente, todos verdes" tras reiniciar Desktop. Documentado aqui y en `docs/modelos gratuitos disponibles.txt` (lista de modelos libres actualizada a Zen/OpenRouter $0).
 
+### P4.1 Rol suscriptor + registro (2026-09-25)
+**Alcance:** tipo de rol en `types/music.ts` + `parseUser`, `POST /api/auth/register` acepta `role: artist|subscriber` (default artist, admin no asignable por API), selector Artista/Suscriptor en `app/register`, `register()` en AuthContext con parametro de rol y redireccion (/dashboard vs /artists), `middleware.ts` con `creatorOnlyPaths` (suscriptor -> /artists en /profile, /releases/new, /releases/:id/edit; /account sigue accesible).
+**Bugs de seguridad encontrados y corregidos (3):**
+1. `app/api/shows/route.ts` POST/PUT/DELETE: el patron `if (session.role === "artist")` dejaba al suscriptor caer en la rama de admin (escalada de privilegios total). Ahora: 403 explicito para roles distintos de admin/artist, y el chequeo va ANTES de leer body/recursos.
+2. `POST /api/releases` no tenia NINGUN chequeo de rol ni de propiedad: cualquier usuario autenticado podia crear releases con `artist_name` arbitrario (bug previo, no introducido por el rol). Ahora 403 por rol + ownership por `artists.user_id` vs `artist_name`.
+3. `app/api/tracks/[id].route.ts` PATCH: un subagente habia ampliado el permiso a subscriber (revertido de inmediato).
+**UI coherente con ownership:** `app/releases/new` precarga el nombre del perfil via `/api/artists/me`, campo readOnly para artistas (editable solo para admin, que si puede crear para cualquiera) y bloqueo de envio si el perfil no carga.
+**Tests:** `tests/unit/subscriber.test.ts` (13 tests: createUser con rol subscriber + CRUD de subscriptions) y `tests/e2e/subscriber-qa.spec.ts` (API 403 en shows/releases/admin, UI selector + redirecciones middleware + /account, limpieza de cuentas).
+**Verificacion local:** tsc 0, unit 123/123, build OK, E2E headed 3/3 (y 6/6 con --repeat-each=2), ownership releases 403/201/200 comprobado con el usuario owner, capturas revisadas (register con Suscriptor seleccionado, /account con sesion de suscriptor).
+**Lecciones:** (1) Playwright debe esperar la hidratacion de React via el fetch `/api/auth/me` antes de interactuar con formularios, si no se pierde el input; (2) `pnpm build` falla con EPERM sobre `data/music_catalog.db` si hay dev server corriendo en Windows - pararlo antes de compilar; (3) el subagente de auth amplio permisos sin criterio: revisar siempre los diffs de autorizacion antes de commitear.
+
