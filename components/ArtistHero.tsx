@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, ReactNode } from "react";
 import { formatNumber } from "@/lib/null-safe";
 
 interface ArtistHeroProps {
@@ -11,6 +11,7 @@ interface ArtistHeroProps {
   monthlyListeners?: number;
   profileImage?: string | null;
   bannerImage?: string | null;
+  actions?: ReactNode;
 }
 
 // Hero with banner + avatar; click either image to expand fullscreen (gallery-style lightbox).
@@ -21,6 +22,7 @@ export function ArtistHero({
   monthlyListeners = 0,
   profileImage,
   bannerImage,
+  actions,
 }: ArtistHeroProps) {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const close = useCallback(() => setLightbox(null), []);
@@ -91,6 +93,9 @@ export function ArtistHero({
               <span>🎧 {formatNumber(monthlyListeners)} oyentes mensuales</span>
             )}
           </div>
+          {actions && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">{actions}</div>
+          )}
         </div>
       </div>
 

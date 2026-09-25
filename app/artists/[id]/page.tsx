@@ -2,6 +2,8 @@ import { getArtistById, getTracksByArtist } from "@/lib/db";
 import { BioSection } from "@/components/BioSection";
 import { ArtistTracksSection } from "@/components/ArtistTracksSection";
 import { ArtistHero } from "@/components/ArtistHero";
+import { SubscriptionButton } from "@/components/subscriber/SubscriptionButton";
+import { SubscriberCount } from "@/components/subscriber/SubscriberCount";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,19 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
         monthlyListeners={artist.monthly_listeners}
         profileImage={artist.profile_image}
         bannerImage={artist.banner_image}
+        actions={
+          <>
+            <SubscriptionButton
+              artistId={artist.id}
+              artistName={artist.name}
+              artistUserId={artist.user_id}
+            />
+            <SubscriberCount
+              artistId={artist.id}
+              artistUserId={artist.user_id}
+            />
+          </>
+        }
       />
       <main className="max-w-4xl mx-auto px-4 pb-12">
         <BioSection
