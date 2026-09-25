@@ -5498,4 +5498,5 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Verificacion local:** tsc 0, unit 123/123, build OK, E2E headed 3/3, capturas revisadas (panel con badge 9+, pagina completa con 18 notificaciones, preferencias en /account).
 **Bugs de UI detectados por el subagente y corregidos:** el panel desbordaba por la izquierda en movil y parpadeaba "No hay notificaciones" antes del primer fetch (loading inicial a skeleton).
 **Lecciones:** un test que espera la senal de hidratacion puede fallar si la respuesta nunca llega (no asumir que el evento ocurre); validar el estado del DOM tras la interaccion. Nota de contrato: `read` acepta el id en query string, la UI envia ambos (query + body).
+**Verificacion en produccion:** E2E 3/3 headed (API con ownership cruzado admin/artista, preferencias, UI campana + Escape + pagina + persistencia) + matriz 50/50. Capturas de prod revisadas (panel abierto con la lista cargada y la pagina completa).
 

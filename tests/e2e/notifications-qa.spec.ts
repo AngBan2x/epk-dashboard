@@ -162,6 +162,7 @@ test.describe("P4.3: Notificaciones in-app QA", () => {
     await expect(bell).toBeVisible({ timeout: 60_000 });
     await bell.click();
     await expect(authedPage.getByRole("dialog")).toBeVisible({ timeout: 30_000 });
+    await expect(authedPage.locator(".animate-pulse")).toHaveCount(0, { timeout: 45_000 });
     await authedPage.screenshot({ path: "tests/screenshots/notifications/e2e-bell-panel.png", fullPage: false });
 
     await authedPage.keyboard.press("Escape");
