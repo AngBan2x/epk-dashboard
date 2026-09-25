@@ -643,13 +643,16 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción | Estado |
 |------|-----------|-------------|--------|
-| P4.1 | subscriber-builder | Rol suscriptor + registro | ⏳ Pendiente |
-| P4.2 | subscriber-builder | Sistema de suscripciones | ⏳ Pendiente |
-| P4.3 | notification-builder | Notificaciones in-app | ⏳ Pendiente |
-| P4.4 | notification-builder | Notificaciones email (Resend) | ⏳ Pendiente |
-| P4.5 | notification-builder | Notificaciones aprobación/rechazo | ⏳ Pendiente |
-| P4.6 | notification-builder | Notificaciones de shows | ⏳ Pendiente |
-| P4.7 | search-builder | Búsqueda en tiempo real | ⏳ Pendiente |
+| P4.1 | subscriber-builder | Rol suscriptor + registro (tipo, middleware, artista-suscriptor) | ⏳ Pendiente |
+| P4.2 | subscriber-builder | Suscripciones (botón, prefs releases/shows, baja, promoción a artista, cascada) | ⏳ Pendiente |
+| P4.3 | notification-builder | In-app: bell + panel + página + polling + prefs + GET /api/notifications | ⏳ Pendiente |
+| P4.4 | notification-builder | Email Resend real en triggers + FROM productivo + sin-key explícito | ⏳ Pendiente |
+| P4.5 | approval-workflow-builder | Unificar approval + notif/email artista al aprobar/rechazar/revisión | ⏳ Pendiente |
+| P4.6 | notification-builder | Shows: transiciones + fan-out suscriptores + reembolso/48h/semana + disclaimer | ⏳ Pendiente |
+| P4.7 | search-builder | GET /api/search?q&sort&order + SearchBar header + sort artists/releases/shows/eventos | ⏳ Pendiente |
+| P4.8 | notification-builder | Broadcast plataforma (admin, in-app todos + email opcional) | ⏳ Pendiente |
+
+> Spec ejecutable: `docs/PHASE_P4.md`. Solo P4 tras reinicio (acordado 2026-09-24).
 
 > **⚠️ TODO antes de P4:** Configurar `YOUTUBE_API_KEY` en Vercel (Google Cloud Console → YouTube Data API v3)
 

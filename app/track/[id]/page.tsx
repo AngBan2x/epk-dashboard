@@ -117,6 +117,14 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                     <p className="text-slate-400 dark:text-slate-500 text-xs">
                       {track.release_date} &middot; {formatNumber(streamCount)} {streamCount === 1 ? 'stream' : 'streams'}
                     </p>
+                    <p className="mt-2">
+                      <a
+                        href={`/releases/${track.id}`}
+                        className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                      >
+                        Ver ficha del lanzamiento →
+                      </a>
+                    </p>
                   </div>
 
                   <div className="mt-5">

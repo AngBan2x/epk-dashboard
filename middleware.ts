@@ -55,8 +55,16 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const protectedPaths = ["/profile", "/account", "/releases/new"];
-  if (protectedPaths.some((p) => path === p || path.startsWith(p + "/"))) {
+  const protectedPaths = ["/profile", "/account", "/releases/new", "/releases/:id/edit"];
+  const isProtected = protectedPaths.some((p) => {
+    if (p.includes(":")) {
+      // Simple param matcher: /releases/:id/edit
+      const rx = new RegExp("^" + p.replace(/:[^/]+/g, "[^/]+") + "$");
+      return rx.test(path);
+    }
+    return path === p || path.startsWith(p + "/");
+  });
+  if (isProtected) {
     const redirect = await requireAuth(request);
     if (redirect) return redirect;
   }
@@ -79,5 +87,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/login", "/register", "/profile", "/account", "/releases/new"],
+  matcher: ["/admin/:path*", "/login", "/register", "/profile", "/account", "/releases/new", "/releases/:id/edit"],
 };

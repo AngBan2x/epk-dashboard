@@ -5455,3 +5455,9 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Feature:** components/ArtistHero.tsx (client island): avatar/banner clicables abren lightbox estilo galeria (backdrop, ✕ Cerrar, Escape); sin imagenes no hay interaccion.
 **Verificacion:** tsc 0, unit 110, build OK, lightbox headed 5/5 (open/escape), matriz 50/50, capturas queen/ed revisadas.
 
+### Bloque 1 docs+modelos+navegacion (2026-09-24, Muse Spark 1.3)
+**Docs:** PHASE_P4.md (spec P4.1-P4.8) + PHASE_P5.md + PHASE_P3.md retro + MASTER_PLAN P4 expandido + AGENTS.md (workflow obligatorio, modelos, tests 110, auth HMAC, MCP 15, privacidad tiers) + modelos opencode.json (mimo v2.6 builders/docs/small, ultra razonamiento, lightning UI rapida, nano-omni vision; banco pruebas sin asignar).
+**Modelos investigados:** Zen gratis + OpenRouter $0 via webfetch (models.dev + docs Zen). Correcciones usuario: mimo 200K en Zen, kimi-k2.7-code y deepseek-v4-flash pagos, GLM-5.2 descartado.
+**Navegacion:** header Shows + menu cuenta (desktop/movil), tab Aprobaciones, link release detail (admin tabla + track page), middleware protege releases/:id/edit, footer admin ya condicional (sin cambio).
+**Auditoria alcanzabilidad:** /shows, /account, /releases/[id], /admin/approvals huerfanas (resuelto); /releases edit sin middleware (resuelto).
+
