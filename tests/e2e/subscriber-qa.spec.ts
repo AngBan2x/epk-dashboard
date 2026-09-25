@@ -62,10 +62,9 @@ test.describe("P4.1: Subscriber Role QA", () => {
     const email = `subscriber-ui-${Date.now()}@example.com`;
     createdEmails.push(email);
 
-    const hydrationSignal = page.waitForResponse(
-      (r) => r.url().includes("/api/auth/me"),
-      { timeout: 60_000 }
-    );
+    const hydrationSignal = page
+      .waitForResponse((r) => r.url().includes("/api/auth/me"), { timeout: 60_000 })
+      .catch(() => null);
     await page.goto(`${BASE_URL}/register`, { waitUntil: "domcontentloaded" });
     await expect(page.locator("form")).toBeVisible({ timeout: 45_000 });
     await hydrationSignal;

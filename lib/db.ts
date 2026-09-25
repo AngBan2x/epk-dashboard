@@ -777,9 +777,11 @@ export async function deleteUser(userId: string): Promise<boolean> {
     await tursoExec("DELETE FROM likes WHERE user_id = ?", [userId]);
     await tursoExec("DELETE FROM notifications WHERE user_id = ?", [userId]);
     await tursoExec("DELETE FROM track_submissions WHERE user_id = ?", [userId]);
+    await tursoExec("DELETE FROM subscriptions WHERE subscriber_id = ?", [userId]);
     // Delete artist profile if exists
     const artist = await getArtistByUserId(userId);
     if (artist) {
+      await tursoExec("DELETE FROM subscriptions WHERE artist_id = ?", [artist.id]);
       await tursoExec("DELETE FROM shows WHERE artist_id = ?", [artist.id]);
       await tursoExec("DELETE FROM artists WHERE id = ?", [artist.id]);
     }
@@ -792,9 +794,11 @@ export async function deleteUser(userId: string): Promise<boolean> {
   db.prepare("DELETE FROM likes WHERE user_id = ?").run(userId);
   db.prepare("DELETE FROM notifications WHERE user_id = ?").run(userId);
   db.prepare("DELETE FROM track_submissions WHERE user_id = ?").run(userId);
+  db.prepare("DELETE FROM subscriptions WHERE subscriber_id = ?").run(userId);
   // Delete artist profile if exists
   const artist = await getArtistByUserId(userId);
   if (artist) {
+    db.prepare("DELETE FROM subscriptions WHERE artist_id = ?").run(artist.id);
     db.prepare("DELETE FROM shows WHERE artist_id = ?").run(artist.id);
     db.prepare("DELETE FROM artists WHERE id = ?").run(artist.id);
   }
