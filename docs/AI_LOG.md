@@ -5462,3 +5462,9 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Auditoria alcanzabilidad:** /shows, /account, /releases/[id], /admin/approvals huerfanas (resuelto); /releases edit sin middleware (resuelto).
 **Verificacion nav headed:** 4/4 (guest Shows+Artistas, artist Shows, menu Mi Perfil/Mi Cuenta) + capturas revisadas OK.
 
+### Fix MCP timeouts + warm cache (2026-09-24, 7adeb13)
+**Sintoma:** MCP Desktop (Electron 1.18.32) fallaba en arranque frio concurrente de servidores locales; en CLI todo verde.
+**Causa:** arranque via npx/uvx sin precache + timeout default insuficiente en `opencode.json`.
+**Fix:** `timeout: 60000` en los 6 MCP locales (filesystem, playwright, context7, git, fetch, auditar) + `scripts/warm-mcp-cache.ts` (pre-calienta npx/uvx antes del arranque).
+**Verificacion:** usuario confirma "funciona perfectamente, todos verdes" tras reiniciar Desktop. Documentado aqui y en `docs/modelos gratuitos disponibles.txt` (lista de modelos libres actualizada a Zen/OpenRouter $0).
+

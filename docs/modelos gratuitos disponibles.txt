@@ -1,28 +1,32 @@
-modelos gratuitos de opencode disponibles actualmente:
+modelos gratuitos de opencode zen disponibles actualmente:
 nemotron 3.5 lightning free
-muse spark 1.2 free
-hy3 free
+muse spark 1.2, 1.3 free
+ling 3.0 flash fin free
 nemotron 3 ultra free
-mimo v2.5 free
-big pickle
+mimo v2.6 flash free
+space bunny free
 
 modelos gratuitos de openrouter disponibles actualmente:
 
-ling 3.0 flash fin
-Dots3-Note Preview
-lfm2.5-2.6B
-Nemotron 3.5 Lightning
-Inkling Small
-Laguna S 2.1
-Inkling
-Laguna XS 2.1
-North Mini Code
-Nemotron 3 Ultra
-Nemotron 3.5 Content Safety
-MiniMax M3
-Nemotron 3 Nano Omni
-Gemma 4 26B A4B
-Gemma 4 31B
-MiniMax M2.7
-Nemotron 3 Super
-Free Models Router
+dots3-note preview (free)
+ember-1
+free models router
+glm 5.2 (free)
+inkling (free)
+inkling small (free)
+laguna s 2.1 (free)
+laguna xs 2.1 (free)
+lfm2.5-2.6B (free)
+ling 3.0 flash fin (free)
+ling 3.0 flash sante (free)
+nemotron 3 nano omni (free)
+nemotron 3 super (free)
+nemotron 3 ultra (free)
+nemotron 3.5 content safety (free)
+nemotron 3.5 lightning (free)
+nex-n2.5-mini (free)
+nex-n2.5-pro (free)
+north mini code (free)
+qwen3.8 27B (free)
+schematron v2 small
+schematron v2 turbo
