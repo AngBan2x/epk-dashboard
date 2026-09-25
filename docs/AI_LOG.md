@@ -5460,4 +5460,5 @@ Fuera tabs + boton unico; JSON/HTML descargan directo con estado propio. Matrix 
 **Modelos investigados:** Zen gratis + OpenRouter $0 via webfetch (models.dev + docs Zen). Correcciones usuario: mimo 200K en Zen, kimi-k2.7-code y deepseek-v4-flash pagos, GLM-5.2 descartado.
 **Navegacion:** header Shows + menu cuenta (desktop/movil), tab Aprobaciones, link release detail (admin tabla + track page), middleware protege releases/:id/edit, footer admin ya condicional (sin cambio).
 **Auditoria alcanzabilidad:** /shows, /account, /releases/[id], /admin/approvals huerfanas (resuelto); /releases edit sin middleware (resuelto).
+**Verificacion nav headed:** 4/4 (guest Shows+Artistas, artist Shows, menu Mi Perfil/Mi Cuenta) + capturas revisadas OK.
 
