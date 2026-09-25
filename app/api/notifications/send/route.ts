@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { resend, FROM_EMAIL } from "@/lib/resend";
-import { getEmailTemplate, type NotificationType } from "@/lib/email-templates";
-import { createNotification, getUserById } from "@/lib/db";
+import { sendNotificationEmail, getEmailConfig } from "@/lib/email";
+import { createNotification } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateRequest } from "@/lib/auth";
 
@@ -52,36 +51,33 @@ export async function POST(req: NextRequest) {
 
     // Send email if requested and resend is configured
     let emailSent = false;
-    if (validated.send_email && resend) {
-      const user = await getUserById(validated.user_id);
-      if (user?.email) {
-        try {
-          const template = getEmailTemplate(validated.type as NotificationType, {
-            userName: user.name,
-            trackTitle: (validated.data?.trackTitle as string) || "",
-            artistName: (validated.data?.artistName as string) || "",
-            adminNotes: validated.data?.adminNotes as string | undefined,
-            dashboardUrl: `/dashboard`,
-          });
-
-          await resend.emails.send({
-            from: FROM_EMAIL,
-            to: user.email,
-            subject: template.subject,
-            html: template.html,
-            text: template.text,
-          });
-          emailSent = true;
-        } catch (emailError) {
-          console.error("Error sending email:", emailError);
-          // Don't fail the request if email fails
-        }
-      }
+    let emailReason: string | undefined;
+    if (validated.send_email) {
+      const result = await sendNotificationEmail({
+        userId: validated.user_id,
+        type: validated.type,
+        data: {
+          userName: "",
+          trackTitle: (validated.data?.trackTitle as string) || "",
+          artistName: (validated.data?.artistName as string) || "",
+          adminNotes: validated.data?.adminNotes as string | undefined,
+          dashboardUrl: `/dashboard`,
+          notificationTitle: validated.title,
+          notificationMessage: validated.message,
+        },
+      });
+      emailSent = result.sent;
+      emailReason = result.reason;
     }
+
+    const emailConfig = getEmailConfig();
 
     return NextResponse.json({
       notification,
       email_sent: emailSent,
+      email_reason: emailReason ?? null,
+      email_configured: emailConfig.configured,
+      email_missing_env: emailConfig.missing,
     }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
