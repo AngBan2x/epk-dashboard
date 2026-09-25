@@ -3,6 +3,72 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import type { UserPreferences } from '@/types/music';
+import { cn } from '@/lib/utils';
+
+const PREFERENCE_FIELDS: { key: keyof UserPreferences; label: string; description: string }[] = [
+  {
+    key: 'email_notifications',
+    label: 'Notificaciones por email',
+    description: 'Resumen de la actividad de tu cuenta en tu correo',
+  },
+  {
+    key: 'push_notifications',
+    label: 'Notificaciones push',
+    description: 'Avisos en tiempo real dentro de la aplicación',
+  },
+  {
+    key: 'new_release_alerts',
+    label: 'Avisos de nuevos releases',
+    description: 'Cuando un artista al que sigues publica algo nuevo',
+  },
+  {
+    key: 'show_alerts',
+    label: 'Avisos de shows',
+    description: 'Nuevos shows, cambios y recordatorios',
+  },
+  {
+    key: 'marketing_emails',
+    label: 'Emails promocionales',
+    description: 'Novedades y campañas de PressPlay',
+  },
+];
+
+function Switch({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
+        'disabled:opacity-50 disabled:cursor-not-allowed',
+        checked ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600'
+      )}
+    >
+      <span
+        className={cn(
+          'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+          checked ? 'translate-x-5' : 'translate-x-0.5'
+        )}
+      />
+    </button>
+  );
+}
 
 export default function AccountPage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -20,6 +86,12 @@ export default function AccountPage() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [prefsLoading, setPrefsLoading] = useState(true);
+  const [prefsSaving, setPrefsSaving] = useState(false);
+  const [prefsError, setPrefsError] = useState('');
+  const [prefsSaved, setPrefsSaved] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -31,6 +103,70 @@ export default function AccountPage() {
       setEmail(user.email || '');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const loadPreferences = async () => {
+      setPrefsLoading(true);
+      try {
+        const res = await fetch('/api/user/preferences', { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        if (!active) return;
+        if (res.ok && data && data.preferences) {
+          setPreferences(data.preferences as UserPreferences);
+          setPrefsError('');
+        } else {
+          setPrefsError('No se pudieron cargar las preferencias de notificación');
+        }
+      } catch {
+        if (active) setPrefsError('Error de conexión');
+      } finally {
+        if (active) setPrefsLoading(false);
+      }
+    };
+    void loadPreferences();
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const handlePreferenceChange = async (key: keyof UserPreferences, value: boolean) => {
+    if (!preferences) return;
+    const previous = preferences;
+    const next = { ...previous, [key]: value } as UserPreferences;
+    setPreferences(next);
+    setPrefsSaving(true);
+    setPrefsError('');
+    setPrefsSaved(false);
+    try {
+      const res = await fetch('/api/user/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setPreferences(previous);
+        setPrefsError(
+          typeof data?.error === 'string' && data.error.trim().length > 0
+            ? data.error
+            : 'No se pudieron guardar las preferencias de notificación'
+        );
+        return;
+      }
+      if (data && data.preferences) {
+        setPreferences(data.preferences as UserPreferences);
+      }
+      setPrefsSaved(true);
+      setTimeout(() => setPrefsSaved(false), 3000);
+    } catch {
+      setPreferences(previous);
+      setPrefsError('Error de conexión al guardar las preferencias');
+    } finally {
+      setPrefsSaving(false);
+    }
+  };
 
   const handleUpdateEmail = async () => {
     try {
@@ -201,6 +337,62 @@ export default function AccountPage() {
                 Cambiar Contraseña
               </button>
             </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Notificaciones</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              Elige qué avisos quieres recibir
+            </p>
+
+            {prefsError && (
+              <div
+                role="alert"
+                className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm"
+              >
+                {prefsError}
+              </div>
+            )}
+
+            {prefsLoading || !preferences ? (
+              <div className="space-y-4" aria-hidden="true">
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <div
+                    key={index}
+                    className="h-9 w-full rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                  {PREFERENCE_FIELDS.map((field) => (
+                    <div
+                      key={field.key}
+                      className="flex items-center justify-between gap-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          {field.label}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {field.description}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={preferences[field.key]}
+                        disabled={prefsSaving}
+                        label={field.label}
+                        onChange={(next) => void handlePreferenceChange(field.key, next)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 min-h-[1.25rem] text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  {prefsSaved ? '✓ Preferencias guardadas' : ''}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Danger Zone */}

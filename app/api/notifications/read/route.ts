@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { markNotificationAsRead, getUserNotifications } from "@/lib/db";
+import { markNotificationAsRead, getNotificationById, getUserNotifications } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 async function validateSession(req: NextRequest) {
@@ -35,6 +35,11 @@ export async function POST(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    }
+
+    const existing = await getNotificationById(id);
+    if (!existing || existing.user_id !== session.userId) {
+      return NextResponse.json({ error: "Notificación no encontrada" }, { status: 404 });
     }
 
     const updated = await markNotificationAsRead(id);
