@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { capitalizeReleaseType } from '@/lib/null-safe';
+import { capitalizeReleaseType, getCoverImage } from '@/lib/null-safe';
 
 interface Submission {
   id: string;
@@ -238,10 +238,10 @@ export default function ApprovalsPage() {
                       <div><span className="text-slate-500 dark:text-slate-400">Tipo:</span> <span className="text-slate-900 dark:text-white">{capitalizeReleaseType(data.release_type)}</span></div>
                       <div><span className="text-slate-500 dark:text-slate-400">Fecha:</span> <span className="text-slate-900 dark:text-white">{data.release_date}</span></div>
                       <div><span className="text-slate-500 dark:text-slate-400">Duración:</span> <span className="text-slate-900 dark:text-white">{data.duration}</span></div>
-                      {data.cover_image && (
+                      {getCoverImage(data) && (
                         <div>
                           <span className="text-slate-500 dark:text-slate-400">Portada:</span>
-                          <Image src={data.cover_image} alt="Cover" width={600} height={160} unoptimized className="mt-2 w-full h-40 object-cover rounded-lg" />
+                          <Image src={getCoverImage(data)!} alt="Cover" width={600} height={160} unoptimized className="mt-2 w-full h-40 object-cover rounded-lg" />
                         </div>
                       )}
                       {data.lyrics && (

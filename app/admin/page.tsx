@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { safeString, capitalizeReleaseType } from "@/lib/null-safe";
+import { safeString, capitalizeReleaseType, getCoverImage } from "@/lib/null-safe";
 import type { Track, ArtistProfile, Show, ShowStatus, ReleaseStatus } from "@/types/music";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
@@ -730,8 +730,8 @@ export default function AdminPage() {
                         <td className="p-3">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
-                              {track.cover_image ? (
-                                <Image src={track.cover_image} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
+                              {getCoverImage(track) ? (
+                                <Image src={getCoverImage(track)!} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                               )}
@@ -822,8 +822,8 @@ export default function AdminPage() {
                         <td className="p-3">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
-                              {release.cover_image ? (
-                                <Image src={release.cover_image} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
+                              {getCoverImage(release) ? (
+                                <Image src={getCoverImage(release)!} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                               )}
@@ -930,13 +930,13 @@ export default function AdminPage() {
                         <tr key={sub.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                           <td className="p-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
-                                {trackData.cover_image ? (
-                                  <Image src={trackData.cover_image} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
-                                )}
-                              </div>
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
+                                  {getCoverImage(trackData) ? (
+                                    <Image src={getCoverImage(trackData)!} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
+                                  )}
+                                </div>
                               <span className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
                                 {safeString(trackData.title)}
                               </span>
@@ -1570,7 +1570,11 @@ onSubmit={async (e) => {
                   return (
                     <>
                       <div className="flex items-center gap-4">
-                        <Image src={trackData.cover_image} alt="" width={96} height={96} unoptimized className="w-24 h-24 rounded-lg object-cover" />
+                        {getCoverImage(trackData) ? (
+                          <Image src={getCoverImage(trackData)!} alt="" width={96} height={96} unoptimized className="w-24 h-24 rounded-lg object-cover" />
+                        ) : (
+                          <div className="w-24 h-24 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl">🎵</div>
+                        )}
                         <div>
                           <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{trackData.title}</h3>
                           <p className="text-slate-600 dark:text-slate-400">{trackData.artist_name}</p>
