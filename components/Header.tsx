@@ -11,10 +11,16 @@ export function Header() {
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   const handleLogout = async () => {
+    setAccountOpen(false);
+    setMobileMenuOpen(false);
     await logout();
   };
+
+  const navLink =
+    "text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors";
 
   return (
     <>
@@ -35,6 +41,12 @@ export function Header() {
                   >
                     Dashboard
                   </Link>
+                  <Link
+                    href="/shows"
+                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    Shows
+                  </Link>
                 </>
               ) : (
                 <>
@@ -43,6 +55,12 @@ export function Header() {
                     className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
                   >
                     Artistas
+                  </Link>
+                  <Link
+                    href="/shows"
+                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    Shows
                   </Link>
                   <Link
                     href="/dashboard"
@@ -62,16 +80,48 @@ export function Header() {
             )}
             <ThemeToggle />
             {user ? (
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-slate-600 dark:text-slate-400">
-                  {user.name} ({user.role})
-                </span>
+              <div className="relative">
                 <button
-                  onClick={handleLogout}
-                  className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  onClick={() => setAccountOpen((v) => !v)}
+                  aria-expanded={accountOpen}
+                  aria-haspopup="menu"
+                  className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
                 >
-                  Cerrar sesión
+                  <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-bold flex items-center justify-center">
+                    {user.name?.[0]?.toUpperCase() || "?"}
+                  </span>
+                  <span className="hidden lg:inline">{user.name} ({user.role})</span>
                 </button>
+                {accountOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-2 z-50"
+                  >
+                    <Link
+                      href="/profile"
+                      role="menuitem"
+                      onClick={() => setAccountOpen(false)}
+                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      Mi Perfil
+                    </Link>
+                    <Link
+                      href="/account"
+                      role="menuitem"
+                      onClick={() => setAccountOpen(false)}
+                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      Mi Cuenta
+                    </Link>
+                    <button
+                      role="menuitem"
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <button
@@ -113,6 +163,13 @@ export function Header() {
                 >
                   Dashboard
                 </Link>
+                <Link
+                  href="/shows"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Shows
+                </Link>
               </>
             ) : (
               <>
@@ -122,6 +179,13 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Artistas
+                </Link>
+                <Link
+                  href="/shows"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Shows
                 </Link>
                 <Link
                   href="/dashboard"
@@ -147,6 +211,20 @@ export function Header() {
                 <span className="text-sm text-slate-600 dark:text-slate-400">
                   {user.name} ({user.role})
                 </span>
+                <Link
+                  href="/profile"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Mi Perfil
+                </Link>
+                <Link
+                  href="/account"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Mi Cuenta
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="text-left px-4 py-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"

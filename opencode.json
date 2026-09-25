@@ -1,7 +1,7 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/nemotron-3-ultra-free",
-  "small_model": "opencode/mimo-v2.5-free",
+  "small_model": "opencode/mimo-v2.6-flash-free",
   "mcp": {
     "filesystem": {
       "type": "local",
@@ -113,7 +113,7 @@
     "fase-orchestrator": {
       "description": "Documentación de referencia para orquestación de fases. Usar orchestrator.md para ejecución real",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -121,7 +121,7 @@
     "api-builder": {
       "description": "Especialista en crear endpoints REST con better-sqlite3, Zod validation y Next.js App Router",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -193,7 +193,7 @@
     "show-form-builder": {
       "description": "Construye formularios CRUD para shows con estados automáticos, transiciones por fecha, métodos de pago flexibles y sistema de cancelación",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -201,7 +201,7 @@
     "notification-builder": {
       "description": "Construye el sistema de notificaciones in-app y por email con preferencias de usuario, panel de notificaciones y polling",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -209,7 +209,7 @@
     "search-builder": {
       "description": "Construye el sistema de búsqueda en tiempo real con SQLite LIKE, debounce, sorting y UI mobile-friendly",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -217,7 +217,7 @@
     "subscriber-builder": {
       "description": "Construye el rol de suscriptor con suscripción a artistas, preferencias de notificación y gestión de cuenta",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -225,7 +225,7 @@
     "social-links-builder": {
       "description": "Construye el gestor de 16 plataformas sociales con CRUD, SVG icons, validación de URLs y display en perfiles",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -233,7 +233,7 @@
     "account-settings-builder": {
       "description": "Construye la página de configuración de cuenta con edición de email, cambio de contraseña, preferencias y eliminación de cuenta",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -241,7 +241,7 @@
     "release-form-builder": {
       "description": "Construye formularios CRUD para releases (singles, EPs, albums) con auto-fill de iTunes, manejo de covers y links externos",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -249,7 +249,7 @@
     "artist-dashboard-builder": {
       "description": "Construye el panel de control del artista con estadísticas, acciones rápidas, actividad reciente y gestión de perfil/social",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -289,7 +289,7 @@
     "brand-fixer": {
       "description": "Busca y reemplaza logos, íconos y marcas inconsistentes en todo el codebase",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "task": { "*": "allow" }
       }
@@ -333,7 +333,7 @@
     "doc-writer": {
       "description": "Especialista en documentación — README, AI_LOG, handoffs, docs técnicos",
       "mode": "subagent",
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/mimo-v2.6-flash-free",
       "permission": {
         "bash": "allow",
         "edit": "allow"

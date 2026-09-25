@@ -555,6 +555,12 @@ export default function AdminPage() {
             >
               Shows ({shows.length})
             </button>
+            <a
+              href="/admin/approvals"
+              className="px-4 py-2 text-sm font-medium rounded-t-lg transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Aprobaciones →
+            </a>
           </nav>
         </div>
 
@@ -822,9 +828,13 @@ export default function AdminPage() {
                                 <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                               )}
                             </div>
-                            <span className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
+                            <a
+                              href={`/releases/${release.id}`}
+                              title="Ver ficha del lanzamiento"
+                              className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[200px] hover:text-primary-600 dark:hover:text-primary-400 hover:underline"
+                            >
                               {safeString(release.title)}
-                            </span>
+                            </a>
                           </div>
                         </td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{safeString(release.artist_name)}</td>

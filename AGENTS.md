@@ -9,7 +9,7 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `pnpm test:unit` | 41 tests (Vitest) |
+| `pnpm test:unit` | 110 tests (Vitest) |
 | `npx playwright test` | Tests E2E |
 
 ## Stack
@@ -52,7 +52,7 @@ tests/             # Vitest + Playwright
 
 ## Auth
 
-- bcryptjs 10 rounds, httpOnly session cookie (base64 JSON)
+- bcryptjs 10 rounds, httpOnly session cookie (HMAC-SHA256 signed via `lib/auth.ts`, backward-compatible con tokens viejos)
 - **Roles**: artist, admin, subscriber
 - **Admin credentials**: admin@epk.local / admin123
 - Token: `{ userId, role, iat, exp }` (exp = 24h si no rememberMe)
@@ -60,7 +60,7 @@ tests/             # Vitest + Playwright
 ## Base de Datos
 
 - **Dual-mode**: Turso (producción) o SQLite local (dev)
-- **9 tablas**: users, artists, tracks, releases, shows, submissions, metrics_history, notifications, subscribers
+- **9 tablas**: users, artists, tracks, releases, shows, submissions, metrics_history, notifications, subscriptions
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
 - **REGLA**: Usar funciones de `lib/db.ts` en vez de `getDbWrite()` directo en API routes
@@ -81,16 +81,25 @@ Cuando el usuario reporte un bug o pida un fix:
 
 ### Modelos Utilizados
 
+> Investigación 2026-09-24 (models.dev + docs Zen). Tiers gratuitos recogen datos para mejora salvo indicación — **nunca poner secretos (tokens, keys, PII) en prompts**.
+
 | Modelo | Cantidad | Uso principal |
 |--------|----------|---------------|
-| `opencode/mimo-v2.5-free` | 11 | Builders UI, documentación |
-| `opencode/nemotron-3-ultra-free` | 11 | APIs, DB, auth, security, testing |
-| `opencode/nemotron-3.5-lightning-free` | 7 | UI rápida, deploy, releases |
+| `opencode/nemotron-3-ultra-free` | 10 | Orquestación, reasoning, APIs, DB, auth, security, testing |
+| `opencode/mimo-v2.6-flash-free` | 12 | Builders UI, docs, `small_model` (sucesor v2.5; 200K ctx en Zen) |
+| `opencode/nemotron-3.5-lightning-free` | 6 | UI rápida, deploy, releases |
+| `openrouter/.../nemotron-3-nano-omni...` | 1 | visual-tester (único vision-capable probado) |
+
+### Banco de pruebas (NO asignar sin evaluar con evidencia)
+`qwen3-coder-30b-a3b`, `devstral-2512`, `kimi-k2.7-code-highspeed`, `qwen3.8-27b`, `gemini-2.5-flash` (todos $0 OpenRouter, code-capables), `muse-spark-1.3` (alternativa orquestador; evidencia: sesión 2026-09-23/24).
+
+### No asignar
+`ling-3.0-flash-fin` (dominio financiero), `jev-*` (no es chat, decisiones estructuradas), stealth unknowns (`space-bunny`, `big-pickle`, `dots3`…) en roles críticos, nada pago (`kimi-k2.7-code`, `deepseek-v4-flash`, `muse-spark-1.2` son pagos).
 
 ### Builders (17)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `api-builder` | mimo-v2.5-free | Endpoints REST |
+| `api-builder` | mimo-v2.6-flash-free | Endpoints REST |
 | `auth-builder` | nemotron-3-ultra-free | Autenticación |
 | `dashboard-builder` | nemotron-3.5-lightning-free | UI/Components |
 | `db-builder` | nemotron-3-ultra-free | Schema DB |
@@ -99,14 +108,14 @@ Cuando el usuario reporte un bug o pida un fix:
 | `epk-card-builder` | nemotron-3-ultra-free | EPK Cards |
 | `carousel-builder` | nemotron-3.5-lightning-free | Carousels |
 | `approval-workflow-builder` | nemotron-3-ultra-free | Aprobaciones |
-| `show-form-builder` | mimo-v2.5-free | Shows |
-| `notification-builder` | mimo-v2.5-free | Notificaciones |
-| `search-builder` | mimo-v2.5-free | Búsqueda |
-| `subscriber-builder` | mimo-v2.5-free | Suscriptores |
-| `social-links-builder` | mimo-v2.5-free | Links sociales |
-| `account-settings-builder` | mimo-v2.5-free | Configuración cuenta |
-| `release-form-builder` | mimo-v2.5-free | Formularios releases |
-| `artist-dashboard-builder` | mimo-v2.5-free | Dashboard artista |
+| `show-form-builder` | mimo-v2.6-flash-free | Shows |
+| `notification-builder` | mimo-v2.6-flash-free | Notificaciones |
+| `search-builder` | mimo-v2.6-flash-free | Búsqueda |
+| `subscriber-builder` | mimo-v2.6-flash-free | Suscriptores |
+| `social-links-builder` | mimo-v2.6-flash-free | Links sociales |
+| `account-settings-builder` | mimo-v2.6-flash-free | Configuración cuenta |
+| `release-form-builder` | mimo-v2.6-flash-free | Formularios releases |
+| `artist-dashboard-builder` | mimo-v2.6-flash-free | Dashboard artista |
 
 ### QA & Security (3)
 | Subagente | Modelo | Uso |
@@ -120,13 +129,13 @@ Cuando el usuario reporte un bug o pida un fix:
 |-----------|--------|-----|
 | `release-manager` | nemotron-3.5-lightning-free | Releases |
 | `vercel-deployer` | nemotron-3.5-lightning-free | Deploy Vercel |
-| `doc-writer` | mimo-v2.5-free | Documentación |
+| `doc-writer` | mimo-v2.6-flash-free | Documentación |
 
 ### Orchestration (2)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
 | `orchestrator` | nemotron-3-ultra-free | Coordinación general |
-| `fase-orchestrator` | mimo-v2.5-free | Orquestación por fases |
+| `fase-orchestrator` | mimo-v2.6-flash-free | Orquestación por fases |
 
 ### Testing (2)
 | Subagente | Modelo | Uso |
@@ -142,7 +151,7 @@ Cuando el usuario reporte un bug o pida un fix:
 ### Branding (1)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `brand-fixer` | mimo-v2.5-free | Branding |
+| `brand-fixer` | mimo-v2.6-flash-free | Branding |
 
 ## Comandos Personalizados (7)
 
@@ -186,7 +195,7 @@ Cuando el usuario reporte un bug o pida un fix:
 | `web-design-guidelines` | Vercel | Revisión UI/accessibility |
 | `improve-codebase-architecture` | Matt Pocock | Mejorar arquitectura |
 
-## MCP Servers (14)
+## MCP Servers (15)
 
 ### Habilitados (6)
 | Server | Tipo | Utilidad |
@@ -198,7 +207,7 @@ Cuando el usuario reporte un bug o pida un fix:
 | git | Local | Operaciones git |
 | fetch | Local | Fetch de contenido web |
 
-### Deshabilitados (8)
+### Deshabilitados (9)
 | Server | Tipo | Utilidad |
 |--------|------|----------|
 | sqlite | Local | **off** — `mcp-server-sqlite` irrecuperable vía npx en Windows (caché corrupto `ajv` sin package.json + EPERM en cleanup + build nativo lento). Usar custom tool `database-query` |
@@ -236,20 +245,22 @@ Cuando el usuario reporte un bug o pida un fix:
 |-----------|--------|-----|
 | `visual-tester` | `nemotron-3-nano-omni` | Análisis de imágenes (vision-capable) |
 | `orchestrator` | `nemotron-3-ultra-free` | Coordinación general |
-| `api-builder` | `mimo-v2.5-free` | APIs y endpoints |
+| `api-builder` | `mimo-v2.6-flash-free` | APIs y endpoints |
 | `db-builder` | `nemotron-3-ultra-free` | Base de datos |
 | `quality-auditor` | `nemotron-3-ultra-free` | Testing y QA |
 
 > Nota: el flujo de análisis de imágenes con plugin `image-detector` + tool `analyze-image` **no está implementado** (eliminado de esta doc). Para análisis visual usar `test-visual` / screenshots + lectura directa.
 
-## Flujo de Trabajo
+## Flujo de Trabajo (OBLIGATORIO)
 
-1. Investigar bugs con `explore` agent
-2. Ejecutar fixes (directo o delegado según complejidad)
-3. Verificar: `npx tsc --noEmit` + `pnpm build` + `pnpm test:unit`
-4. Documentar en `docs/AI_LOG.md`
-5. Commit con mensaje descriptivo
-6. Push a main
+> Regla estricta: ningún cambio se considera terminado hasta completar el ciclo entero.
+
+1. Documentar lo que se va a hacer (plan + alcance en `docs/AI_LOG.md` o doc de fase)
+2. Implementar (directo o delegado según Reglas de Delegación)
+3. Pruebas visuales y funcionales en **local**; corregir y **reiterar hasta que todo pase**
+4. Commit con mensaje descriptivo + push a main
+5. Mismas pruebas en **producción** (matriz + funcional + headed + screenshots); corregir y **reiterar hasta que todo pase**
+6. Documentar lo hecho, lo corregido y resultados finales (`docs/AI_LOG.md` + doc de fase)
 7. Crear release si es fase completa
 
 ## Convenciones
