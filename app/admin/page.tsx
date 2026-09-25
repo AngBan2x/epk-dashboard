@@ -79,6 +79,21 @@ interface Notification {
   created_at: string;
 }
 
+interface EmailStatus {
+  configured: boolean;
+  missing: string[];
+  from: string;
+  from_domain: string | null;
+  stats: {
+    sent: number;
+    failed: number;
+    skipped: number;
+    lastSentAt: string | null;
+    lastError: string | null;
+    lastMessageId: string | null;
+  };
+}
+
 type AdminTab = "tracks" | "releases" | "submissions" | "notifications" | "artists" | "shows";
 
 export default function AdminPage() {
@@ -127,6 +142,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null);
 
   // Auth guard — redirect if not admin
   useEffect(() => {
@@ -143,6 +159,7 @@ export default function AdminPage() {
     fetchArtists();
     fetchShows();
     fetchPendingShows();
+    fetchEmailStatus();
   }, []);
 
   useEffect(() => {
@@ -242,6 +259,17 @@ export default function AdminPage() {
     }
   };
 
+  const fetchEmailStatus = async () => {
+    try {
+      const res = await fetch(`/api/admin/email-status?t=${Date.now()}`);
+      if (res.ok) {
+        setEmailStatus(await res.json());
+      }
+    } catch {
+      setEmailStatus(null);
+    }
+  };
+
   const handleShowApproval = async (showId: string, approved: boolean) => {
     setActionLoading(showId);
     setMessage(null);
@@ -257,6 +285,7 @@ export default function AdminPage() {
         setMessage({ type: "success", text: approved ? "Show aprobado" : "Show rechazado" });
         fetchPendingShows();
         fetchShows();
+        fetchEmailStatus();
       } else {
         const error = await res.json();
         setMessage({ type: "error", text: error.error || "Error al actualizar" });
@@ -571,6 +600,25 @@ export default function AdminPage() {
               : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800"
           }`}>
             {message.type === "success" ? "✅" : "⚠️"} {message.text}
+          </div>
+        )}
+
+        {emailStatus && !emailStatus.configured && (
+          <div
+            role="alert"
+            className="mb-6 p-4 rounded-lg text-sm font-medium bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800"
+          >
+            ⚠️ Emails no configurados — falta: {emailStatus.missing.join(", ")}. Los correos
+            (aprobaciones, shows, avisos) no se enviarán hasta que se configuren en Vercel.
+            {emailStatus.stats.failed > 0 && ` · Fallos: ${emailStatus.stats.failed}`}
+            {emailStatus.stats.lastError ? ` · Último error: ${emailStatus.stats.lastError}` : ""}
+          </div>
+        )}
+
+        {emailStatus && emailStatus.configured && (
+          <div className="mb-6 p-3 rounded-lg text-xs font-medium bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+            📧 Emails activos · remitente: {emailStatus.from} · enviados: {emailStatus.stats.sent} ·
+            fallidos: {emailStatus.stats.failed} · omitidos: {emailStatus.stats.skipped}
           </div>
         )}
 

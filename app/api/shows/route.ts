@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById, createNotification } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { sendNotificationEmail } from "@/lib/email";
 import type { ShowStatus } from "@/types/music";
 import { randomUUID } from "crypto";
 
@@ -135,6 +136,20 @@ export async function POST(req: NextRequest) {
         message: `Tu show en ${validated.venue_name} ha sido enviado para revisión. Será publicado tras aprobación del equipo.`,
         data: JSON.stringify({ show_id: show.id, venue_name: validated.venue_name }),
         read: false,
+      });
+
+      void sendNotificationEmail({
+        userId: artistForNotification.user_id,
+        type: "show_pending_review",
+        data: {
+          userName: "",
+          trackTitle: validated.venue_name,
+          artistName: artistForNotification.name,
+          dashboardUrl: "/dashboard",
+          context: "show",
+          showVenue: validated.venue_name,
+          showDate: validated.date ?? undefined,
+        },
       });
     }
 

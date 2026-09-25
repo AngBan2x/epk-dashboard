@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { sendNotificationEmail } from "@/lib/email";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -154,6 +155,19 @@ export async function PUT(req: NextRequest) {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [notificationId, userId, type, title, message, JSON.stringify({ releaseId: id }), 0, now]
         );
+
+        void sendNotificationEmail({
+          userId,
+          type: type as "submission_approved" | "submission_rejected",
+          data: {
+            userName: "",
+            trackTitle: release.title ?? "",
+            artistName: release.artist_name ?? "",
+            adminNotes: status === "rejected" ? admin_notes ?? undefined : undefined,
+            dashboardUrl: "/dashboard",
+            context: "track",
+          },
+        });
       }
     }
 
