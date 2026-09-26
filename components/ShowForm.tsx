@@ -343,6 +343,10 @@ export function ShowForm({ show, artistId = "", artists, onSave, onCancel }: Sho
             + Agregar método de pago
           </button>
         </div>
+        <div className="mb-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+          Los pagos se realizan directamente al artista u organizador del evento. PressPlay no
+          procesa ni custodia dinero y no se responsabiliza por pagos perdidos o estafas.
+        </div>
         {form.payment_methods.length === 0 && (
           <p className="text-xs text-slate-400">No hay métodos de pago agregados.</p>
         )}

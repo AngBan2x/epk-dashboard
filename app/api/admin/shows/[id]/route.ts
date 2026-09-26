@@ -58,10 +58,40 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await req.json();
-    const { approved, admin_notes } = body;
+    const { approved, admin_notes, action, reason } = body;
 
-    if (typeof approved !== "boolean") {
-      return NextResponse.json({ error: "approved debe ser un booleano" }, { status: 400 });
+    const notes =
+      typeof admin_notes === "string" && admin_notes.trim()
+        ? admin_notes.trim()
+        : typeof reason === "string" && reason.trim()
+          ? reason.trim()
+          : undefined;
+
+    const validActions = ["approve", "reject", "revision"];
+    let resolvedAction: "approve" | "reject" | "revision";
+    let nextApproved: boolean;
+
+    if (action !== undefined && action !== null) {
+      if (typeof action !== "string" || !validActions.includes(action)) {
+        return NextResponse.json({ error: "action debe ser approve, reject o revision" }, { status: 400 });
+      }
+      resolvedAction = action as "approve" | "reject" | "revision";
+      nextApproved = resolvedAction === "approve";
+    } else if (typeof approved === "boolean") {
+      resolvedAction = approved ? "approve" : "reject";
+      nextApproved = approved;
+    } else {
+      return NextResponse.json(
+        { error: "Envía approved (boolean) o action (approve | reject | revision)" },
+        { status: 400 }
+      );
+    }
+
+    if (resolvedAction === "revision" && (!notes || notes.length < 10)) {
+      return NextResponse.json(
+        { error: "El motivo de revisión debe tener al menos 10 caracteres" },
+        { status: 400 }
+      );
     }
 
     // Check if show exists
@@ -77,34 +107,53 @@ export async function PATCH(
     // Update approved status
     await dbRun(
       "UPDATE shows SET approved = ?, updated_at = ? WHERE id = ?",
-      [approved ? 1 : 0, now, id]
+      [nextApproved ? 1 : 0, now, id]
     );
 
-    if (approved !== wasApproved && show.artist_id) {
+    if (show.artist_id) {
       const artists = await dbQuery("SELECT * FROM artists WHERE id = ?", [show.artist_id]) as any[];
       if (artists.length > 0 && artists[0].user_id) {
         const userId = artists[0].user_id;
-        const type = approved ? "submission_approved" : "submission_rejected";
-        const title = approved ? "¡Tu show ha sido aprobado!" : "Tu show no fue aprobado";
-        const message = approved
-          ? `"${show.venue_name}" el ${show.date || "sin fecha"} ya está visible en tu perfil.`
-          : `El show "${show.venue_name}" no fue aprobado. ${admin_notes ? `Razón: ${admin_notes}` : "Puedes editarlo y volver a enviarlo."}`;
+        const data = { showId: id, trackTitle: show.venue_name, artistName: artists[0].name, showVenue: show.venue_name, showDate: show.date };
 
-        await notifyApprovalDecision({
-          userId,
-          type,
-          title,
-          message,
-          data: { showId: id, trackTitle: show.venue_name, artistName: artists[0].name, showVenue: show.venue_name, showDate: show.date },
-          context: "show",
-          adminNotes: admin_notes ?? undefined,
-        });
+        if (resolvedAction === "revision") {
+          await notifyApprovalDecision({
+            userId,
+            type: "revision_requested",
+            title: "Tu show necesita cambios",
+            message: `El show "${show.venue_name}" necesita cambios antes de ser aprobado. Motivo: ${notes}`,
+            data,
+            context: "show",
+            adminNotes: notes,
+          });
+        } else if (nextApproved !== wasApproved) {
+          const type = nextApproved ? "submission_approved" : "submission_rejected";
+          const title = nextApproved ? "¡Tu show ha sido aprobado!" : "Tu show no fue aprobado";
+          const message = nextApproved
+            ? `"${show.venue_name}" el ${show.date || "sin fecha"} ya está visible en tu perfil.`
+            : `El show "${show.venue_name}" no fue aprobado. ${notes ? `Razón: ${notes}` : "Puedes editarlo y volver a enviarlo."}`;
+
+          await notifyApprovalDecision({
+            userId,
+            type,
+            title,
+            message,
+            data,
+            context: "show",
+            adminNotes: notes,
+          });
+        }
       }
     }
 
     return NextResponse.json({
-      message: approved ? "Show aprobado" : "Show rechazado",
-      approved,
+      message: resolvedAction === "revision"
+        ? "Revisión solicitada"
+        : nextApproved
+          ? "Show aprobado"
+          : "Show rechazado",
+      approved: nextApproved,
+      action: resolvedAction,
     });
   } catch (error) {
     console.error("PATCH admin shows error:", error);
