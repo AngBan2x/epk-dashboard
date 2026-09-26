@@ -62,6 +62,39 @@ const ICONS: Record<string, { node: React.ReactNode; wrapper: string }> = {
     ),
     wrapper: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
   },
+  show_postponed: {
+    node: (
+      <>
+        <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+        <path d="M8 2.75v4M16 2.75v4M3.5 10h17M12 13.5v3l1.75 1.05" />
+      </>
+    ),
+    wrapper: "bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400",
+  },
+  show_cancelled: {
+    node: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M14.5 9.5l-5 5M9.5 9.5l5 5" />
+      </>
+    ),
+    wrapper: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400",
+  },
+  show_reactivated: {
+    node: (
+      <>
+        <path d="M4.93 4.93a7.5 7.5 0 0112.74 3.17M19.07 19.07a7.5 7.5 0 01-12.74-3.17" />
+        <path d="M17.5 2.5v4h-4M6.5 21.5v-4h4" />
+      </>
+    ),
+    wrapper: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400",
+  },
+  new_show: {
+    node: (
+      <path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+    ),
+    wrapper: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+  },
 };
 
 export function notificationHref(data: Record<string, unknown> | null): string | null {

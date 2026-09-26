@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { updateShow } from "@/lib/db";
+import { getArtistById, updateShow } from "@/lib/db";
 import { showStatusLabel } from "@/lib/show-status";
 import { authorizeShowTransition, parseShowDate, startOfToday } from "@/lib/show-transitions";
+import { notifyArtistOwner, notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,45 @@ export async function POST(
     if (!updated) {
       return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }
+
+    const artist = await getArtistById(updated.artist_id);
+    const title = "Show pospuesto";
+    const message = `El show "${updated.venue_name}" fue pospuesto al ${updated.date}. Motivo: ${validated.reason}`;
+    const data = {
+      show_id: updated.id,
+      showId: updated.id,
+      venue_name: updated.venue_name,
+      showVenue: updated.venue_name,
+      showDate: updated.date,
+      artistName: artist?.name ?? "",
+      reason: validated.reason,
+      dashboardUrl: "/shows",
+    };
+    const emailData = {
+      showVenue: updated.venue_name,
+      showDate: updated.date ?? undefined,
+      reason: validated.reason,
+      artistName: artist?.name ?? "",
+      dashboardUrl: "/shows",
+    };
+
+    await notifyArtistSubscribers({
+      artistId: updated.artist_id,
+      kind: "show_update",
+      title,
+      message,
+      data,
+      emailType: "show_postponed",
+      emailData,
+    });
+    await notifyArtistOwner({
+      artistId: updated.artist_id,
+      title,
+      message,
+      data,
+      emailType: "show_postponed",
+      emailData,
+    });
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {

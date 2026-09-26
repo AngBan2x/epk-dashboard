@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
+import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -173,6 +174,32 @@ export async function PUT(req: NextRequest) {
           data: { releaseId: id, trackTitle: release.title, artistName: release.artist_name },
           context: "release",
           adminNotes: admin_notes ?? undefined,
+        });
+      }
+
+      if (status === "approved" && artist.length > 0) {
+        const artistName = String(artist[0].name ?? release.artist_name ?? "");
+        const title = "Nuevo release publicado";
+        const message = `"${release.title}" de ${artistName} ya está disponible en PressPlay.`;
+
+        await notifyArtistSubscribers({
+          artistId: String(artist[0].id),
+          kind: "release",
+          title,
+          message,
+          data: {
+            releaseId: id,
+            track_id: id,
+            trackTitle: release.title,
+            artistName,
+            dashboardUrl: "/releases",
+          },
+          emailType: "new_release",
+          emailData: {
+            trackTitle: release.title,
+            artistName,
+            dashboardUrl: `/releases/${id}`,
+          },
         });
       }
     }

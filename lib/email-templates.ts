@@ -6,7 +6,11 @@ export type NotificationType =
   | "system"
   | "show_pending_review"
   | "platform_release"
-  | "revision_requested";
+  | "revision_requested"
+  | "show_postponed"
+  | "show_cancelled"
+  | "show_reactivated"
+  | "new_show";
 
 export interface EmailTemplateData {
   userName: string;
@@ -19,6 +23,8 @@ export interface EmailTemplateData {
   showDate?: string;
   notificationTitle?: string;
   notificationMessage?: string;
+  reason?: string;
+  refundNote?: string;
 }
 
 export function escapeHtml(value: unknown): string {
@@ -49,6 +55,8 @@ export function getEmailTemplate(type: NotificationType, data: EmailTemplateData
   const adminNotes = data.adminNotes ? escapeHtml(data.adminNotes) : "";
   const showVenue = escapeHtml(data.showVenue ?? data.trackTitle);
   const showDate = escapeHtml(data.showDate ?? "");
+  const reason = data.reason ? escapeHtml(data.reason) : "";
+  const refundNote = data.refundNote ? escapeHtml(data.refundNote) : "";
 
   switch (type) {
     case "submission_approved": {
@@ -318,6 +326,175 @@ export function getEmailTemplate(type: NotificationType, data: EmailTemplateData
           </html>
         `,
         text: `Hola ${data.userName},\n\nTu ${noun} "${data.trackTitle}" de ${data.artistName} requiere algunos cambios antes de poder ser aprobado.\n\n${data.adminNotes ? `Comentarios del equipo: ${data.adminNotes}\n\n` : ""}Por favor revisa los comentarios, edita tu ${noun} y vuelve a enviarlo para revisión.\n\nVer en: ${dashboardLink}\n\nSaludos,\nEl equipo de PressPlay`,
+      };
+    }
+
+    case "show_postponed": {
+      return {
+        subject: `⏰ Tu show "${data.showVenue ?? data.trackTitle}" fue pospuesto`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Show pospuesto</h1>
+              </div>
+              <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+                <p style="font-size: 16px; margin-bottom: 16px;">Hola <strong>${userName}</strong>,</p>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #1e293b;">${showVenue}</h2>
+                  <p style="margin: 0; font-size: 16px; color: #64748b;">${artistName}</p>
+                  <p style="margin: 8px 0 0 0; font-size: 16px; color: #475569;">Nueva fecha: <strong>${showDate || "por confirmar"}</strong></p>
+                </div>
+                <p style="font-size: 16px; margin-bottom: 16px;">
+                  Tu show ha sido <span style="color: #d97706; font-weight: bold;">pospuesto</span>.
+                </p>
+                ${reason ? `
+                  <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Motivo:</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #78350f;">${reason}</p>
+                  </div>
+                ` : ""}
+                <a href="${dashboardLink}" style="display: inline-block; background: #f59e0b; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  Ver el show en PressPlay
+                </a>
+                <p style="font-size: 14px; color: #64748b; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                  Si tienes alguna pregunta, no dudes en contactarnos.
+                </p>
+              </div>
+            </body>
+          </html>
+        `,
+        text: `Hola ${data.userName},\n\nTu show "${data.showVenue ?? data.trackTitle}" de ${data.artistName} ha sido POSPUESTO.\n\n${data.showDate ? `Nueva fecha: ${data.showDate}\n\n` : ""}${data.reason ? `Motivo: ${data.reason}\n\n` : ""}Ver en: ${dashboardLink}\n\nSaludos,\nEl equipo de PressPlay`,
+      };
+    }
+
+    case "show_cancelled": {
+      return {
+        subject: `🚫 Tu show "${data.showVenue ?? data.trackTitle}" fue cancelado`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">🚫 Show cancelado</h1>
+              </div>
+              <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+                <p style="font-size: 16px; margin-bottom: 16px;">Hola <strong>${userName}</strong>,</p>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #1e293b;">${showVenue}</h2>
+                  <p style="margin: 0; font-size: 16px; color: #64748b;">${artistName}</p>
+                  <p style="margin: 8px 0 0 0; font-size: 16px; color: #475569;">Fecha original: <strong>${showDate || "sin fecha"}</strong></p>
+                </div>
+                <p style="font-size: 16px; margin-bottom: 16px;">
+                  Lamentamos informarte que este show ha sido <span style="color: #dc2626; font-weight: bold;">cancelado</span>.
+                </p>
+                ${reason ? `
+                  <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0; font-size: 14px; color: #991b1b;"><strong>Motivo:</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #7f1d1d;">${reason}</p>
+                  </div>
+                ` : ""}
+                ${refundNote ? `
+                  <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0; font-size: 14px; color: #1e40af;"><strong>Reembolso:</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #1e3a8a;">${refundNote}</p>
+                  </div>
+                ` : ""}
+                <a href="${dashboardLink}" style="display: inline-block; background: #64748b; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  Ver más shows en PressPlay
+                </a>
+                <p style="font-size: 14px; color: #64748b; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                  Si tienes alguna pregunta sobre los reembolsos, no dudes en contactarnos.
+                </p>
+              </div>
+            </body>
+          </html>
+        `,
+        text: `Hola ${data.userName},\n\nTu show "${data.showVenue ?? data.trackTitle}" de ${data.artistName} ha sido CANCELADO.\n\n${data.reason ? `Motivo: ${data.reason}\n\n` : ""}${data.refundNote ? `Reembolso: ${data.refundNote}\n\n` : ""}Ver en: ${dashboardLink}\n\nSaludos,\nEl equipo de PressPlay`,
+      };
+    }
+
+    case "show_reactivated": {
+      return {
+        subject: `🔄 Tu show "${data.showVenue ?? data.trackTitle}" fue reactivado`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">🔄 Show reactivado</h1>
+              </div>
+              <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+                <p style="font-size: 16px; margin-bottom: 16px;">Hola <strong>${userName}</strong>,</p>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #1e293b;">${showVenue}</h2>
+                  <p style="margin: 0; font-size: 16px; color: #64748b;">${artistName}</p>
+                  <p style="margin: 8px 0 0 0; font-size: 16px; color: #475569;">Fecha: <strong>${showDate || "por confirmar"}</strong></p>
+                </div>
+                <p style="font-size: 16px; margin-bottom: 16px;">
+                  Buenas noticias: este show vuelve a estar <span style="color: #10b981; font-weight: bold;">activo</span> en PressPlay.
+                </p>
+                <a href="${dashboardLink}" style="display: inline-block; background: #10b981; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  Ver el show en PressPlay
+                </a>
+                <p style="font-size: 14px; color: #64748b; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                  Si tienes alguna pregunta, no dudes en contactarnos.
+                </p>
+              </div>
+            </body>
+          </html>
+        `,
+        text: `Hola ${data.userName},\n\nTu show "${data.showVenue ?? data.trackTitle}" de ${data.artistName} ha sido REACTIVADO y ya vuelve a estar disponible.\n\n${data.showDate ? `Fecha: ${data.showDate}\n\n` : ""}Ver en: ${dashboardLink}\n\nSaludos,\nEl equipo de PressPlay`,
+      };
+    }
+
+    case "new_show": {
+      return {
+        subject: `🎤 Nuevo show de ${data.artistName}: "${data.showVenue ?? data.trackTitle}"`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">🎤 Nuevo show</h1>
+              </div>
+              <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+                <p style="font-size: 16px; margin-bottom: 16px;">Hola <strong>${userName}</strong>,</p>
+                <p style="font-size: 16px; margin-bottom: 16px;">
+                  <strong>${artistName}</strong> acaba de publicar un nuevo show:
+                </p>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #1e293b;">${showVenue}</h2>
+                  <p style="margin: 0; font-size: 16px; color: #475569;">${showDate || "Fecha por confirmar"}</p>
+                </div>
+                <a href="${dashboardLink}" style="display: inline-block; background: #f97316; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  Ver el show en PressPlay
+                </a>
+                <p style="font-size: 14px; color: #64748b; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                  Recibes este aviso porque estás suscrito a este artista.
+                </p>
+              </div>
+            </body>
+          </html>
+        `,
+        text: `Hola ${data.userName},\n\n${data.artistName} acaba de publicar un nuevo show:\n\n"${data.showVenue ?? data.trackTitle}"${data.showDate ? ` — ${data.showDate}` : ""}\n\nVer en: ${dashboardLink}\n\nSaludos,\nEl equipo de PressPlay`,
       };
     }
 
