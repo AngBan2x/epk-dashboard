@@ -498,8 +498,47 @@ export function getEmailTemplate(type: NotificationType, data: EmailTemplateData
       };
     }
 
-    case "platform_release":
-      throw new Error("Template platform_release pendiente de implementación (P4.8)");
+    case "platform_release": {
+      const platformTitle = data.notificationTitle || data.trackTitle || "Aviso de PressPlay";
+      const platformMessage = data.notificationMessage || data.trackTitle || "";
+      const announcementTitle = escapeHtml(platformTitle);
+      const announcementMessage = escapeHtml(platformMessage);
+      return {
+        subject: `Aviso oficial de PressPlay: ${platformTitle}`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">Aviso oficial de PressPlay</h1>
+                <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0 0; font-size: 14px;">Comunicado del equipo de PressPlay</p>
+              </div>
+              <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+                <p style="font-size: 16px; margin-bottom: 16px;">Hola <strong>${userName}</strong>,</p>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #1e293b;">${announcementTitle}</h2>
+                  <p style="margin: 0; font-size: 16px; color: #475569; white-space: pre-line;">${announcementMessage}</p>
+                </div>
+                <p style="font-size: 16px; margin-bottom: 24px;">
+                  Este comunicado lo envía el equipo de PressPlay a todas las personas registradas en la plataforma.
+                </p>
+                <a href="${dashboardLink}" style="display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  Ir a mi cuenta
+                </a>
+                <p style="font-size: 14px; color: #64748b; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                  Recibes este mensaje por ser usuario de PressPlay. Es un aviso informativo de servicio, no una promoción.
+                </p>
+              </div>
+            </body>
+          </html>
+        `,
+        text: `Hola ${data.userName},\n\nAVISO OFICIAL DE PRESSPLAY\n\n${platformTitle}\n\n${platformMessage}\n\nEste comunicado lo envía el equipo de PressPlay a todas las personas registradas en la plataforma.\n\nVer en: ${dashboardLink}\n\nRecibes este mensaje por ser usuario de PressPlay. Es un aviso informativo de servicio, no una promoción.\n\nSaludos,\nEl equipo de PressPlay`,
+      };
+    }
 
     default:
       throw new Error(`Tipo de notificación desconocido: ${type as string}`);

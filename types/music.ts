@@ -232,6 +232,7 @@ export type NotificationType =
   | "track_liked"
   | "system"
   | "show_pending_review"
+  | "platform_release"
   | "revision_requested"
   | "show_postponed"
   | "show_cancelled"

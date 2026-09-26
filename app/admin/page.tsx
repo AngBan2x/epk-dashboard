@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ShowForm } from "@/components/ShowForm";
 import { ShowTransitionModal, type ShowTransitionMode } from "@/components/ShowTransitionModal";
+import { BroadcastPanel } from "@/components/admin/BroadcastPanel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Button } from "@/components/ui/Button";
 
@@ -1098,6 +1099,15 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "notifications" && (
+          <BroadcastPanel
+            onSent={() => {
+              fetchNotifications();
+              fetchEmailStatus();
+            }}
+          />
         )}
 
         {/* Notifications Table */}
