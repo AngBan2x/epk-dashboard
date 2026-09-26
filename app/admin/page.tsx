@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ShowForm } from "@/components/ShowForm";
+import { ShowTransitionModal, type ShowTransitionMode } from "@/components/ShowTransitionModal";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Button } from "@/components/ui/Button";
 
@@ -96,6 +97,8 @@ interface EmailStatus {
 
 type AdminTab = "tracks" | "releases" | "submissions" | "notifications" | "artists" | "shows";
 
+type ShowApprovalAction = "approve" | "reject" | "revision";
+
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -112,6 +115,7 @@ export default function AdminPage() {
   const [pendingShows, setPendingShows] = useState<Show[]>([]);
   const [editingShow, setEditingShow] = useState<Show | null>(null);
   const [showFormOpen, setShowFormOpen] = useState(false);
+  const [showTransition, setShowTransition] = useState<{ show: Show; mode: ShowTransitionMode } | null>(null);
   const [artistForm, setArtistForm] = useState({
     name: "",
     biography: "",
@@ -270,7 +274,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleShowApproval = async (showId: string, approved: boolean) => {
+  const handleShowApproval = async (showId: string, action: ShowApprovalAction, adminNotes?: string) => {
     setActionLoading(showId);
     setMessage(null);
 
@@ -278,17 +282,26 @@ export default function AdminPage() {
       const res = await fetch(`/api/admin/shows/${showId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approved }),
+        body: JSON.stringify({ action, admin_notes: adminNotes }),
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: approved ? "Show aprobado" : "Show rechazado" });
+        const text = action === "approve"
+          ? "Show aprobado"
+          : action === "reject"
+            ? "Show rechazado"
+            : "Revisión solicitada";
+        setMessage({ type: "success", text });
         fetchPendingShows();
         fetchShows();
         fetchEmailStatus();
       } else {
         const error = await res.json();
-        setMessage({ type: "error", text: error.error || "Error al actualizar" });
+        const msg = error.error;
+        setMessage({
+          type: "error",
+          text: typeof msg === "string" ? msg : "Error al actualizar",
+        });
       }
     } catch {
       setMessage({ type: "error", text: "Error de conexión" });
@@ -1550,20 +1563,34 @@ onSubmit={async (e) => {
                             <td className="p-3 text-slate-600 dark:text-slate-400">{[show.city, show.country].filter(Boolean).join(", ") || "—"}</td>
                             <td className="p-3 text-slate-600 dark:text-slate-400">{show.date || "—"}</td>
                             <td className="p-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2 flex-wrap">
                                 <button
-                                  onClick={() => handleShowApproval(show.id, true)}
+                                  onClick={() => handleShowApproval(show.id, "approve")}
                                   disabled={actionLoading === show.id}
                                   className="px-2 py-1 rounded text-xs font-semibold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950 transition disabled:opacity-50"
                                 >
                                   ✅ Aprobar
                                 </button>
                                 <button
-                                  onClick={() => handleShowApproval(show.id, false)}
+                                  onClick={() => handleShowApproval(show.id, "reject")}
                                   disabled={actionLoading === show.id}
                                   className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition disabled:opacity-50"
                                 >
                                   ❌ Rechazar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const notes = prompt("Motivo de revisión (requerido, mín. 10 caracteres):");
+                                    if (notes !== null && notes.trim().length >= 10) {
+                                      handleShowApproval(show.id, "revision", notes.trim());
+                                    } else if (notes !== null) {
+                                      alert("El motivo de revisión debe tener al menos 10 caracteres");
+                                    }
+                                  }}
+                                  disabled={actionLoading === show.id}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition disabled:opacity-50"
+                                >
+                                  📝 Revisión
                                 </button>
                               </div>
                             </td>
@@ -1617,7 +1644,7 @@ onSubmit={async (e) => {
                               </span>
                             </td>
                             <td className="p-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2 flex-wrap">
                                 <button
                                   onClick={() => {
                                     setEditingShow(show);
@@ -1626,6 +1653,30 @@ onSubmit={async (e) => {
                                 >
                                   ✏️ Editar
                                 </button>
+                                {!["pasado", "cancelado", "suspendido"].includes(show.status) && (
+                                  <button
+                                    onClick={() => setShowTransition({ show, mode: "postpone" })}
+                                    className="px-2 py-1 rounded text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950 transition"
+                                  >
+                                    Posponer
+                                  </button>
+                                )}
+                                {show.status !== "cancelado" && (
+                                  <button
+                                    onClick={() => setShowTransition({ show, mode: "cancel" })}
+                                    className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
+                                  >
+                                    Cancelar
+                                  </button>
+                                )}
+                                {["cancelado", "pospuesto", "suspendido"].includes(show.status) && (
+                                  <button
+                                    onClick={() => setShowTransition({ show, mode: "reactivate" })}
+                                    className="px-2 py-1 rounded text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition"
+                                  >
+                                    Reactivar
+                                  </button>
+                                )}
                                 <button
                                   onClick={async () => {
                                     if (confirm("¿Eliminar este show?")) {
@@ -1732,6 +1783,25 @@ onSubmit={async (e) => {
               </div>
             </div>
           </div>
+        )}
+        {showTransition && (
+          <ShowTransitionModal
+            show={showTransition.show}
+            mode={showTransition.mode}
+            onClose={() => setShowTransition(null)}
+            onCompleted={(updated) => {
+              setShows((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+              setShowTransition(null);
+              fetchPendingShows();
+              fetchShows();
+              const text = showTransition.mode === "postpone"
+                ? "Show pospuesto"
+                : showTransition.mode === "cancel"
+                  ? "Show cancelado"
+                  : "Show reactivado";
+              setMessage({ type: "success", text });
+            }}
+          />
         )}
       </main>
     </div>

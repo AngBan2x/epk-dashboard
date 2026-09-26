@@ -17,6 +17,7 @@ async function validateSession(req: NextRequest) {
 const CreateShowSchema = z.object({
   artist_id: z.string().min(1, "artist_id requerido"),
   venue_name: z.string().min(1, "venue_name requerido"),
+  approved: z.boolean().optional(),
   city: z.string().nullish(),
   country: z.string().nullish(),
   date: z.string().nullish(),
@@ -123,10 +124,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    const show = await createShow(validated);
+    const approved = session.role === "admin" && validated.approved === true;
+    const show = await createShow({ ...validated, approved });
 
     // Create notification for the artist
-    const artistForNotification = await getArtistById(validated.artist_id);
+    const artistForNotification = approved ? null : await getArtistById(validated.artist_id);
     if (artistForNotification && artistForNotification.user_id) {
       await createNotification({
         id: randomUUID(),
