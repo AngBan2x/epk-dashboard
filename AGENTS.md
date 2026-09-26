@@ -9,8 +9,8 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `pnpm test:unit` | 110 tests (Vitest) |
-| `npx playwright test` | Tests E2E |
+| `pnpm test:unit` | 165 tests (Vitest, 14 archivos). Requiere Node 22 en local: `& "$env:TEMP\opencode\node22\node.exe" "node_modules\vitest\vitest.mjs" run` |
+| `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast |
 
 ## Stack
 
@@ -60,7 +60,7 @@ tests/             # Vitest + Playwright
 ## Base de Datos
 
 - **Dual-mode**: Turso (producción) o SQLite local (dev)
-- **9 tablas**: users, artists, tracks, releases, shows, submissions, metrics_history, notifications, subscriptions
+- **9 tablas**: users, artists, tracks, releases, shows, submissions, metrics_history, notifications, subscriptions (`tracks.admin_notes` y `track_submissions` con `admin_id`/`reviewed_at` añadidos en P4.5)
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
 - **REGLA**: Usar funciones de `lib/db.ts` en vez de `getDbWrite()` directo en API routes
@@ -271,3 +271,4 @@ Cuando el usuario reporte un bug o pida un fix:
 - **Docs**: actualizar AI_LOG.md con cada cambio significativo
 - **Nunca remover TODOs** del MASTER_PLAN.md
 - **Cover image priority**: uploaded > Spotify/Apple Music > YouTube thumbnail > default placeholder
+
