@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
-import { sendNotificationEmail } from "@/lib/email";
+import { notifyApprovalDecision } from "@/lib/approval-notifications";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -58,7 +58,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await req.json();
-    const { approved } = body;
+    const { approved, admin_notes } = body;
 
     if (typeof approved !== "boolean") {
       return NextResponse.json({ error: "approved debe ser un booleano" }, { status: 400 });
@@ -80,36 +80,24 @@ export async function PATCH(
       [approved ? 1 : 0, now, id]
     );
 
-    // Create notification for the artist
     if (approved !== wasApproved && show.artist_id) {
       const artists = await dbQuery("SELECT * FROM artists WHERE id = ?", [show.artist_id]) as any[];
       if (artists.length > 0 && artists[0].user_id) {
         const userId = artists[0].user_id;
-        const notificationId = crypto.randomUUID();
         const type = approved ? "submission_approved" : "submission_rejected";
         const title = approved ? "¡Tu show ha sido aprobado!" : "Tu show no fue aprobado";
         const message = approved
           ? `"${show.venue_name}" el ${show.date || "sin fecha"} ya está visible en tu perfil.`
-          : `El show "${show.venue_name}" no fue aprobado. Puedes editarlo y volver a enviarlo.`;
+          : `El show "${show.venue_name}" no fue aprobado. ${admin_notes ? `Razón: ${admin_notes}` : "Puedes editarlo y volver a enviarlo."}`;
 
-        await dbRun(
-          `INSERT INTO notifications (id, user_id, type, title, message, data, read, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [notificationId, userId, type, title, message, JSON.stringify({ showId: id }), 0, now]
-        );
-
-        void sendNotificationEmail({
+        await notifyApprovalDecision({
           userId,
-          type: type as "submission_approved" | "submission_rejected",
-          data: {
-            userName: "",
-            trackTitle: show.venue_name ?? "",
-            artistName: artists[0].name ?? "",
-            dashboardUrl: "/dashboard",
-            context: "show",
-            showVenue: show.venue_name ?? "",
-            showDate: show.date ?? undefined,
-          },
+          type,
+          title,
+          message,
+          data: { showId: id, trackTitle: show.venue_name, artistName: artists[0].name, showVenue: show.venue_name, showDate: show.date },
+          context: "show",
+          adminNotes: admin_notes ?? undefined,
         });
       }
     }

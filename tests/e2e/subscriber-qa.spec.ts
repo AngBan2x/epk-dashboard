@@ -188,7 +188,7 @@ test.describe("P4.1: Subscriber Role QA", () => {
     createdEmails.push(email);
   });
 
-  test("limpieza: elimina las cuentas QA creadas", async ({ browser }) => {
+  test.afterAll(async ({ browser }) => {
     test.setTimeout(300_000);
     const ctx = await browser.newContext();
     for (const email of createdEmails) {
@@ -204,6 +204,7 @@ test.describe("P4.1: Subscriber Role QA", () => {
     await ctx.close();
   });
 });
+
 
 
 

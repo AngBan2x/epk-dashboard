@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getDbWrite } from "@/lib/db";
-import { randomUUID } from "crypto";
 import { getTrackSubmissionsByUser, createTrackSubmission, getAllTrackSubmissions, updateTrackSubmissionStatus, getTrackSubmissionById, getTrackSubmissionsByStatus } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { notifyApprovalDecision } from "@/lib/approval-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -54,44 +53,68 @@ const CreateSubmissionSchema = z.object({
 
 // Schema for updating submission status (admin only)
 const UpdateStatusSchema = z.object({
-  status: z.enum(["pending", "approved", "rejected"]),
+  status: z.enum(["pending", "approved", "rejected", "revision"]),
   admin_notes: z.string().optional(),
 });
 
+function parseTrackDataSafely(trackData: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(trackData) as unknown;
+    if (parsed && typeof parsed === "object") return parsed as Record<string, string>;
+    return {};
+  } catch {
+    return {};
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
+    const session = await validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
     const status = searchParams.get("status");
     const id = searchParams.get("id");
+
+    const isAdmin = session.role === "admin";
+    const noCacheHeaders = {
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      "Surrogate-Control": "no-store",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    };
 
     if (id) {
       const submission = await getTrackSubmissionById(id);
       if (!submission) {
         return NextResponse.json({ error: "Submission not found" }, { status: 404 });
       }
+      if (!isAdmin && submission.user_id !== session.userId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
       return NextResponse.json(submission);
     }
 
-    if (userId) {
-      const submissions = await getTrackSubmissionsByUser(userId);
-      return NextResponse.json(submissions);
+    const validStatus = status && ["pending", "approved", "rejected", "revision"].includes(status)
+      ? (status as "pending" | "approved" | "rejected" | "revision")
+      : null;
+
+    if (isAdmin) {
+      if (userId) {
+        return NextResponse.json(await getTrackSubmissionsByUser(userId), { headers: noCacheHeaders });
+      }
+      if (validStatus) {
+        return NextResponse.json(await getTrackSubmissionsByStatus(validStatus), { headers: noCacheHeaders });
+      }
+      return NextResponse.json(await getAllTrackSubmissions(), { headers: noCacheHeaders });
     }
 
-    if (status && ["pending", "approved", "rejected"].includes(status)) {
-      const submissions = await getTrackSubmissionsByStatus(status as "pending" | "approved" | "rejected");
-      return NextResponse.json(submissions);
-    }
-
-    const submissions = await getAllTrackSubmissions();
-    return NextResponse.json(submissions, {
-      headers: {
-        "Cache-Control": "private, no-cache, no-store, must-revalidate",
-        "Surrogate-Control": "no-store",
-        "Pragma": "no-cache",
-        "Expires": "0",
-      },
-    });
+    const own = await getTrackSubmissionsByUser(session.userId);
+    const filtered = validStatus ? own.filter((s) => s.status === validStatus) : own;
+    return NextResponse.json(filtered, { headers: noCacheHeaders });
   } catch (error) {
     console.error("GET submissions error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
@@ -111,7 +134,7 @@ export async function POST(req: NextRequest) {
     // Usar userId de la sesión en vez de header spoofable
     const userId = session.userId;
 
-    const id = randomUUID();
+    const id = crypto.randomUUID();
     const submission = await createTrackSubmission({
       id,
       user_id: userId,
@@ -151,9 +174,45 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const validated = UpdateStatusSchema.parse(body);
 
-    const updated = await updateTrackSubmissionStatus(id, validated.status, validated.admin_notes);
+    const submission = await getTrackSubmissionById(id);
+    if (!submission) {
+      return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+    }
+
+    const oldStatus = submission.status;
+    const updated = await updateTrackSubmissionStatus(id, validated.status, validated.admin_notes, session.userId);
     if (!updated) {
       return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+    }
+
+    if (validated.status !== oldStatus && (validated.status === "approved" || validated.status === "rejected" || validated.status === "revision")) {
+      const trackData = parseTrackDataSafely(submission.track_data);
+      const trackTitle = trackData.title ?? "tu envío";
+      const type = validated.status === "approved"
+        ? "submission_approved"
+        : validated.status === "rejected"
+          ? "submission_rejected"
+          : "revision_requested";
+      const title = validated.status === "approved"
+        ? "¡Tu envío ha sido aprobado!"
+        : validated.status === "rejected"
+          ? "Tu envío no fue aprobado"
+          : "Tu envío necesita cambios";
+      const message = validated.status === "approved"
+        ? `"${trackTitle}" ya está disponible en el catálogo.`
+        : validated.status === "rejected"
+          ? `Razón: ${validated.admin_notes || "No se especificó motivo."}`
+          : validated.admin_notes || "Por favor revisa y actualiza la información.";
+
+      await notifyApprovalDecision({
+        userId: submission.user_id,
+        type,
+        title,
+        message,
+        data: { submissionId: id, trackTitle, artistName: trackData.artist_name },
+        context: "track",
+        adminNotes: validated.admin_notes ?? undefined,
+      });
     }
 
     return NextResponse.json(updated);

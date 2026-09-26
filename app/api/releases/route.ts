@@ -15,6 +15,7 @@ const CreateReleaseSchema = z.object({
   genre: z.string().optional(),
   description: z.string().optional(),
   duration: z.string().optional(),
+  status: z.enum(["draft", "pending"]).optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -121,14 +122,17 @@ export async function POST(req: NextRequest) {
       genre,
       description,
       duration,
+      status,
     } = parsed.data;
 
     const youtubeVideoId = external_links?.youtube_video_id;
 
+    const initialStatus = status || "draft";
+
     await dbRun(
       `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, genre, description, duration, youtube_video_id, external_links, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", genre || "", description || "", duration || "", youtubeVideoId || "", JSON.stringify(external_links || {}), "draft"]
+      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", genre || "", description || "", duration || "", youtubeVideoId || "", JSON.stringify(external_links || {}), initialStatus]
     );
 
     // Insert tracks if provided
@@ -178,13 +182,12 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, ...updates } = body;
+    const { id, status, ...updates } = body;
 
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    // Check ownership: tracks use artist_name, verify via artists table
     const existing = await dbQuery("SELECT artist_name FROM tracks WHERE id = ?", [id]) as { artist_name: string }[];
     if (!existing.length) {
       return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });
@@ -205,6 +208,16 @@ export async function PUT(req: NextRequest) {
       updates.external_links = JSON.stringify(updates.external_links);
     }
 
+    if (status !== undefined) {
+      if (["approved", "rejected", "revision"].includes(status)) {
+        if (session.role !== "admin") {
+          return NextResponse.json({ error: "No autorizado: solo un admin puede aprobar, rechazar o pedir revisión" }, { status: 403 });
+        }
+      } else if (!["draft", "pending"].includes(status)) {
+        return NextResponse.json({ error: "Estado inválido. Debe ser: draft, pending, approved, rejected, revision" }, { status: 400 });
+      }
+    }
+
     const ALLOWED_COLUMNS = new Set([
       "title", "artist_name", "release_date", "cover_image", "release_type",
       "genre", "description", "duration", "youtube_video_id", "external_links",
@@ -216,14 +229,23 @@ export async function PUT(req: NextRequest) {
     ]);
 
     const safeKeys = Object.keys(updates).filter((k) => ALLOWED_COLUMNS.has(k));
-    if (safeKeys.length === 0) {
+    if (safeKeys.length === 0 && status === undefined) {
       return NextResponse.json({ error: "Sin campos válidos para actualizar" }, { status: 400 });
     }
 
     const fields = safeKeys.map((key) => `${key} = ?`).join(", ");
     const values = safeKeys.map((key) => updates[key]);
 
-    await dbRun(`UPDATE tracks SET ${fields} WHERE id = ?`, [...values, id]);
+    if (status !== undefined) {
+      if (fields) {
+        await dbRun(`UPDATE tracks SET ${fields}, status = ? WHERE id = ?`, [...values, status, id]);
+      } else {
+        await dbRun(`UPDATE tracks SET status = ? WHERE id = ?`, [status, id]);
+      }
+    } else if (fields) {
+      await dbRun(`UPDATE tracks SET ${fields} WHERE id = ?`, [...values, id]);
+    }
+
     return NextResponse.json({ message: "Release actualizado" });
   } catch (error) {
     console.error("PUT releases error:", error);
@@ -245,7 +267,6 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    // Check ownership: tracks use artist_name, verify via artists table
     const existing = await dbQuery("SELECT artist_name FROM tracks WHERE id = ?", [id]) as { artist_name: string }[];
     if (!existing.length) {
       return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });

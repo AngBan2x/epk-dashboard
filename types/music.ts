@@ -180,7 +180,7 @@ export type SubmissionStatus = "pending" | "approved" | "rejected" | "revision";
 
 export type SubmissionType = "track" | "release" | "show";
 
-export type ReleaseStatus = "draft" | "pending" | "approved" | "rejected";
+export type ReleaseStatus = "draft" | "pending" | "approved" | "rejected" | "revision";
 
 export interface TrackSubmission {
   id: string;
@@ -225,7 +225,7 @@ export interface RawLikeRow {
   created_at: string;
 }
 
-export type NotificationType = "submission_approved" | "submission_rejected" | "new_release" | "track_liked" | "system" | "show_pending_review";
+export type NotificationType = "submission_approved" | "submission_rejected" | "new_release" | "track_liked" | "system" | "show_pending_review" | "revision_requested";
 
 export interface Notification {
   id: string;
