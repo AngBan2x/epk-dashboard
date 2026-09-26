@@ -732,6 +732,17 @@ export async function getUserById(id: string): Promise<User | null> {
   return row !== undefined ? parseUser(row) : null;
 }
 
+export async function getAllUsers(): Promise<User[]> {
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    const rows = await tursoExec("SELECT * FROM users ORDER BY created_at ASC");
+    return rows.map((r) => parseUser(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as Record<string, unknown>[];
+  return rows.map(parseUser);
+}
+
 export async function createUser(user: Omit<User, "id" | "created_at"> & { id: string }): Promise<User> {
   if (isTursoEnabled()) {
     await ensureTursoSchemaIfNeeded();

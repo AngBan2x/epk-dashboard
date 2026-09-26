@@ -8,6 +8,7 @@ const ALL_TYPES: NotificationType[] = [
   "track_liked",
   "system",
   "show_pending_review",
+  "platform_release",
 ];
 
 const DATA = {
@@ -52,8 +53,17 @@ describe("P4.4 templates", () => {
     expect(escapeHtml(`"a"'b'`)).toBe("&quot;a&quot;&#39;b&#39;");
   });
 
-  it("platform_release esta definido pero sin logica (P4.8)", () => {
-    expect(() => getEmailTemplate("platform_release", DATA)).toThrow(/P4\.8/);
+  it("platform_release genera el aviso oficial de PressPlay (P4.8)", () => {
+    const t = getEmailTemplate("platform_release", DATA);
+    expect(t.subject).toContain("Aviso oficial de PressPlay");
+    expect(t.subject).toContain("Titulo <b>system</b>");
+    expect(t.html).toContain("<!DOCTYPE html>");
+    expect(t.html).toContain("Aviso oficial de PressPlay");
+    expect(t.html).toContain("no una promoción");
+    expect(t.html).not.toContain("<b>system</b>");
+    expect(t.html).toContain("Titulo &lt;b&gt;system&lt;/b&gt;");
+    expect(t.text).toContain("AVISO OFICIAL DE PRESSPLAY");
+    expect(t.text.length).toBeGreaterThan(0);
   });
 
   it("usa contexto show para shows", () => {

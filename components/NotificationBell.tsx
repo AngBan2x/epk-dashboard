@@ -95,6 +95,16 @@ const ICONS: Record<string, { node: React.ReactNode; wrapper: string }> = {
     ),
     wrapper: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
   },
+  platform_release: {
+    node: (
+      <>
+        <circle cx="12" cy="12" r="2.25" />
+        <path d="M8.75 8.75a4.5 4.5 0 000 6.5M15.25 8.75a4.5 4.5 0 010 6.5" />
+        <path d="M5.75 5.75a8.5 8.5 0 000 12.5M18.25 5.75a8.5 8.5 0 010 12.5" />
+      </>
+    ),
+    wrapper: "bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400",
+  },
 };
 
 export function notificationHref(data: Record<string, unknown> | null): string | null {
