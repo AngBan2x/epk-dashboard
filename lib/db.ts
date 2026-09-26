@@ -412,6 +412,7 @@ function initLocalTables(): void {
   // Release form fields
   try { db.exec(`ALTER TABLE tracks ADD COLUMN genre TEXT`); } catch {}
   try { db.exec(`ALTER TABLE tracks ADD COLUMN description TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN admin_notes TEXT`); } catch {}
 
   // P2.6: Add new columns to track_submissions (safe ALTER TABLE)
   try { db.exec(`ALTER TABLE track_submissions ADD COLUMN submission_type TEXT DEFAULT 'track'`); } catch {}
@@ -513,6 +514,9 @@ function parseLike(row: Record<string, unknown>): Like {
     created_at: String(row.created_at),
   };
 }
+
+const NOTIFICATIONS_CREATED_AT_SORT =
+  "julianday(replace(created_at, 'T', ' ')) DESC, created_at DESC";
 
 function parseNotification(row: Record<string, unknown>): Notification {
   return {
@@ -1110,9 +1114,10 @@ export async function hasUserLikedTrack(userId: string, trackId: string): Promis
 export async function createNotification(
   notification: Omit<Notification, "id" | "created_at"> & { id: string }
 ): Promise<Notification> {
+  const now = new Date().toISOString();
   if (isTursoEnabled()) {
     await tursoExec(
-      "INSERT INTO notifications (id, user_id, type, title, message, data, read) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO notifications (id, user_id, type, title, message, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         notification.id,
         notification.user_id,
@@ -1121,6 +1126,7 @@ export async function createNotification(
         notification.message,
         notification.data,
         notification.read ? 1 : 0,
+        now,
       ]
     );
     const created = await getNotificationById(notification.id);
@@ -1129,7 +1135,7 @@ export async function createNotification(
   }
   const db = getLocalDbWrite();
   db.prepare(
-    "INSERT INTO notifications (id, user_id, type, title, message, data, read) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO notifications (id, user_id, type, title, message, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(
     notification.id,
     notification.user_id,
@@ -1137,7 +1143,8 @@ export async function createNotification(
     notification.title,
     notification.message,
     notification.data,
-    notification.read ? 1 : 0
+    notification.read ? 1 : 0,
+    now
   );
   const created = await getNotificationById(notification.id);
   if (!created) throw new Error("Failed to create notification");
@@ -1161,7 +1168,7 @@ export async function getUserNotifications(userId: string, unreadOnly = false): 
     if (unreadOnly) {
       query += " AND read = 0";
     }
-    query += " ORDER BY created_at DESC";
+    query += " ORDER BY " + NOTIFICATIONS_CREATED_AT_SORT;
     const rows = await tursoExec(query, args);
     return rows.map((r) => parseNotification(r as Record<string, unknown>));
   }
@@ -1170,7 +1177,7 @@ export async function getUserNotifications(userId: string, unreadOnly = false): 
   if (unreadOnly) {
     query += " AND read = 0";
   }
-  query += " ORDER BY created_at DESC";
+  query += " ORDER BY " + NOTIFICATIONS_CREATED_AT_SORT;
   const rows = db.prepare(query).all(userId) as Record<string, unknown>[];
   return rows.map(parseNotification);
 }

@@ -99,6 +99,7 @@ export async function ensureTursoSchema(): Promise<boolean> {
   // P3 Batch 2: Release form fields
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN genre TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN description TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN admin_notes TEXT`); } catch {}
 
   // 2. artists (con user_id FK + P2.1)
   await client.execute(`
@@ -157,6 +158,11 @@ export async function ensureTursoSchema(): Promise<boolean> {
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
+
+  try { await client.execute(`ALTER TABLE track_submissions ADD COLUMN submission_type TEXT DEFAULT 'track'`); } catch {}
+  try { await client.execute(`ALTER TABLE track_submissions ADD COLUMN metadata TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE track_submissions ADD COLUMN admin_id TEXT`); } catch {}
+  try { await client.execute(`ALTER TABLE track_submissions ADD COLUMN reviewed_at TEXT`); } catch {}
 
   // 5. likes
   await client.execute(`

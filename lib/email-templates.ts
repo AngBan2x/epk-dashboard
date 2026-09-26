@@ -5,7 +5,8 @@ export type NotificationType =
   | "track_liked"
   | "system"
   | "show_pending_review"
-  | "platform_release";
+  | "platform_release"
+  | "revision_requested";
 
 export interface EmailTemplateData {
   userName: string;
@@ -13,7 +14,7 @@ export interface EmailTemplateData {
   artistName: string;
   adminNotes?: string;
   dashboardUrl: string;
-  context?: "track" | "show";
+  context?: "track" | "show" | "release";
   showVenue?: string;
   showDate?: string;
   notificationTitle?: string;
@@ -269,6 +270,54 @@ export function getEmailTemplate(type: NotificationType, data: EmailTemplateData
           </html>
         `,
         text: `Hola ${data.userName},\n\nTu show en ${venue} ha sido enviado para revisión. Será publicado tras la aprobación del equipo.\n\n${data.showDate ? `Fecha: ${data.showDate}\n\n` : ""}Ver en: ${dashboardLink}\n\nSaludos,\nEl equipo de PressPlay`,
+      };
+    }
+
+    case "revision_requested": {
+      const noun = nounFor(data.context);
+      const title = data.context === "show" ? showVenue : trackTitle;
+      return {
+        subject: `📝 Tu ${noun} "${data.trackTitle}" necesita cambios`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">📝 ${noun === "show" ? "Show" : "Track"} Requiere Revisión</h1>
+              </div>
+              <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+                <p style="font-size: 16px; margin-bottom: 16px;">Hola <strong>${userName}</strong>,</p>
+                <p style="font-size: 16px; margin-bottom: 16px;">
+                  Tu ${noun} <strong>"${title}"</strong> de <strong>${artistName}</strong>
+                  requiere algunos cambios antes de poder ser aprobado.
+                </p>
+                ${data.context === "show" && showDate ? `
+                  <p style="font-size: 16px; margin-bottom: 16px;">Fecha: <strong>${showDate}</strong></p>
+                ` : ""}
+                ${adminNotes ? `
+                  <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0; font-size: 14px; color: #1e40af;"><strong>Comentarios del equipo:</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #1e3a8a;">${adminNotes}</p>
+                  </div>
+                ` : ""}
+                <p style="font-size: 16px; margin-bottom: 24px;">
+                  Por favor revisa los comentarios, edita tu ${noun} y vuelve a enviarlo para revisión.
+                </p>
+                <a href="${dashboardLink}" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  Editar mi ${noun === "show" ? "Show" : "Track"}
+                </a>
+                <p style="font-size: 14px; color: #64748b; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                  Si tienes alguna pregunta, no dudes en contactarnos.
+                </p>
+              </div>
+            </body>
+          </html>
+        `,
+        text: `Hola ${data.userName},\n\nTu ${noun} "${data.trackTitle}" de ${data.artistName} requiere algunos cambios antes de poder ser aprobado.\n\n${data.adminNotes ? `Comentarios del equipo: ${data.adminNotes}\n\n` : ""}Por favor revisa los comentarios, edita tu ${noun} y vuelve a enviarlo para revisión.\n\nVer en: ${dashboardLink}\n\nSaludos,\nEl equipo de PressPlay`,
       };
     }
 

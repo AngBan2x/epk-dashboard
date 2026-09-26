@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTrackSubmissions, getTrackSubmissionsByStatus } from "@/lib/db";
+import { getAllTrackSubmissions } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -20,19 +20,21 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
+    const allSubmissions = await getAllTrackSubmissions();
+
     let submissions;
     if (status && ["pending", "approved", "rejected", "revision"].includes(status)) {
-      submissions = await getTrackSubmissionsByStatus(status as any);
+      submissions = allSubmissions.filter((s) => s.status === status);
     } else {
-      submissions = await getAllTrackSubmissions();
+      submissions = allSubmissions;
     }
 
     const stats = {
-      pending: submissions.filter((s: any) => s.status === "pending").length,
-      approved: submissions.filter((s: any) => s.status === "approved").length,
-      rejected: submissions.filter((s: any) => s.status === "rejected").length,
-      revision: submissions.filter((s: any) => s.status === "revision").length,
-      total: submissions.length,
+      pending: allSubmissions.filter((s) => s.status === "pending").length,
+      approved: allSubmissions.filter((s) => s.status === "approved").length,
+      rejected: allSubmissions.filter((s) => s.status === "rejected").length,
+      revision: allSubmissions.filter((s) => s.status === "revision").length,
+      total: allSubmissions.length,
     };
 
     return NextResponse.json({ submissions, stats }, {

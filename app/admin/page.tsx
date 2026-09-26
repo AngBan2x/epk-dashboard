@@ -416,7 +416,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleSubmissionAction = async (submissionId: string, status: "approved" | "rejected", notes?: string) => {
+  const handleSubmissionAction = async (submissionId: string, status: "approved" | "rejected" | "revision", notes?: string) => {
     setActionLoading(submissionId);
     setMessage(null);
 
@@ -454,7 +454,8 @@ export default function AdminPage() {
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: `Release ${status === "approved" ? "aprobado" : status === "rejected" ? "rechazado" : "actualizado"}` });
+        const statusText = status === "approved" ? "aprobado" : status === "rejected" ? "rechazado" : status === "revision" ? "en revisión" : "actualizado";
+        setMessage({ type: "success", text: `Release ${statusText}` });
         fetchReleases();
       } else {
         const error = await res.json();
@@ -491,6 +492,7 @@ export default function AdminPage() {
     pending: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
     approved: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
     rejected: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
+    revision: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700",
   };
 
   const releaseStatusColors: Record<ReleaseStatus, string> = {
@@ -498,6 +500,7 @@ export default function AdminPage() {
     pending: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
     approved: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
     rejected: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
+    revision: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700",
   };
 
   const releaseStatusLabels: Record<ReleaseStatus, string> = {
@@ -505,6 +508,7 @@ export default function AdminPage() {
     pending: "⏳ Pendiente",
     approved: "✅ Aprobado",
     rejected: "❌ Rechazado",
+    revision: "📝 Revisión",
   };
 
   return (
@@ -840,6 +844,7 @@ export default function AdminPage() {
                   <option value="pending">Pendiente</option>
                   <option value="approved">Aprobado</option>
                   <option value="rejected">Rechazado</option>
+                  <option value="revision">Revisión</option>
                 </select>
               </div>
             </div>
@@ -909,7 +914,7 @@ export default function AdminPage() {
                                 </button>
                                 <button
                                   onClick={() => {
-                                    const notes = prompt("Notas de rechazo (requerido):");
+                                    const notes = prompt("Notas de rechazo (requerido, mín. 20 caracteres):");
                                     if (notes !== null && notes.trim().length >= 20) {
                                       handleReleaseAction(release.id, "rejected", notes);
                                     } else if (notes !== null) {
@@ -921,9 +926,32 @@ export default function AdminPage() {
                                 >
                                   ❌ Rechazar
                                 </button>
+                                <button
+                                  onClick={() => {
+                                    const notes = prompt("Comentarios para revisión (requerido, mín. 10 caracteres):");
+                                    if (notes !== null && notes.trim().length >= 10) {
+                                      handleReleaseAction(release.id, "revision", notes);
+                                    } else if (notes !== null) {
+                                      alert("Los comentarios deben tener al menos 10 caracteres");
+                                    }
+                                  }}
+                                  disabled={actionLoading === release.id}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition disabled:opacity-50"
+                                >
+                                  📝 Revisión
+                                </button>
                               </>
                             )}
                             {release.status === "rejected" && (
+                              <button
+                                onClick={() => handleReleaseAction(release.id, "draft")}
+                                disabled={actionLoading === release.id}
+                                className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition disabled:opacity-50"
+                              >
+                                🔄 Resetear a borrador
+                              </button>
+                            )}
+                            {release.status === "revision" && (
                               <button
                                 onClick={() => handleReleaseAction(release.id, "draft")}
                                 disabled={actionLoading === release.id}
@@ -994,7 +1022,7 @@ export default function AdminPage() {
                           <td className="p-3 text-slate-600 dark:text-slate-400 font-mono text-xs">{sub.user_id.slice(0, 8)}...</td>
                           <td className="p-3">
                             <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${statusColors[sub.status]}`}>
-                              {sub.status === "pending" ? "⏳ Pendiente" : sub.status === "approved" ? "✅ Aprobado" : "❌ Rechazado"}
+                              {sub.status === "pending" ? "⏳ Pendiente" : sub.status === "approved" ? "✅ Aprobado" : sub.status === "rejected" ? "❌ Rechazado" : "📝 Revisión"}
                             </span>
                           </td>
                           <td className="p-3 text-slate-600 dark:text-slate-400 text-xs">
@@ -1019,13 +1047,31 @@ export default function AdminPage() {
                                   </button>
                                   <button
                                     onClick={() => {
-                                      const notes = prompt("Notas de rechazo (opcional):");
-                                      if (notes !== null) handleSubmissionAction(sub.id, "rejected", notes);
+                                      const notes = prompt("Notas de rechazo (requerido, mín. 10 caracteres):");
+                                      if (notes !== null && notes.trim().length >= 10) {
+                                        handleSubmissionAction(sub.id, "rejected", notes);
+                                      } else if (notes !== null) {
+                                        alert("Las notas de rechazo deben tener al menos 10 caracteres");
+                                      }
                                     }}
                                     disabled={actionLoading === sub.id}
                                     className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition disabled:opacity-50"
                                   >
                                     ❌ Rechazar
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const notes = prompt("Comentarios para revisión (requerido, mín. 10 caracteres):");
+                                      if (notes !== null && notes.trim().length >= 10) {
+                                        handleSubmissionAction(sub.id, "revision", notes);
+                                      } else if (notes !== null) {
+                                        alert("Los comentarios deben tener al menos 10 caracteres");
+                                      }
+                                    }}
+                                    disabled={actionLoading === sub.id}
+                                    className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition disabled:opacity-50"
+                                  >
+                                    📝 Revisión
                                   </button>
                                 </>
                               )}

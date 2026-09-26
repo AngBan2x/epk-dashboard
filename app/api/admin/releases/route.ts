@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
-import { sendNotificationEmail } from "@/lib/email";
+import { notifyApprovalDecision } from "@/lib/approval-notifications";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -117,8 +117,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    if (!status || !["draft", "pending", "approved", "rejected"].includes(status)) {
-      return NextResponse.json({ error: "Estado inválido. Debe ser: draft, pending, approved, rejected" }, { status: 400 });
+    if (!status || !["draft", "pending", "approved", "rejected", "revision"].includes(status)) {
+      return NextResponse.json({ error: "Estado inválido. Debe ser: draft, pending, approved, rejected, revision" }, { status: 400 });
     }
 
     // Check if release exists
@@ -130,43 +130,49 @@ export async function PUT(req: NextRequest) {
     const release = existing[0];
     const oldStatus = release.status || "draft";
 
-    // Update status
     const now = new Date().toISOString();
     await dbRun(
-      "UPDATE tracks SET status = ?, updated_at = ? WHERE id = ?",
-      [status, now, id]
+      "UPDATE tracks SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?",
+      [status, admin_notes ?? null, now, id]
     );
 
-    // Create notification for the artist if status changed to approved/rejected
-    if (status !== oldStatus && (status === "approved" || status === "rejected")) {
+    if (status !== oldStatus && (status === "approved" || status === "rejected" || status === "revision")) {
       // Find the artist user
       const artist = await dbQuery("SELECT * FROM artists WHERE name = ?", [release.artist_name]) as any[];
       if (artist.length > 0 && artist[0].user_id) {
         const userId = artist[0].user_id;
-        const notificationId = crypto.randomUUID();
-        const type = status === "approved" ? "submission_approved" : "submission_rejected";
-        const title = status === "approved" ? "¡Tu release ha sido aprobado!" : "Tu release no fue aprobado";
-        const message = status === "approved"
-          ? `"${release.title}" ya está disponible en el catálogo.`
-          : `Razón: ${admin_notes || "No se especificó motivo."}`;
+        let type: "submission_approved" | "submission_rejected" | "revision_requested";
+        let title: string;
+        let message: string;
 
-        await dbRun(
-          `INSERT INTO notifications (id, user_id, type, title, message, data, read, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [notificationId, userId, type, title, message, JSON.stringify({ releaseId: id }), 0, now]
-        );
+        switch (status) {
+          case "approved":
+            type = "submission_approved";
+            title = "¡Tu release ha sido aprobado!";
+            message = `"${release.title}" ya está disponible en el catálogo.`;
+            break;
+          case "rejected":
+            type = "submission_rejected";
+            title = "Tu release no fue aprobado";
+            message = `Razón: ${admin_notes || "No se especificó motivo."}`;
+            break;
+          case "revision":
+            type = "revision_requested";
+            title = "Tu release necesita cambios";
+            message = admin_notes || "Por favor revisa y actualiza la información.";
+            break;
+          default:
+            throw new Error(`Estado de revisión no soportado: ${status}`);
+        }
 
-        void sendNotificationEmail({
+        await notifyApprovalDecision({
           userId,
-          type: type as "submission_approved" | "submission_rejected",
-          data: {
-            userName: "",
-            trackTitle: release.title ?? "",
-            artistName: release.artist_name ?? "",
-            adminNotes: status === "rejected" ? admin_notes ?? undefined : undefined,
-            dashboardUrl: "/dashboard",
-            context: "track",
-          },
+          type,
+          title,
+          message,
+          data: { releaseId: id, trackTitle: release.title, artistName: release.artist_name },
+          context: "release",
+          adminNotes: admin_notes ?? undefined,
         });
       }
     }

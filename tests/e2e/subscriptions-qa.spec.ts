@@ -300,7 +300,7 @@ test.describe("P4.2: Suscripciones QA", () => {
     await ctx.close();
   });
 
-  test("limpieza: elimina las cuentas QA creadas", async ({ browser }) => {
+  test.afterAll(async ({ browser }) => {
     test.setTimeout(300_000);
     const ctx = await browser.newContext();
     for (const email of createdEmails) {
@@ -316,5 +316,6 @@ test.describe("P4.2: Suscripciones QA", () => {
     await ctx.close();
   });
 });
+
 
 
