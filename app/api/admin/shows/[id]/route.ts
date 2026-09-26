@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
+import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -143,6 +144,37 @@ export async function PATCH(
             adminNotes: notes,
           });
         }
+      }
+
+      if (resolvedAction === "approve" && nextApproved && !wasApproved) {
+        const artistName = artists.length > 0 ? String(artists[0].name ?? "") : "";
+        const title = "Nuevo show publicado";
+        const message = `El show "${show.venue_name}" de ${artistName}${show.date ? ` el ${show.date}` : ""} ya es público en PressPlay.`;
+        const subscriberData = {
+          show_id: id,
+          showId: id,
+          venue_name: show.venue_name,
+          showVenue: show.venue_name,
+          showDate: show.date,
+          artistName,
+          artistId: show.artist_id,
+          dashboardUrl: "/shows",
+        };
+
+        await notifyArtistSubscribers({
+          artistId: show.artist_id,
+          kind: "show",
+          title,
+          message,
+          data: subscriberData,
+          emailType: "new_show",
+          emailData: {
+            showVenue: show.venue_name,
+            showDate: show.date ?? undefined,
+            artistName,
+            dashboardUrl: "/shows",
+          },
+        });
       }
     }
 

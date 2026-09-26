@@ -1863,7 +1863,7 @@ export async function createTrack(data: {
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
         external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         track.id, track.title, track.artist_name, track.release_type, track.release_date,
         track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -1889,7 +1889,7 @@ export async function createTrack(data: {
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
         external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       track.id, track.title, track.artist_name, track.release_type, track.release_date,
       track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,

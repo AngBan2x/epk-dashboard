@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { updateShow } from "@/lib/db";
+import { getArtistById, updateShow } from "@/lib/db";
 import { authorizeShowTransition } from "@/lib/show-transitions";
+import { notifyArtistOwner, notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,49 @@ export async function POST(
     if (!updated) {
       return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }
+
+    const artist = await getArtistById(updated.artist_id);
+    const refundNote = validated.refund_note?.trim();
+    const refundPart = refundNote ? ` Aviso de reembolso: ${refundNote}` : "";
+    const title = "Show cancelado";
+    const message = `El show "${updated.venue_name}" fue cancelado. Motivo: ${validated.reason}.${refundPart}`;
+    const data = {
+      show_id: updated.id,
+      showId: updated.id,
+      venue_name: updated.venue_name,
+      showVenue: updated.venue_name,
+      showDate: updated.date,
+      artistName: artist?.name ?? "",
+      reason: validated.reason,
+      refund_note: refundNote ?? "",
+      dashboardUrl: "/shows",
+    };
+    const emailData = {
+      showVenue: updated.venue_name,
+      showDate: updated.date ?? undefined,
+      reason: validated.reason,
+      refundNote: refundNote ?? undefined,
+      artistName: artist?.name ?? "",
+      dashboardUrl: "/shows",
+    };
+
+    await notifyArtistSubscribers({
+      artistId: updated.artist_id,
+      kind: "show_update",
+      title,
+      message,
+      data,
+      emailType: "show_cancelled",
+      emailData,
+    });
+    await notifyArtistOwner({
+      artistId: updated.artist_id,
+      title,
+      message,
+      data,
+      emailType: "show_cancelled",
+      emailData,
+    });
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
