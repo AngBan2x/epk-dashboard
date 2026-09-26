@@ -643,16 +643,16 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 #### Fase P4: Subscribers + Notifications + Search
 | Task | Subagente | Descripción | Estado |
 |------|-----------|-------------|--------|
-| P4.1 | subscriber-builder | Rol suscriptor + registro (tipo, middleware, artista-suscriptor) | ⏳ Pendiente |
-| P4.2 | subscriber-builder | Suscripciones (botón, prefs releases/shows, baja, promoción a artista, cascada) | ⏳ Pendiente |
-| P4.3 | notification-builder | In-app: bell + panel + página + polling + prefs + GET /api/notifications | ⏳ Pendiente |
-| P4.4 | notification-builder | Email Resend real en triggers + FROM productivo + sin-key explícito | ⏳ Pendiente |
-| P4.5 | approval-workflow-builder | Unificar approval + notif/email artista al aprobar/rechazar/revisión | ⏳ Pendiente |
-| P4.6 | notification-builder | Shows: transiciones + fan-out suscriptores + reembolso/48h/semana + disclaimer | ⏳ Pendiente |
-| P4.7 | search-builder | GET /api/search?q&sort&order + SearchBar header + sort artists/releases/shows/eventos | ⏳ Pendiente |
-| P4.8 | notification-builder | Broadcast plataforma (admin, in-app todos + email opcional) | ⏳ Pendiente |
+| P4.1 | auth-builder | Rol suscriptor + registro (tipo, API, middleware, selector en el registro) | Completada (local + prod) |
+| P4.2 | api-builder + subscriber-builder | Suscripciones (boton, prefs releases/shows, baja, cascada en deleteUser) | Completada (local + prod) |
+| P4.3 | api-builder + notification-builder | In-app: bell + panel + pagina + polling + prefs + GET /api/notifications | Completada (local + prod) |
+| P4.4 | notification-builder | Email Resend real en triggers + estado visible en admin (falta FROM_EMAIL del usuario) | Completada, pendiente FROM_EMAIL en Vercel |
+| P4.5 | approval-workflow-builder | Unificar approval + notif/email al aprobar/rechazar/revisión | Completada (local + prod) |
+| P4.6 | show-form-builder + notification-builder | Shows: transiciones + fan-out + reembolso + disclaimer | Completada (local + prod) |
+| P4.7 | search-builder | GET /api/search + SearchBar header/móvil + sort por URL | Completada (local + prod) |
+| P4.8 | notification-builder | Broadcast plataforma (admin, in-app todos + email opcional) | Completada (local + prod) |
 
-> Spec ejecutable: `docs/PHASE_P4.md`. Solo P4 tras reinicio (acordado 2026-09-24).
+> Spec ejecutable: `docs/PHASE_P4.md`. Fase P4 completada el 2026-09-26 (P4.1-P4.8 verificadas en local y produccion; detalle en `docs/AI_LOG.md`). Pendiente de configuracion: `FROM_EMAIL` en Vercel para enviar correo a cualquier destinatario (hoy solo al email de la cuenta de Resend).
 
 > **⚠️ TODO antes de P4:** Configurar `YOUTUBE_API_KEY` en Vercel (Google Cloud Console → YouTube Data API v3)
 
@@ -1098,3 +1098,4 @@ CREATE TABLE IF NOT EXISTS shows (
 | Typecheck | 0 errores |
 | Unit tests | Todos passing |
 | Release | v3.8.0 publicado en GitHub |
+
