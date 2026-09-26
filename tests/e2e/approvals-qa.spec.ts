@@ -38,6 +38,7 @@ async function loginAs(request: import("@playwright/test").APIRequestContext, em
 }
 
 const uniqueEmail = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}@example.com`;
+const createdEmails: string[] = [];
 
 async function registerSubscriber(request: import("@playwright/test").APIRequestContext) {
   const email = uniqueEmail("p45-sub");
@@ -45,6 +46,7 @@ async function registerSubscriber(request: import("@playwright/test").APIRequest
     data: { name: "QA Aprobaciones", email, password: "TestPass123!", role: "subscriber" },
   });
   expect(response.status()).toBe(201);
+  createdEmails.push(email);
   return email;
 }
 
@@ -203,6 +205,22 @@ test.describe("P4.5: Aprobaciones QA", () => {
     await page.screenshot({ path: "tests/screenshots/approvals/admin-approvals.png", fullPage: false });
     expect(errors).toEqual([]);
     await authed.close();
+  });
+
+  test.afterAll(async ({ browser }) => {
+    test.setTimeout(300_000);
+    const ctx = await browser.newContext();
+    for (const email of createdEmails) {
+      await throttle(1);
+      const login = await ctx.request.post(`${BASE_URL}/api/auth/login`, {
+        data: { email, password: "TestPass123!", rememberMe: false },
+      });
+      if (!login.ok()) continue;
+      const deleted = await ctx.request.delete(`${BASE_URL}/api/auth/me`);
+      if (deleted.ok()) console.log(`eliminada ${email}`);
+    }
+    createdEmails.length = 0;
+    await ctx.close();
   });
 });
 
