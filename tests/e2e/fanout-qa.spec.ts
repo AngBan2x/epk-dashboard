@@ -8,6 +8,8 @@ const ARTIST_ID = "art-1788275587598";
 const PASSWORD = "TestPass123!";
 const loginStamps: number[] = [];
 const createdEmails: string[] = [];
+const createdShowIds: string[] = [];
+const createdReleaseIds: string[] = [];
 
 async function throttle() {
   const now = Date.now();
@@ -94,6 +96,7 @@ test.describe("P4.6b: Fan-out a suscriptores QA", () => {
         data: { artist_id: ARTIST_ID, venue_name: `QA P46b Venue ${Date.now()}`, city: "Valencia", date: futureDate(20) },
       })
     ).json();
+    createdShowIds.push(show.id);
 
     const admin = await browser.newContext();
     await loginAs(admin.request, ADMIN);
@@ -135,6 +138,7 @@ test.describe("P4.6b: Fan-out a suscriptores QA", () => {
         data: { title: `QA P46b Release ${Date.now()}`, artist_name: "Angel Bandres", release_date: "2026-11-01", status: "pending" },
       })
     ).json();
+    createdReleaseIds.push(release.id);
 
     let releaseNotified = false;
     for (let attempt = 0; attempt < 3 && !releaseNotified; attempt++) {
@@ -162,7 +166,21 @@ test.describe("P4.6b: Fan-out a suscriptores QA", () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(420_000);
+    const admin = await browser.newContext();
+    await loginAs(admin.request, ADMIN);
+    for (const id of createdShowIds) {
+      const res = await admin.request.delete(`${BASE_URL}/api/shows?id=${id}`);
+      if (res.ok()) console.log(`show eliminado ${id}`);
+    }
+    for (const id of createdReleaseIds) {
+      const res = await admin.request.delete(`${BASE_URL}/api/tracks?id=${id}`);
+      if (res.ok()) console.log(`release eliminado ${id}`);
+    }
+    createdShowIds.length = 0;
+    createdReleaseIds.length = 0;
+    await admin.close();
+
     const ctx = await browser.newContext();
     for (const email of createdEmails) {
       await throttle();
@@ -176,6 +194,7 @@ test.describe("P4.6b: Fan-out a suscriptores QA", () => {
     await ctx.close();
   });
 });
+
 
 
 
