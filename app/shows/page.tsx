@@ -4,6 +4,15 @@ import Image from "next/image";
 import { useState, useEffect } from 'react';
 import type { Show, ShowStatus } from '@/types/music';
 import { safeString } from '@/lib/null-safe';
+import { sortList } from '@/lib/search';
+import { SortSelect, useListSort } from '@/components/SortSelect';
+
+const SHOW_ACCESSORS = {
+  text: (show: Show) => safeString(show.venue_name),
+  date: (show: Show) => show.date,
+};
+
+const DEFAULT_SORT = { sort: "date", order: "asc" } as const;
 
 const defaultStatus = { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Desconocido' };
 
@@ -39,6 +48,13 @@ export default function ShowsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ShowStatus | ''>('');
   const [futureOnly, setFutureOnly] = useState(false);
+  const [sortState, setSortState] = useListSort(DEFAULT_SORT);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const venue = params.get('venue') ?? params.get('q');
+    if (venue) setSearch(venue);
+  }, []);
 
   useEffect(() => {
     fetch('/api/shows').then(async (res) => {
@@ -52,7 +68,7 @@ export default function ShowsPage() {
     // Search filter by venue/city
     if (search) {
       const searchLower = search.toLowerCase();
-      const matchesVenue = show.venue_name.toLowerCase().includes(searchLower);
+      const matchesVenue = safeString(show.venue_name).toLowerCase().includes(searchLower);
       const matchesCity = show.city && show.city.toLowerCase().includes(searchLower);
       const matchesCountry = show.country && show.country.toLowerCase().includes(searchLower);
       if (!matchesVenue && !matchesCity && !matchesCountry) {
@@ -77,6 +93,8 @@ export default function ShowsPage() {
     return true;
   });
 
+  const visibleShows = sortList(filteredShows, sortState, SHOW_ACCESSORS);
+
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
       {/* Page header */}
@@ -89,7 +107,7 @@ export default function ShowsPage() {
 
       {/* Filters section */}
       <div className="mb-6 rounded-xl border border-border px-4 py-3 bg-card/50 backdrop-blur-sm">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Search input */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
@@ -134,6 +152,8 @@ export default function ShowsPage() {
               {futureOnly && 'Solo futuros'}
             </label>
           </div>
+
+          <SortSelect value={sortState} onChange={setSortState} />
         </div>
       </div>
 
@@ -148,14 +168,14 @@ export default function ShowsPage() {
               <div className="h-4 w-1/2 rounded" />
             </div>
           </div>
-        ) : filteredShows.length === 0 ? (
+        ) : visibleShows.length === 0 ? (
           <div className="col-span-full text-center py-8">
             <p className="text-3xl mb-2">🎤</p>
             <p className="text-lg text-muted-foreground">No hay shows programados</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredShows.map((show) => (
+            {visibleShows.map((show) => (
               <ShowCard show={show} statusConfig={statusConfig} key={show.id} />
             ))}
           </div>

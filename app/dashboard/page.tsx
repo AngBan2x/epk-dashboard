@@ -20,6 +20,15 @@ import { ShowForm } from "@/components/ShowForm";
 import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
 import { formatDateES } from "@/lib/null-safe";
 import { showStatusLabel } from "@/lib/show-status";
+import { sortList } from "@/lib/search";
+import { SortSelect, useListSort } from "@/components/SortSelect";
+
+const TRACK_ACCESSORS = {
+  text: (track: Track) => track.title,
+  date: (track: Track) => track.release_date,
+};
+
+const DEFAULT_SORT = { sort: "date", order: "desc" } as const;
 
 interface DashboardData {
   tracks: Track[];
@@ -88,6 +97,7 @@ export default function DashboardPage() {
   const [editingShow, setEditingShow] = useState<Show | null>(null);
   const [showFormOpen, setShowFormOpen] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [sortState, setSortState] = useListSort(DEFAULT_SORT);
 
   useEffect(() => {
     const base = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
@@ -103,6 +113,8 @@ export default function DashboardPage() {
 
   const { tracks, artists, artistProfile, artistShows } = data;
   const artistTracks = artistProfile ? tracks.filter((t) => t.artist_name === artistProfile.name) : tracks;
+  const sortedTracks = sortList(tracks, sortState, TRACK_ACCESSORS);
+  const sortedArtistTracks = sortList(artistTracks, sortState, TRACK_ACCESSORS);
   const isAdmin = user?.role === "admin";
 
   if (loading) {
@@ -138,14 +150,19 @@ export default function DashboardPage() {
               </a>
 
 {/* Show all tracks in grid */}
-              <section className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-                {tracks.map((track, i) => (
-                  <SlideIn key={track.id} index={i}>
-                    <a href={`/track/${track.id}`} className="block h-full">
-                      <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
-                    </a>
-                  </SlideIn>
-                ))}
+              <section className="mt-8 mb-8">
+                <div className="mb-4 flex justify-end">
+                  <SortSelect value={sortState} onChange={setSortState} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {sortedTracks.map((track, i) => (
+                    <SlideIn key={track.id} index={i}>
+                      <a href={`/track/${track.id}`} className="block h-full">
+                        <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
+                      </a>
+                    </SlideIn>
+                  ))}
+                </div>
               </section>
             </section>
           ) : artistProfile ? (
@@ -288,8 +305,11 @@ export default function DashboardPage() {
                   title="Mis Tracks"
                   subtitle="Tu catálogo musical"
                 />
+                <div className="mb-4 flex justify-end">
+                  <SortSelect value={sortState} onChange={setSortState} />
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {artistTracks.map((track, i) => (
+                  {sortedArtistTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
                       <div className="relative group">
                         <a href={`/track/${track.id}`} className="block h-full">
@@ -495,19 +515,24 @@ export default function DashboardPage() {
               </section>
 
               {/* All tracks */}
-              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-                {tracks.map((track, i) => (
-                  <SlideIn key={track.id} index={i}>
-                    <a href={`/track/${track.id}`} className="block h-full">
-                      <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
-                    </a>
-                  </SlideIn>
-                ))}
-                {tracks.length === 0 && (
-                  <div className="col-span-full text-center py-12 text-slate-400">
-                    <p>No se encontraron tracks.</p>
-                  </div>
-                )}
+              <section>
+                <div className="mb-4 flex justify-end">
+                  <SortSelect value={sortState} onChange={setSortState} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+                  {sortedTracks.map((track, i) => (
+                    <SlideIn key={track.id} index={i}>
+                      <a href={`/track/${track.id}`} className="block h-full">
+                        <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
+                      </a>
+                    </SlideIn>
+                  ))}
+                  {tracks.length === 0 && (
+                    <div className="col-span-full text-center py-12 text-slate-400">
+                      <p>No se encontraron tracks.</p>
+                    </div>
+                  )}
+                </div>
               </section>
 
               {/* Carousel of all artists' Bio + Shows */}

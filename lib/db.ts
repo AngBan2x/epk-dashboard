@@ -45,6 +45,12 @@ import type {
   ReleaseStatus,
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
+import {
+  SEARCH_GROUP_LIMIT,
+  hitMatches,
+  sortList,
+  type SortState,
+} from "@/lib/search";
 
 // ─── Environment detection ──────────────────────────────────────────────────
 // NOTE: process.env is evaluated at build time by Webpack. Use a getter function
@@ -1723,20 +1729,112 @@ export async function getTracksByReleaseType(releaseType: string): Promise<Track
   return rows.map(parseTrack);
 }
 
-export async function searchTracks(query: string): Promise<Track[]> {
-  const pattern = `%${query}%`;
+export interface ArtistSearchHit {
+  id: string;
+  name: string;
+  genre: string;
+  location: string;
+  image: string;
+  date: string;
+}
+
+export interface ReleaseSearchHit {
+  id: string;
+  title: string;
+  artist_name: string;
+  release_type: string;
+  image: string;
+  date: string;
+}
+
+export interface ShowSearchHit {
+  id: string;
+  venue_name: string;
+  city: string;
+  country: string;
+  image: string;
+  date: string;
+}
+
+function searchText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+export async function searchArtists(
+  normalizedQuery: string,
+  state: SortState,
+  limit = SEARCH_GROUP_LIMIT
+): Promise<ArtistSearchHit[]> {
+  const sql = "SELECT id, name, genre, location, profile_image, created_at FROM artists";
+  let rows: Record<string, unknown>[];
   if (isTursoEnabled()) {
-    const rows = await tursoExec(
-      "SELECT * FROM tracks WHERE title LIKE ? OR artist_name LIKE ? OR release_type LIKE ? OR lyrics LIKE ?",
-      [pattern, pattern, pattern, pattern]
-    );
-    return rows.map((r) => parseTrack(r as Record<string, unknown>));
+    rows = (await tursoExec(sql)) as Record<string, unknown>[];
+  } else {
+    rows = getLocalDb().prepare(sql).all() as Record<string, unknown>[];
   }
-  const db = getLocalDb();
-  const rows = db
-    .prepare("SELECT * FROM tracks WHERE title LIKE ? OR artist_name LIKE ? OR release_type LIKE ? OR lyrics LIKE ?")
-    .all(pattern, pattern, pattern, pattern) as Record<string, unknown>[];
-  return rows.map(parseTrack);
+  const hits = rows
+    .map((row) => ({
+      id: searchText(row.id),
+      name: searchText(row.name),
+      genre: searchText(row.genre),
+      location: searchText(row.location),
+      image: searchText(row.profile_image),
+      date: searchText(row.created_at),
+    }))
+    .filter((hit) => hitMatches(normalizedQuery, [hit.name, hit.genre, hit.location]));
+  return sortList(hits, state, { text: (hit) => hit.name, date: (hit) => hit.date }, normalizedQuery).slice(0, limit);
+}
+
+export async function searchReleases(
+  normalizedQuery: string,
+  state: SortState,
+  limit = SEARCH_GROUP_LIMIT
+): Promise<ReleaseSearchHit[]> {
+  const sql = "SELECT id, title, artist_name, release_type, release_date, cover_image FROM tracks WHERE release_id IS NULL";
+  let rows: Record<string, unknown>[];
+  if (isTursoEnabled()) {
+    rows = (await tursoExec(sql)) as Record<string, unknown>[];
+  } else {
+    rows = getLocalDb().prepare(sql).all() as Record<string, unknown>[];
+  }
+  const hits = rows
+    .map((row) => ({
+      id: searchText(row.id),
+      title: searchText(row.title),
+      artist_name: searchText(row.artist_name),
+      release_type: searchText(row.release_type),
+      image: searchText(row.cover_image),
+      date: searchText(row.release_date),
+    }))
+    .filter((hit) => hitMatches(normalizedQuery, [hit.title, hit.artist_name, hit.release_type]));
+  return sortList(hits, state, { text: (hit) => hit.title, date: (hit) => hit.date }, normalizedQuery).slice(0, limit);
+}
+
+export async function searchShows(
+  normalizedQuery: string,
+  state: SortState,
+  limit = SEARCH_GROUP_LIMIT
+): Promise<ShowSearchHit[]> {
+  const sql = "SELECT id, venue_name, city, country, date, flyer_url FROM shows";
+  let rows: Record<string, unknown>[];
+  if (isTursoEnabled()) {
+    rows = (await tursoExec(sql)) as Record<string, unknown>[];
+  } else {
+    rows = getLocalDb().prepare(sql).all() as Record<string, unknown>[];
+  }
+  const hits = rows
+    .map((row) => ({
+      id: searchText(row.id),
+      venue_name: searchText(row.venue_name),
+      city: searchText(row.city),
+      country: searchText(row.country),
+      image: searchText(row.flyer_url),
+      date: searchText(row.date),
+    }))
+    .filter((hit) => hitMatches(normalizedQuery, [hit.venue_name, hit.city, hit.country]));
+  return sortList(hits, state, { text: (hit) => hit.venue_name, date: (hit) => hit.date }, normalizedQuery).slice(0, limit);
 }
 
 // ─── Tracks by Artist ──────────────────────────────────────────────────────────
