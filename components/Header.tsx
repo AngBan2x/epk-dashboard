@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LoginModal } from "@/components/LoginModal";
 import { NotificationBell } from "@/components/NotificationBell";
+import { SearchBar, MobileSearch } from "@/components/SearchBar";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 
@@ -40,6 +41,10 @@ export function Header() {
             <Image src="/logo.svg" alt="PressPlay" width={28} height={28} unoptimized className="w-7 h-7" />
             <span className="font-bold text-xl text-slate-900 dark:text-slate-100">PressPlay</span>
           </Link>
+
+          <div className="hidden md:block flex-1 max-w-md px-6">
+            <SearchBar />
+          </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
@@ -162,6 +167,7 @@ export function Header() {
 
           {/* Mobile Menu Button */}
           <div className="flex items-center gap-1 md:hidden">
+            <MobileSearch />
             {!isDesktop && <NotificationBell />}
             <button
               className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
