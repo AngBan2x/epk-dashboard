@@ -80,10 +80,11 @@ test.describe("P4.7: Busqueda y ordenacion QA", () => {
     expect(box?.width).toBeGreaterThanOrEqual(380);
     expect(box?.height).toBeGreaterThanOrEqual(700);
     await mpage.getByRole("combobox", { name: /buscar/i }).first().fill("teatro");
-    await expect(mpage.getByText("Teatro Municipal").first()).toBeVisible({ timeout: 30_000 });
+    const mlist = mpage.locator('[role="listbox"]');
+    await expect(mlist.getByText("Teatro Municipal").first()).toBeVisible({ timeout: 30_000 });
+    await expect(mlist).not.toContainText("Buscando", { timeout: 15_000 });
     await mpage.screenshot({ path: "tests/screenshots/search/qa-mobile-search.png", fullPage: false });
-    await mpage.keyboard.press("Escape");
-    await expect(overlay).toBeHidden({ timeout: 15_000 });
+    await mpage.keyboard.press("Escape");    await expect(overlay).toBeHidden({ timeout: 15_000 });
     await mobile.close();
   });
 });
