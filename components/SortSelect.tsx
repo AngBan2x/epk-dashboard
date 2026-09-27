@@ -68,8 +68,8 @@ export function SortSelect({ value, onChange, label = "Ordenar por", className =
   const known = SORT_OPTIONS.some((option) => option.value === current);
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <label htmlFor={id} className="text-xs font-medium text-slate-500 dark:text-slate-400">
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <label htmlFor={id} className="text-xs font-medium text-slate-600 dark:text-slate-400">
         {label}
       </label>
       <select
@@ -79,10 +79,14 @@ export function SortSelect({ value, onChange, label = "Ordenar por", className =
           const option = SORT_OPTIONS.find((item) => item.value === event.target.value);
           if (option) onChange(option.state);
         }}
-        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-600/30"
+        className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:[color-scheme:dark]"
       >
         {SORT_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+          >
             {option.label}
           </option>
         ))}

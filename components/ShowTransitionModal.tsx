@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Show } from "@/types/music";
 
 export type ShowTransitionMode = "postpone" | "cancel" | "reactivate";
@@ -13,7 +13,7 @@ interface ShowTransitionModalProps {
 }
 
 const INPUT_CLASS =
-  "w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm";
+  "w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500";
 
 const LABEL_CLASS = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1";
 
@@ -41,6 +41,30 @@ export function ShowTransitionModal({ show, mode, onClose, onCompleted }: ShowTr
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const focusable = panel?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    (focusable ?? panel)?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused && typeof previouslyFocused.focus === "function") {
+        previouslyFocused.focus();
+      }
+    };
+  }, []);
 
   const submit = async () => {
     setError(null);
@@ -101,23 +125,26 @@ export function ShowTransitionModal({ show, mode, onClose, onCompleted }: ShowTr
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={TITLES[mode]}
     >
       <div
-        className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 max-h-[90vh] overflow-y-auto"
+        ref={panelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="show-transition-title"
+        className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 max-h-[90vh] overflow-y-auto focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{TITLES[mode]}</h2>
+            <h2 id="show-transition-title" className="text-lg font-bold text-slate-900 dark:text-slate-100">{TITLES[mode]}</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{show.venue_name}</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            aria-label="Cerrar"
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl leading-none"
+            aria-label="Cerrar diálogo"
+            className="p-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-2xl leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             ×
           </button>
@@ -167,14 +194,14 @@ export function ShowTransitionModal({ show, mode, onClose, onCompleted }: ShowTr
                 className={`${INPUT_CLASS} resize-none`}
                 placeholder="Describe el motivo (mínimo 10 caracteres)"
               />
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 {reason.trim().length}/10 caracteres mínimos
               </p>
             </div>
           )}
 
           {error && (
-            <div className="p-3 rounded-lg text-xs font-medium bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
+            <div role="alert" className="p-3 rounded-lg text-xs font-medium bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
               {error}
             </div>
           )}
@@ -184,7 +211,7 @@ export function ShowTransitionModal({ show, mode, onClose, onCompleted }: ShowTr
               type="button"
               onClick={submit}
               disabled={saving}
-              className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white transition disabled:opacity-50"
+              className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               {saving ? "Guardando..." : SUBMIT_LABELS[mode]}
             </button>
@@ -192,7 +219,7 @@ export function ShowTransitionModal({ show, mode, onClose, onCompleted }: ShowTr
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               Volver
             </button>
