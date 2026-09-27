@@ -1,9 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTracks, createTrack, updateTrack, deleteTrack, getDbWrite, isTursoConfigured } from "@/lib/db";
+import { getAllTracks, createTrack, updateTrack, deleteTrack, getTrackById, getArtistByName, getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
 import { validateRequest } from "@/lib/auth";
+import { notifyApprovalDecision } from "@/lib/approval-notifications";
+import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 
 export const dynamic = "force-dynamic";
+
+const TRACK_STATUSES = ["draft", "pending", "approved", "rejected", "revision"];
+
+async function notifyApprovedTrack(trackId: string, previousStatus: string | null | undefined): Promise<void> {
+  try {
+    if (previousStatus === "approved") return;
+    const track = await getTrackById(trackId);
+    if (!track || track.status !== "approved") return;
+
+    const artist = track.artist_name ? await getArtistByName(track.artist_name) : null;
+    if (artist?.user_id) {
+      await notifyApprovalDecision({
+        userId: artist.user_id,
+        type: "submission_approved",
+        title: "¡Tu release ha sido aprobado!",
+        message: `"${track.title}" ya está disponible en el catálogo.`,
+        data: { trackId: track.id, trackTitle: track.title, artistName: track.artist_name },
+        context: "track",
+      });
+    }
+
+    if (artist && !track.release_id) {
+      await notifyArtistSubscribers({
+        artistId: artist.id,
+        kind: "release",
+        title: "Nuevo release publicado",
+        message: `"${track.title}" de ${artist.name} ya está disponible en PressPlay.`,
+        data: {
+          trackId: track.id,
+          track_id: track.id,
+          trackTitle: track.title,
+          artistName: artist.name,
+          dashboardUrl: "/releases",
+        },
+        emailType: "new_release",
+        emailData: {
+          trackTitle: track.title,
+          artistName: artist.name,
+          dashboardUrl: `/releases/${track.id}`,
+        },
+      });
+    }
+  } catch (notificationError) {
+    console.error("tracks notificación (no fatal):", notificationError);
+  }
+}
 
 async function validateSession(req: NextRequest) {
   const session = await validateRequest(req);
@@ -78,6 +126,12 @@ export async function POST(req: NextRequest) {
     }
 
     const track = await createTrack({ id, title, ...rest });
+    if (typeof rest.status === "string" && TRACK_STATUSES.includes(rest.status)) {
+      await updateTrack(id, { status: rest.status });
+      if (rest.status === "approved") {
+        await notifyApprovedTrack(id, null);
+      }
+    }
     return NextResponse.json({ id: track.id, title: track.title, artist_name: track.artist_name }, { status: 201 });
   } catch (error) {
     console.error("[API/tracks] Error POST:", error);
@@ -103,9 +157,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "id es requerido" }, { status: 400 });
     }
 
+    const existingTrack = await getTrackById(id);
     const updated = await updateTrack(id, updates);
     if (!updated) {
       return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
+    }
+
+    if (updates.status === "approved") {
+      await notifyApprovedTrack(id, existingTrack?.status ?? null);
     }
 
     return NextResponse.json({ id: updated.id, ...updates });

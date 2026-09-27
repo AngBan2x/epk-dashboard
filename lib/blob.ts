@@ -23,12 +23,14 @@ function sanitizeFilename(filename: string): string {
 
 export async function uploadImage(
   file: File,
-  prefix: string
+  prefix: string,
+  contentType?: string
 ): Promise<{ url: string; filename: string }> {
   const filename = `${Date.now()}-${sanitizeFilename(file.name)}`;
   const blob = await put(`${prefix}/${filename}`, file, {
     access: "public",
     token: token(),
+    contentType: contentType || file.type || undefined,
   });
   return { url: blob.url, filename };
 }

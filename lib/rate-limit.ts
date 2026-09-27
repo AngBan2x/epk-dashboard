@@ -1,3 +1,5 @@
+import { NextRequest, NextResponse } from "next/server";
+
 const store = new Map<string, { count: number; resetAt: number }>();
 
 setInterval(() => {
@@ -29,4 +31,39 @@ export function checkRateLimit(
 
   entry.count++;
   return { allowed: true, remaining: maxAttempts - entry.count, resetAt: entry.resetAt };
+}
+
+export function clientIp(req: NextRequest): string {
+  return req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+}
+
+export function rateLimitResponse(resetAt: number, message: string): NextResponse {
+  const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  return NextResponse.json(
+    { error: message },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(retryAfterSeconds),
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": String(resetAt),
+      },
+    }
+  );
+}
+
+export function enforceRateLimit(
+  req: NextRequest,
+  scope: string,
+  userId: string | null,
+  maxAttempts: number,
+  windowMs = 60_000
+): NextResponse | null {
+  const key = `${scope}:${userId ?? "anon"}:${clientIp(req)}`;
+  const result = checkRateLimit(key, maxAttempts, windowMs);
+  if (result.allowed) return null;
+  return rateLimitResponse(
+    result.resetAt,
+    "Demasiadas solicitudes. Espera unos segundos antes de volver a intentarlo."
+  );
 }

@@ -2097,6 +2097,7 @@ export async function updateTrack(id: string, updates: Partial<{
   video_embed_url: string | null;
   gallery_images: string[] | null;
   is_instrumental: boolean;
+  status: import("@/types/music").ReleaseStatus;
 }>): Promise<Track | null> {
   const existing = await getTrackById(id);
   if (!existing) return null;

@@ -8,6 +8,7 @@ import {
   updateSubscription,
 } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const CreateSubscriptionSchema = z.object({
   artist_id: z.string().min(1, "artist_id requerido"),
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
     }
+
+    const blocked = enforceRateLimit(req, "subscriptions", session.userId, 20);
+    if (blocked) return blocked;
 
     const body = await req.json();
     const validated = CreateSubscriptionSchema.parse(body);

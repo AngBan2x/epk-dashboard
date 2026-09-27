@@ -11,6 +11,11 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
+function stripUserId(row: Record<string, unknown>): Record<string, unknown> {
+  const { user_id: _user_id, ...rest } = row;
+  return rest;
+}
+
 // GET /api/artists — Listar artistas: admin ve todos, público solo aprobados
 export async function GET(req: NextRequest) {
   try {
@@ -28,10 +33,10 @@ export async function GET(req: NextRequest) {
           sql: "SELECT * FROM artists WHERE is_active = 1 ORDER BY created_at DESC",
           args: [],
         });
-        artists = result.rows;
+        artists = (result.rows as Record<string, unknown>[]).map(stripUserId);
       } else {
         const db = getDbWrite();
-        artists = db.prepare("SELECT * FROM artists WHERE is_active = 1 ORDER BY created_at DESC").all();
+        artists = (db.prepare("SELECT * FROM artists WHERE is_active = 1 ORDER BY created_at DESC").all() as Record<string, unknown>[]).map(stripUserId);
       }
     }
 

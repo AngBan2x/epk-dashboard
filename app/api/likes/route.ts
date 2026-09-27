@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { toggleLike, getLikeCount, hasUserLikedTrack, getUserLikes } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const ToggleLikeSchema = z.object({
   track_id: z.string().min(1, "track_id requerido"),
@@ -45,13 +46,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const validated = ToggleLikeSchema.parse(body);
-
     const userId = await getUserIdFromSession(req);
     if (!userId) {
       return NextResponse.json({ error: "Usuario no autenticado" }, { status: 401 });
     }
+
+    const blocked = enforceRateLimit(req, "likes", userId, 60);
+    if (blocked) return blocked;
+
+    const body = await req.json();
+    const validated = ToggleLikeSchema.parse(body);
 
     const result = await toggleLike(userId, validated.track_id);
     return NextResponse.json(result);

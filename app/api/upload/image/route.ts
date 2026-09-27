@@ -3,11 +3,41 @@ import { validateRequest } from "@/lib/auth";
 import { getTrackById, getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
 import { uploadImage, deleteImage } from "@/lib/blob";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
+
+function detectImageMime(bytes: Uint8Array): string | null {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    bytes.length >= 6 &&
+    bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38 &&
+    (bytes[4] === 0x37 || bytes[4] === 0x39) && bytes[5] === 0x61
+  ) {
+    return "image/gif";
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
 
 async function validateSession(req: NextRequest) {
   const session = await validateRequest(req);
@@ -59,10 +89,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "trackId o kind+artistId requeridos" }, { status: 400 });
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    const dotIndex = file.name.lastIndexOf(".");
+    const extension = dotIndex >= 0 ? file.name.toLowerCase().slice(dotIndex) : "";
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
       return NextResponse.json(
-        { error: "Tipo de archivo no válido. Solo se permiten JPG, PNG o WebP" },
-        { status: 400 }
+        { error: "Extensión no válida. Solo se permiten imágenes JPG, PNG o WebP" },
+        { status: 415 }
       );
     }
 
@@ -70,6 +102,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "El archivo supera el límite de 5MB" },
         { status: 400 }
+      );
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const detectedMime = detectImageMime(bytes);
+    if (!detectedMime || !ALLOWED_TYPES.includes(detectedMime)) {
+      return NextResponse.json(
+        { error: "El archivo no corresponde a una imagen JPG, PNG o WebP válida" },
+        { status: 415 }
+      );
+    }
+    if (file.type.toLowerCase() !== detectedMime) {
+      return NextResponse.json(
+        { error: "El tipo de archivo declarado no coincide con su contenido real" },
+        { status: 415 }
       );
     }
 
@@ -113,7 +160,10 @@ export async function POST(req: NextRequest) {
       prefix = `${ownerUserId}/profile`;
     }
 
-    const { url: imageUrl, filename } = await uploadImage(file, prefix);
+    const blocked = enforceRateLimit(req, "upload", session.userId, 20);
+    if (blocked) return blocked;
+
+    const { url: imageUrl, filename } = await uploadImage(file, prefix, detectedMime);
 
     // Profile/banner uploads return the URL only (no tracks write)
     if (!trackId) {

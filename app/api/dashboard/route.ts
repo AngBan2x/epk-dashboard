@@ -1,17 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllTracks, getAllArtists, getArtistByUserId, getShowsByArtists, getLikeCount, getSubscriberCount } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
-import type { Show } from "@/types/music";
+import type { ArtistProfile, Show } from "@/types/music";
 
 export const dynamic = "force-dynamic";
+
+function stripUserId(artists: ArtistProfile[]): Omit<ArtistProfile, "user_id">[] {
+  return artists.map(({ user_id: _user_id, ...rest }) => rest);
+}
 
 export async function GET(req: NextRequest) {
   try {
     const session = await validateRequest(req);
+    const isAdmin = session?.role === "admin";
+
+    let artistProfile = null;
+    if (session?.userId) {
+      artistProfile = await getArtistByUserId(session.userId);
+    }
 
     const allTracks = await getAllTracks();
-    const tracks = allTracks.filter(t => !t.release_id);
-    const artists = await getAllArtists();
+    const standaloneTracks = allTracks.filter(t => !t.release_id);
+    const tracks = isAdmin
+      ? standaloneTracks
+      : standaloneTracks.filter(
+          t => t.status === "approved" || (!!artistProfile && t.artist_name === artistProfile.name)
+        );
+
+    const allArtists = await getAllArtists();
+    const artists = isAdmin ? allArtists : stripUserId(allArtists);
 
     const showsByArtist: Record<string, Show[]> = {};
     if (artists.length > 0) {
@@ -32,26 +49,20 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    let artistProfile = null;
     let artistShows: Show[] = [];
     let totalLikes = 0;
     let subscribers = 0;
-    if (session.userId) {
-      const profile = await getArtistByUserId(session.userId);
-      if (profile) {
-        artistProfile = profile;
-        artistShows = (showsByArtist[profile.id] ?? []);
-        subscribers = await getSubscriberCount(profile.id);
-        // Count likes for artist's tracks
-        const artistTracks = tracks.filter(t => t.artist_name === profile.name);
-        for (const track of artistTracks) {
-          totalLikes += await getLikeCount(track.id);
-        }
-      } else {
-        // Admin: count all likes
-        for (const track of tracks) {
-          totalLikes += await getLikeCount(track.id);
-        }
+    if (artistProfile) {
+      artistShows = (showsByArtist[artistProfile.id] ?? []);
+      subscribers = await getSubscriberCount(artistProfile.id);
+      // Count likes for artist's tracks
+      const artistTracks = tracks.filter(t => t.artist_name === artistProfile.name);
+      for (const track of artistTracks) {
+        totalLikes += await getLikeCount(track.id);
+      }
+    } else if (session.userId) {
+      for (const track of tracks) {
+        totalLikes += await getLikeCount(track.id);
       }
     }
 
