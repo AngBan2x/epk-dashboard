@@ -3,6 +3,9 @@ import { z } from "zod";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
 import { validateRequest } from "@/lib/auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { notifyApprovalDecision } from "@/lib/approval-notifications";
+import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 
 const CreateReleaseSchema = z.object({
   title: z.string().min(1, "title requerido"),
@@ -50,18 +53,35 @@ async function dbRun(sql: string, params?: unknown[]): Promise<void> {
   stmt.run(...(params ?? []));
 }
 
+async function getArtistNamesByUserId(userId: string): Promise<string[]> {
+  const rows = await dbQuery("SELECT name FROM artists WHERE user_id = ?", [userId]) as { name: string }[];
+  return rows.map((row) => row.name).filter((name) => typeof name === "string" && name.length > 0);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
     const id = searchParams.get("id");
 
+    let artistNames: string[] | null = null;
+    let publicOnly = false;
+    if (userId) {
+      artistNames = await getArtistNamesByUserId(userId);
+      if (artistNames.length === 0) {
+        return NextResponse.json(id ? null : []);
+      }
+      const session = await validateSession(req);
+      publicOnly = !session || (session.role !== "admin" && session.userId !== userId);
+    }
+    const visibilityClause = publicOnly ? " AND status = 'approved'" : "";
+
     if (id) {
       let query = "SELECT * FROM tracks WHERE id = ?";
-      const params = [id];
-      if (userId) {
-        query += " AND artist_id = ?";
-        params.push(userId);
+      const params: string[] = [id];
+      if (artistNames) {
+        query += ` AND artist_name IN (${artistNames.map(() => "?").join(", ")})${visibilityClause}`;
+        params.push(...artistNames);
       }
       const releases = await dbQuery(query, params);
       return NextResponse.json(releases[0] || null);
@@ -70,9 +90,9 @@ export async function GET(req: NextRequest) {
     let query = "SELECT * FROM tracks WHERE 1=1";
     const params: string[] = [];
 
-    if (userId) {
-      query += " AND artist_id = ?";
-      params.push(userId);
+    if (artistNames) {
+      query += ` AND artist_name IN (${artistNames.map(() => "?").join(", ")})${visibilityClause}`;
+      params.push(...artistNames);
     }
 
     query += " ORDER BY created_at DESC";
@@ -95,6 +115,9 @@ export async function POST(req: NextRequest) {
     if (session.role !== "admin" && session.role !== "artist") {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
+
+    const blocked = enforceRateLimit(req, "releases", session.userId, 10);
+    if (blocked) return blocked;
 
     const body = await req.json();
 
@@ -188,15 +211,16 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const existing = await dbQuery("SELECT artist_name FROM tracks WHERE id = ?", [id]) as { artist_name: string }[];
+    const existing = await dbQuery("SELECT id, title, artist_name, status FROM tracks WHERE id = ?", [id]) as { id: string; title: string; artist_name: string; status?: string | null }[];
     if (!existing.length) {
       return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });
     }
-    const artistRow = await dbQuery("SELECT user_id FROM artists WHERE name = ?", [existing[0].artist_name]) as { user_id: string }[];
+    const artistRow = await dbQuery("SELECT id, user_id FROM artists WHERE name = ?", [existing[0].artist_name]) as { id: string; user_id: string | null }[];
     const ownsTrack = artistRow.length > 0 && artistRow[0].user_id === session.userId;
     if (!ownsTrack && session.role !== "admin") {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
+    const previousStatus = existing[0].status ?? "draft";
 
     // Handle youtube_video_id from external_links
     if (updates.external_links && updates.external_links.youtube_video_id) {
@@ -244,6 +268,75 @@ export async function PUT(req: NextRequest) {
       }
     } else if (fields) {
       await dbRun(`UPDATE tracks SET ${fields} WHERE id = ?`, [...values, id]);
+    }
+
+    const DECISION_STATUSES = ["approved", "rejected", "revision"];
+    if (
+      session.role === "admin" &&
+      status !== undefined &&
+      status !== previousStatus &&
+      DECISION_STATUSES.includes(status)
+    ) {
+      try {
+        const ownerUserId = artistRow[0]?.user_id ?? null;
+        const artistId = artistRow[0]?.id ?? null;
+        const artistName = existing[0].artist_name;
+        const trackTitle = existing[0].title;
+
+        if (ownerUserId) {
+          const type =
+            status === "approved"
+              ? "submission_approved"
+              : status === "rejected"
+                ? "submission_rejected"
+                : "revision_requested";
+          const title =
+            status === "approved"
+              ? "¡Tu release ha sido aprobado!"
+              : status === "rejected"
+                ? "Tu release no fue aprobado"
+                : "Tu release necesita cambios";
+          const message =
+            status === "approved"
+              ? `"${trackTitle}" ya está disponible en el catálogo.`
+              : status === "rejected"
+                ? "Razón: no se especificó motivo."
+                : "Por favor revisa y actualiza la información.";
+
+          await notifyApprovalDecision({
+            userId: ownerUserId,
+            type,
+            title,
+            message,
+            data: { releaseId: id, trackTitle, artistName },
+            context: "release",
+          });
+        }
+
+        if (status === "approved" && artistId) {
+          await notifyArtistSubscribers({
+            artistId,
+            kind: "release",
+            title: "Nuevo release publicado",
+            message: `"${trackTitle}" de ${artistName} ya está disponible en PressPlay.`,
+            data: {
+              releaseId: id,
+              track_id: id,
+              trackTitle,
+              artistName,
+              dashboardUrl: "/releases",
+            },
+            emailType: "new_release",
+            emailData: {
+              trackTitle,
+              artistName,
+              dashboardUrl: `/releases/${id}`,
+            },
+          });
+        }
+      } catch (notificationError) {
+        console.error("PUT releases notificación (no fatal):", notificationError);
+      }
     }
 
     return NextResponse.json({ message: "Release actualizado" });

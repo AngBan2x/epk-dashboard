@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById, createNotification } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { sendNotificationEmail } from "@/lib/email";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 import type { ShowStatus } from "@/types/music";
 import { randomUUID } from "crypto";
 
@@ -110,6 +112,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
+    const blocked = enforceRateLimit(req, "shows", session.userId, 10);
+    if (blocked) return blocked;
+
     const body = await req.json();
     const validated = CreateShowSchema.parse(body);
 
@@ -181,11 +186,11 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
     // Ownership check: artists can only update their own shows; admins can update any
+    const existing = await getShowById(id);
+    if (!existing) {
+      return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
+    }
     if (session.role === "artist") {
-      const existing = await getShowById(id);
-      if (!existing) {
-        return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
-      }
       const artist = await getArtistById(existing.artist_id);
       if (!artist || artist.user_id !== session.userId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -196,6 +201,45 @@ export async function PUT(req: NextRequest) {
     if (!show) {
       return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }
+
+    const RELEVANT_FIELDS = [
+      "venue_name", "city", "country", "date", "time", "status",
+      "price_range", "ticket_url", "ticket_link", "flyer_url",
+    ];
+    const previous = existing as unknown as Record<string, unknown>;
+    const next = data as Record<string, unknown>;
+    const changedFields = RELEVANT_FIELDS.filter(
+      (field) => Object.prototype.hasOwnProperty.call(next, field) && previous[field] !== next[field]
+    );
+
+    if (changedFields.length > 0) {
+      try {
+        await notifyArtistSubscribers({
+          artistId: show.artist_id,
+          kind: "show_update",
+          title: "Show actualizado",
+          message: `El show en ${show.venue_name} fue actualizado.${show.date ? ` Nueva fecha: ${show.date}.` : ""}`,
+          data: {
+            show_id: show.id,
+            showId: show.id,
+            venue_name: show.venue_name,
+            showVenue: show.venue_name,
+            showDate: show.date,
+            changed_fields: changedFields,
+            dashboardUrl: "/shows",
+          },
+          emailType: "system",
+          emailData: {
+            showVenue: show.venue_name,
+            showDate: show.date ?? undefined,
+            dashboardUrl: "/shows",
+          },
+        });
+      } catch (fanOutError) {
+        console.error("PUT shows fan-out (no fatal):", fanOutError);
+      }
+    }
+
     return NextResponse.json(show);
   } catch (error) {
     if (error instanceof z.ZodError) {
