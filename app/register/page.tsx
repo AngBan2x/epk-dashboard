@@ -15,7 +15,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<"artist" | "subscriber">("artist");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -36,8 +35,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register(name, email, password, role);
-      router.push(role === "artist" ? "/dashboard" : "/artists");
+      await register(name, email, password);
+      router.push("/artists");
       router.refresh();
     } catch (err) {
       setError(safeString(err instanceof Error ? err.message : "Error al registrar"));
@@ -55,6 +54,11 @@ export default function RegisterPage() {
           <p className="text-slate-500 dark:text-slate-400 mt-1">Únete a PressPlay</p>
         </div>
 
+        <p className="mb-6 text-sm text-slate-600 dark:text-slate-400 text-center">
+          Tu cuenta empieza como Suscriptor; al publicar tu primer release o show y que sea aprobado,
+          te convertirás en Artista.
+        </p>
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
             {error}
@@ -62,58 +66,6 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <fieldset>
-            <legend className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Tipo de cuenta
-            </legend>
-            <div className="grid grid-cols-2 gap-3">
-              <label
-                htmlFor="role-artist"
-                className={`cursor-pointer rounded-lg border p-3 text-sm transition ${
-                  role === "artist"
-                    ? "border-primary-600 bg-primary-50 dark:bg-primary-950/40 ring-1 ring-primary-600"
-                    : "border-slate-300 dark:border-slate-600 hover:border-slate-400"
-                }`}
-              >
-                <input
-                  id="role-artist"
-                  type="radio"
-                  name="role"
-                  value="artist"
-                  checked={role === "artist"}
-                  onChange={() => setRole("artist")}
-                  className="sr-only"
-                />
-                <span className="block font-semibold text-slate-900 dark:text-slate-100">Artista</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Publica tu música, shows y dossier de prensa
-                </span>
-              </label>
-              <label
-                htmlFor="role-subscriber"
-                className={`cursor-pointer rounded-lg border p-3 text-sm transition ${
-                  role === "subscriber"
-                    ? "border-primary-600 bg-primary-50 dark:bg-primary-950/40 ring-1 ring-primary-600"
-                    : "border-slate-300 dark:border-slate-600 hover:border-slate-400"
-                }`}
-              >
-                <input
-                  id="role-subscriber"
-                  type="radio"
-                  name="role"
-                  value="subscriber"
-                  checked={role === "subscriber"}
-                  onChange={() => setRole("subscriber")}
-                  className="sr-only"
-                />
-                <span className="block font-semibold text-slate-900 dark:text-slate-100">Suscriptor</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Sigue a tus artistas favoritos y recibe avisos
-                </span>
-              </label>
-            </div>
-          </fieldset>
-
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
               Nombre

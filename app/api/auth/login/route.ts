@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { getUserByEmail, getDbWrite } from "@/lib/db";
-import { createSessionToken } from "@/lib/auth";
+import { getUserByEmail } from "@/lib/db";
+import { createSessionToken, SESSION_MAX_AGE, SESSION_MAX_AGE_REMEMBER } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const LoginSchema = z.object({
@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = LoginSchema.parse(body);
 
-    // Buscar usuario
     const user = await getUserByEmail(validated.email);
     if (!user) {
       return NextResponse.json(
@@ -34,7 +33,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verificar contraseña
     const validPassword = await bcrypt.compare(validated.password, user.password_hash);
     if (!validPassword) {
       return NextResponse.json(
@@ -43,14 +41,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Crear sesión con timestamp de emisión y expiración condicional
     const now = Date.now();
+    const rememberMe = validated.rememberMe ?? false;
+    const maxAge = rememberMe ? SESSION_MAX_AGE_REMEMBER : SESSION_MAX_AGE;
+
     const sessionToken = await createSessionToken({
       userId: user.id,
       email: user.email,
       role: user.role,
       iat: now,
-      ...(validated.rememberMe ? {} : { exp: now + 24 * 60 * 60 * 1000 }),
+      rememberMe,
     });
 
     const response = NextResponse.json({
@@ -62,14 +62,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Set httpOnly cookie — session-only by default, 30 days if rememberMe
-    const maxAge = validated.rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60; // 30 days or 24h
     response.cookies.set("auth_session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      ...(maxAge ? { maxAge } : {}),
+      maxAge: maxAge / 1000,
     });
 
     return response;
@@ -80,7 +78,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("[API/auth/login] Error:", error);
+    console.error("[API/auth/login] Error: login failed");
     return NextResponse.json(
       { error: "Error al iniciar sesión" },
       { status: 500 }

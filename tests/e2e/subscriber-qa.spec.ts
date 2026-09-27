@@ -123,7 +123,7 @@ test.describe("P4.1: Subscriber Role QA", () => {
     createdEmails.push(email);
   });
 
-  test("UI: selector de cuenta suscriptor + redirecciones de middleware", async ({ page }) => {
+  test("UI: registro sin selector de rol y acceso de suscriptor a crear contenido", async ({ page }) => {
     test.setTimeout(180_000);
 
     const email = `subscriber-ui-${Date.now()}-${Math.floor(Math.random() * 1000)}@example.com`;
@@ -135,20 +135,18 @@ test.describe("P4.1: Subscriber Role QA", () => {
     await hydrationSignal;
     await page.waitForTimeout(750);
 
-    const subscriberRadio = page.getByRole("radio", { name: /Suscriptor/ });
-    await expect(subscriberRadio).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByRole("radio")).toHaveCount(0);
+    await expect(page.getByText(/Suscriptor/i).first()).toBeVisible({ timeout: 45_000 });
     const nameInput = page.locator("input#name");
     const emailInput = page.locator('input[type="email"]');
     const passwords = page.locator('input[type="password"]');
 
-    await subscriberRadio.check({ force: true });
     await nameInput.fill("QA Subscriber UI");
     await emailInput.fill(email);
     await passwords.nth(0).fill(TEST_PASSWORD);
     await passwords.nth(1).fill(TEST_PASSWORD);
     await page.waitForTimeout(750);
 
-    expect(await subscriberRadio.isChecked()).toBe(true);
     expect(await nameInput.inputValue()).toBe("QA Subscriber UI");
     expect(await emailInput.inputValue()).toBe(email);
     expect(await passwords.nth(1).inputValue()).toBe(TEST_PASSWORD);
@@ -173,10 +171,12 @@ test.describe("P4.1: Subscriber Role QA", () => {
     await page.waitForURL("**/artists", { timeout: 60_000 });
 
     await page.goto(`${BASE_URL}/releases/new`, { waitUntil: "domcontentloaded" });
-    expect(page.url()).toContain("/artists");
+    await page.waitForTimeout(1500);
+    expect(page.url()).toContain("/releases/new");
 
     await page.goto(`${BASE_URL}/profile`, { waitUntil: "domcontentloaded" });
-    expect(page.url()).toContain("/artists");
+    await page.waitForTimeout(1500);
+    expect(page.url()).toContain("/profile");
 
     const accountResponse = await page.goto(`${BASE_URL}/account`, { waitUntil: "domcontentloaded" });
     expect(accountResponse?.status()).toBe(200);

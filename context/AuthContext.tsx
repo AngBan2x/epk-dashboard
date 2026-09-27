@@ -7,9 +7,11 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  register: (name: string, email: string, password: string, role?: "artist" | "subscriber") => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+  hasRole: (role: "artist" | "admin" | "subscriber") => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,7 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const error = await res.json();
         message = error.error || message;
       } catch {
-        // Response was not JSON
       }
       throw new Error(message);
     }
@@ -59,11 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchUser();
   };
 
-  const register = async (name: string, email: string, password: string, role: "artist" | "subscriber" = "artist") => {
+  const register = async (name: string, email: string, password: string) => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, email, password }),
     });
 
     if (!res.ok) {
@@ -72,12 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const error = await res.json();
         message = error.error || message;
       } catch {
-        // Response was not JSON (e.g., HTML error page from Next.js)
       }
       throw new Error(message);
     }
 
-    // Auto-login after register
     await login(email, password);
   };
 
@@ -88,8 +87,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshSession = async () => {
+    await fetchUser();
+  };
+
+  const hasRole = (role: "artist" | "admin" | "subscriber"): boolean => {
+    return user?.role === role;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser: fetchUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser: fetchUser, refreshSession, hasRole }}>
       {children}
     </AuthContext.Provider>
   );
@@ -102,6 +109,8 @@ const defaultAuth: AuthContextType = {
   register: async () => {},
   logout: async () => {},
   refreshUser: async () => {},
+  refreshSession: async () => {},
+  hasRole: () => false,
 };
 
 export function useAuth() {
