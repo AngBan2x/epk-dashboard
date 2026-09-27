@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getTrackSubmissionsByUser, createTrackSubmission, getAllTrackSubmissions, updateTrackSubmissionStatus, getTrackSubmissionById, getTrackSubmissionsByStatus } from "@/lib/db";
+import { getTrackSubmissionsByUser, createTrackSubmission, getTrackSubmissionById } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
-import { notifyApprovalDecision } from "@/lib/approval-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +11,7 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role || "artist" };
 }
 
-// Schema for creating a submission
+// Schema for creating a submission (artist portal)
 const CreateSubmissionSchema = z.object({
   track_data: z.object({
     title: z.string().min(1, "Título requerido"),
@@ -51,12 +50,6 @@ const CreateSubmissionSchema = z.object({
   }),
 });
 
-// Schema for updating submission status (admin only)
-const UpdateStatusSchema = z.object({
-  status: z.enum(["pending", "approved", "rejected", "revision"]),
-  admin_notes: z.string().optional(),
-});
-
 function parseTrackDataSafely(trackData: string): Record<string, string> {
   try {
     const parsed = JSON.parse(trackData) as unknown;
@@ -67,6 +60,20 @@ function parseTrackDataSafely(trackData: string): Record<string, string> {
   }
 }
 
+const statusLabels: Record<string, string> = {
+  pending: "Pendiente",
+  approved: "Aprobado",
+  rejected: "Rechazado",
+  revision: "Revisión",
+};
+
+function addSpanishStatusLabel(submission: any) {
+  return {
+    ...submission,
+    status_label: statusLabels[submission.status] || submission.status,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await validateSession(req);
@@ -75,7 +82,6 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("user_id");
     const status = searchParams.get("status");
     const id = searchParams.get("id");
 
@@ -90,12 +96,12 @@ export async function GET(req: NextRequest) {
     if (id) {
       const submission = await getTrackSubmissionById(id);
       if (!submission) {
-        return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+        return NextResponse.json({ error: "Envío no encontrado" }, { status: 404 });
       }
       if (!isAdmin && submission.user_id !== session.userId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
-      return NextResponse.json(submission);
+      return NextResponse.json(addSpanishStatusLabel(submission));
     }
 
     const validStatus = status && ["pending", "approved", "rejected", "revision"].includes(status)
@@ -103,18 +109,20 @@ export async function GET(req: NextRequest) {
       : null;
 
     if (isAdmin) {
-      if (userId) {
-        return NextResponse.json(await getTrackSubmissionsByUser(userId), { headers: noCacheHeaders });
-      }
+      // Admin can still use this for reading all, but decisions go through /api/admin/approvals/[id]
+      const { getAllTrackSubmissions, getTrackSubmissionsByStatus } = await import("@/lib/db");
       if (validStatus) {
-        return NextResponse.json(await getTrackSubmissionsByStatus(validStatus), { headers: noCacheHeaders });
+        const subs = await getTrackSubmissionsByStatus(validStatus);
+        return NextResponse.json(subs.map(addSpanishStatusLabel), { headers: noCacheHeaders });
       }
-      return NextResponse.json(await getAllTrackSubmissions(), { headers: noCacheHeaders });
+      const subs = await getAllTrackSubmissions();
+      return NextResponse.json(subs.map(addSpanishStatusLabel), { headers: noCacheHeaders });
     }
 
+    // Artist portal: ONLY own submissions
     const own = await getTrackSubmissionsByUser(session.userId);
     const filtered = validStatus ? own.filter((s) => s.status === validStatus) : own;
-    return NextResponse.json(filtered, { headers: noCacheHeaders });
+    return NextResponse.json(filtered.map(addSpanishStatusLabel), { headers: noCacheHeaders });
   } catch (error) {
     console.error("GET submissions error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
@@ -147,80 +155,12 @@ export async function POST(req: NextRequest) {
       reviewed_at: null,
     });
 
-    return NextResponse.json(submission, { status: 201 });
+    return NextResponse.json(addSpanishStatusLabel(submission), { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
     console.error("POST submissions error:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  try {
-    const session = await validateSession(req);
-    if (!session || session.role !== "admin") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
-
-    const body = await req.json();
-    const validated = UpdateStatusSchema.parse(body);
-
-    const submission = await getTrackSubmissionById(id);
-    if (!submission) {
-      return NextResponse.json({ error: "Submission not found" }, { status: 404 });
-    }
-
-    const oldStatus = submission.status;
-    const updated = await updateTrackSubmissionStatus(id, validated.status, validated.admin_notes, session.userId);
-    if (!updated) {
-      return NextResponse.json({ error: "Submission not found" }, { status: 404 });
-    }
-
-    if (validated.status !== oldStatus && (validated.status === "approved" || validated.status === "rejected" || validated.status === "revision")) {
-      const trackData = parseTrackDataSafely(submission.track_data);
-      const trackTitle = trackData.title ?? "tu envío";
-      const type = validated.status === "approved"
-        ? "submission_approved"
-        : validated.status === "rejected"
-          ? "submission_rejected"
-          : "revision_requested";
-      const title = validated.status === "approved"
-        ? "¡Tu envío ha sido aprobado!"
-        : validated.status === "rejected"
-          ? "Tu envío no fue aprobado"
-          : "Tu envío necesita cambios";
-      const message = validated.status === "approved"
-        ? `"${trackTitle}" ya está disponible en el catálogo.`
-        : validated.status === "rejected"
-          ? `Razón: ${validated.admin_notes || "No se especificó motivo."}`
-          : validated.admin_notes || "Por favor revisa y actualiza la información.";
-
-      await notifyApprovalDecision({
-        userId: submission.user_id,
-        type,
-        title,
-        message,
-        data: { submissionId: id, trackTitle, artistName: trackData.artist_name },
-        context: "track",
-        adminNotes: validated.admin_notes ?? undefined,
-      });
-    }
-
-    return NextResponse.json(updated);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 });
-    }
-    console.error("PATCH submissions error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

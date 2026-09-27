@@ -3,6 +3,7 @@ import { z } from "zod";
 import { updateTrackSubmissionStatus, getTrackSubmissionById } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
+import { promoteUserToArtist } from "@/lib/artist-promotion";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ async function validateAdminSession(req: NextRequest) {
 
 const ActionSchema = z.object({
   action: z.enum(["approve", "reject", "revision"]),
-  reason: z.string().min(10, "Razón requerida (mín. 10 caracteres)").optional(),
+  reason: z.string().min(10, "La razón debe tener al menos 10 caracteres"),
 });
 
 function parseTrackDataSafely(trackData: string): Record<string, string> {
@@ -25,6 +26,20 @@ function parseTrackDataSafely(trackData: string): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+const statusLabels: Record<string, string> = {
+  pending: "Pendiente",
+  approved: "Aprobado",
+  rejected: "Rechazado",
+  revision: "Revisión",
+};
+
+function addSpanishStatusLabel(submission: any) {
+  return {
+    ...submission,
+    status_label: statusLabels[submission.status] || submission.status,
+  };
 }
 
 export async function GET(
@@ -39,10 +54,10 @@ export async function GET(
 
     const submission = await getTrackSubmissionById(params.id);
     if (!submission) {
-      return NextResponse.json({ error: "Submission no encontrada" }, { status: 404 });
+      return NextResponse.json({ error: "Envío no encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json(submission);
+    return NextResponse.json(addSpanishStatusLabel(submission));
   } catch (error) {
     console.error("GET approval detail error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
@@ -63,32 +78,31 @@ export async function POST(
 
     const submission = await getTrackSubmissionById(params.id);
     if (!submission) {
-      return NextResponse.json({ error: "Submission no encontrada" }, { status: 404 });
+      return NextResponse.json({ error: "Envío no encontrado" }, { status: 404 });
     }
 
     const oldStatus = submission.status;
     let newStatus: "approved" | "rejected" | "revision";
-    let adminNotes: string | null = null;
+    let adminNotes: string | null = validated.reason;
 
     switch (validated.action) {
       case "approve":
         newStatus = "approved";
-        adminNotes = validated.reason || null;
         break;
       case "reject":
         newStatus = "rejected";
-        adminNotes = validated.reason || null;
         break;
       case "revision":
         newStatus = "revision";
-        adminNotes = validated.reason || null;
         break;
     }
 
-    const updated = await updateTrackSubmissionStatus(params.id, newStatus, adminNotes ?? undefined, admin.userId);
+    const updated = await updateTrackSubmissionStatus(params.id, newStatus, adminNotes, admin.userId);
     if (!updated) {
       return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
     }
+
+    let promoted = false;
 
     if (newStatus !== oldStatus) {
       const trackData = parseTrackDataSafely(submission.track_data);
@@ -118,12 +132,25 @@ export async function POST(
         context: "track",
         adminNotes: adminNotes ?? undefined,
       });
+
+      // PROMOTION HOOK: When approved and author is subscriber with first approved content
+      if (newStatus === "approved") {
+        try {
+          const result = await promoteUserToArtist(submission.user_id, { source: "release" });
+          promoted = result.promoted;
+        } catch (promotionError) {
+          // Log but don't break the approval
+          console.error("[PROMOTION] Failed to promote user:", promotionError);
+          promoted = false;
+        }
+      }
     }
 
     return NextResponse.json({
-      ...updated,
+      ...addSpanishStatusLabel(updated),
       action_performed: validated.action,
       admin_id: admin.userId,
+      promoted,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

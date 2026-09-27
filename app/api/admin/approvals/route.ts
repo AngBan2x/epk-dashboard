@@ -10,6 +10,20 @@ async function validateAdminSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
+const statusLabels: Record<string, string> = {
+  pending: "Pendiente",
+  approved: "Aprobado",
+  rejected: "Rechazado",
+  revision: "Revisión",
+};
+
+function addSpanishStatusLabel(submission: any) {
+  return {
+    ...submission,
+    status_label: statusLabels[submission.status] || submission.status,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const admin = await validateAdminSession(req);
@@ -19,16 +33,31 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "20", 10);
 
     const allSubmissions = await getAllTrackSubmissions();
 
-    let submissions;
+    // Filter by status
+    let filtered = allSubmissions;
     if (status && ["pending", "approved", "rejected", "revision"].includes(status)) {
-      submissions = allSubmissions.filter((s) => s.status === status);
-    } else {
-      submissions = allSubmissions;
+      filtered = filtered.filter((s) => s.status === status);
     }
 
+    // Search by title or artist name
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter((s) => {
+        const trackData = JSON.parse(s.track_data);
+        return (
+          trackData.title?.toLowerCase().includes(searchLower) ||
+          trackData.artist_name?.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    // Stats computed on ALL submissions (not filtered)
     const stats = {
       pending: allSubmissions.filter((s) => s.status === "pending").length,
       approved: allSubmissions.filter((s) => s.status === "approved").length,
@@ -37,7 +66,24 @@ export async function GET(req: NextRequest) {
       total: allSubmissions.length,
     };
 
-    return NextResponse.json({ submissions, stats }, {
+    // Pagination
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / limit);
+    const start = (page - 1) * limit;
+    const paginated = filtered.slice(start, start + limit);
+
+    const submissionsWithLabels = paginated.map(addSpanishStatusLabel);
+
+    return NextResponse.json({
+      submissions: submissionsWithLabels,
+      stats,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
       },

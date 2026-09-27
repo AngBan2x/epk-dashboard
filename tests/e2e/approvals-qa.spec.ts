@@ -124,7 +124,11 @@ test.describe("P4.5: Aprobaciones QA", () => {
     const artistApprovals = await artist.request.get(`${BASE_URL}/api/admin/approvals`);
     expect([401, 403]).toContain(artistApprovals.status());
     const artistPatch = await artist.request.patch(`${BASE_URL}/api/submissions?id=alguna`);
-    expect([401, 403]).toContain(artistPatch.status());
+    expect(artistPatch.status()).toBe(405);
+    const artistDecision = await artist.request.post(`${BASE_URL}/api/admin/approvals/alguna`, {
+      data: { action: "approve", reason: "Contenido verificado por el artista" },
+    });
+    expect([401, 403]).toContain(artistDecision.status());
     await artist.close();
 
     const subscriber = await browser.newContext();
@@ -142,9 +146,18 @@ test.describe("P4.5: Aprobaciones QA", () => {
     await loginAs(admin.request, ADMIN_EMAIL, ADMIN_PASSWORD);
     const allSubmissions = await admin.request.get(`${BASE_URL}/api/submissions`);
     expect(allSubmissions.status()).toBe(200);
-    const filtered = await admin.request.get(`${BASE_URL}/api/submissions?status=pending`);
-    expect(filtered.status()).toBe(200);
-    expect(Array.isArray(await filtered.json())).toBe(true);
+    const console = await admin.request.get(`${BASE_URL}/api/admin/approvals?status=pending`);
+    expect(console.status()).toBe(200);
+    const consoleBody = (await console.json()) as {
+      stats?: Record<string, number>;
+      submissions?: unknown[];
+    };
+    expect(Array.isArray(consoleBody.submissions)).toBe(true);
+    expect(typeof consoleBody.stats).toBe("object");
+    const shortReason = await admin.request.post(`${BASE_URL}/api/admin/approvals/alguna`, {
+      data: { action: "reject", reason: "corto" },
+    });
+    expect([400, 404]).toContain(shortReason.status());
     await admin.close();
   });
 
@@ -184,6 +197,19 @@ test.describe("P4.5: Aprobaciones QA", () => {
   test("UI: el panel admin muestra revision y stats correctos", async ({ browser }) => {
     const ctx = await browser.newContext();
     await loginAs(ctx.request, ADMIN_EMAIL, ADMIN_PASSWORD);
+    const qaId = `qa-p45-ui-${Date.now()}`;
+    const created = await ctx.request.post(`${BASE_URL}/api/tracks`, {
+      data: {
+        id: qaId,
+        title: `QA P45 UI Revision ${Date.now()}`,
+        artist_name: "Angel Bandres",
+        release_type: "single",
+        release_date: "2026-12-01",
+        status: "draft",
+      },
+    });
+    expect([200, 201]).toContain(created.status());
+    const releaseId = created.status() === 201 ? (await created.json()).id : qaId;
     const state = await ctx.storageState();
     await ctx.close();
 
@@ -192,19 +218,28 @@ test.describe("P4.5: Aprobaciones QA", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(String(e)));
 
-    await page.goto(`${BASE_URL}/admin`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await expect(page.getByRole("heading", { name: /Panel de Administración/ })).toBeVisible({ timeout: 60_000 });
-    await page.getByRole("button", { name: /Releases/ }).first().click();
-    await page.waitForTimeout(3000);
-    await expect(page.getByRole("button", { name: /Revisi/ }).first()).toBeVisible({ timeout: 30_000 });
-    await page.screenshot({ path: "tests/screenshots/approvals/admin-releases.png", fullPage: false });
+    try {
+      await page.goto(`${BASE_URL}/admin`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await expect(page.getByRole("heading", { name: /Panel de Administración/ })).toBeVisible({ timeout: 60_000 });
+      await page.getByRole("button", { name: /Releases/ }).first().click();
+      await page.waitForTimeout(3000);
+      await expect(page.getByRole("button", { name: /Revisi/ }).first()).toBeVisible({ timeout: 30_000 });
+      await page.screenshot({ path: "tests/screenshots/approvals/admin-releases.png", fullPage: false });
 
-    await page.goto(`${BASE_URL}/admin/approvals`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await expect(page.getByRole("heading", { name: /Aprobaciones/ })).toBeVisible({ timeout: 60_000 });
-    await page.waitForTimeout(2500);
-    await page.screenshot({ path: "tests/screenshots/approvals/admin-approvals.png", fullPage: false });
-    expect(errors).toEqual([]);
-    await authed.close();
+      await page.getByRole("link", { name: /Envíos/ }).first().click();
+      await page.waitForURL(/\/admin\/approvals/, { timeout: 30_000 });
+      await expect(page.getByRole("heading", { name: /Aprobaciones/ })).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByLabel(/Buscar envíos/)).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(2500);
+      await page.screenshot({ path: "tests/screenshots/approvals/admin-approvals.png", fullPage: false });
+      expect(errors).toEqual([]);
+    } finally {
+      if (releaseId) {
+        const cleanup = await page.request.delete(`${BASE_URL}/api/tracks?id=${releaseId}`);
+        expect([200, 404]).toContain(cleanup.status());
+      }
+      await authed.close();
+    }
   });
 
   test.afterAll(async ({ browser }) => {

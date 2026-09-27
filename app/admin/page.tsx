@@ -132,7 +132,6 @@ export default function AdminPage() {
   const [releasesPage, setReleasesPage] = useState(1);
   const [releasesStatusFilter, setReleasesStatusFilter] = useState<ReleaseStatus | "all">("all");
   //
-  const [viewingSubmission, setViewingSubmission] = useState<Submission | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     release_type: "Single",
@@ -430,32 +429,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleSubmissionAction = async (submissionId: string, status: "approved" | "rejected" | "revision", notes?: string) => {
-    setActionLoading(submissionId);
-    setMessage(null);
-
-    try {
-      const res = await fetch(`/api/submissions?id=${submissionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, admin_notes: notes }),
-      });
-
-      if (res.ok) {
-        setMessage({ type: "success", text: `Submission ${status}` });
-        fetchSubmissions();
-        setViewingSubmission(null);
-      } else {
-        const error = await res.json();
-        setMessage({ type: "error", text: error.error || "Error al actualizar" });
-      }
-    } catch {
-      setMessage({ type: "error", text: "Error de conexión" });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const handleReleaseAction = async (releaseId: string, status: ReleaseStatus, notes?: string) => {
     setActionLoading(releaseId);
     setMessage(null);
@@ -562,16 +535,14 @@ export default function AdminPage() {
             >
               Releases ({releases.length})
             </button>
-            <button
-              onClick={() => setActiveTab("submissions")}
+            <a
+              href="/admin/approvals"
               className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                activeTab === "submissions"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                "text-blue-600 dark:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               }`}
             >
-              Envíos ({submissions.filter(s => s.status === "pending").length} pendientes)
-            </button>
+              Envíos ({submissions.filter(s => s.status === "pending").length} pendientes) →
+            </a>
             <button
               onClick={() => setActiveTab("notifications")}
               className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
@@ -978,122 +949,6 @@ export default function AdminPage() {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Submissions Table */}
-        {activeTab === "submissions" && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 className="font-semibold text-slate-900 dark:text-slate-100">
-                Envíos de Artistas ({submissions.length} total)
-              </h2>
-            </div>
-
-            {loading ? (
-              <div className="p-8 text-center text-slate-400">Cargando envíos...</div>
-            ) : submissions.length === 0 ? (
-              <div className="p-8 text-center text-slate-400">
-                <p>No hay envíos pendientes.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800">
-                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Título</th>
-                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Artista</th>
-                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Usuario</th>
-                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Estado</th>
-                      <th className="text-left p-3 font-semibold text-slate-700 dark:text-slate-300">Fecha</th>
-                      <th className="text-right p-3 font-semibold text-slate-700 dark:text-slate-300">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {submissions.map((sub) => {
-                      const trackData = parseTrackData(sub.track_data);
-                      return (
-                        <tr key={sub.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
-                          <td className="p-3">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
-                                  {getCoverImage(trackData) ? (
-                                    <Image src={getCoverImage(trackData)!} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
-                                  )}
-                                </div>
-                              <span className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
-                                {safeString(trackData.title)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-slate-600 dark:text-slate-400">{safeString(trackData.artist_name)}</td>
-                          <td className="p-3 text-slate-600 dark:text-slate-400 font-mono text-xs">{sub.user_id.slice(0, 8)}...</td>
-                          <td className="p-3">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${statusColors[sub.status]}`}>
-                              {sub.status === "pending" ? "⏳ Pendiente" : sub.status === "approved" ? "✅ Aprobado" : sub.status === "rejected" ? "❌ Rechazado" : "📝 Revisión"}
-                            </span>
-                          </td>
-                          <td className="p-3 text-slate-600 dark:text-slate-400 text-xs">
-                            {new Date(sub.created_at).toLocaleDateString("es-ES")}
-                          </td>
-                          <td className="p-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => setViewingSubmission(sub)}
-                                className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
-                              >
-                                👁️ Ver
-                              </button>
-                              {sub.status === "pending" && (
-                                <>
-                                  <button
-                                    onClick={() => handleSubmissionAction(sub.id, "approved")}
-                                    disabled={actionLoading === sub.id}
-                                    className="px-2 py-1 rounded text-xs font-semibold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950 transition disabled:opacity-50"
-                                  >
-                                    ✅ Aprobar
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const notes = prompt("Notas de rechazo (requerido, mín. 10 caracteres):");
-                                      if (notes !== null && notes.trim().length >= 10) {
-                                        handleSubmissionAction(sub.id, "rejected", notes);
-                                      } else if (notes !== null) {
-                                        alert("Las notas de rechazo deben tener al menos 10 caracteres");
-                                      }
-                                    }}
-                                    disabled={actionLoading === sub.id}
-                                    className="px-2 py-1 rounded text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition disabled:opacity-50"
-                                  >
-                                    ❌ Rechazar
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const notes = prompt("Comentarios para revisión (requerido, mín. 10 caracteres):");
-                                      if (notes !== null && notes.trim().length >= 10) {
-                                        handleSubmissionAction(sub.id, "revision", notes);
-                                      } else if (notes !== null) {
-                                        alert("Los comentarios deben tener al menos 10 caracteres");
-                                      }
-                                    }}
-                                    disabled={actionLoading === sub.id}
-                                    className="px-2 py-1 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition disabled:opacity-50"
-                                  >
-                                    📝 Revisión
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
                   </tbody>
                 </table>
               </div>
@@ -1709,91 +1564,8 @@ onSubmit={async (e) => {
               )}
             </div>
           </div>
-        )}
+)}
 
-        {/* Submission Detail Modal */}
-        {viewingSubmission && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setViewingSubmission(null)}>
-            <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Detalle del Envío</h2>
-                <button onClick={() => setViewingSubmission(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl leading-none">×</button>
-              </div>
-              <div className="p-6 space-y-4">
-                {(() => {
-                  const trackData = parseTrackData(viewingSubmission.track_data);
-                  return (
-                    <>
-                      <div className="flex items-center gap-4">
-                        {getCoverImage(trackData) ? (
-                          <Image src={getCoverImage(trackData)!} alt="" width={96} height={96} unoptimized className="w-24 h-24 rounded-lg object-cover" />
-                        ) : (
-                          <div className="w-24 h-24 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl">🎵</div>
-                        )}
-                        <div>
-                          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{trackData.title}</h3>
-                          <p className="text-slate-600 dark:text-slate-400">{trackData.artist_name}</p>
-                          <p className="text-sm text-slate-500 dark:text-slate-500">Usuario: {viewingSubmission.user_id.slice(0, 8)}...</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div><span className="font-medium text-slate-700 dark:text-slate-300">Tipo: </span>{capitalizeReleaseType(trackData.release_type)}</div>
-                        <div><span className="font-medium text-slate-700 dark:text-slate-300">Fecha: </span>{trackData.release_date}</div>
-                        <div><span className="font-medium text-slate-700 dark:text-slate-300">Duración: </span>{trackData.duration}</div>
-                        <div><span className="font-medium text-slate-700 dark:text-slate-300">Estado: </span>
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[viewingSubmission.status]}`}>
-                            {viewingSubmission.status === "pending" ? "Pendiente" : viewingSubmission.status === "approved" ? "Aprobado" : "Rechazado"}
-                          </span>
-                        </div>
-                        {trackData.spotify_url && <div><span className="font-medium text-slate-700 dark:text-slate-300">Spotify: </span><a href={trackData.spotify_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Ver</a></div>}
-                        {trackData.youtube_video_id && <div><span className="font-medium text-slate-700 dark:text-slate-300">YouTube: </span>{trackData.youtube_video_id}</div>}
-                      </div>
-                      {trackData.lyrics && (
-                        <div>
-                          <h4 className="font-medium text-slate-900 dark:text-slate-100 mb-2">Letra</h4>
-                          <pre className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-4 rounded-lg max-h-60 overflow-auto">{trackData.lyrics}</pre>
-                        </div>
-                      )}
-                      {viewingSubmission.admin_notes && (
-                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                          <h4 className="font-medium text-amber-800 dark:text-amber-300 mb-1">Notas del Admin</h4>
-                          <p className="text-amber-700 dark:text-amber-400">{viewingSubmission.admin_notes}</p>
-                        </div>
-                      )}
-                      <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                        {viewingSubmission.status === "pending" && (
-                          <>
-                            <button
-                              onClick={() => handleSubmissionAction(viewingSubmission.id, "approved")}
-                              className="flex-1 px-4 py-2 rounded-lg font-semibold bg-green-600 text-white hover:bg-green-500 transition"
-                            >
-                              ✅ Aprobar
-                            </button>
-                            <button
-                              onClick={() => {
-                                const notes = prompt("Notas de rechazo (opcional):");
-                                if (notes !== null) handleSubmissionAction(viewingSubmission.id, "rejected", notes);
-                              }}
-                              className="flex-1 px-4 py-2 rounded-lg font-semibold bg-red-600 text-white hover:bg-red-500 transition"
-                            >
-                              ❌ Rechazar
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => setViewingSubmission(null)}
-                          className="flex-1 px-4 py-2 rounded-lg font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-                        >
-                          Cerrar
-                        </button>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
         {showTransition && (
           <ShowTransitionModal
             show={showTransition.show}
