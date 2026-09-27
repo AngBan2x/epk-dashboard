@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { createUser, getUserByEmail, createArtist } from "@/lib/db";
+import { createUser, getUserByEmail } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -9,7 +9,6 @@ const RegisterSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   email: z.string().email("Email inválido"),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
-  role: z.enum(["artist", "subscriber"]).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -39,9 +38,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const validated = RegisterSchema.parse(body);
-    const role = validated.role ?? "artist";
 
-    // Verificar si el email ya existe
     const existingUser = await getUserByEmail(validated.email);
     if (existingUser) {
       return NextResponse.json(
@@ -50,17 +47,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hash de la contraseña
     const passwordHash = await bcrypt.hash(validated.password, 10);
 
-    // Crear usuario
     const userId = randomUUID();
     const user = await createUser({
       id: userId,
       name: validated.name,
       email: validated.email,
       password_hash: passwordHash,
-      role,
+      role: "subscriber",
       preferences: {
         email_notifications: true,
         push_notifications: true,
@@ -74,25 +69,6 @@ export async function POST(req: NextRequest) {
       last_login: null,
     });
 
-    // Auto-create artist profile for artists (use INSERT OR IGNORE for Turso)
-    if (role === "artist") {
-      try {
-        await createArtist({
-          name: user.name,
-          userId: user.id,
-          biography: undefined,
-          pressText: undefined,
-          pressHighlights: [],
-          genre: undefined,
-          location: undefined,
-        });
-      } catch (artistError) {
-        // Artist name may already exist - not critical for registration
-        console.warn("[API/auth/register] Artist creation skipped:", artistError instanceof Error ? artistError.message : "unknown");
-      }
-    }
-
-    // Devolver usuario sin password_hash
     const { password_hash, ...userWithoutPassword } = user;
     return NextResponse.json(userWithoutPassword, { status: 201 });
   } catch (error) {
@@ -102,7 +78,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    // Detect UNIQUE constraint violations (email already exists — race condition)
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes("UNIQUE constraint failed") || msg.includes("UNIQUE")) {
       return NextResponse.json(
@@ -110,7 +85,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
-    console.error("[API/auth/register] Error:", error instanceof Error ? error.message : String(error), error instanceof Error ? error.stack : "");
+    console.error("[API/auth/register] Error: registration failed");
     return NextResponse.json(
       { error: "Error al registrar usuario" },
       { status: 500 }

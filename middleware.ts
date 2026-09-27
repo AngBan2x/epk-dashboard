@@ -56,10 +56,8 @@ export async function middleware(request: NextRequest) {
   }
 
   const protectedPaths = ["/profile", "/account", "/releases/new", "/releases/:id/edit"];
-  const creatorOnlyPaths = ["/profile", "/releases/new", "/releases/:id/edit"];
   const isProtected = protectedPaths.some((p) => {
     if (p.includes(":")) {
-      // Simple param matcher: /releases/:id/edit
       const rx = new RegExp("^" + p.replace(/:[^/]+/g, "[^/]+") + "$");
       return rx.test(path);
     }
@@ -68,20 +66,6 @@ export async function middleware(request: NextRequest) {
   if (isProtected) {
     const redirect = await requireAuth(request);
     if (redirect) return redirect;
-
-    const isCreatorOnly = creatorOnlyPaths.some((p) => {
-      if (p.includes(":")) {
-        const rx = new RegExp("^" + p.replace(/:[^/]+/g, "[^/]+") + "$");
-        return rx.test(path);
-      }
-      return path === p || path.startsWith(p + "/");
-    });
-    if (isCreatorOnly) {
-      const session = await decodeSessionToken(sessionCookie!.value);
-      if (session && session.role === "subscriber") {
-        return NextResponse.redirect(new URL("/artists", request.url));
-      }
-    }
   }
 
   if (path === "/login" || path === "/register") {
