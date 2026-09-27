@@ -56,13 +56,13 @@ import {
 // NOTE: process.env is evaluated at build time by Webpack. Use a getter function
 // so it's evaluated at runtime instead. This ensures isTursoEnabled() is true on Vercel.
 
-function getTursoUrl(): string | undefined {
+export function getTursoUrl(): string | undefined {
   return process.env.TURSO_DATABASE_URL;
 }
-function getTursoToken(): string | undefined {
+export function getTursoToken(): string | undefined {
   return process.env.TURSO_AUTH_TOKEN;
 }
-function isTursoEnabled(): boolean {
+export function isTursoEnabled(): boolean {
   return Boolean(getTursoUrl() && getTursoToken());
 }
 
@@ -71,7 +71,7 @@ function isTursoEnabled(): boolean {
 let _db: import("better-sqlite3").Database | null = null;
 let _dbWrite: import("better-sqlite3").Database | null = null;
 
-function getLocalDb(): import("better-sqlite3").Database {
+export function getLocalDb(): import("better-sqlite3").Database {
   if (!_db) {
     // Dynamic import to avoid crash when better-sqlite3 is not available (e.g., edge runtime)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -82,7 +82,7 @@ function getLocalDb(): import("better-sqlite3").Database {
   return _db;
 }
 
-function getLocalDbWrite(): import("better-sqlite3").Database {
+export function getLocalDbWrite(): import("better-sqlite3").Database {
   if (!_dbWrite) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require("better-sqlite3") as typeof import("better-sqlite3");
@@ -97,13 +97,6 @@ function getLocalDbWrite(): import("better-sqlite3").Database {
 // ─── Turso client (remote) ──────────────────────────────────────────────────
 // Fresh client per request. No singleton caching. Each call creates a new
 // @libsql/client instance with independent HTTP connection pool.
-
-function getTursoClientSync(): import("@libsql/client").Client | null {
-  if (!isTursoEnabled()) return null;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createClient } = require("@libsql/client");
-  return createClient({ url: getTursoUrl()!, authToken: getTursoToken()! });
-}
 
 // ─── Turso: Lazy schema initialization ─────────────────────────────────────
 // Ensures all tables exist in Turso before first write. Called once, then cached.
@@ -136,14 +129,14 @@ async function ensureTursoSchemaIfNeeded(): Promise<void> {
 
 let _tursoQueryCounter = 0;
 
-function bustSelectCache(sql: string): string {
+export function bustSelectCache(sql: string): string {
   if (sql.trimStart().toUpperCase().startsWith("SELECT")) {
     return `${sql} /*q${_tursoQueryCounter++}*/`;
   }
   return sql;
 }
 
-async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
+export async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
   const client = getTursoClientSync();
   if (!client) throw new Error("Turso client not available");
   try {
@@ -154,12 +147,12 @@ async function tursoExec(sql: string, args?: unknown[]): Promise<unknown[]> {
   }
 }
 
-async function tursoExecSingle(sql: string, args?: unknown[]): Promise<Record<string, unknown> | undefined> {
+export async function tursoExecSingle(sql: string, args?: unknown[]): Promise<Record<string, unknown> | undefined> {
   const rows = await tursoExec(sql, args);
   return rows[0] as Record<string, unknown> | undefined;
 }
 
-async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
+export async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
   const client = getTursoClientSync();
   if (!client) throw new Error("Turso client not available");
   try {
@@ -168,6 +161,13 @@ async function tursoExecUpdate(sql: string, args?: unknown[]): Promise<number> {
   } catch (err) {
     throw err;
   }
+}
+
+export function getTursoClientSync(): import("@libsql/client").Client | null {
+  if (!isTursoEnabled()) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createClient } = require("@libsql/client");
+  return createClient({ url: getTursoUrl()!, authToken: getTursoToken()! });
 }
 
 // ─── Initialize tables (local only; Turso schema via ensureTursoSchema) ─────
@@ -803,7 +803,9 @@ export async function deleteUser(userId: string): Promise<boolean> {
     const artist = await getArtistByUserId(userId);
     if (artist) {
       await tursoExec("DELETE FROM subscriptions WHERE artist_id = ?", [artist.id]);
+      await tursoExec("DELETE FROM dossiers WHERE artist_id = ?", [artist.id]);
       await tursoExec("DELETE FROM shows WHERE artist_id = ?", [artist.id]);
+      await deleteTracksByArtistName(artist.name, true);
       await tursoExec("DELETE FROM artists WHERE id = ?", [artist.id]);
     }
     // Delete user
@@ -820,7 +822,9 @@ export async function deleteUser(userId: string): Promise<boolean> {
   const artist = await getArtistByUserId(userId);
   if (artist) {
     db.prepare("DELETE FROM subscriptions WHERE artist_id = ?").run(artist.id);
+    db.prepare("DELETE FROM dossiers WHERE artist_id = ?").run(artist.id);
     db.prepare("DELETE FROM shows WHERE artist_id = ?").run(artist.id);
+    await deleteTracksByArtistName(artist.name, false);
     db.prepare("DELETE FROM artists WHERE id = ?").run(artist.id);
   }
   // Delete user
@@ -1199,6 +1203,16 @@ export async function getUserNotifications(userId: string, unreadOnly = false): 
   return rows.map(parseNotification);
 }
 
+export async function getAllNotifications(): Promise<Notification[]> {
+  if (isTursoEnabled()) {
+    const rows = await tursoExec("SELECT * FROM notifications ORDER BY created_at DESC");
+    return rows.map((r) => parseNotification(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db.prepare("SELECT * FROM notifications ORDER BY created_at DESC").all() as Record<string, unknown>[];
+  return rows.map(parseNotification);
+}
+
 export async function markNotificationAsRead(id: string): Promise<Notification | null> {
   if (isTursoEnabled()) {
     await tursoExec("UPDATE notifications SET read = 1 WHERE id = ?", [id]);
@@ -1496,14 +1510,41 @@ export async function updateArtist(id: string, data: Partial<CreateArtistInput> 
   return getArtistById(id);
 }
 
+async function deleteTracksByArtistName(artistName: string, isTurso: boolean): Promise<void> {
+  if (isTurso) {
+    await tursoExec("DELETE FROM metrics_history WHERE track_id IN (SELECT id FROM tracks WHERE artist_name = ?)", [artistName]);
+    await tursoExec("DELETE FROM likes WHERE track_id IN (SELECT id FROM tracks WHERE artist_name = ?)", [artistName]);
+    await tursoExec("DELETE FROM tracks WHERE artist_name = ?", [artistName]);
+  } else {
+    const db = getLocalDbWrite();
+    db.prepare("DELETE FROM metrics_history WHERE track_id IN (SELECT id FROM tracks WHERE artist_name = ?)").run(artistName);
+    db.prepare("DELETE FROM likes WHERE track_id IN (SELECT id FROM tracks WHERE artist_name = ?)").run(artistName);
+    db.prepare("DELETE FROM tracks WHERE artist_name = ?").run(artistName);
+  }
+}
+
 export async function deleteArtist(id: string): Promise<{ success: boolean }> {
   if (isTursoEnabled()) {
+    const artist = await getArtistById(id);
+    if (!artist) return { success: false };
+
+    await tursoExec("DELETE FROM subscriptions WHERE artist_id = ?", [id]);
+    await tursoExec("DELETE FROM dossiers WHERE artist_id = ?", [id]);
+    await tursoExec("DELETE FROM notifications WHERE user_id = (SELECT user_id FROM artists WHERE id = ?)", [id]);
     await tursoExec("DELETE FROM shows WHERE artist_id = ?", [id]);
+    await deleteTracksByArtistName(artist.name, true);
     const rowsAffected = await tursoExecUpdate("DELETE FROM artists WHERE id = ?", [id]);
     return { success: rowsAffected > 0 };
   }
   const db = getLocalDbWrite();
+  const artist = await getArtistById(id);
+  if (!artist) return { success: false };
+
+  db.prepare("DELETE FROM subscriptions WHERE artist_id = ?").run(id);
+  db.prepare("DELETE FROM dossiers WHERE artist_id = ?").run(id);
+  db.prepare("DELETE FROM notifications WHERE user_id = (SELECT user_id FROM artists WHERE id = ?)").run(id);
   db.prepare("DELETE FROM shows WHERE artist_id = ?").run(id);
+  await deleteTracksByArtistName(artist.name, false);
   const result = db.prepare("DELETE FROM artists WHERE id = ?").run(id);
   return { success: result.changes > 0 };
 }
@@ -1936,6 +1977,12 @@ export async function createTrack(data: {
   isrc?: string | null;
   composers?: string[] | null;
   is_instrumental?: boolean;
+  // P3 Batch 2: Multi-track releases + YouTube timestamps
+  release_id?: string | null;
+  start_time?: number;
+  end_time?: number;
+  // Release approval workflow
+  status?: import("@/types/music").ReleaseStatus;
 }): Promise<Track> {
   const track = {
     id: data.id,
@@ -1963,16 +2010,21 @@ export async function createTrack(data: {
     isrc: data.isrc || null,
     composers: data.composers || null,
     is_instrumental: data.is_instrumental ?? false,
+    // P3 Batch 2: Multi-track releases + YouTube timestamps
+    release_id: data.release_id ?? null,
+    start_time: data.start_time ?? 0,
+    end_time: data.end_time ?? 0,
   };
 
-  if (isTursoEnabled()) {
+if (isTursoEnabled()) {
     await tursoExec(
       `INSERT OR REPLACE INTO tracks (
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
-        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental,
+        release_id, start_time, end_time
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         track.id, track.title, track.artist_name, track.release_type, track.release_date,
         track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -1988,6 +2040,9 @@ export async function createTrack(data: {
         track.isrc,
         track.composers ? JSON.stringify(track.composers) : null,
         track.is_instrumental ? 1 : 0,
+        track.release_id,
+        track.start_time,
+        track.end_time,
       ]
     );
   } else {
@@ -1997,8 +2052,9 @@ export async function createTrack(data: {
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
-        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental,
+        release_id, start_time, end_time
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       track.id, track.title, track.artist_name, track.release_type, track.release_date,
       track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -2013,7 +2069,10 @@ export async function createTrack(data: {
       track.sides_b ? JSON.stringify(track.sides_b) : null,
       track.isrc,
       track.composers ? JSON.stringify(track.composers) : null,
-      track.is_instrumental ? 1 : 0
+      track.is_instrumental ? 1 : 0,
+      track.release_id,
+      track.start_time,
+      track.end_time,
     );
   }
 
