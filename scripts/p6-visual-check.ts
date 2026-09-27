@@ -27,7 +27,7 @@ async function main() {
       const context = await browser.newContext({
         ...(vp.name === "mobile" ? devices["iPhone 13"] : devices["Desktop Chrome"]),
         viewport: { width: vp.width, height: vp.height },
-        colorScheme: scheme,
+        colorScheme: scheme as "light" | "dark",
         storageState: { cookies: [], origins: [{ origin: BASE, localStorage: [{ name: "epk-theme", value: scheme }] }] },
       });
       const page = await context.newPage();
@@ -86,7 +86,7 @@ await page.waitForTimeout(2000);
     .locator("#shows-status")
     .evaluate((el) => {
       const cs = getComputedStyle(el);
-      return { colorScheme: cs.colorScheme, background: cs.backgroundColor, color: cs.colorColor };
+      return { colorScheme: cs.colorScheme, background: cs.backgroundColor, color: cs.color };
     })
     .catch(() => null);
   const showsControls = {
