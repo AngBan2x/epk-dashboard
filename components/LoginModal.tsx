@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +23,9 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstInputRef = useRef<HTMLInputElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,15 +61,74 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setError("");
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    openerRef.current = document.activeElement as HTMLElement | null;
+    const focusTarget = firstInputRef.current ?? panelRef.current;
+    focusTarget?.focus();
+
+    return () => {
+      openerRef.current?.focus?.();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusables = panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    const onPointerDown = (event: MouseEvent) => {
+      const panel = panelRef.current;
+      if (panel && !panel.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-700 relative">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    >
+      <div
+        ref={panelRef}
+        className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-          aria-label="Cerrar"
+          aria-label="Cerrar diálogo"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -75,7 +137,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
         <div className="text-center mb-6">
           <Image src="/logo.svg" alt="PressPlay" width={40} height={40} unoptimized className="w-10 h-10 mx-auto mb-3" />
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+          <h2 id="modal-title" className="text-xl font-bold text-slate-900 dark:text-slate-100">
             {isLogin ? "Iniciar Sesión" : "Crear Cuenta"}
           </h2>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
@@ -84,7 +146,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm" role="alert">
             {error}
           </div>
         )}
@@ -103,10 +165,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 required={!isLogin}
                 disabled={isLogin}
                 minLength={2}
-                className={cn(
-                  "w-full px-4 py-3 border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent",
-                  isLogin ? "border-slate-300 dark:border-slate-600 opacity-50 cursor-not-allowed" : "border-slate-300 dark:border-slate-600"
-                )}
+                className="w-full px-4 py-3 border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus-visible:ring-2 focus-visible:ring-emerald-500/20"
                 placeholder="Tu nombre"
               />
             </div>
@@ -118,11 +177,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </label>
             <input
               id="email"
+              ref={firstInputRef}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus-visible:ring-2 focus-visible:ring-emerald-500/20"
               placeholder="tu@email.com"
             />
           </div>
@@ -138,7 +198,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus-visible:ring-2 focus-visible:ring-emerald-500/20"
               placeholder={isLogin ? "••••••••" : "Mínimo 8 caracteres"}
             />
           </div>
@@ -155,7 +215,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required={!isLogin}
                 minLength={8}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus-visible:ring-2 focus-visible:ring-emerald-500/20"
                 placeholder="Repite tu contraseña"
               />
             </div>
@@ -173,7 +233,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </label>
           )}
 
-          <Button type="submit" className="w-full py-3" disabled={loading}>
+          <Button type="submit" className="w-full py-3 focus-visible:ring focus-visible:ring-primary-500/20" disabled={loading}>
             {loading ? (isLogin ? "Iniciando..." : "Creando...") : (isLogin ? "Iniciar Sesión" : "Crear Cuenta")}
           </Button>
         </form>

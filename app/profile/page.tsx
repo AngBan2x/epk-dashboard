@@ -1,10 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { ImageUploader } from '@/components/ImageUploader';
+import { ArtistSocialLinks, SocialPlatformIcon } from '@/components/ArtistSocialLinks';
+import {
+  SOCIAL_PLATFORMS,
+  filterValidSocialLinks,
+  validateSocialUrl,
+} from '@/lib/social-platforms';
+import { safeParseJSON } from '@/lib/null-safe';
+import type { SocialLink } from '@/types/music';
 
 interface ArtistProfile {
   id: string;
@@ -15,7 +23,7 @@ interface ArtistProfile {
   city: string | null;
   profile_image: string | null;
   banner_image: string | null;
-  social_links: string | null;
+  social_links: SocialLink[] | null;
   slug: string | null;
 }
 
@@ -36,6 +44,73 @@ export default function ProfilePage() {
   const [profileImage, setProfileImage] = useState('');
   const [bannerImage, setBannerImage] = useState('');
   const [slug, setSlug] = useState('');
+  const [socialInputs, setSocialInputs] = useState<Record<string, string>>({});
+  const [socialTouched, setSocialTouched] = useState<Record<string, boolean>>({});
+  const [showSocialEditor, setShowSocialEditor] = useState(false);
+
+  const setPlatformValue = (key: string, value: string) => {
+    setSocialInputs((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const markPlatformTouched = (key: string) => {
+    setSocialTouched((prev) => ({ ...prev, [key]: true }));
+  };
+
+  const clearPlatform = (key: string) => {
+    setSocialInputs((prev) => ({ ...prev, [key]: '' }));
+    setSocialTouched((prev) => ({ ...prev, [key]: false }));
+  };
+
+  const socialErrors = useMemo(() => {
+    const errors: Record<string, string> = {};
+    for (const platform of SOCIAL_PLATFORMS) {
+      const value = (socialInputs[platform.key] ?? '').trim();
+      if (!value) continue;
+      const result = validateSocialUrl(platform.key, value);
+      if (!result.valid && result.error) errors[platform.key] = result.error;
+    }
+    return errors;
+  }, [socialInputs]);
+
+  const socialErrorList = useMemo(
+    () =>
+      SOCIAL_PLATFORMS.filter((platform) => Boolean(socialErrors[platform.key])).map(
+        (platform) => ({ key: platform.key, label: platform.label, message: socialErrors[platform.key] })
+      ),
+    [socialErrors]
+  );
+
+  const configuredPlatforms = useMemo(
+    () =>
+      SOCIAL_PLATFORMS.filter((platform) => {
+        const value = (socialInputs[platform.key] ?? '').trim();
+        return value.length > 0 && !socialErrors[platform.key];
+      }),
+    [socialInputs, socialErrors]
+  );
+
+  const buildSocialLinks = (): SocialLink[] =>
+    filterValidSocialLinks(
+      configuredPlatforms.map((platform) => ({
+        platform: platform.key,
+        url: socialInputs[platform.key] ?? '',
+      }))
+    );
+
+  const applySocialLinks = (raw: unknown) => {
+    const parsed: SocialLink[] = Array.isArray(raw)
+      ? (raw as SocialLink[])
+      : typeof raw === 'string' && raw
+        ? safeParseJSON<SocialLink[]>(raw, [])
+        : [];
+
+    const next: Record<string, string> = {};
+    for (const link of filterValidSocialLinks(parsed)) {
+      next[link.platform] = link.url;
+    }
+    setSocialInputs(next);
+    setSocialTouched({});
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -73,10 +148,12 @@ export default function ProfilePage() {
         setProfileImage(data.profile_image || '');
         setBannerImage(data.banner_image || '');
         setSlug(data.slug || '');
+        applySocialLinks(data.social_links);
       } else if (res.status === 404) {
         // Profile doesn't exist yet — create a blank one
         setProfile(null);
         setName(user?.name || '');
+        applySocialLinks(null);
       } else {
         setError('Error al cargar el perfil');
       }
@@ -89,6 +166,16 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
+    if (socialErrorList.length > 0) {
+      setSaved(false);
+      setError(
+        `Revisa los enlaces sociales: ${socialErrorList
+          .map((item) => item.label)
+          .join(', ')} no son válidos.`
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       setSaved(false);
@@ -103,6 +190,7 @@ export default function ProfilePage() {
         profile_image: profileImage || null,
         banner_image: bannerImage || null,
         slug: slug || null,
+        social_links: buildSocialLinks(),
       };
 
       // Try PATCH first, if profile doesn't exist try POST to create
@@ -305,6 +393,140 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Social Links */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Redes Sociales</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {configuredPlatforms.length} de {SOCIAL_PLATFORMS.length} plataformas configuradas
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {configuredPlatforms.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSocialInputs({});
+                        setSocialTouched({});
+                      }}
+                      aria-label="Quitar todos los enlaces sociales"
+                      className="px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800"
+                    >
+                      Quitar todos
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowSocialEditor((prev) => !prev)}
+                    aria-expanded={showSocialEditor}
+                    aria-controls="social-links-editor"
+                    className="px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800"
+                  >
+                    {showSocialEditor ? 'Ocultar' : 'Añadir'}
+                  </button>
+                </div>
+              </div>
+
+              {configuredPlatforms.length > 0 && (
+                <div className="mb-5 p-4 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-3">Vista previa</p>
+                  <ArtistSocialLinks
+                    socialLinks={buildSocialLinks()}
+                    artistName={name}
+                    showLabels
+                    ariaLabel="Vista previa de tus redes sociales"
+                  />
+                </div>
+              )}
+
+              {showSocialEditor && (
+                <div id="social-links-editor" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {SOCIAL_PLATFORMS.map((platform) => {
+                    const value = socialInputs[platform.key] ?? '';
+                    const hasValue = value.trim().length > 0;
+                    const error = socialErrors[platform.key];
+                    const showError = Boolean(error) && (hasValue || socialTouched[platform.key]);
+                    const inputId = `social-${platform.key}`;
+                    const errorId = `${inputId}-error`;
+
+                    return (
+                      <div
+                        key={platform.key}
+                        className={`p-3 rounded-lg border transition-colors ${
+                          showError
+                            ? 'border-red-300 dark:border-red-800 bg-red-50/60 dark:bg-red-900/10'
+                            : hasValue
+                              ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/10'
+                              : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <label
+                            htmlFor={inputId}
+                            className="inline-flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-100 cursor-pointer"
+                          >
+                            <span style={{ color: platform.color }} aria-hidden="true">
+                              <SocialPlatformIcon platform={platform} className="w-4 h-4" />
+                            </span>
+                            {platform.label}
+                          </label>
+                          {hasValue && !error && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                              <span aria-hidden="true">✓</span>
+                              Configurado
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            id={inputId}
+                            type="url"
+                            inputMode="url"
+                            autoComplete="off"
+                            spellCheck={false}
+                            value={value}
+                            onChange={(e) => setPlatformValue(platform.key, e.target.value)}
+                            onBlur={() => markPlatformTouched(platform.key)}
+                            placeholder={platform.placeholder}
+                            aria-invalid={showError}
+                            aria-describedby={showError ? errorId : undefined}
+                            className="flex-1 min-w-0 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                          />
+                          {hasValue && (
+                            <button
+                              type="button"
+                              onClick={() => clearPlatform(platform.key)}
+                              aria-label={`Limpiar el enlace de ${platform.label}`}
+                              title={`Limpiar ${platform.label}`}
+                              className="shrink-0 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                            >
+                              <span aria-hidden="true">✕</span>
+                            </button>
+                          )}
+                        </div>
+                        {showError && (
+                          <p
+                            id={errorId}
+                            role="alert"
+                            className="mt-2 text-xs text-red-600 dark:text-red-400"
+                          >
+                            {error}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {socialErrorList.length > 0 && (
+                <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
+                  {socialErrorList.map((item) => `${item.label}: ${item.message}`).join(' ')}
+                </p>
+              )}
             </div>
 
             {/* Save button */}

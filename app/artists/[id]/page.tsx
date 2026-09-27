@@ -2,9 +2,11 @@ import { getArtistById, getTracksByArtist } from "@/lib/db";
 import { BioSection } from "@/components/BioSection";
 import { ArtistTracksSection } from "@/components/ArtistTracksSection";
 import { ArtistHero } from "@/components/ArtistHero";
+import { ArtistSocialLinks } from "@/components/ArtistSocialLinks";
 import { SubscriptionButton } from "@/components/subscriber/SubscriptionButton";
 import { SubscriberCount } from "@/components/subscriber/SubscriberCount";
 import { notFound } from "next/navigation";
+import type { Track } from "@/types/music";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
     notFound();
   }
 
-  let tracks: any[] = [];
+  let tracks: Track[] = [];
   try {
     tracks = await getTracksByArtist(params.id);
   } catch (e) {
@@ -46,6 +48,17 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
         }
       />
       <main className="max-w-4xl mx-auto px-4 pb-12">
+        {artist.social_links && artist.social_links.length > 0 && (
+          <div className="pt-6">
+            <ArtistSocialLinks
+              socialLinks={artist.social_links}
+              artistName={artist.name}
+              showLabels
+              ariaLabel={`Redes sociales de ${artist.name}`}
+            />
+          </div>
+        )}
+
         <BioSection
           artistName={artist.name}
           genre={artist.genre || undefined}

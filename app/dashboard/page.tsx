@@ -5,7 +5,8 @@ import { Metadata } from "next";
 import { EPKCard } from "@/components/EPKCard";
 import { EPKExporter } from "@/components/EPKExporter";
 import { BioSection } from "@/components/BioSection";
-import { SocialBar } from "@/components/SocialBar";
+import { ArtistSocialLinks } from "@/components/ArtistSocialLinks";
+import { CatalogArtistsCarousel } from "@/components/dashboard/CatalogArtistsCarousel";
 import { ShowsBooking } from "@/components/ShowsBooking";
 import { LoginModal } from "@/components/LoginModal";
 import LastfmMetrics from "@/components/LastfmMetrics";
@@ -505,12 +506,21 @@ export default function DashboardPage() {
                   </p>
                 </PitchHeading>
 
-                <div className="mt-4">
-                  <SocialBar
-                    spotifyUrl="https://open.spotify.com"
-                    youtubeUrl="https://www.youtube.com"
-                    instagramUrl="https://www.instagram.com"
-                  />
+                <div className="mt-4 space-y-3">
+                  {artists
+                    .filter((a) => Array.isArray(a.social_links) && a.social_links.length > 0)
+                    .map((a) => (
+                      <div key={a.id} className="flex flex-wrap items-center gap-3">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          {a.name}
+                        </span>
+                        <ArtistSocialLinks
+                          socialLinks={a.social_links}
+                          artistName={a.name}
+                          ariaLabel={`Redes sociales de ${a.name}`}
+                        />
+                      </div>
+                    ))}
                 </div>
               </section>
 
@@ -537,34 +547,10 @@ export default function DashboardPage() {
 
               {/* Carousel of all artists' Bio + Shows */}
               {artists.length > 0 && (
-                <section className="mb-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-                  <SectionHeader
-                    emoji="🎤"
-                    title="Artistas"
-                    subtitle="Bios y shows del catálogo"
-                  />
-                  <div className="space-y-8">
-                    {artists.map((art, i) => {
-                      const artShows = data.showsByArtist[art.id] || [];
-                      return (
-                        <SlideIn key={art.id} index={tracks.length + i}>
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <BioSection
-                              artistName={art.name}
-                              genre={art.genre || "Multi-género"}
-                              location={art.location || "Latinoamérica"}
-                              monthlyListeners={art.monthly_listeners || 0}
-                              biography={art.biography}
-                              pressText={art.press_text}
-                              pressHighlights={art.press_highlights}
-                            />
-                            <ShowsBooking artistId={art.id} shows={artShows} />
-                          </div>
-                        </SlideIn>
-                      );
-                    })}
-                  </div>
-                </section>
+                <CatalogArtistsCarousel
+                  artists={artists}
+                  showsByArtist={data.showsByArtist}
+                />
               )}
 
               <SlideIn index={tracks.length + artists.length}>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LoginModal } from "@/components/LoginModal";
@@ -30,8 +30,33 @@ export function Header() {
     await logout();
   };
 
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAccountOpen(false);
+        buttonRef.current?.focus();
+      }
+    };
+    const onMouseDown = (event: MouseEvent) => {
+      const container = containerRef.current;
+      if (container && !container.contains(event.target as Node)) setAccountOpen(false);
+    };
+    const button = buttonRef.current;
+    if (button) {
+      button.addEventListener("keydown", onKeyDown);
+      document.addEventListener("mousedown", onMouseDown);
+    }
+    return () => {
+      button?.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [accountOpen]);
+
   const navLink =
-    "text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors";
+    "block text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors focus-visible:ring focus-visible:ring-primary-500/20";
 
   return (
     <>
@@ -52,13 +77,19 @@ export function Header() {
                 <>
                   <Link
                     href="/dashboard"
-                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                    className={navLink}
                   >
                     Dashboard
                   </Link>
                   <Link
+                    href="/artists"
+                    className={navLink}
+                  >
+                    Artistas
+                  </Link>
+                  <Link
                     href="/shows"
-                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                    className={navLink}
                   >
                     Shows
                   </Link>
@@ -67,19 +98,19 @@ export function Header() {
                 <>
                   <Link
                     href="/artists"
-                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                    className={navLink}
                   >
                     Artistas
                   </Link>
                   <Link
                     href="/shows"
-                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                    className={navLink}
                   >
                     Shows
                   </Link>
                   <Link
                     href="/dashboard"
-                    className="text-sm text-slate-600 hover:text-slate-900 mx-2 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                    className={navLink}
                   >
                     Catálogo
                   </Link>
@@ -88,7 +119,7 @@ export function Header() {
             {user?.role === "admin" && (
               <Link
                 href="/admin"
-                className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                className={navLink}
               >
                 Admin
               </Link>
@@ -98,10 +129,11 @@ export function Header() {
             {user ? (
               <div className="relative">
                 <button
+                  ref={buttonRef}
                   onClick={() => setAccountOpen((v) => !v)}
                   aria-expanded={accountOpen}
                   aria-haspopup="menu"
-                  className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  className="focus-visible:ring focus-visible:ring-primary-500/20 flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
                 >
                   <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-bold flex items-center justify-center">
                     {user.name?.[0]?.toUpperCase() || "?"}
@@ -110,6 +142,7 @@ export function Header() {
                 </button>
                 {accountOpen && (
                   <div
+                    ref={containerRef}
                     role="menu"
                     className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-2 z-50"
                   >
@@ -117,7 +150,7 @@ export function Header() {
                       href="/profile"
                       role="menuitem"
                       onClick={() => setAccountOpen(false)}
-                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:ring focus-visible:ring-primary-500/20"
                     >
                       Mi Perfil
                     </Link>
@@ -125,7 +158,7 @@ export function Header() {
                       href="/account"
                       role="menuitem"
                       onClick={() => setAccountOpen(false)}
-                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:ring focus-visible:ring-primary-500/20"
                     >
                       Mi Cuenta
                     </Link>
@@ -133,7 +166,7 @@ export function Header() {
                       href="/subscriptions"
                       role="menuitem"
                       onClick={() => setAccountOpen(false)}
-                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:ring focus-visible:ring-primary-500/20"
                     >
                       Mis suscripciones
                     </Link>
@@ -141,14 +174,14 @@ export function Header() {
                       href="/notifications"
                       role="menuitem"
                       onClick={() => setAccountOpen(false)}
-                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:ring focus-visible:ring-primary-500/20"
                     >
                       Notificaciones
                     </Link>
                     <button
                       role="menuitem"
                       onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:ring focus-visible:ring-primary-500/20"
                     >
                       Cerrar sesión
                     </button>
@@ -198,6 +231,13 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Dashboard
+                </Link>
+                <Link
+                  href="/artists"
+                  className="block text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Artistas
                 </Link>
                 <Link
                   href="/shows"
