@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Show, ShowStatus } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -30,6 +31,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
   const [shows, setShows] = useState<Show[]>(propShows || []);
   const [loading, setLoading] = useState(!propShows);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const reduceMotion = useReducedMotion();
 
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => {
@@ -93,7 +95,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
             editable && onAdd ? (
               <button
                 onClick={onAdd}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white transition"
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 + Nuevo Show
               </button>
@@ -103,13 +105,13 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
       </div>
 
       {shows.length === 0 ? (
-        <div className="p-8 text-center text-slate-400 dark:text-slate-500">
+        <div className="p-8 text-center text-slate-500 dark:text-slate-400">
           <p className="text-3xl mb-2">🎤</p>
           <p>No hay shows programados</p>
           {editable && onAdd && (
             <button
               onClick={onAdd}
-              className="mt-3 text-sm text-primary-600 dark:text-primary-400 hover:underline"
+              className="mt-3 text-sm text-primary-600 dark:text-primary-400 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               Agregar el primer show
             </button>
@@ -127,7 +129,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h4 className="font-semibold text-slate-900 dark:text-white truncate">
+                      <h4 className="font-semibold text-slate-900 dark:text-white truncate" title={safeString(show.venue_name)}>
                         {safeString(show.venue_name)}
                       </h4>
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${showStatusClass(show.status)}`}>
@@ -159,7 +161,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                         title={expanded.has(show.id) ? "Ocultar detalles" : "Ver detalles"}
                         aria-label={expanded.has(show.id) ? "Ocultar detalles" : "Ver detalles"}
                         aria-expanded={expanded.has(show.id)}
-                        className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                        className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                       >
                         <svg className={`w-4 h-4 transition-transform ${expanded.has(show.id) ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                       </button>
@@ -169,7 +171,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                         href={show.ticket_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white transition"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                       >
                         🎟️ Tickets
                       </a>
@@ -181,7 +183,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                             onClick={() => onEdit(show)}
                             title="Editar show"
                             aria-label="Editar show"
-                            className="p-2 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
+                            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
                           </button>
@@ -191,7 +193,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                             onClick={() => onDelete(show.id)}
                             title="Eliminar show"
                             aria-label="Eliminar show"
-                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
+                            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                           </button>
@@ -200,8 +202,16 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                     )}
                   </div>
                 </div>
-                {expanded.has(show.id) && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-sm">
+                <AnimatePresence initial={false}>
+                  {expanded.has(show.id) && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-sm">
                     {show.description && (
                       <p className="text-slate-600 dark:text-slate-300">{show.description}</p>
                     )}
@@ -217,16 +227,19 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                         {show.payment_methods.map((pm, i) => (
                           <Badge key={i}>{paymentMethodLabel(pm.type)}{pm.details ? ` — ${pm.details}` : ""}</Badge>
                         ))}
+                        <p className="w-full text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                          Los pagos se realizan directamente al artista u organizador del evento. PressPlay no procesa ni custodia dinero y no se responsabiliza por pagos perdidos o estafas.
+                        </p>
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2">
                       {show.flyer_url && (
-                        <a href={show.flyer_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                        <a href={show.flyer_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                           🖼️ Ver flyer
                         </a>
                       )}
                       {show.ticket_link && show.ticket_link !== show.ticket_url && (
-                        <a href={show.ticket_link} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                        <a href={show.ticket_link} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                           🎟️ Link alternativo de tickets
                         </a>
                       )}
@@ -237,12 +250,14 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                       </p>
                     )}
                     {editable && show.notes && (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 italic">
                         🔒 Solo tú: {show.notes}
                       </p>
                     )}
-                  </div>
-                )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}

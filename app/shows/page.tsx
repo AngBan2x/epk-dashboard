@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import type { Show, ShowStatus } from '@/types/music';
 import { safeString } from '@/lib/null-safe';
 import { sortList } from '@/lib/search';
+import { showStatusClass, showStatusLabel, SHOW_STATUS_OPTIONS } from '@/lib/show-status';
 import { SortSelect, useListSort } from '@/components/SortSelect';
 
 const SHOW_ACCESSORS = {
@@ -14,23 +15,14 @@ const SHOW_ACCESSORS = {
 
 const DEFAULT_SORT = { sort: "date", order: "asc" } as const;
 
-const defaultStatus = { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Desconocido' };
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
-const statusConfig: Record<ShowStatus, { color: string; bg: string; border: string; label: string }> = {
-  proximamente: { color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-300 dark:border-yellow-700', label: 'Próximamente' },
-  activo: { color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-300 dark:border-green-700', label: 'Activo' },
-  confirmado: { color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-300 dark:border-purple-700', label: 'Confirmado' },
-  en_venta: { color: 'text-indigo-700 dark:text-indigo-300', bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-300 dark:border-indigo-700', label: 'En Venta' },
-  agotado: { color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-300 dark:border-red-700', label: 'Agotado' },
-  cancelado: { color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-300 dark:border-red-700', label: 'Cancelado' },
-  pospuesto: { color: 'text-orange-700 dark:text-orange-300', bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-300 dark:border-orange-700', label: 'Pospuesto' },
-  reprogramado: { color: 'text-cyan-700 dark:text-cyan-300', bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-300 dark:border-cyan-700', label: 'Reprogramado' },
-  disponible: { color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-100 dark:bg-emerald-900/30', border: 'border-emerald-300 dark:border-emerald-700', label: 'Disponible' },
-  pasado: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Pasado' },
-  hoy: { color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-300 dark:border-blue-700', label: 'Hoy' },
-  suspendido: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Suspendido' },
-  finalizado: { color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', label: 'Finalizado' },
-};
+const LABEL_CLASS = 'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1';
+
+const FIELD_CLASS = `w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 ${FOCUS_RING}`;
+
+const PAYMENT_DISCLAIMER =
+  'Los pagos se realizan directamente al artista u organizador del evento. PressPlay no procesa ni custodia dinero y no se responsabiliza por pagos perdidos o estafas.';
 
 function formatDateSpanish(dateStr: string | null): string {
   if (!dateStr) return 'Fecha por confirmar';
@@ -65,7 +57,6 @@ export default function ShowsPage() {
   }, []);
 
   const filteredShows = shows.filter((show) => {
-    // Search filter by venue/city
     if (search) {
       const searchLower = search.toLowerCase();
       const matchesVenue = safeString(show.venue_name).toLowerCase().includes(searchLower);
@@ -76,12 +67,10 @@ export default function ShowsPage() {
       }
     }
 
-    // Status filter
     if (statusFilter && show.status !== statusFilter) {
       return false;
     }
 
-    // Future only filter
     if (futureOnly && show.date) {
       const showDate = new Date(show.date);
       const today = new Date();
@@ -96,11 +85,11 @@ export default function ShowsPage() {
   const visibleShows = sortList(filteredShows, sortState, SHOW_ACCESSORS);
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8">
       {/* Page header */}
       <header className="mb-6 text-center">
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Shows & Events</h1>
-        <p className="text-lg text-muted-foreground">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">Shows &amp; Events</h1>
+        <p className="text-lg text-slate-600 dark:text-slate-400">
           {filteredShows.length} {filteredShows.length === 1 ? 'show programado' : 'shows programados'}
         </p>
       </header>
@@ -110,46 +99,59 @@ export default function ShowsPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Search input */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
+            <label htmlFor="shows-search" className={LABEL_CLASS}>
               Buscar por venue o ciudad
             </label>
             <input
+              id="shows-search"
+              type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-border bg-input px-3 py-2 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
+              className={FIELD_CLASS}
               placeholder="Venue o ciudad"
             />
           </div>
 
           {/* Status filter */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
+            <label htmlFor="shows-status" className={LABEL_CLASS}>
               Estado
             </label>
             <select
+              id="shows-status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as ShowStatus)}
-              className="w-full rounded-lg border border-border bg-input px-3 py-2 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
+              className={`${FIELD_CLASS} dark:[color-scheme:dark]`}
             >
-              <option value="">Todos</option>
-              {(["proximamente", "activo", "confirmado", "en_venta", "agotado", "cancelado", "pospuesto", "reprogramado", "disponible", "pasado", "hoy", "suspendido", "finalizado"] as ShowStatus[]).map((status) => (
-                <option key={status} value={status}>
-                  {status}
+              <option value="" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+                Todos
+              </option>
+              {SHOW_STATUS_OPTIONS.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                  className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {showStatusLabel(option.value)}
                 </option>
               ))}
             </select>
           </div>
 
           {/* Future only toggle */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <div className="flex items-end pb-1">
+            <label
+              htmlFor="shows-future-only"
+              className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
               <input
+                id="shows-future-only"
                 type="checkbox"
                 checked={futureOnly}
                 onChange={(e) => setFutureOnly(e.target.checked)}
-                className="rounded bg-primary px-2 py-1"
+                className={`h-4 w-4 rounded border-slate-300 dark:border-slate-600 accent-primary-600 ${FOCUS_RING}`}
               />
-              {futureOnly && 'Solo futuros'}
+              Solo futuros
             </label>
           </div>
 
@@ -160,112 +162,115 @@ export default function ShowsPage() {
       {/* Shows grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {loading ? (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 animate-pulse">
-            <div className="h-24 w-full rounded-lg mb-3" />
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-1/3 rounded" />
-              <div className="h-4 w-2/3 rounded" />
-              <div className="h-4 w-1/2 rounded" />
-            </div>
-          </div>
+          Array.from({ length: 3 }).map((_, index) => <SkeletonCard key={index} />)
         ) : visibleShows.length === 0 ? (
-          <div className="col-span-full text-center py-8">
-            <p className="text-3xl mb-2">🎤</p>
-            <p className="text-lg text-muted-foreground">No hay shows programados</p>
+          <div className="col-span-full rounded-2xl border border-border bg-card py-10 text-center">
+            <p className="mb-2 text-3xl">🎤</p>
+            <p className="text-lg text-slate-600 dark:text-slate-400">No hay shows programados</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleShows.map((show) => (
-              <ShowCard show={show} statusConfig={statusConfig} key={show.id} />
-            ))}
-          </div>
+          visibleShows.map((show) => <ShowCard show={show} key={show.id} />)
         )}
       </div>
+
+      <p className="mt-6 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+        {PAYMENT_DISCLAIMER}
+      </p>
     </div>
   );
 }
 
 function SkeletonCard() {
   return (
-    <div
-      className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 animate-pulse"
-    >
-      <div className="h-24 w-full rounded-lg mb-3" />
+    <div className="rounded-2xl border border-border bg-card p-4 animate-pulse">
+      <div className="h-24 w-full rounded-lg mb-3 bg-slate-200 dark:bg-slate-700" />
       <div className="flex items-center gap-2 mb-1">
-        <div className="h-4 w-1/3 rounded" />
-        <div className="h-4 w-2/3 rounded" />
-        <div className="h-4 w-1/2 rounded" />
+        <div className="h-4 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
       </div>
     </div>
   );
 }
 
-function ShowCard({ show, statusConfig }: { show: Show; statusConfig: Record<ShowStatus, { color: string; bg: string; border: string; label: string }> }) {
-  const formattedDate = formatDateSpanish(show.date);
-  const status = statusConfig[show.status] ?? defaultStatus;
+function ShowCard({ show }: { show: Show }) {
+  const [descOpen, setDescOpen] = useState(false);
+
+  const venue = safeString(show.venue_name) || 'Venue por confirmar';
+  const description = safeString(show.description);
+  const location = [safeString(show.city), safeString(show.country)].filter(Boolean).join(', ');
+  const ticketHref = safeString(show.ticket_url) || safeString(show.ticket_link);
+  const hasLongDescription = description.length > 100;
 
   return (
-    <div
-      key={show.id}
-      className="rounded-2xl border border-border bg-card p-4 hover:bg-card-hover transition-colors"
-    >
-      {/* Flyer image header */}
+    <article className="rounded-2xl border border-border bg-card p-4 hover:bg-card-hover transition-colors flex flex-col">
       {show.flyer_url && (
         <Image
           src={show.flyer_url}
-          alt={safeString(show.venue_name)}
+          alt={`Flyer de ${venue}`}
           width={768}
           height={192}
           unoptimized
-          className="h-48 w-full rounded-t-lg object-cover mb-3"
+          className="h-48 w-full rounded-xl object-cover mb-4"
         />
       )}
 
-      {/* Card content */}
-      <div className="pt-4">
-        <h3 className="font-semibold text-foreground truncate">{safeString(show.venue_name)}</h3>
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${showStatusClass(show.status)}`}>
+          {showStatusLabel(show.status)}
+        </span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          📅 {formatDateSpanish(show.date)}
+          {show.time ? ` • ${show.time}` : ''}
+        </span>
+      </div>
 
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
-          {show.city && <span>{safeString(show.city)}</span>}
-          {show.country && <span>{safeString(show.country)}</span>}
-        </div>
+      <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate" title={venue}>
+        {venue}
+      </h3>
 
-        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-          {safeString(show.description)?.substring(0, 100)}
-        </p>
+      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 mb-3">
+        {location ? `📍 ${location}` : '📍 Ubicación por confirmar'}
+      </p>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-          <span>{safeString(show.date)}</span>
-          {show.time && (
-            <span className="text-primary/80">
-              •{safeString(show.time)}
-            </span>
+      {description && (
+        <div className="mb-3">
+          <p
+            className={`text-sm leading-relaxed text-slate-600 dark:text-slate-400 ${hasLongDescription && !descOpen ? 'line-clamp-2' : ''}`}
+          >
+            {description}
+          </p>
+          {hasLongDescription && (
+            <button
+              type="button"
+              onClick={() => setDescOpen((open) => !open)}
+              aria-expanded={descOpen}
+              className={`mt-1 text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline ${FOCUS_RING}`}
+            >
+              {descOpen ? 'Mostrar menos' : 'Mostrar más'}
+            </button>
           )}
         </div>
+      )}
 
-        {show.price_range && (
-          <p className="text-primary font-medium mb-2">{safeString(show.price_range)}</p>
-        )}
+      {show.price_range && (
+        <p className="text-sm font-semibold text-primary-600 dark:text-primary-400 mb-2">
+          💰 {safeString(show.price_range)}
+        </p>
+      )}
 
-        {show.ticket_url && (
+      {ticketHref && (
+        <div className="mt-auto pt-2">
           <a
-            href={show.ticket_url}
+            href={ticketHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary text-sm font-medium"
+            className={`inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 ${FOCUS_RING}`}
           >
             🎟️ Ver tickets
           </a>
-        )}
-      </div>
-
-      {/* Status badge */}
-      <div className="mt-2 flex items-center gap-1 text-xs font-medium">
-        <span
-          className={`inline-flex px-2 py-0.5 rounded-full ${status.bg} ${status.color} ${status.border}`}>
-          {status.label}
-        </span>
-      </div>
-    </div>
+        </div>
+      )}
+    </article>
   );
 }
