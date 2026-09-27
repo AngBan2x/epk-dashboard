@@ -48,7 +48,7 @@ export function ThemeToggle() {
         bg-slate-100 dark:bg-dark-800 border-slate-300 dark:border-dark-600
         hover:bg-slate-200 dark:hover:bg-dark-700
         hover:scale-105 active:scale-95
-        focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:ring-offset-2"
       aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       title={isDark ? "Modo Claro" : "Modo Oscuro"}
     >
