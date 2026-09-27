@@ -666,6 +666,21 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P5.5 | qa-visual | QA visual completo |
 | P5.6 | release-manager | Release v4.0.0 |
 
+#### Fase P6: Fixes UI + Roles + Seguridad + A11y
+| Task | Subagente | Descripción | Estado |
+|------|-----------|-------------|--------|
+| P6.1 | show-form-builder | Shows UI: animación expansión, cards, checkbox, truncate, select dark, SortSelect | Pendiente |
+| P6.2 | header-builder | Header: espaciado, link Artistas logueado, cierre menú avatar | Pendiente |
+| P6.3 | carousel-builder | Carrusel solo-catálogo (Embla) | Pendiente |
+| P6.4 | dashboard-builder | Visualizador M + B-UI descargas | Pendiente |
+| P6.5 | api-builder | Export unificado + APIs roles + rate limit + fixes S | Pendiente |
+| P6.6 | approval-workflow-builder | Split admin + hook de promoción | Pendiente |
+| P6.7 | auth-builder | Registro cerrado, AuthContext, middleware, sesión | Pendiente |
+| P6.8 | db-migrator | Backfill + cascadas + aviso sin dueño | Pendiente |
+| P6.9 | security/quality/visual | Auditoría + tests + capturas globales | Pendiente |
+
+> Spec ejecutable: `docs/PHASE_P6.md`. Decisiones registradas: suscriptor-por-defecto sí, registro artista cerrado, promoción por release o show aprobado, submissions=portal / approvals=consola, exportador unificado (B), carrusel solo catálogo, tarjetas ricas sin detalle, menú sin X, visualizador M, rate limit solo en escrituras más abusables.
+
 ---
 
 ### v3.10.0 — Dark Mode Fix + Apple Music Branding (Detalle)
