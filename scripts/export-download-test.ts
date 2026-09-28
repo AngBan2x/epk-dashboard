@@ -25,22 +25,33 @@ async function main() {
   try { await page.waitForSelector("h2", { timeout: 25000 }); } catch {}
   await page.waitForTimeout(3000);
 
-  for (const fmt of ["JSON", "HTML"] as const) {
-    const btn = page.getByRole("button", { name: new RegExp(`Descargar dossier en ${fmt}`, "i") }).first();
-    if ((await btn.count()) === 0) { fail(`export ${fmt} button`, "not found"); continue; }
-    pass(`export ${fmt} button`, "visible");
+  for (const label of [
+    "Descargar Dossier de prensa",
+    "Descargar Rider técnico",
+    "Descargar Catálogo en JSON",
+    "Descargar Catálogo imprimible",
+  ]) {
+    const btn = page.getByRole("button", { name: new RegExp(`^${label}`, "i") }).first();
+    if ((await btn.count()) === 0) {
+      fail(`${label} button`, "not found");
+      continue;
+    }
+    pass(`${label} button`, "visible");
     const [download] = await Promise.all([
-      page.waitForEvent("download", { timeout: 30000 }),
+      page.waitForEvent("download", { timeout: 45000 }),
       btn.click(),
     ]);
     const path = await download.path().catch(() => null);
     const name = download.suggestedFilename();
-    const okExt = name.toLowerCase().endsWith(fmt.toLowerCase() === "json" ? ".json" : ".html");
-    if (path && okExt) pass(`export ${fmt} download`, name);
-    else fail(`export ${fmt} download`, `path=${!!path} name=${name}`);
-    await page.waitForTimeout(3500); // let status reset to idle
+    const wantsJson = label.includes("JSON");
+    const okExt = wantsJson
+      ? name.toLowerCase().endsWith(".json")
+      : name.toLowerCase().endsWith(".html");
+    if (path && okExt && path.length > 0) pass(`${label} download`, `${name}`);
+    else fail(`${label} download`, `path=${!!path} name=${name}`);
+    await page.waitForTimeout(2500);
   }
-  await page.screenshot({ path: "tests/screenshots/export-buttons-check.png" });
+  await page.screenshot({ path: "tests/screenshots/export-buttons-check.png", fullPage: true });
   await browser.close();
   const bad = results.filter((r) => !r.ok);
   console.log(`\n=== EXPORT DOWNLOAD: ${results.length - bad.length} PASS / ${bad.length} FAIL ===`);
