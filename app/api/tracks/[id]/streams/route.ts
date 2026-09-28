@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTrackById, incrementTrackStreams, getMetricsHistoryByTrack } from "@/lib/db";
+import { requireSession, verifyWebhookSignature } from "@/lib/webhook-auth";
 
 // GET /api/tracks/:id/streams — Return stream data for a track
 export async function GET(
@@ -28,11 +29,21 @@ export async function GET(
 
 // POST /api/tracks/:id/streams — Increment stream count (play event)
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params;
+
+    const rawBody = await req.text();
+    const signature = req.headers.get("x-webhook-signature");
+    const authorizedBySignature = await verifyWebhookSignature(rawBody, signature);
+
+    if (!authorizedBySignature) {
+      const session = await requireSession(req);
+      if (session instanceof NextResponse) return session;
+    }
+
     const track = await getTrackById(id);
     if (!track) {
       return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });

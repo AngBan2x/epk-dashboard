@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncLocalToTurso, ensureTursoSchema, isTursoConfigured } from "@/lib/turso";
 import { getAllTracks } from "@/lib/db";
+import { requireAdmin } from "@/lib/webhook-auth";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   try {
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
+
     if (!isTursoConfigured()) {
       return NextResponse.json(
         { status: "error", message: "Turso no configurado. Configure TURSO_DATABASE_URL y TURSO_AUTH_TOKEN." },

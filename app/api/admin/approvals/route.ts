@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTrackSubmissions } from "@/lib/db";
+import { getAllTrackSubmissions, getAllArtists } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +39,12 @@ export async function GET(req: NextRequest) {
 
     const allSubmissions = await getAllTrackSubmissions();
 
+    const ownerIds = new Set(
+      (await getAllArtists())
+        .filter((a) => Boolean(a.user_id))
+        .map((a) => (a.name || "").toLowerCase())
+    );
+
     // Filter by status
     let filtered = allSubmissions;
     if (status && ["pending", "approved", "rejected", "revision"].includes(status)) {
@@ -72,11 +78,34 @@ export async function GET(req: NextRequest) {
     const start = (page - 1) * limit;
     const paginated = filtered.slice(start, start + limit);
 
-    const submissionsWithLabels = paginated.map(addSpanishStatusLabel);
+    const submissionsWithLabels = paginated.map((s) => {
+      const withLabel = addSpanishStatusLabel(s);
+      let artistName = "";
+      try {
+        artistName = String(JSON.parse(s.track_data)?.artist_name ?? "");
+      } catch {
+        artistName = "";
+      }
+      return {
+        ...withLabel,
+        artist_has_owner: artistName.length > 0 && ownerIds.has(artistName),
+      };
+    });
+
+    const ownerless = allSubmissions.filter((s) => {
+      let name = "";
+      try {
+        name = String(JSON.parse(s.track_data)?.artist_name ?? "");
+      } catch {
+        name = "";
+      }
+      return name.length > 0 && !ownerIds.has(name);
+    }).length;
 
     return NextResponse.json({
       submissions: submissionsWithLabels,
       stats,
+      artistless_count: ownerless,
       pagination: {
         page,
         limit,

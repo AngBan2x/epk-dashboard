@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { upsertMetricsHistory, getMetricsHistoryByTrack } from "@/lib/db";
+import { upsertMetricsHistory, getMetricsHistoryByTrack, getTrackById } from "@/lib/db";
+import { verifyWebhookSignature, requireAdmin } from "@/lib/webhook-auth";
 
 const MetricsWebhookSchema = z.object({
   track_id: z.string().min(1, "track_id requerido"),
@@ -14,19 +15,43 @@ const MetricsWebhookSchema = z.object({
     pct: z.number().min(0).max(100),
   })).default([]),
   source: z.string().min(1, "source requerido"),
-  signature: z.string().optional(), // Para verificación HMAC futura
+  signature: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const validated = MetricsWebhookSchema.parse(body);
+    const rawBody = await req.text();
+    const headerSignature = req.headers.get("x-webhook-signature");
 
-    // Verificar que el track existe
-    const trackExists = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tracks/${validated.track_id}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!trackExists.ok) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Cuerpo JSON inválido" }, { status: 400 });
+    }
+
+    const payload = parsed as Record<string, unknown>;
+    const inBodySignature = typeof payload.signature === "string" ? payload.signature : null;
+    const provided = headerSignature ?? inBodySignature;
+
+    const authorized =
+      (await verifyWebhookSignature(rawBody, headerSignature)) ||
+      (inBodySignature !== null && (await verifyWebhookSignature(rawBody, inBodySignature)));
+
+    if (!authorized) {
+      const denied = await requireAdmin(req);
+      if (denied) {
+        return NextResponse.json(
+          { error: "Falta la firma HMAC válida en x-webhook-signature o un rol de administrador" },
+          { status: 401 }
+        );
+      }
+    }
+
+    const validated = MetricsWebhookSchema.parse(parsed);
+
+    const track = await getTrackById(validated.track_id);
+    if (!track) {
       return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
     }
 

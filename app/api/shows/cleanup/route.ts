@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { notifyArtistOwner } from "@/lib/subscriber-notifications";
+import { requireAdmin } from "@/lib/webhook-auth";
 
 const MAX_NOTIFY_SHOWS = 50;
 
@@ -49,8 +50,11 @@ async function notifyPastShows(rows: PastShowRow[]): Promise<number> {
   return notified;
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   try {
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
+
     const TURSO_URL = process.env.TURSO_DATABASE_URL;
     const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
     const USE_TURSO = Boolean(TURSO_URL && TURSO_TOKEN);

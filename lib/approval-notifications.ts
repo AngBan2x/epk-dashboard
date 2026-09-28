@@ -22,6 +22,7 @@ function toEpochMs(value: string | null | undefined): number {
 export async function notifyApprovalDecision(input: NotifyApprovalDecisionInput): Promise<{
   notificationCreated: boolean;
   emailSent: boolean;
+  reason: string | null;
 }> {
   const { userId, type, title, message, data, context, adminNotes } = input;
 
@@ -66,8 +67,16 @@ export async function notifyApprovalDecision(input: NotifyApprovalDecisionInput)
     },
   });
 
+  const reasons: string[] = [];
+  if (isDuplicate) reasons.push("Ya había una notificación idéntica reciente");
+  if (!notificationCreated) reasons.push("La notificación en-app no se creó");
+  if (!emailResult.sent) {
+    reasons.push(emailResult.reason ?? "El email no se envió (¿FROM_EMAIL sin configurar?)");
+  }
+
   return {
     notificationCreated,
     emailSent: emailResult.sent,
+    reason: reasons.length > 0 ? reasons.join("; ") : null,
   };
 }

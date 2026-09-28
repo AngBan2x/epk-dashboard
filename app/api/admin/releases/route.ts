@@ -137,11 +137,19 @@ export async function PUT(req: NextRequest) {
       [status, admin_notes ?? null, now, id]
     );
 
+    const notification = {
+      artistNotified: false,
+      artistFound: false,
+      subscribersNotified: 0,
+      reason: null as string | null,
+    };
+
     if (status !== oldStatus && (status === "approved" || status === "rejected" || status === "revision")) {
       // Find the artist user
-      const artist = await dbQuery("SELECT * FROM artists WHERE name = ?", [release.artist_name]) as any[];
+      const artist = (await dbQuery("SELECT * FROM artists WHERE name = ?", [release.artist_name])) as Array<Record<string, unknown>>;
+      notification.artistFound = artist.length > 0;
       if (artist.length > 0 && artist[0].user_id) {
-        const userId = artist[0].user_id;
+        const userId = String(artist[0].user_id);
         let type: "submission_approved" | "submission_rejected" | "revision_requested";
         let title: string;
         let message: string;
@@ -166,7 +174,7 @@ export async function PUT(req: NextRequest) {
             throw new Error(`Estado de revisión no soportado: ${status}`);
         }
 
-        await notifyApprovalDecision({
+        const decision = await notifyApprovalDecision({
           userId,
           type,
           title,
@@ -175,6 +183,10 @@ export async function PUT(req: NextRequest) {
           context: "release",
           adminNotes: admin_notes ?? undefined,
         });
+        notification.artistNotified = decision.notificationCreated;
+        notification.reason = decision.reason ?? null;
+      } else if (artist.length > 0) {
+        notification.reason = "El artista no tiene una cuenta vinculada (artists.user_id vacío): no se le pudo avisar.";
       }
 
       if (status === "approved" && artist.length > 0) {
@@ -182,7 +194,7 @@ export async function PUT(req: NextRequest) {
         const title = "Nuevo release publicado";
         const message = `"${release.title}" de ${artistName} ya está disponible en PressPlay.`;
 
-        await notifyArtistSubscribers({
+        const fanout = await notifyArtistSubscribers({
           artistId: String(artist[0].id),
           kind: "release",
           title,
@@ -201,10 +213,11 @@ export async function PUT(req: NextRequest) {
             dashboardUrl: `/releases/${id}`,
           },
         });
+        notification.subscribersNotified = fanout.notified;
       }
     }
 
-    return NextResponse.json({ message: "Estado actualizado", status });
+    return NextResponse.json({ message: "Estado actualizado", status, notification });
   } catch (error) {
     console.error("PUT admin releases error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

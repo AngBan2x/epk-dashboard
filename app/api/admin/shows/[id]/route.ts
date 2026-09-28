@@ -111,14 +111,22 @@ export async function PATCH(
       [nextApproved ? 1 : 0, now, id]
     );
 
+    const notification = {
+      artistNotified: false,
+      artistFound: false,
+      subscribersNotified: 0,
+      reason: null as string | null,
+    };
+
     if (show.artist_id) {
-      const artists = await dbQuery("SELECT * FROM artists WHERE id = ?", [show.artist_id]) as any[];
+      const artists = (await dbQuery("SELECT * FROM artists WHERE id = ?", [show.artist_id])) as Array<Record<string, unknown>>;
+      notification.artistFound = artists.length > 0;
       if (artists.length > 0 && artists[0].user_id) {
-        const userId = artists[0].user_id;
-        const data = { showId: id, trackTitle: show.venue_name, artistName: artists[0].name, showVenue: show.venue_name, showDate: show.date };
+        const userId = String(artists[0].user_id);
+        const data = { showId: id, trackTitle: show.venue_name, artistName: String(artists[0].name), showVenue: show.venue_name, showDate: show.date };
 
         if (resolvedAction === "revision") {
-          await notifyApprovalDecision({
+          const decision = await notifyApprovalDecision({
             userId,
             type: "revision_requested",
             title: "Tu show necesita cambios",
@@ -127,6 +135,8 @@ export async function PATCH(
             context: "show",
             adminNotes: notes,
           });
+          notification.artistNotified = decision.notificationCreated;
+          notification.reason = decision.reason ?? null;
         } else if (nextApproved !== wasApproved) {
           const type = nextApproved ? "submission_approved" : "submission_rejected";
           const title = nextApproved ? "¡Tu show ha sido aprobado!" : "Tu show no fue aprobado";
@@ -134,7 +144,7 @@ export async function PATCH(
             ? `"${show.venue_name}" el ${show.date || "sin fecha"} ya está visible en tu perfil.`
             : `El show "${show.venue_name}" no fue aprobado. ${notes ? `Razón: ${notes}` : "Puedes editarlo y volver a enviarlo."}`;
 
-          await notifyApprovalDecision({
+          const decision = await notifyApprovalDecision({
             userId,
             type,
             title,
@@ -143,7 +153,12 @@ export async function PATCH(
             context: "show",
             adminNotes: notes,
           });
+          notification.artistNotified = decision.notificationCreated;
+          notification.reason = decision.reason ?? null;
         }
+      } else if (artists.length > 0) {
+        notification.reason =
+          "El artista no tiene una cuenta vinculada (artists.user_id vacío): no se le pudo avisar.";
       }
 
       if (resolvedAction === "approve" && nextApproved && !wasApproved) {
@@ -161,7 +176,7 @@ export async function PATCH(
           dashboardUrl: "/shows",
         };
 
-        await notifyArtistSubscribers({
+        const fanout = await notifyArtistSubscribers({
           artistId: show.artist_id,
           kind: "show",
           title,
@@ -175,6 +190,7 @@ export async function PATCH(
             dashboardUrl: "/shows",
           },
         });
+        notification.subscribersNotified = fanout.notified;
       }
     }
 
@@ -186,6 +202,7 @@ export async function PATCH(
           : "Show rechazado",
       approved: nextApproved,
       action: resolvedAction,
+      notification,
     });
   } catch (error) {
     console.error("PATCH admin shows error:", error);

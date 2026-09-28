@@ -286,12 +286,28 @@ export default function AdminPage() {
       });
 
       if (res.ok) {
+        const data = await res.json().catch(() => null);
         const text = action === "approve"
           ? "Show aprobado"
           : action === "reject"
             ? "Show rechazado"
             : "Revisión solicitada";
-        setMessage({ type: "success", text });
+        const notification = data?.notification as
+          | { artistNotified?: boolean; artistFound?: boolean; subscribersNotified?: number; reason?: string | null }
+          | undefined;
+        if (notification?.reason) {
+          setMessage({
+            type: "error",
+            text: `${text}. El artista NO fue notificado: ${notification.reason}`,
+          });
+        } else if (notification?.artistNotified) {
+          setMessage({
+            type: "success",
+            text: `${text}. Artista notificado y ${notification.subscribersNotified ?? 0} suscriptores avisados.`,
+          });
+        } else {
+          setMessage({ type: "success", text });
+        }
         fetchPendingShows();
         fetchShows();
         fetchEmailStatus();
@@ -441,8 +457,24 @@ export default function AdminPage() {
       });
 
       if (res.ok) {
+        const data = await res.json().catch(() => null);
         const statusText = status === "approved" ? "aprobado" : status === "rejected" ? "rechazado" : status === "revision" ? "en revisión" : "actualizado";
-        setMessage({ type: "success", text: `Release ${statusText}` });
+        const notification = data?.notification as
+          | { artistNotified?: boolean; artistFound?: boolean; subscribersNotified?: number; reason?: string | null }
+          | undefined;
+        if (notification?.reason) {
+          setMessage({
+            type: "error",
+            text: `Release ${statusText}. El artista NO fue notificado: ${notification.reason}`,
+          });
+        } else if (notification?.artistNotified) {
+          setMessage({
+            type: "success",
+            text: `Release ${statusText}. Artista notificado y ${notification.subscribersNotified ?? 0} suscriptores avisados.`,
+          });
+        } else {
+          setMessage({ type: "success", text: `Release ${statusText}` });
+        }
         fetchReleases();
       } else {
         const error = await res.json();

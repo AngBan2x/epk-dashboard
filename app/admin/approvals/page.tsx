@@ -19,6 +19,7 @@ interface Submission {
   reviewed_at?: string | null;
   revision?: number;
   status_label?: string;
+  artist_has_owner?: boolean;
 }
 
 interface Stats {
@@ -55,6 +56,7 @@ export default function ApprovalsPage() {
   const [revisionTarget, setRevisionTarget] = useState<Submission | null>(null);
   const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [artistlessCount, setArtistlessCount] = useState(0);
   const modalTitleRef = useRef<HTMLHeadingElement>(null);
   const rejectModalTitleRef = useRef<HTMLHeadingElement>(null);
   const revisionModalTitleRef = useRef<HTMLHeadingElement>(null);
@@ -80,6 +82,7 @@ export default function ApprovalsPage() {
         setSubmissions(data.submissions);
         setStats(data.stats);
         setPagination(data.pagination);
+        setArtistlessCount(typeof data.artistless_count === "number" ? data.artistless_count : 0);
         setPage(pageNumber);
       }
     } catch (error) {
@@ -289,6 +292,24 @@ export default function ApprovalsPage() {
           </div>
         )}
 
+        {artistlessCount > 0 && (
+          <div
+            role="status"
+            className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+          >
+            <strong className="font-semibold">
+              {artistlessCount} {artistlessCount === 1 ? "envío pertenece" : "envíos pertenecen"} a artistas
+              sin cuenta vinculada
+            </strong>
+            <p className="mt-1 text-xs">
+              Al aprobar o rechazar, esos artistas no recibirán notificación porque su
+              <code className="mx-1">artists.user_id</code> está vacío. Puedes vincularlos con
+              <code className="mx-1">npx tsx scripts/backfill-artist-owners.ts</code> o desde la ficha
+              del artista.
+            </p>
+          </div>
+        )}
+
         {/* Search */}
         <div className="mb-6">
           <input
@@ -329,6 +350,14 @@ export default function ApprovalsPage() {
                           {revision > 0 && (
                             <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
                               Revisión #{revision}
+                            </span>
+                          )}
+                          {sub.artist_has_owner === false && (
+                            <span
+                              title="Este artista no tiene cuenta vinculada: no recibirá la notificación de la decisión."
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                            >
+                              Sin cuenta vinculada
                             </span>
                           )}
                         </div>
