@@ -3,7 +3,6 @@
 import { Metadata } from "next";
 
 import { EPKCard } from "@/components/EPKCard";
-import { EPKExporter } from "@/components/EPKExporter";
 import { BioSection } from "@/components/BioSection";
 import { ArtistSocialLinks } from "@/components/ArtistSocialLinks";
 import { CatalogArtistsCarousel } from "@/components/dashboard/CatalogArtistsCarousel";
@@ -12,6 +11,7 @@ import { LoginModal } from "@/components/LoginModal";
 import LastfmMetrics from "@/components/LastfmMetrics";
 import { DossierEditor } from "@/components/DossierEditor";
 import { DownloadCenter } from "@/components/DownloadCenter";
+import { CatalogDownloadButton } from "@/components/CatalogDownloadButton";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { useAuth } from "@/context/AuthContext";
@@ -117,6 +117,7 @@ export default function DashboardPage() {
   const sortedTracks = sortList(tracks, sortState, TRACK_ACCESSORS);
   const sortedArtistTracks = sortList(artistTracks, sortState, TRACK_ACCESSORS);
   const isAdmin = user?.role === "admin";
+  const isSubscriber = !!user && !isAdmin && !artistProfile;
 
   if (loading) {
     return (
@@ -165,6 +166,80 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </section>
+            </section>
+          ) : isSubscriber ? (
+            /* ===== SUBSCRIBER VIEW ===== */
+            <section className="mb-8">
+              <PitchHeading>
+                <h1 className="mb-3 text-2xl font-bold text-slate-900 dark:text-white">
+                  Bienvenido a PressPlay
+                </h1>
+                <p className="text-base text-slate-600 dark:text-slate-400">
+                  Tu cuenta es de <strong className="text-primary-600 dark:text-primary-400">Suscriptor</strong>.{" "}
+                  Sigue a los artistas que te gustan y, cuando quieras publicar, crea tu primer
+                  lanzamiento o show.
+                </p>
+              </PitchHeading>
+
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                    1. Publica tu primer release o show
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Se envía a revisión y aparece como pendiente. Nadie más puede editarlo.
+                  </p>
+                  <a
+                    href="/releases/new"
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  >
+                    Crear mi primer release
+                  </a>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                    2. Te conviertes en Artista
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Al aprobarse tu primera publicación tu cuenta pasa a Artista automáticamente y
+                    se desbloquean el dossier, el rider y las descargas para prensa.
+                  </p>
+                  <a
+                    href="/shows"
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Ver shows publicados
+                  </a>
+                </div>
+              </div>
+
+              {artists.length > 0 && (
+                <div className="mt-6">
+                  <SectionHeader
+                    emoji="🎤"
+                    title="Artistas del catálogo"
+                    subtitle=" Sigue a los que te interesen para no perderte nada"
+                  />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {artists.slice(0, 6).map((artist) => (
+                      <a
+                        key={artist.id}
+                        href={`/artists/${artist.id}`}
+                        className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-primary-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                          {artist.name}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                          {artist.genre || "Multi-género"}
+                          {artist.location ? ` · ${artist.location}` : ""}
+                        </p>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           ) : artistProfile ? (
             /* ===== ARTIST VIEW ===== */
@@ -334,16 +409,18 @@ export default function DashboardPage() {
                 </div>
               </section>
 
-              {/* Dossier / Rider + Centro de Descargas */}
+              {/* Dossier / Rider + Descargas unificadas */}
               {artistProfile && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
                   <SlideIn index={artistTracks.length + 2}>
                     <DossierEditor
                       artistId={artistProfile.id}
                       artistName={artistProfile.name}
                       onSaved={() => {
                         const url = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
-                        fetch(url).then(r => r.json()).then(json => setData(json));
+                        fetch(url, { cache: "no-store" })
+                          .then((r) => r.json())
+                          .then((json) => setData(json));
                       }}
                     />
                   </SlideIn>
@@ -488,10 +565,6 @@ export default function DashboardPage() {
     </div>
   </div>
 ) : null}
-
-              <SlideIn index={artistTracks.length + 3}>
-                <EPKExporter tracks={artistTracks} />
-              </SlideIn>
             </>
           ) : (
             /* ===== GUEST VIEW ===== */
@@ -554,7 +627,16 @@ export default function DashboardPage() {
               )}
 
               <SlideIn index={tracks.length + artists.length}>
-                <EPKExporter tracks={tracks} />
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                    ¿Trabajas en prensa o Contrataciones?
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Descarga el catálogo completo del EPK en JSON con métricas, enlaces y detalles
+                    de producción de cada lanzamiento.
+                  </p>
+                    <CatalogDownloadButton />
+                  </div>
               </SlideIn>
             </>
           )}

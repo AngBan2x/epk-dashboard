@@ -34,6 +34,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [ytLikes, setYtLikes] = useState(0);
   const [ytViews, setYtViews] = useState(0);
+  const [coverBroken, setCoverBroken] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [loading, setLoading] = useState(false);
   const streams = formatNumber((track.metrics?.streams ?? 0) + ytViews);
@@ -120,14 +121,15 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
       <div className="aspect-square bg-slate-100 dark:bg-slate-700 relative overflow-hidden flex-shrink-0">
-        {coverImage ? (
+        {coverImage && !coverBroken ? (
           <Image
             src={coverImage}
-            alt={title}
+            alt={`Portada de ${title}`}
             width={400}
             height={400}
             unoptimized
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+            onError={() => setCoverBroken(true)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-3xl">

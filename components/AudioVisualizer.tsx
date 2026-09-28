@@ -1,8 +1,19 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import { useAudioPlayer } from "@/context/AudioPlayerContext";
-import { createAudioVisualizer, generateSyntheticFrequencies, type AudioVisualizerNode } from "@/lib/web-audio";
+import {
+  createAudioVisualizer,
+  generateSyntheticFrequencies,
+  computeBandFrequencies,
+  computeBandLevels,
+  DEFAULT_FFT_SIZE,
+  DEFAULT_BAND_CURVE,
+  DEFAULT_BAND_GAIN,
+  PEAK_DECAY,
+  type AudioVisualizerNode,
+  type FrequencyBand,
+} from "@/lib/web-audio";
 
 interface AudioVisualizerProps {
   className?: string;
@@ -20,9 +31,20 @@ export function AudioVisualizer({
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isPlayingRef = useRef(isPlaying);
+  const peaksRef = useRef<number[]>([]);
+  const bandsRef = useRef<FrequencyBand[] | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
-  // Sync ref with state for the render loop
   isPlayingRef.current = isPlaying;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReducedMotion(query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
 
   const updateCanvasSize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -58,64 +80,36 @@ export function AudioVisualizer({
     const setupVisualizer = async () => {
       if (cancelled) return;
       try {
-        if (audioRef.current && !cancelled) {
-          visualizerNode = await createAudioVisualizer(audioRef.current, 128);
+        if (audioRef.current) {
+          visualizerNode = await createAudioVisualizer(audioRef.current, DEFAULT_FFT_SIZE);
+          if (visualizerNode) {
+            bandsRef.current = computeBandFrequencies(
+              visualizerNode.sampleRate,
+              visualizerNode.analyser.fftSize,
+              barCount
+            );
+            peaksRef.current = new Array(barCount).fill(0);
+          }
         }
       } catch {
-        // CORS or other error — will use synthetic frequencies
         visualizerNode = null;
       }
     };
     setupVisualizer();
 
-    const render = () => {
-      if (cancelled) return;
-
+    const drawBars = (frequencies: number[], peaks: number[]) => {
       const dpr = window.devicePixelRatio || 1;
       const width = canvas.width;
       const canvasHeight = canvas.height;
 
       ctx.clearRect(0, 0, width, canvasHeight);
 
-      let frequencies: number[] = [];
-
-      if (isPlayingRef.current) {
-        if (visualizerNode) {
-          const data = visualizerNode.getFrequencyData();
-          const binCount = data.length;
-          // Logarithmic frequency grouping: low octaves get more bins
-          const logMin = Math.log(1);
-          const logMax = Math.log(binCount);
-          for (let i = 0; i < barCount; i++) {
-            const lo = Math.exp(logMin + (logMax - logMin) * (i / barCount));
-            const hi = Math.exp(logMin + (logMax - logMin) * ((i + 1) / barCount));
-            const binLo = Math.max(0, Math.floor(lo));
-            const binHi = Math.min(binCount - 1, Math.floor(hi));
-            let sum = 0;
-            let count = 0;
-            for (let b = binLo; b <= binHi; b++) {
-              sum += data[b];
-              count++;
-            }
-            frequencies.push(count > 0 ? sum / count : 0);
-          }
-        } else {
-          frequencies = generateSyntheticFrequencies(barCount, 0.9);
-        }
-      } else {
-        const time = Date.now() / 1000;
-        frequencies = Array.from({ length: barCount }, (_, i) =>
-          Math.sin(time * 0.8 + i * 0.4) * 15 + 20
-        );
-      }
-
       const barWidth = (width / barCount) * 0.65;
       const gap = (width / barCount) * 0.35;
-
       const isDark = document.documentElement.classList.contains("dark");
 
       frequencies.forEach((value, i) => {
-        const percent = value / 255;
+        const percent = Math.max(0, Math.min(1, value / 255));
         const barHeight = Math.max(6 * dpr, percent * canvasHeight);
         const x = i * (barWidth + gap);
         const y = canvasHeight - barHeight;
@@ -146,8 +140,59 @@ export function AudioVisualizer({
           ctx.fill();
           ctx.shadowBlur = 0;
         }
-      });
 
+        const peakValue = peaks[i] ?? 0;
+        if (peakValue > 0.04 && peakValue > percent) {
+          const peakY = canvasHeight - Math.max(2 * dpr, peakValue * canvasHeight);
+          ctx.fillStyle = isDark ? "rgba(236, 72, 153, 0.85)" : "rgba(190, 24, 93, 0.85)";
+          ctx.fillRect(x, peakY, barWidth, 2 * dpr);
+        }
+      });
+    };
+
+    const readFrequencies = (): { frequencies: number[]; peaks: number[] } => {
+      if (isPlayingRef.current && visualizerNode) {
+        const bands = bandsRef.current;
+        if (bands && bands.length === barCount) {
+          const data = visualizerNode.getFrequencyData();
+          const levels = computeBandLevels(data, bands, {
+            gain: DEFAULT_BAND_GAIN,
+            curve: DEFAULT_BAND_CURVE,
+            previousPeaks: peaksRef.current,
+            peakDecay: PEAK_DECAY,
+          });
+          peaksRef.current = levels.map((l) => l.peak);
+          return { frequencies: levels.map((l) => l.level * 255), peaks: peaksRef.current };
+        }
+      }
+
+      if (isPlayingRef.current) {
+        const synthetic = generateSyntheticFrequencies(barCount, 0.9);
+        peaksRef.current = synthetic.map((v) => Math.max(0, Math.min(1, v / 255)));
+        return { frequencies: synthetic, peaks: peaksRef.current };
+      }
+
+      const time = Date.now() / 1000;
+      const idle = Array.from(
+        { length: barCount },
+        (_, i) => (Math.sin(time * 0.8 + i * 0.4) * 15 + 20)
+      );
+      return { frequencies: idle, peaks: new Array(barCount).fill(0) };
+    };
+
+    if (reducedMotion) {
+      const { frequencies, peaks } = readFrequencies();
+      drawBars(frequencies, peaks);
+      return () => {
+        cancelled = true;
+        resizeObserver.disconnect();
+      };
+    }
+
+    const render = () => {
+      if (cancelled) return;
+      const { frequencies, peaks } = readFrequencies();
+      drawBars(frequencies, peaks);
       animationFrameRef.current = requestAnimationFrame(render);
     };
 
@@ -160,21 +205,23 @@ export function AudioVisualizer({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [audioRef, barCount, updateCanvasSize]);
+  }, [audioRef, barCount, updateCanvasSize, reducedMotion]);
 
   return (
     <div ref={containerRef} className={`w-full overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900/60 p-4 border border-slate-200 dark:border-slate-700/50 backdrop-blur-md ${className}`}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-          Audio Frequency Visualizer
+          Visualizador de frecuencia
         </span>
         <span className="text-xs text-slate-500 dark:text-slate-400 pr-10">
-          {isPlaying ? "Live Spectrum" : "Paused"}
+          {isPlaying ? "Espectro en vivo" : "En pausa"}
         </span>
       </div>
       <canvas
         ref={canvasRef}
         className="w-full block"
+        role="img"
+        aria-label={isPlaying ? "Espectro de audio en vivo" : "Visualizador de audio en pausa"}
       />
     </div>
   );

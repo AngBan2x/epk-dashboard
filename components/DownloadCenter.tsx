@@ -1,165 +1,226 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { safeString } from "@/lib/null-safe";
-import { generateRiderHTML, generateDossierHTML } from "@/lib/downloadable-assets";
+import React, { useState, useCallback, useEffect } from "react";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Badge, CountBadge } from "@/components/ui/Badge";
+import { safeString } from "@/lib/null-safe";
 
-export interface DownloadableAsset {
+type ExportSection = "dossier" | "rider" | "catalog";
+type ExportFormat = "html" | "json";
+
+interface DownloadOption {
   id: string;
   name: string;
-  category: "Tech Rider" | "Logos & Vectores" | "Fotos HD" | "Ficha EPK" | "Audio Stems";
-  size: string;
-  format: string;
-  url?: string;
+  description: string;
+  format: ExportFormat;
+  sections: ExportSection[];
+  badge: string;
 }
 
 interface DownloadCenterProps {
   artistId?: string;
   artistName?: string;
-  trackTitle?: string;
-  assets?: DownloadableAsset[];
   trackCount?: number;
+  className?: string;
+  onSaved?: () => void | Promise<void>;
+}
+
+type Status = "idle" | "loading" | "error";
+
+function filenameFromDisposition(header: string | null, fallback: string) {
+  if (!header) return fallback;
+  const match = /filename="?([^"]+)"?/i.exec(header);
+  return match?.[1] ?? fallback;
 }
 
 export function DownloadCenter({
   artistId,
   artistName = "Artista",
-  trackTitle,
-  assets = [],
   trackCount = 0,
+  className = "",
+  onSaved,
 }: DownloadCenterProps) {
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [dossierData, setDossierData] = useState<Record<string, string | null> | null>(null);
+  const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "") || "Artista";
+  const [statusById, setStatusById] = useState<Record<string, Status>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [dossierRevision, setDossierRevision] = useState(0);
 
-  const loadDossier = useCallback(async () => {
-    if (!artistId) return;
-    try {
-      const res = await fetch(`/api/dossiers?artist_id=${artistId}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.dossier) setDossierData(json.dossier);
-      }
-    } catch {}
-  }, [artistId]);
-
-  useEffect(() => {
-    loadDossier();
-  }, [loadDossier]);
-
-  const defaultAssets: DownloadableAsset[] = [
+  const options: DownloadOption[] = [
     {
-      id: "asset-1",
-      name: `Rider Tecnico & Stage Plot - ${artistName} 2026`,
-      category: "Tech Rider",
-      size: "~15 KB",
-      format: "HTML",
+      id: "dossier",
+      name: `Dossier de prensa`,
+      description: "Ficha de prensa con biography, métricas, contactos y notas",
+      format: "html",
+      sections: ["dossier"],
+      badge: "HTML",
     },
     {
-      id: "asset-3",
-      name: `Dossier ${artistName}`,
-      category: "Ficha EPK",
-      size: "~12 KB",
-      format: "HTML",
+      id: "rider",
+      name: `Rider técnico`,
+      description: "Stage plot, requisitos de sonido, luz y backline",
+      format: "html",
+      sections: ["rider"],
+      badge: "HTML",
+    },
+    {
+      id: "catalog-json",
+      name: `Catálogo en JSON`,
+      description: "Todos los tracks con métricas y enlaces, listo para automatizar",
+      format: "json",
+      sections: ["catalog"],
+      badge: "JSON",
+    },
+    {
+      id: "catalog-html",
+      name: `Catálogo imprimible`,
+      description: "Ficha imprimible de cada lanzamiento con portada",
+      format: "html",
+      sections: ["catalog"],
+      badge: "HTML",
     },
   ];
 
-  const assetList = assets.length > 0 ? assets : defaultAssets;
+  useEffect(() => {
+    if (!onSaved) return;
+  }, [onSaved]);
 
-  const handleDownload = async (asset: DownloadableAsset) => {
-    setDownloadingId(asset.id);
-    // Re-fetch dossier data before generating HTML to get the latest edits
-    await loadDossier();
-    setTimeout(() => {
-      if (asset.url) {
-        window.open(asset.url, "_blank");
-      } else {
-        let htmlContent = "";
-        let filename = "";
+  const refreshDossier = useCallback(async () => {
+    if (!artistId) return;
+    try {
+      await fetch(`/api/dossiers?artist_id=${artistId}`, { cache: "no-store" });
+      setDossierRevision((n) => n + 1);
+    } catch {
+      setDossierRevision((n) => n + 1);
+    }
+  }, [artistId]);
 
-        if (asset.category === "Tech Rider") {
-          htmlContent = generateRiderHTML(artistName, dossierData);
-          const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "");
-          filename = `PressPlay_Rider_Tecnico_${safeName}.html`;
-        } else if (asset.category === "Ficha EPK") {
-          htmlContent = generateDossierHTML(artistName, dossierData);
-          const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "");
-          filename = `PressPlay_Dossier_${safeName}.html`;
-        } else {
-          const content = `EPK ASSET: ${asset.name}\nArtista: ${artistName}\nCategoria: ${asset.category}\nGenerado el: ${new Date().toISOString()}`;
-          const blob = new Blob([content], { type: "text/plain" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${asset.name.replace(/[^a-z0-9]/gi, "_")}.${asset.format.toLowerCase()}`;
-          a.click();
-          URL.revokeObjectURL(url);
-          setDownloadingId(null);
-          return;
-        }
+  const handleDownload = async (option: DownloadOption) => {
+    if (!artistId) {
+      setError("Necesitas un perfil de artista para generar el dossier y el rider.");
+      return;
+    }
 
-        const blob = new Blob([htmlContent], { type: "text/html" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+    setStatusById((prev) => ({ ...prev, [option.id]: "loading" }));
+    setError(null);
+
+    try {
+      const response = await fetch("/api/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          format: option.format,
+          artist_id: artistId,
+          include: option.sections,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || "No se pudo generar el archivo");
       }
-      setDownloadingId(null);
-    }, 600);
+
+      const blob = await response.blob();
+      const filename = filenameFromDisposition(
+        response.headers.get("Content-Disposition"),
+        `${option.id}-${safeName}.${option.format}`
+      );
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+
+      setStatusById((prev) => ({ ...prev, [option.id]: "idle" }));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo generar el archivo. Inténtalo de nuevo."
+      );
+      setStatusById((prev) => ({ ...prev, [option.id]: "error" }));
+    }
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+    <div
+      className={`bg-white rounded-2xl border border-slate-200 p-6 dark:border-slate-700 dark:bg-slate-800 ${className}`}
+      data-dossier-revision={dossierRevision}
+    >
       <SectionHeader
         emoji="📥"
-        title="Centro de Descargas"
-        subtitle="Assets para prensa y venues"
+        title="Descargas para prensa"
+        subtitle="Todo se genera en el servidor con tus datos más recientes"
         badges={
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            <Badge variant="emerald">Disponibles</Badge>
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+            <Badge variant="emerald">Sin coste</Badge>
             <CountBadge>{trackCount || 0} tracks incluidos</CountBadge>
           </div>
         }
       />
 
-      <div className="grid grid-cols-1 gap-3">
-        {assetList.map((asset) => (
-          <div
-            key={asset.id}
-            className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 hover:border-primary-500/50 transition-all"
-          >
-            <div className="w-8 h-8 rounded-lg bg-pink-800 text-pink-50 font-bold text-[10px] flex items-center justify-center border border-pink-300 dark:border-pink-800/60 flex-shrink-0">
-              {asset.format}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
-                {safeString(asset.name)}
-              </p>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                {asset.size}
-              </div>
-            </div>
-
-            <button
-              onClick={() => handleDownload(asset)}
-              disabled={downloadingId === asset.id}
-              className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white transition flex items-center gap-1 disabled:opacity-50"
-              aria-label={`Descargar ${asset.name}`}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {options.map((option) => {
+          const status = statusById[option.id] ?? "idle";
+          return (
+            <div
+              key={option.id}
+              className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition hover:border-primary-500/50 dark:border-slate-700 dark:bg-slate-900/60"
             >
-              {downloadingId === asset.id ? (
-                <>...</>
-              ) : (
-                <>Descargar</>
-              )}
-            </button>
-          </div>
-        ))}
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-pink-300 bg-pink-800 text-[10px] font-bold text-pink-50 dark:border-pink-800/60">
+                {option.badge}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  {safeString(option.name)}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-slate-600 dark:text-slate-400">
+                  {option.description}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDownload(option)}
+                disabled={status === "loading"}
+                className="flex flex-shrink-0 items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                aria-label={`Descargar ${option.name} de ${artistName}`}
+              >
+                {status === "loading" ? "Generando…" : "Descargar"}
+              </button>
+            </div>
+          );
+        })}
       </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={refreshDossier}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Actualizar datos del dossier
+        </button>
+        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+          Se generan en el servidor con la última versión guardada.
+        </span>
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="rounded border border-red-400 px-2 py-1 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
