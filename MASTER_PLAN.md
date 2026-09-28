@@ -659,27 +659,30 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 #### Fase P5: Polish + Demo
 | Task | Subagente | Descripción |
 |------|-----------|-------------|
-| P5.1 | carousel-builder | Carruseles infinitos |
-| P5.2 | seed-builder | Seed data: 5 artistas reales |
-| P5.3 | social-links-builder | SVG icons (17 plataformas) |
-| P5.4 | show-form-builder | Disclaimer banner pagos |
-| P5.5 | qa-visual | QA visual completo |
-| P5.6 | release-manager | Release v4.0.0 |
+| P5.1 | carousel-builder | Carruseles infinitos (HECHO: solo catalogo dashboard) |
+| P5.2 | seed-builder | Seed data: 5 artistas reales (script listo, NO aplicado en prod) |
+| P5.3 | social-links-builder | SVG icons (16 plataformas) — HECHO |
+| P5.4 | show-form-builder | Disclaimer banner pagos — HECHO y verificado |
+| P5.5 | qa-visual | QA visual completo — HECHO (12/12 vistas + teclado) |
+| P5.6 | release-manager | Release v4.0.0 (sigue prerelease v4.0.0-rc.27 por decision del usuario) |
 
-#### Fase P6: Fixes UI + Roles + Seguridad + A11y
+#### Fase P6: Fixes UI + Roles + Seguridad + A11y — COMPLETADA 2026-09-27
 | Task | Subagente | Descripción | Estado |
 |------|-----------|-------------|--------|
-| P6.1 | show-form-builder | Shows UI: animación expansión, cards, checkbox, truncate, select dark, SortSelect | Pendiente |
-| P6.2 | header-builder | Header: espaciado, link Artistas logueado, cierre menú avatar | Pendiente |
-| P6.3 | carousel-builder | Carrusel solo-catálogo (Embla) | Pendiente |
-| P6.4 | dashboard-builder | Visualizador M + B-UI descargas | Pendiente |
-| P6.5 | api-builder | Export unificado + APIs roles + rate limit + fixes S | Pendiente |
-| P6.6 | approval-workflow-builder | Split admin + hook de promoción | Pendiente |
-| P6.7 | auth-builder | Registro cerrado, AuthContext, middleware, sesión | Pendiente |
-| P6.8 | db-migrator | Backfill + cascadas + aviso sin dueño | Pendiente |
-| P6.9 | security/quality/visual | Auditoría + tests + capturas globales | Pendiente |
+| P6.1 | show-form-builder | Shows UI: animación expansión, cards, filtros accesibles, SortSelect, disclaimer | Completada |
+| P6.2 | header-builder | Header: espaciado, link Artistas logueado, cierre menú avatar | Completada |
+| P6.3 | carousel-builder | Carrusel solo-catálogo (Embla) | Completada |
+| P6.4 | dashboard-builder | Visualizador M + descargas unificadas + vista suscriptor + a11y | Completada |
+| P6.5 | api-builder | Export server-side + rate limit acotado + S1/S3/S4/S7/S8 | Completada |
+| P6.6 | approval-workflow-builder | Split submissions/approvals + hook de promoción | Completada |
+| P6.7 | auth-builder | Registro solo suscriptor, token con exp siempre, invalidación por cambio de rol | Completada |
+| P6.8 | db-migrator | Cascadas de borrado + promoción idempotente + scripts seed/backfill/QA | Completada |
+| P6.9 | security/quality | Auditoría de seguridad, 225 unit, 12/12 vistas, matriz prod 50/50 | Completada |
 
 > Spec ejecutable: `docs/PHASE_P6.md`. Decisiones registradas: suscriptor-por-defecto sí, registro artista cerrado, promoción por release o show aprobado, submissions=portal / approvals=consola, exportador unificado (B), carrusel solo catálogo, tarjetas ricas sin detalle, menú sin X, visualizador M, rate limit solo en escrituras más abusables.
+>
+> **Verificación:** 225/225 unit · tsc 0 · build OK · E2E prod 6/6 (approvals + subscriber) · shows-transitions 2/2 · funcional de exportación 9/9 · matriz prod 50/50 · higiene de datos por SQL directo (9 tracks, 2 shows, 0 QA, 13 usuarios de prueba de fases anteriores eliminados).
+> **Pendiente de decisión del usuario:** `FROM_EMAIL` y dominio `pressplay.eu.org` sin verificar (no sale correo a terceros), aplicación del seed P5.2 en producción, y backfill de `artists.user_id` (6 de 7 artistas siguen sin dueño).
 
 ---
 
