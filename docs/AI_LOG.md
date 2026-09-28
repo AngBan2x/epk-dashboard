@@ -5758,6 +5758,37 @@ El usuario reporto 13 problemas con capturas (animacion shows, carrusel ausente,
 
 **Gates:** `tsc` 0 errores, `vitest` **249/249** (21 archivos), `next lint` sin warnings, `pnpm build` OK.
 
-**Pendiente del usuario:** verificar una subida real en produccion (el token ya no se le pasa, asi que solo puede funcionar por OIDC) y despues pulsar **Revoke Token**. En `.env.local` hace falta `BLOB_STORE_ID` (`vercel env pull`). Nota de seguridad: el token de escritura se compartio en texto plano durante la conversacion, asi que **debe revocarse**.
+**Verificado en produccion por el usuario:** subio una imagen de perfil y agrego enlaces de redes sociales en `/profile` -> "funciona perfectamente". Como el codigo desplegado ya no pasa ningun token, la subida **solo puede haber funcionado por OIDC**. **Paso 2 confirmado**, el usuario ya puede pulsar **Revoke Token**.
+
+### A2 - Copy del boton de subida + limpieza de variables (2026-09-28) · S
+
+**Copy (opcion B, elegida por el usuario tras ver las tres opciones).** El flujo de subida tiene **dos pasos**: el boton sube el archivo a Blob y devuelve la URL a `setProfileImage`, y despues hay que pulsar "Guardar Perfil" para que el `PATCH` la vincule al artista. "Subir imagen" describia la mecanica interna, no la accion del usuario.
+
+| Antes | Ahora | Linea |
+|---|---|---|
+| "Subir imagen" | **"Confirmar"** | `components/ImageUploader.tsx:222` |
+| "Subiendo..." | **"Confirmando..."** | `:201` |
+| "Quitar" | **"Cambiar"** | `:193` |
+
+"Cambiar" y no "Quitar" porque junto a un boton "Confirmar", "Quitar" se leia como deshacer algo ya guardado, cuando en realidad descarta la seleccion pendiente.
+
+**Tests:** los 2 selectores de `scripts/verify-upload-headed.ts:45,69` buscaban `"Subir imagen"`; se actualizaron a `"Confirmar"` con `exact: true`. `git grep` confirma **0 referencias** restantes a "Subir imagen" / "Subiendo" en `app/`, `components/`, `tests/` y `scripts/`.
+
+**Limpieza de variables muertas en `.env.local`** (verificadas sin exposicion de valores: 0 usos en `lib/`, `app/`, `components/`, `context/`, `middleware.ts`, `next.config.js`):
+
+| Variable | Por que estaba muerta |
+|---|---|
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | 0 referencias en codigo. El commit `8688f4b` migro de R2 a Blob y las dejo inertes |
+| `LASTFM_API_SECRET` | 0 usos. `lib/lastfm.ts:4` solo lee `LASTFM_API_KEY`; la API 2.0 de Last.fm solo necesita la key para lectura, el secret es para firmar `track.scrobble` |
+
+**Se conservan:** `LASTFM_API_KEY` (es la que funciona), `VERCEL_OIDC_TOKEN` (parte de OIDC), `UNSPLASH_*` (las usa `scripts/seed-artist-images.ts:27`).
+
+**Comprobado antes de borrar:** contra Turso, **0 URLs de R2** en `tracks.cover_image`, `tracks.gallery_images`, `artists.profile_image` y `artists.banner_image`, y **1 imagen en Blob** (el perfil). Ninguna imagen en produccion depende ya de R2.
+
+`.env.local` esta en `.gitignore:46` (`.env*`), asi que la limpieza no toca el repo.
+
+**Gates:** `tsc` 0, `vitest` **249/249**, `lint` sin warnings, `build` OK.
+
+**Pendiente del usuario en Vercel:** pulsar **Revoke Token** y comprobar que `BLOB_READ_WRITE_TOKEN` desaparece de las variables del proyecto. El token se compartio en texto plano durante la conversacion, asi que **debe revocarse**.
 
 **Fuera de alcance:** Resend (`FROM_EMAIL` ausente, `pressplay.eu.org` pendiente, cuota agotada), rate limit distribuido, refactor de `/dashboard` a Server Components, export RGPD y recuperación de contraseña, y store de Blob privado (el acceso se fija al crear el store y las imágenes del EPK son públicas por diseño).
