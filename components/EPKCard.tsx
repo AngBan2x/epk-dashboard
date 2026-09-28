@@ -22,9 +22,10 @@ interface EPKCardProps {
   initialLiked?: boolean;
   initialLikeCount?: number;
   onLoginPrompt?: () => void;
+  priority?: boolean;
 }
 
-export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onLoginPrompt }: EPKCardProps) {
+export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onLoginPrompt, priority = false }: EPKCardProps) {
   const { user } = useAuth();
   const title = safeString(track.title);
   const artistName = safeString(track.artist_name);
@@ -131,6 +132,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
             {...imageOptimizationProps(coverImage)}
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
             onError={() => setCoverBroken(true)}
+            priority={priority}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-3xl">

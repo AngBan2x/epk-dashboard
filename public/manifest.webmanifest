@@ -1,0 +1,18 @@
+{
+  "name": "PressPlay — Donde la música se presenta",
+  "short_name": "PressPlay",
+  "description": "Electronic Press Kit para artistas musicales: bios, releases, shows y rider técnico.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
