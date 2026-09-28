@@ -5616,3 +5616,65 @@ El usuario reporto 13 problemas con capturas (animacion shows, carrusel ausente,
 3. 6 de los 7 artistas siguen sin `user_id` (`scripts/backfill-artist-owners.ts` existe y es conservador: no adivina, solo sugiere; necesita que existan usuarios reales que coincidan). Mientras tanto, un artista sin dueno no recibe la notificacion de aprobacion.
 4. El rate limit vive en memoria por instancia: en Vercel serverless se puede saltar rotando de instancia. Un limite global requiere Upstash o similar.
 5. `.env.local` tiene secretos reales en disco, que es lo normal en desarrollo y esta en `.gitignore` (verificado que no esta trackeado). No hace falta rotar nada salvo que el equipo o el archivo se hayan expuesto.
+
+### Tranches 0-4: bugs rotos, seguridad, rendimiento, a11y, CI y SEO (2026-09-28)
+
+**Origen:** el usuario pregunto que mas se puede hacer o verificar **sin depender de Resend**. SeANGED tres auditorias de solo lectura (cuenta y ciclo de vida, integraciones y claves, calidad/a11y/rendimiento) y de ahi salio el plan de cuatro tranches que el usuario apruebo y ordeno ejecutar. Ningun trabajo de esta tanda toca el envio de correo.
+
+**Commits (7):** `b80f55e` (T0), `9b6c33c` (T1), `e3b00e2` (T2), `cca4285` (T3), `2ce18ef` (T4), `c499729` (fix de suite E2E).
+
+## Tranche 0 - Bugs que estaban rotos en produccion (S/M)
+
+- **T0.1 Ajustes de cuenta rotos:** `app/api/user/settings/route.ts` usaba `getDbWrite()`, que es el writer SQLite local y efimero: en Vercel (Turso) el cambio de email, el de contrasena y el borrado de cuenta devolvian **500**, y ningun E2E lo detectaba porque todos borran via `DELETE /api/auth/me`. Reescrito sobre funciones Turso-aware nuevas en `lib/db.ts` (`getPasswordHash`, `isEmailTaken`, `updateUserEmail`, `updateUserPassword`, `softDeleteUser`, `restoreUser`, `getSoftDeletedUserByEmail`, `purgeExpiredDeletedUsers`).
+- **T0.2 La UI moria sobre el borrado de cuenta:** decia "30 dias de gracia" sin restauracion, sin purga, y `deleted_at` no bloqueaba ni el login ni la sesion; ademas las cuentas suspendidas **seguian recibiendo notificaciones y emails**. Ahora: login responde 403 `ACCOUNT_SUSPENDED`, `/api/auth/me` responde 403 y borra la cookie, el fan-out filtra por `deleted_at`, existe `PUT /api/user/settings` para recuperar la cuenta con email y contrasena, y hay un formulario de recuperacion en `/account` con los dias restantes.
+- **T0.3 Contrasena minima unificada a 8** con validacion real en backend (antes `/account` pedia 6 y el endpoint de cambio no validaba longitud, aceptando `"a"`).
+- **T0.4 Paginacion real** en la consola de aprobaciones: los botones Anterior/Siguiente eran no-op con `// TODO` mientras mostraban "Pagina X de Y" al admin.
+- **Higiene:** en una tanda previa de esta sesion se eliminaron **13 usuarios de prueba** que llevaban semanas en produccion.
+
+## Tranche 1 - Seguridad (S/M)
+
+- **Cuatro endpoints sin autenticacion cerrados:** `POST /api/sync` (ademas ejecutaba DDL), `DELETE /api/shows/cleanup` (disparaba fan-out), `POST /api/tracks/:id/streams` (cualquiera inflaba metricas) y `POST /api/webhooks/metrics` (cualquiera inyectaba streams/likes).
+- **Firma HMAC** nueva en `lib/webhook-auth.ts` con `WEBHOOK_SECRET`: los webhooks aceptan `x-webhook-signature` y, si no hay firma valida, exigen sesion de admin. El webhook de metricas ya no hace un `fetch` HTTP para comprobar que el track existe, consulta la base directamente.
+- **Notificaciones que se perdian en silencio:** con 6 de 7 artistas sin `user_id` vinculado, aprobar o rechazar no avisaba a nadie y el admin recibia un "Release aprobado" como si todo estuviera bien. Ahora `PUT /api/admin/releases` y `PATCH /api/admin/shows/[id]` devuelven `notification {artistNotified, artistFound, subscribersNotified, reason}`, el admin muestra un aviso rojo cuando el artista **no** fue notificado, y la consola de aprobaciones trae un contador de envíos sin cuenta vinculada mas un chip "Sin cuenta vinculada" por fila.
+- Verificado en local: los cuatro endpoints devuelven **401** a visitantes anonimos.
+
+## Tranche 2 - Rendimiento (S/M)
+
+- **N+1 eliminado en `/api/dashboard`:** hacia un `await getLikeCount(track.id)` **por track, en serie**, mas cuatro consultas secuenciales independientes. Ahora las tres lecturas principales van en `Promise.all` y los likes en una sola consulta (`getTotalLikesForTracks`). **Dashboard autenticado: ~150 ms** (con 9 tracks; antes eran 9 round-trips encadenados a Turso). Esto era la causa del `testTimeout: 30 s` que documentaba AGENTS.md.
+- **Optimizacion de imagenes activada:** los 22 `unoptimized` remotos eran un *workaround* porque `next.config.js` no declaraba `remotePatterns`. Se anaden los hosts (mzstatic, i.scdn, ytimg, YouTube, Unsplash, Blob, R2), AVIF/WebP, y `lib/image-config.ts` decide por URL si una imagen se puede optimizar: las de host desconocido o `blob:` siguen con `unoptimized` para no romper nada. Verificado: 9 imagenes ya pasan por `/_next/image` con `srcset` y **0 rotas**.
+- **Dependencias muertas eliminadas:** `googleapis` (**203 MB**, sustituido por `fetch` contra la misma API y verificado con datos reales), `date-fns` (10 MB), `@aws-sdk/client-s3` (3,2 MB + 22 paquetes), `@types/bcryptjs`, `@eslint/js` y el archivo muerto `lib/youtube-stats.ts`.
+- **`AudioVisualizer` diferido** con `next/dynamic` (ya no entra en el bundle de todas las rutas) y waterfall del servidor de `/track/[id]` a `Promise.all`.
+
+## Tranche 3 - Accesibilidad y calidad (S/M)
+
+- **23 controles de `DossierEditor` associates** a su label (`htmlFor`/`id`), el unico incumplimiento duro de a11y que quedaba (WCAG 1.3.1/4.1.2). Verificado: **0 controles sin etiqueta** en `/shows`.
+- **Red de seguridad global de foco** en `globals.css`: `:focus-visible` con anillo de 2px en todo control interactivo, con excepcion de los que ya pintan su propio anillo. Cubre los ~125 botones que no declaraban `focus-visible` (30 solo en el panel admin). Verificado en navegador: `outline=2px solid`.
+- **`ui/Button` deja de incumplir el area tactil:** `md` pasa a `h-11` (44px).
+- **0 warnings de ESLint** (los dos restantes de `exhaustive-deps` documentados con motivo, porque anadir las funciones de fetch provocaria bucles de peticiones).
+- **Bug latente corregido en `AudioPlayer`:** `currentSource` nunca se reseteaba al cambiar de track, dejando una fuente obsoleta.
+- **Placeholders y copys:** "Proximamente" en metricas y video pasa a "Sin datos aun" / "Sin video" / "Material audiovisual en preparacion"; "Saves"/"Playlists" a "Guardados"/"Listas".
+- **Preferencias que se guardaban pero nunca se leian:** `new_release_alerts` y `show_alerts` ahora se respetan de verdad en el fan-out, con 2 tests que lo demuestran.
+
+## Tranche 4 - Verificacion, CI y SEO
+
+- **CI arreglado:** el workflow usaba **Node 20** (el binario de `better-sqlite3` exige el ABI de Node 24, asi que los tests unitarios fallarian) y **no ejecutaba Playwright**, con lo que los 23 specs E2E no bloqueaban nada. Ahora Node 24 + paso de E2E con secretos.
+- **SEO completo:** `app/sitemap.ts` (22 URLs: estaticas + artistas + tracks aprobados), `app/robots.ts` (excluye paneles y `/api`), `public/manifest.webmanifest`, `metadataBase`, OpenGraph y Twitter globales, y **`generateMetadata` + JSON-LD `MusicGroup` en la pagina de artista**, que antes heredaba el titulo generico. Verificado: sitemap.xml 200 con 22 URLs, robots 200, manifest 200, pagina de artista con JSON-LD y og:title.
+- **Contraste AA:** axe detectaba blanco sobre `emerald-600` (3.4:1) y texto de pie a `slate-400`. Con `emerald-700` y `slate-600` en claro, el barrido de axe da **0 violaciones criticas/serias** en `/dashboard`, `/shows` y `/artists`.
+- **Lighthouse contra el build de produccion (no dev, que no es representativo):** `/shows` **95** de performance, 98 de accesibilidad, 96 de buenas practicas, **100** de SEO, LCP 2.3 s, CLS 0. `/dashboard` 60 de performance, 94 de accesibilidad, 96 de buenas practicas, **100** de SEO, LCP 4.6 s, CLS 0. El LCP del dashboard es la portada del primer card, que se cargaba con `lazy`; se marco como `priority` y se anadieron preconnect, lo que lo bajo de 5.1 s a 4.6 s. **Queda pendiente**: el dashboard sigue siendo la ruta mas pesada (TBT ~1.1 s) porque es casi todo cliente; partirlo en Server Components es un refactor mayor, asi que se deja documentado en vez de hacerlo a medias.
+- **E2E en produccion, las 5 suites que faltaban:** `subscriptions` 5/5, `notifications` 3/3, `fanout` 1/1, `search` 2/2, `broadcast` 1/1. La de suscripciones fallaba por buscar el selector de rol que P6 elimino; se actualizo al contrato nuevo.
+- **Gates finales:** 249/249 unit, `tsc` 0, `next lint` sin warnings, build OK, **matriz de produccion 50/50**.
+- **Higiene de datos tras toda la tanda:** 9 tracks, 2 shows, 2 usuarios reales, 0 filas QA, 0 suscripciones y 0 notificaciones huerfanas.
+
+**Leciones de la tanda:**
+1. **Los scripts de PowerShell con regex son peligrosos**: un `-replace` que no casa devolvio `$null` y escribio 5 archivos a 0 bytes (`EPKCard`, `SearchBar`, `ITunesSearch`, `VideoShowcase`, `GlobalAudioPlayer`). Se recuperaron con `git checkout` y se rehizo con ediciones puntuales. Regla: nunca escribir archivos con regex en PowerShell sobre codigo fuente.
+2. Una regla CSS dentro de `@layer base` **no llegaba al CSS servido**; el anillo de foco global no aparecia. Al sacarla del layer funciono. Antes de dar por buena una regla global, comprobar en el navegador que la regla existe en `document.styleSheets`.
+3. `vi.clearAllMocks()` limpia las llamadas, pero un mock tipado sin parametros (`vi.fn(async () => ...)`) hace fallar el `tsc` al leer `.mock.calls[0][0]`. Tipar el parametro del mock.
+4. Los E2E que verifican UI de registro fallan de forma Expected al cambiar el modelo de roles: hay que actualizar el contrato del test, no relajar la asercion.
+
+**Pendiente por decision del usuario (no bloquea, ninguno requiere Resend):**
+1. `BLOB_READ_WRITE_TOKEN` ausente: **subir imagenes da 500 en produccion**. `SESSION_SECRET` tampoco esta en `.env.local` ni en `.env.example` (en dev usa un valor fijo).
+2. Aplicar el seed P5.2 del catalogo influyente en produccion (script listo e idempotente, no aplicado).
+3. Backfill de `artists.user_id`: 6 de 7 artistas siguen sin dueno, asi que sus aprobaciones no les llegan. El script existe y no adivina.
+4. Rate limit distribuido (Upstash/KV): hoy es un `Map` en memoria, evitable en serverless.
+5. `/dashboard` como ruta critica de performance (TBT ~1.1 s) si se quiere el siguiente paso.
+6. Export de datos personales / RGPD y recuperacion de contrasena: la segunda **si depende de correo**, asi que sigue fuera de alcance.

@@ -9,10 +9,13 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `npx vitest run` | **225 tests** (Vitest, 18 archivos). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
+| `npx vitest run` | **249 tests** (Vitest, 21 archivos). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
 | `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast. Usa `PLAYWRIGHT_BASE_URL=https://epk-dashboard.vercel.app` para correr contra producción |
 | `npx tsx scripts/turso-check.ts` | Verifica la higiene de datos en Turso por SQL directo (tracks, shows, usuarios QA, huerfanos). Es la fuente de verdad, no las lecturas de API (la réplica va retrasada) |
 | `npx tsx scripts/qa-cleanup.ts --apply` | Limpia datos de QA de producción. **Dry-run por defecto**: siempre revisa el dry-run antes de aplicar |
+| `npx next lint` | ESLint. Debe salir sin warnings (P7) |
+| `npx tsx scripts/a11y-check.ts` | Controles sin etiqueta, anillo de foco y áreas táctiles |
+| `npx tsx scripts/axe-check.ts` | Barrido WCAG AA con axe sobre las rutas públicas |
 
 ## Stack
 
@@ -58,6 +61,7 @@ tests/             # Vitest + Playwright
 - **Roles**: artist, admin, subscriber. **Desde P6 el registro público crea solo `subscriber`** (se eliminó el selector de artista); la promoción a `artist` ocurre al aprobar su primer release o show, en `POST /api/admin/approvals/[id]` vía `lib/artist-promotion.ts` (idempotente). Un suscriptor SÍ puede entrar a crear releases/shows: siempre quedan `pending`/`approved=false`.
 - **Admin credentials**: admin@epk.local / <CONTRASENA_ROTADA>
 - Token: `{ userId, role, iat, exp, invalidateSessionBefore? }` — **`exp` siempre presente** (24 h, o 30 días con rememberMe); `invalidateSessionBefore` + `reissueSessionToken` permiten invalidar sesiones tras un cambio de rol, con compatibilidad hacia atrás con tokens antiguos.
+- **Cuentas suspendidas (P7)**: `users.deleted_at` bloquea el login (403 `ACCOUNT_SUSPENDED`), invalida la sesión en `/api/auth/me` y saca al usuario del fan-out. Se recupera con `PUT /api/user/settings` (email + contraseña) dentro de 30 días; `purgeExpiredDeletedUsers()` hace la purga.
 - **Aprobaciones (P6)**: `submissions` es el portal del artista (solo lo propio, sin escritura de decisiones) y `approvals` es la consola admin (escritor único `POST /api/admin/approvals/[id]`, motivo mínimo de 10 caracteres validado en backend, `revision` y auditoría).
 
 ## Base de Datos
@@ -68,7 +72,7 @@ tests/             # Vitest + Playwright
 - **Scripts de datos**: `scripts/seed-influential-catalog.ts` (P5.2, **NO aplicado en prod**), `scripts/backfill-artist-owners.ts` (6 de 7 artistas siguen con `user_id` NULL) y `scripts/qa-cleanup.ts`. Los tres con dry-run por defecto y `--apply` para escribir.
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
-- **REGLA**: Usar funciones de `lib/db.ts` en vez de `getDbWrite()` directo en API routes
+- **REGLA**: Usar funciones de `lib/db.ts` en vez de `getDbWrite()` directo en API routes. **P7: `getDbWrite()` apunta al SQLite local y está ROTO en producción (Turso); nunca usarlo en una ruta API**
 
 ## Reglas de Delegación (CRÍTICO)
 
@@ -275,5 +279,6 @@ Cuando el usuario reporte un bug o pida un fix:
 - **Releases**: `gh release create vX.Y.Z`
 - **Docs**: actualizar AI_LOG.md con cada cambio significativo
 - **Nunca remover TODOs** del MASTER_PLAN.md
+- **Lighthouse**: medir siempre contra el build de producción (`pnpm build` y luego `pnpm start -p 3100`), nunca contra `pnpm dev`: los números de dev no son representativos
 - **Cover image priority**: uploaded > Spotify/Apple Music > YouTube thumbnail > default placeholder
 

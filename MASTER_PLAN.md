@@ -679,6 +679,18 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | P6.8 | db-migrator | Cascadas de borrado + promoción idempotente + scripts seed/backfill/QA | Completada |
 | P6.9 | security/quality | Auditoría de seguridad, 225 unit, 12/12 vistas, matriz prod 50/50 | Completada |
 
+#### Fase P7: Tranches 0-4 (bugs, seguridad, rendimiento, a11y, CI, SEO) — COMPLETADA 2026-09-28
+| Task | Alcance | Estado |
+|------|---------|--------|
+| T0 | Ajustes de cuenta Turso-aware, suspensión real con gracia y restauración, contraseña unificada a 8, paginación real | Completada |
+| T1 | Cierre de `/api/sync`, `/api/shows/cleanup`, `/api/tracks/:id/streams`, firma HMAC en webhooks, aviso cuando el artista no fue notificado, badge sin cuenta vinculada | Completada |
+| T2 | N+1 del dashboard eliminado (~150 ms), optimización de imágenes activa, `googleapis` fuera (203 MB) + 4 deps muertas, `next/dynamic` en el visualizador | Completada |
+| T3 | 23 labels del dossier, anillo de foco global, áreas táctiles, 0 warnings de lint, bug del AudioPlayer, placeholders y preferencias reales | Completada |
+| T4 | CI en Node 24 con Playwright, sitemap/robots/manifest/JSON-LD, contraste AA, Lighthouse y axe | Completada |
+
+> Verificación: 249/249 unit · tsc 0 · next lint sin warnings · build OK · matriz prod 50/50 · E2E prod 5/5 + 3/3 + 1/1 + 2/2 + 1/1 · axe 0 violaciones críticas · Lighthouse `/shows` 95 perf y `/dashboard` 60 perf, ambos SEO 100.
+> Pendiente de decisión del usuario: `BLOB_READ_WRITE_TOKEN` (las subidas fallan en prod), `SESSION_SECRET` en `.env.example`, seed P5.2 en producción, backfill de `artists.user_id`, rate limit distribuido y el refactor del dashboard a Server Components.
+
 > Spec ejecutable: `docs/PHASE_P6.md`. Decisiones registradas: suscriptor-por-defecto sí, registro artista cerrado, promoción por release o show aprobado, submissions=portal / approvals=consola, exportador unificado (B), carrusel solo catálogo, tarjetas ricas sin detalle, menú sin X, visualizador M, rate limit solo en escrituras más abusables.
 >
 > **Verificación:** 225/225 unit · tsc 0 · build OK · E2E prod 6/6 (approvals + subscriber) · shows-transitions 2/2 · funcional de exportación 9/9 · matriz prod 50/50 · higiene de datos por SQL directo (9 tracks, 2 shows, 0 QA, 13 usuarios de prueba de fases anteriores eliminados).
