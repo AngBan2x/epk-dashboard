@@ -202,17 +202,16 @@ test.describe("P4.2: Suscripciones QA", () => {
     await hydrationSignal;
     await page.waitForTimeout(750);
 
-    const subscriberRadio = page.getByRole("radio", { name: /Suscriptor/ });
     const nameInput = page.locator("input#name");
     const emailInput = page.locator('input[type="email"]');
     const passwords = page.locator('input[type="password"]');
-    await subscriberRadio.check({ force: true });
+    // Desde P6 el registro es solo de suscriptor: no hay selector de rol.
+    await expect(page.getByRole("radio")).toHaveCount(0);
     await nameInput.fill("QA Suscriptor UI");
     await emailInput.fill(email);
     await passwords.nth(0).fill(TEST_PASSWORD);
     await passwords.nth(1).fill(TEST_PASSWORD);
     await page.waitForTimeout(500);
-    expect(await subscriberRadio.isChecked()).toBe(true);
     expect(await nameInput.inputValue()).toBe("QA Suscriptor UI");
     expect(await emailInput.inputValue()).toBe(email);
 
