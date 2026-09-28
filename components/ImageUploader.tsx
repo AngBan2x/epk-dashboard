@@ -190,7 +190,7 @@ export function ImageUploader({ trackId, uploadId, kind, artistId, onUploadCompl
                 onClick={handleCancel}
                 className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg hover:bg-black/80 transition"
               >
-                Quitar
+                Cambiar
               </button>
             )}
           </div>
@@ -198,7 +198,7 @@ export function ImageUploader({ trackId, uploadId, kind, artistId, onUploadCompl
           {uploading && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 dark:text-slate-400">Subiendo...</span>
+                <span className="text-slate-500 dark:text-slate-400">Confirmando...</span>
                 <span className="text-primary-500 font-semibold">{progress}%</span>
               </div>
               <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
@@ -219,7 +219,7 @@ export function ImageUploader({ trackId, uploadId, kind, artistId, onUploadCompl
               onClick={handleUpload}
               className="w-full px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              Subir imagen
+              Confirmar
             </button>
           )}
         </div>

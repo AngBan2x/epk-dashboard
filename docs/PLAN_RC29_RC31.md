@@ -103,9 +103,26 @@ Estado real verificado: **no hay caché, ni archivo pregenerado, ni columna de v
 | C1 | EPKCards legibles en la página del artista | `app/artists/[id]/page.tsx:100` usa `max-w-4xl` (896px) con `xl:grid-cols-4` → **198px por card**, contra 294px del mismo componente en el catálogo. `EPKCard.tsx:173` trunca el título **sin atributo `title`** (bug de a11y: el texto completo es inaccesible). No hay `slice`: es puramente layout | S/M |
 | C2 | Lanzamientos organizados por tipo + colapsar a 6 | Aprobado: secciones Álbumes / EPs / Singles, orden descendente por fecha, cada grupo colapsado a 6 con "Ver los N restantes". Sin estado global | M |
 | C3 | Carrusel del catálogo: 1 artista por página, bio a la izquierda y shows a la derecha | Tres fallos encadenados: (a) `BioSection.tsx:71` usa `md:grid-cols-4` por **viewport**, no por contenedor → dentro de una slide de 300px deja **17px de ancho de texto** por celda; (b) `useCarousel.ts:21` fija `slidesToScroll: 1` mientras `lib/carousel.ts:11-30` ya declara la config 1/2/4 por breakpoint con **0 imports**; (c) el contador compara un índice de *snap* contra `artists.length` en vez de páginas | M |
-| C4 | `/shows` con consistencia visual completa | Cero gradientes de marca, sin `max-w` (se estira a pantalla completa), sin `framer-motion`, sin usar el design system, y los 2 shows de producción están en `proximamente` (mismo badge ámbar) y **sin flyer**, así que las tarjetas quedan como rectángulos grises. Añadir gradiente, `max-w-7xl`, `ui/Card` / `ui/Badge` / `EmptyState`, `framer-motion` y **flyer de fallback** | M |
+| C4 | `/shows` con consistencia visual completa | Cero gradientes de marca, sin `max-w` (se estira a pantalla completa), sin `framer-motion`, sin usar el design system, y los 2 shows de producción están en `proximamente` (mismo badge ámbar) y **sin flyer**, así que las tarjetas quedan como rectángulos grises. Añadir gradiente, `max-w-7xl`, `ui/Card` / `ui/Badge` / `EmptyState`, `framer-motion` y **flyer de fallback** | S |
+| C5 | ~~Copy del botón de subida~~ **HECHO (opción B)** | `components/ImageUploader.tsx`. Hoy el flujo tiene **dos pasos**: el botón sube el archivo a Blob y devuelve la URL a `setProfileImage`, y después hay que pulsar **"Guardar Perfil"** para que el PATCH la vincule al artista. "Subir imagen" describía la mecánica interna en vez de la acción del usuario. Cambiado a **"Confirmar"** + **"Confirmando..."** + **"Cambiar"** (antes "Quitar"), para que la secuencia se lea coherente. Actualizados los 2 selectores de `scripts/verify-upload-headed.ts` | S |
 
 Colores a reutilizar: `ArtistHero.tsx:47` (`from-indigo-600 via-violet-600 to-pink-500`), `app/dashboard/page.tsx:264-282` (stat cards amber/emerald/blue/pink), `app/dashboard/page.tsx:298-310` (quick actions con tinte).
+
+### C5 aplicado (opción B)
+
+El usuario eligió la opción B tras ver las tres. Copy final en `components/ImageUploader.tsx`:
+
+| Antes | Ahora | Dónde |
+|---|---|---|
+| "Subir imagen" | **"Confirmar"** | `:222` |
+| "Subiendo..." | **"Confirmando..."** | `:201` |
+| "Quitar" | **"Cambiar"** | `:193` |
+
+"Cambiar" en vez de "Quitar" porque con un botón que dice "Confirmar", "Quitar" se leía como deshacer la imagen ya guardada; en realidad descarta la selección pendiente y permite elegir otra.
+
+Actualizados los 2 selectores de `scripts/verify-upload-headed.ts:45,69` (`"Subir imagen"` → `"Confirmar"` con `exact: true`), que se habrían roto con el rename. Búsqueda confirma **0 referencias** restantes a "Subir imagen" / "Subiendo" en `app`, `components`, `tests` y `scripts`.
+
+**Opción C sigue sobre la mesa** (upload inmediato y un solo botón) como posible mejora futura: elimina la doble confirmación de raíz, pero cambia el comportamiento y el usuario perdería el "deshacer" antes de guardar.
 
 **Gate:** `tsc`, `vitest`, `build`, revisión headed con capturas de las 4 vistas en móvil y desktop. Riesgo principal: la suite `shows-transitions`. → **rc.30 o rc.31**
 

@@ -42,7 +42,7 @@ async function main() {
   await page.locator(`#upload-${TRACK}`).setInputFiles(PNG_PATH);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}/5-gallery-uploader-open.png` });
-  const upBtn = page.getByRole("button", { name: "Subir imagen" });
+  const upBtn = page.getByRole("button", { name: "Confirmar", exact: true });
   await upBtn.waitFor({ timeout: 15000 });
   const upResp = page.waitForResponse((r) => r.url().includes("/api/upload/image") && r.request().method() === "POST", { timeout: 60000 });
   await upBtn.click();
@@ -66,7 +66,7 @@ async function main() {
   await page.locator("text=Imagen de Banner").scrollIntoViewIfNeeded().catch(() => {});
   await page.locator(`#upload-banner-${artistId}`).setInputFiles(PNG_PATH);
   await page.waitForTimeout(1500);
-  const bannerUpBtn = page.getByRole("button", { name: "Subir imagen" }).first();
+  const bannerUpBtn = page.getByRole("button", { name: "Confirmar", exact: true }).first();
   await bannerUpBtn.waitFor({ timeout: 15000 });
   const upResp2 = page.waitForResponse((r) => r.url().includes("/api/upload/image") && r.request().method() === "POST", { timeout: 60000 });
   await bannerUpBtn.click();
