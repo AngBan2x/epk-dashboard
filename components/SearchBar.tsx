@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { MIN_QUERY_LENGTH, type SearchResponse, type SearchResultItem } from "@/lib/search";
+import { imageOptimizationProps } from "@/lib/image-config";
 
 const DEBOUNCE_MS = 300;
 
@@ -312,7 +313,7 @@ function SearchBox({ className = "", autoFocus, placeholder = "Buscar artistas, 
                         alt=""
                         width={40}
                         height={40}
-                        unoptimized
+                        {...imageOptimizationProps(entry.item.image)}
                         className="h-10 w-10 flex-shrink-0 rounded-lg object-cover"
                       />
                     ) : (

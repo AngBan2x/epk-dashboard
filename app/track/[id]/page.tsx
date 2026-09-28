@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AudioPlayer } from "@/components/AudioPlayer";
-import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper";
+import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper"
 import { LyricsSectionWrapper } from "@/components/LyricsSectionWrapper";
 
 import { ImageGalleryWrapper } from "@/components/ImageGalleryWrapper";
@@ -38,8 +38,10 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
   const track = await getTrackById(id);
   if (!track) notFound();
 
-  const artist = await getArtistByName(track.artist_name);
-  const allTracks = await getAllTracks();
+  const [artist, allTracks] = await Promise.all([
+    getArtistByName(track.artist_name),
+    getAllTracks(),
+  ]);
   const currentIndex = allTracks.findIndex(t => t.id === id);
   const prevTrack = currentIndex > 0 ? allTracks[currentIndex - 1] : null;
   const nextTrack = currentIndex < allTracks.length - 1 ? allTracks[currentIndex + 1] : null;

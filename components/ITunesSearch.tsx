@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { imageOptimizationProps } from "@/lib/image-config";
 
 interface ITunesResult {
   trackId: number;
@@ -155,7 +156,7 @@ export function ITunesSearch({ onSelect, placeholder = "Buscar en iTunes" }: ITu
                   alt={track.trackName}
                   width={40}
                   height={40}
-                  unoptimized
+                  {...imageOptimizationProps(track.artworkUrl100)}
                   className="w-10 h-10 rounded object-contain object-center mb-2"
                 />
               )}
