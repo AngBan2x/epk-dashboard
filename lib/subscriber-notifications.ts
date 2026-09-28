@@ -161,6 +161,11 @@ async function notifyUser(
       return;
     }
 
+    if (user.deleted_at) {
+      summary.skipped += 1;
+      return;
+    }
+
     const payload = JSON.stringify(input.data);
     const recent = await getUserNotifications(user.id);
     const fiveMinutesAgo = Date.now() - FANOUT_DEDUP_WINDOW_MS;

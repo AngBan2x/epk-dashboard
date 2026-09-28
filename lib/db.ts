@@ -743,6 +743,107 @@ export async function getAllUsers(): Promise<User[]> {
   return rows.map(parseUser);
 }
 
+export async function isEmailTaken(email: string, excludeUserId?: string): Promise<boolean> {
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    const row = await tursoExecSingle(
+      "SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1",
+      [email, excludeUserId ?? ""]
+    );
+    return row !== null;
+  }
+  const db = getLocalDb();
+  const row = db
+    .prepare("SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1")
+    .get(email, excludeUserId ?? "") as Record<string, unknown> | undefined;
+  return row !== undefined;
+}
+
+export async function getPasswordHash(userId: string): Promise<string | null> {
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    const row = await tursoExecSingle("SELECT password_hash FROM users WHERE id = ?", [userId]);
+    return row ? String((row as Record<string, unknown>).password_hash) : null;
+  }
+  const db = getLocalDb();
+  const row = db
+    .prepare("SELECT password_hash FROM users WHERE id = ?")
+    .get(userId) as Record<string, unknown> | undefined;
+  return row !== undefined ? String(row.password_hash) : null;
+}
+
+export async function updateUserEmail(userId: string, email: string): Promise<boolean> {
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    await tursoExecUpdate("UPDATE users SET email = ? WHERE id = ?", [email, userId]);
+    return true;
+  }
+  const db = getLocalDbWrite();
+  db.prepare("UPDATE users SET email = ? WHERE id = ?").run(email, userId);
+  return true;
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string): Promise<boolean> {
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    await tursoExecUpdate("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, userId]);
+    return true;
+  }
+  const db = getLocalDbWrite();
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, userId);
+  return true;
+}
+
+export async function softDeleteUser(userId: string): Promise<boolean> {
+  const deletedAt = new Date().toISOString();
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    await tursoExecUpdate("UPDATE users SET deleted_at = ? WHERE id = ?", [deletedAt, userId]);
+    return true;
+  }
+  const db = getLocalDbWrite();
+  db.prepare("UPDATE users SET deleted_at = ? WHERE id = ?").run(deletedAt, userId);
+  return true;
+}
+
+export async function restoreUser(userId: string): Promise<boolean> {
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    await tursoExecUpdate("UPDATE users SET deleted_at = NULL WHERE id = ?", [userId]);
+    return true;
+  }
+  const db = getLocalDbWrite();
+  db.prepare("UPDATE users SET deleted_at = NULL WHERE id = ?").run(userId);
+  return true;
+}
+
+export async function getSoftDeletedUserByEmail(email: string): Promise<User | null> {
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    const row = await tursoExecSingle("SELECT * FROM users WHERE email = ? AND deleted_at IS NOT NULL", [email]);
+    return row ? parseUser(row) : null;
+  }
+  const db = getLocalDb();
+  const row = db
+    .prepare("SELECT * FROM users WHERE email = ? AND deleted_at IS NOT NULL")
+    .get(email) as Record<string, unknown> | undefined;
+  return row !== undefined ? parseUser(row) : null;
+}
+
+export async function purgeExpiredDeletedUsers(graceDays = 30): Promise<number> {
+  const cutoff = new Date(Date.now() - graceDays * 24 * 60 * 60 * 1000).toISOString();
+  const stale = await getAllUsers();
+  const expired = stale.filter(
+    (u) => u.deleted_at !== null && new Date(u.deleted_at as unknown as string).getTime() < new Date(cutoff).getTime()
+  );
+  let purged = 0;
+  for (const user of expired) {
+    const ok = await deleteUser(user.id);
+    if (ok) purged++;
+  }
+  return purged;
+}
+
 export async function createUser(user: Omit<User, "id" | "created_at"> & { id: string }): Promise<User> {
   if (isTursoEnabled()) {
     await ensureTursoSchemaIfNeeded();

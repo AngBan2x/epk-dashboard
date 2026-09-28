@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import type { UserPreferences } from '@/types/music';
 import { cn } from '@/lib/utils';
 
+const MIN_PASSWORD_LENGTH = 8;
+const DELETION_GRACE_DAYS = 30;
+
 const PREFERENCE_FIELDS: { key: keyof UserPreferences; label: string; description: string }[] = [
   {
     key: 'email_notifications',
@@ -85,6 +88,11 @@ export default function AccountPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [restoreEmail, setRestoreEmail] = useState('');
+  const [restorePassword, setRestorePassword] = useState('');
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMessage, setRestoreMessage] = useState('');
+  const [restoreError, setRestoreError] = useState('');
 
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [prefsLoading, setPrefsLoading] = useState(true);
@@ -203,8 +211,8 @@ export default function AccountPage() {
         setSaving(false);
         return;
       }
-      if (newPassword.length < 6) {
-        setError('La nueva contraseña debe tener al menos 6 caracteres');
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        setError(`La nueva contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
         setSaving(false);
         return;
       }
@@ -241,7 +249,7 @@ export default function AccountPage() {
         body: JSON.stringify({ password: deletePassword }),
       });
       if (res.ok) {
-        logout();
+        await logout();
         router.push('/');
       } else {
         const data = await res.json();
@@ -251,6 +259,30 @@ export default function AccountPage() {
       setError('Error de conexión');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleRestoreAccount = async () => {
+    try {
+      setRestoring(true);
+      setRestoreError('');
+      setRestoreMessage('');
+      const res = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: restoreEmail, password: restorePassword }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setRestoreMessage(data?.message || 'Cuenta restaurada. Ya puedes iniciar sesión.');
+        setRestorePassword('');
+      } else {
+        setRestoreError(data?.error || 'No se pudo restaurar la cuenta');
+      }
+    } catch {
+      setRestoreError('Error de conexión');
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -399,7 +431,10 @@ export default function AccountPage() {
           <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-red-200 dark:border-red-800 p-6">
             <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Zona de Peligro</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-              Eliminar tu cuenta es permanente. Tienes 30 días de gracia para recuperarla.
+              Al eliminar tu cuenta se suspende durante {DELETION_GRACE_DAYS} días: no podrás
+              iniciar sesión ni recibirás notificaciones, y tus publicaciones pasan a ocultarse.
+              Pasados esos {DELETION_GRACE_DAYS} días la cuenta se purga de forma permanente. Puedes
+              recuperarla antes con tu email y tu contraseña.
             </p>
             {!showDeleteConfirm ? (
               <button
@@ -437,6 +472,52 @@ export default function AccountPage() {
                 </div>
               </div>
             )}
+
+            <div className="mt-5 border-t border-red-100 dark:border-red-900 pt-4">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                ¿Eliminaste tu cuenta por error?
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Recupérala con tu email y contraseña dentro del periodo de {DELETION_GRACE_DAYS} días.
+              </p>
+              <div className="mt-3 space-y-2">
+                <label htmlFor="restore-email" className="sr-only">Email de la cuenta suspendida</label>
+                <input
+                  id="restore-email"
+                  type="email"
+                  value={restoreEmail}
+                  onChange={(e) => setRestoreEmail(e.target.value)}
+                  placeholder="Email de la cuenta"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+                <label htmlFor="restore-password" className="sr-only">Contraseña de la cuenta suspendida</label>
+                <input
+                  id="restore-password"
+                  type="password"
+                  value={restorePassword}
+                  onChange={(e) => setRestorePassword(e.target.value)}
+                  placeholder="Tu contraseña"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+                <button
+                  onClick={handleRestoreAccount}
+                  disabled={restoring || !restoreEmail || !restorePassword}
+                  className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                >
+                  {restoring ? 'Restaurando...' : 'Recuperar mi cuenta'}
+                </button>
+                {restoreMessage && (
+                  <p role="status" className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    {restoreMessage}
+                  </p>
+                )}
+                {restoreError && (
+                  <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
+                    {restoreError}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Success message */}
