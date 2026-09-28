@@ -88,9 +88,9 @@ export async function PATCH(
       );
     }
 
-    if (resolvedAction === "revision" && (!notes || notes.length < 10)) {
+    if (resolvedAction !== "approve" && (!notes || notes.length < 10)) {
       return NextResponse.json(
-        { error: "El motivo de revisión debe tener al menos 10 caracteres" },
+        { error: "El motivo debe tener al menos 10 caracteres" },
         { status: 400 }
       );
     }
