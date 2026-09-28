@@ -5672,9 +5672,92 @@ El usuario reporto 13 problemas con capturas (animacion shows, carrusel ausente,
 4. Los E2E que verifican UI de registro fallan de forma Expected al cambiar el modelo de roles: hay que actualizar el contrato del test, no relajar la asercion.
 
 **Pendiente por decision del usuario (no bloquea, ninguno requiere Resend):**
-1. `BLOB_READ_WRITE_TOKEN` ausente: **subir imagenes da 500 en produccion**. `SESSION_SECRET` tampoco esta en `.env.local` ni en `.env.example` (en dev usa un valor fijo).
+1. ~~`BLOB_READ_WRITE_TOKEN` ausente: **subir imagenes da 500 en produccion**.~~ **CORREGIDO: era falso.** El token faltaba en `.env.local`, no en produccion, asi que el fallo era **local**. En produccion existia y las subidas funcionaban. Resuelto de raiz con OIDC (ver seccion rc.29 mas abajo). `SESSION_SECRET` tampoco estaba en `.env.local` ni en `.env.example` (en dev usa un valor fijo): ya documentado en `.env.example`.
 2. Aplicar el seed P5.2 del catalogo influyente en produccion (script listo e idempotente, no aplicado).
 3. Backfill de `artists.user_id`: 6 de 7 artistas siguen sin dueno, asi que sus aprobaciones no les llegan. El script existe y no adivina.
 4. Rate limit distribuido (Upstash/KV): hoy es un `Map` en memoria, evitable en serverless.
 5. `/dashboard` como ruta critica de performance (TBT ~1.1 s) si se quiere el siguiente paso.
 6. Export de datos personales / RGPD y recuperacion de contrasena: la segunda **si depende de correo**, asi que sigue fuera de alcance.
+
+---
+
+## Plan rc.29 → rc.31 — Blob OIDC, descargas de prensa, UI y datos (2026-09-28)
+
+**Estado:** documentado, **nada ejecutado**. Plan completo en `docs/PLAN_RC29_RC31.md`.
+**Origen:** 4 decisiones del usuario (Blob / Last.fm / semilla / cuentas) + 9 problemas de UI reportados con capturas. Todo verificado con `archivo:línea` antes de planificar.
+
+### Decisiones del usuario
+
+| Tema | Decisión |
+|---|---|
+| Vercel Blob | **Plan A (OIDC)**: eliminar el token explícito, no rotarlo |
+| Last.fm | Conservar las métricas de los artistas que tengan música ahí |
+| Semilla P5.2 | Solo artistas **reales y de renombre**, sin sufijo `-seed` en el nombre visible |
+| Cuentas de artistas | Crear las 6 que faltan, emails `@pressplay.app` y contraseña aleatoria **desconocida** |
+| PDF de prensa | **PDF real en servidor con `pdfkit`** (Chromium headless descartado) |
+| Lanzamientos | Agrupar por tipo y colapsar cada grupo a 6 con "ver todos" |
+| `/shows` | Consistencia visual completa con el resto del sitio |
+
+### Tres afirmaciones previas que eran FALSAS (corregidas)
+
+1. **"Subir imágenes da 500 en producción"** (`MASTER_PLAN.md:692` y este log) → **falso**. `BLOB_READ_WRITE_TOKEN` falta en `.env.local`, así que falla **en local**. En producción existe y las subidas funcionan.
+2. **"La app usa Cloudflare R2 y `lib/blob.ts` es código muerto"** (informado por un subagente) → **falso**. R2 tiene **0 referencias** en `lib/`, `app/`, `components/` y `scripts/`; el commit `8688f4b` migró de R2 a Blob y `app/api/upload/image/route.ts:5` importa `lib/blob.ts`. **No borrar `lib/blob.ts` ni `@vercel/blob`.**
+3. **"`components/ArtistsCatalog.tsx` usa `useState` sin importar y rompe `/artists`"** (informado por un subagente) → **falso**. El archivo no usa `useState`; los imports están completos.
+
+### Diagnóstico raíz del OIDC
+
+`lib/blob.ts:32` y `:41` pasan `token: token()` de forma explícita. En `@vercel/blob` 2.8.0 el orden de resolución (`chunk-YYMLUMXS.js`) es: `:169` token explícito **gana siempre** → `:173` OIDC → `:198` `BLOB_READ_WRITE_TOKEN`. El token explícito **desactiva el OIDC hoy** y obliga al secreto estático. Por eso Vercel avisa de que "parece un secreto pero su valor es visible".
+
+### Bugs de una línea con 4 síntomas
+
+`lib/null-safe.ts:1` → `safeString(v, fallback = "—")`. El em dash es **truthy**, así que el `||` nunca evalúa su alternativa:
+
+| Archivo:línea | Síntoma |
+|---|---|
+| `app/shows/page.tsx:202` | `ticket_url` null → `"—"` → `<a href="—">` → **404** (URL relativa) |
+| `app/shows/page.tsx:200` | La tarjeta imprime `"—"` como descripción |
+| `app/shows/page.tsx:201` | La tarjeta imprime `"📍 —, —"` como ubicación |
+| `app/artists/[id]/page.tsx:67-68` | JSON-LD emite `"genre": "—"` |
+
+**No** cambiar el default global: hay ~67 usos y cambiarlo arriesga regresiones.
+
+### Otros diagnósticos medidos
+
+- **"Actualizar datos del dossier" es código muerto.** No hay caché, ni archivo pregenerado, ni columna de versión: `POST /api/export` lee fresco de Turso en cada clic (`lib/export-bundle.ts:92-102`). `refreshDossier` descarta la respuesta y solo incrementa un contador (`data-dossier-revision`) que nadie lee. El flujo "guardar y se actualiza solo" **ya funciona**.
+- **Desbalance de la tarjeta Dossier/Rider**: `align-items: stretch` de CSS Grid en `app/dashboard/page.tsx:414`; la tarjeta derecha (~300px) estira a la izquierda dejando ~190px de vacío.
+- **EPKCards comprimidas**: `app/artists/[id]/page.tsx:100` usa `max-w-4xl` (896px) con `xl:grid-cols-4` → **198px por card**, contra 294px en el catálogo. `EPKCard.tsx:173` trunca el título **sin atributo `title`** (bug de a11y). No hay `slice`: es puramente layout.
+- **Carrusel**: `BioSection.tsx:71` usa `md:grid-cols-4` por **viewport**, no por contenedor → dentro de una slide de 300px deja **17px de ancho de texto** por celda. `useCarousel.ts:21` fija `slidesToScroll: 1` mientras `lib/carousel.ts:11-30` ya declara la config 1/2/4 por breakpoint con **0 imports**. El contador compara un índice de *snap* contra `artists.length`.
+- **`/api/export` es público y sin rate limit** (bug preexistente). `/api/lastfm` también: proxy público sin límite que además desperdicia 1 de cada 3 unidades de cuota en `getTopAlbums`, cuya datos la UI nunca lee.
+- **N+1 de YouTube**: `EPKCard.tsx:44-56` pide stats por track, así que N releases = N llamadas upstream por visitante. `UnifiedMetrics.tsx:40,48` sustituye el fallo por el valor local y `app/track/[id]/page.tsx:154` muestra un `0` de likes hardcodeado.
+- **No existe ruta `/catalogo`**: el enlace "Catálogo" del header apunta a `/dashboard` (`components/Header.tsx:115`).
+
+### Orden de ejecución
+
+`A` (OIDC + bugs de una línea) → `B` (descargas: públicas, sin botón, HTML, PDF) → `C` (tarjetas, carrusel, `/shows`) → `D` (6 cuentas + semilla con nombres reales) → `E` (métricas honestas + N+1 de YouTube). Un commit y un push por fase, con prerelease `rc.29` → `rc.31`.
+
+**Único gate del usuario:** conectar el OIDC en Vercel **antes** de borrar `BLOB_READ_WRITE_TOKEN`, nunca al revés.
+
+### A1 — Blob pasa a OIDC (2026-09-28) · S
+
+**Causa raiz confirmada leyendo el SDK instalado.** `lib/blob.ts` pasaba `token: token()` de forma explicita, y en `@vercel/blob` 2.8.0 ese caso gana **siempre**: `chunk-YYMLUMXS.js:169` devuelve `readWrite` antes de que se evalue el bloque OIDC de `:173-197`. O sea, el store ya estaba conectado a OIDC en Vercel y el codigo lo estaba puenteando por encima para forzar el secreto estatico. De ahi el aviso de "parece un secreto pero su valor es visible".
+
+**Cadena real de autenticacion** (verificada, no supuesta):
+- `lib/blob.ts:1` es el **unico** archivo que importa de `@vercel/blob`.
+- El SDK no lee `VERCEL_OIDC_TOKEN` del entorno: delega en `@vercel/oidc`, y ahi esta el mecanismo (`get-vercel-oidc-token-sync.js:26`): `getContext().headers?.["x-vercel-oidc-token"] ?? process.env.VERCEL_OIDC_TOKEN`. En produccion lo inyecta la propia plataforma por request, asi que **no es una variable que se gestione en el panel de Vercel** (por eso el dialogo de conexion solo crea `BLOB_STORE_ID` y `BLOB_WEBHOOK_PUBLIC_KEY`).
+- Orden final: token explicito (`:169`) → OIDC (`:173`) → `BLOB_STORE_ID` (`:184`) → `BLOB_READ_WRITE_TOKEN` (`:198`).
+
+**El token estatico y el OIDC apuntan al mismo store.** `parseStoreIdFromReadWriteToken` parte el token por `_` y toma el cuarto segmento (`1KJI0SvTDCm0FYOc`), y `BLOB_STORE_ID` normaliza quitando el prefijo `store_` al mismo valor. Por tanto **no hay migracion**: mismas URLs, mismos blobs, y revocar el token no invalida lo ya subido.
+
+**Cambios:**
+- `lib/blob.ts`: fuera el `token: token()` de `put()` y `del()`, y eliminadas `token()` y `cleanEnv()` que quedaban muertas. Comentario de cabecera actualizado con el porqué, para que nadie reintroduzca el token explícito.
+- `tests/unit/security-sweep.test.ts`: fuera el `process.env.BLOB_READ_WRITE_TOKEN` del `beforeAll`/`afterAll`; solo existia para evitar el throw de `token()`.
+- `.env.example`: documenta `BLOB_STORE_ID` y `SESSION_SECRET` (este ultimo no estaba, y `lib/auth.ts` lanza sin el en produccion), con aviso explicito de **no** definir `BLOB_READ_WRITE_TOKEN`.
+- `MASTER_PLAN.md` y este log: corregida la afirmacion falsa de "subidas fallan en produccion".
+
+**Blast radius:** 1 archivo de produccion + 2 lineas de test. `uploadImage` y `deleteImage` son internas de `lib/blob.ts` y solo se usan en `app/api/upload/image/route.ts:166,281`, asi que ninguna firma cambia.
+
+**Gates:** `tsc` 0 errores, `vitest` **249/249** (21 archivos), `next lint` sin warnings, `pnpm build` OK.
+
+**Pendiente del usuario:** verificar una subida real en produccion (el token ya no se le pasa, asi que solo puede funcionar por OIDC) y despues pulsar **Revoke Token**. En `.env.local` hace falta `BLOB_STORE_ID` (`vercel env pull`). Nota de seguridad: el token de escritura se compartio en texto plano durante la conversacion, asi que **debe revocarse**.
+
+**Fuera de alcance:** Resend (`FROM_EMAIL` ausente, `pressplay.eu.org` pendiente, cuota agotada), rate limit distribuido, refactor de `/dashboard` a Server Components, export RGPD y recuperación de contraseña, y store de Blob privado (el acceso se fija al crear el store y las imágenes del EPK son públicas por diseño).

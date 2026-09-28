@@ -97,7 +97,6 @@ function insertTrack(id: string, artistName: string, status: string) {
 beforeAll(async () => {
   if (isTursoConfigured()) return;
   delete process.env.RESEND_API_KEY;
-  process.env.BLOB_READ_WRITE_TOKEN = "sweep-test-token";
 
   ownerToken = await createSessionToken({
     userId: OWNER_USER_ID,
@@ -164,7 +163,6 @@ afterAll(async () => {
   db.prepare("DELETE FROM shows WHERE id = ?").run(showId);
   db.prepare("DELETE FROM artists WHERE name IN (?, ?)").run(OWNED_ARTIST_NAME, OTHER_ARTIST_NAME);
   await deleteUser(OWNER_USER_ID);
-  delete process.env.BLOB_READ_WRITE_TOKEN;
 });
 
 beforeEach(() => {
