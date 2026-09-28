@@ -49,8 +49,8 @@ export function VideoShowcase({
             Video Disponible
           </span>
         ) : (
-          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-400 px-2.5 py-1 rounded-full">
-            Próximamente
+          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 px-2.5 py-1 rounded-full">
+            Sin vídeo
           </span>
         )}
       </div>
@@ -80,7 +80,7 @@ export function VideoShowcase({
             </div>
           ) : (
             <div className="text-center p-4 bg-slate-900/80 rounded-lg backdrop-blur-sm border border-slate-700 text-slate-300 text-sm">
-              Material audiovisual en post-producción
+              Material audiovisual en preparación
             </div>
           )}
         </div>

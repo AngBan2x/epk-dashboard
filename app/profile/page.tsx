@@ -122,6 +122,9 @@ export default function ProfilePage() {
     if (user) {
       fetchProfile();
     }
+    // El perfil se carga cuando llega la sesion; fetchProfile se redefine en
+    // cada render y anadirlo causaria bucles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchProfile = async () => {

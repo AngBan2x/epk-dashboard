@@ -45,6 +45,22 @@ body {
   }
 }
 
+/* Red de seguridad de foco (WCAG 2.4.7): garantiza que TODO control
+   interactivo tenga indicador visible al navegar con teclado, sin depender
+   de que cada componente declare su propio focus-visible. */
+:focus-visible {
+  outline: 2px solid rgb(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Los componentes que ya pintan su propio anillo (focus-visible:ring)
+   desactivan el outline global para no duplicar el indicador. */
+[class*="focus-visible:ring"]:focus-visible,
+[class*="focus-visible:outline-none"]:focus-visible {
+  outline: none;
+}
+
 /* Fade in + scale animation */
 @keyframes fadeInScale {
   0% { opacity: 0; transform: scale(0.8); }

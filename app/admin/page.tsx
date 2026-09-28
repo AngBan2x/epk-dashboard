@@ -156,6 +156,9 @@ export default function AdminPage() {
     }
   }, [user, authLoading, router]);
 
+  // Carga inicial unica: las funciones de fetch se redefinen en cada render,
+  // por eso no pueden entrar en las dependencias sin provocar bucles.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchTracks();
     fetchReleases();
@@ -165,6 +168,9 @@ export default function AdminPage() {
     fetchShows();
     fetchPendingShows();
     fetchEmailStatus();
+    // Las funciones de fetch se redefinen en cada render: incluirlas en las
+    // dependencias provocaria bucles de peticiones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

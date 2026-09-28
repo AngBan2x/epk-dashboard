@@ -245,8 +245,9 @@ function DossierTab({ data, updateField }: { data: DossierData; updateField: (f:
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Biografia</label>
+        <label htmlFor="dossier-biography" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Biografia</label>
         <textarea
+          id="dossier-biography"
           value={data.biography}
           onChange={(e) => updateField("biography", e.target.value)}
           rows={4}
@@ -255,8 +256,9 @@ function DossierTab({ data, updateField }: { data: DossierData; updateField: (f:
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Press Text</label>
+        <label htmlFor="dossier-press-text" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Press Text</label>
         <textarea
+          id="dossier-press-text"
           value={data.press_text}
           onChange={(e) => updateField("press_text", e.target.value)}
           rows={3}
@@ -266,20 +268,22 @@ function DossierTab({ data, updateField }: { data: DossierData; updateField: (f:
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Genero</label>
+          <label htmlFor="dossier-genre" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Genero</label>
           <input
             type="text"
-            value={data.genre}
+            id="dossier-genre"
+          value={data.genre}
             onChange={(e) => updateField("genre", e.target.value)}
             className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
             placeholder="Rock, Pop, Electronica..."
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Ubicacion</label>
+          <label htmlFor="dossier-location" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Ubicacion</label>
           <input
             type="text"
-            value={data.location}
+            id="dossier-location"
+          value={data.location}
             onChange={(e) => updateField("location", e.target.value)}
             className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
             placeholder="Ciudad, Pais"
@@ -287,9 +291,10 @@ function DossierTab({ data, updateField }: { data: DossierData; updateField: (f:
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Influencias</label>
+        <label htmlFor="dossier-influences" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Influencias</label>
         <input
           type="text"
+          id="dossier-influences"
           value={data.influences}
           onChange={(e) => updateField("influences", e.target.value)}
           className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
@@ -298,20 +303,22 @@ function DossierTab({ data, updateField }: { data: DossierData; updateField: (f:
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email Contacto</label>
+          <label htmlFor="dossier-contact-email" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email Contacto</label>
           <input
             type="email"
-            value={data.contact_email}
+            id="dossier-contact-email"
+          value={data.contact_email}
             onChange={(e) => updateField("contact_email", e.target.value)}
             className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
             placeholder="contacto@ejemplo.com"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email Booking</label>
+          <label htmlFor="dossier-booking-email" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email Booking</label>
           <input
             type="email"
-            value={data.booking_email}
+            id="dossier-booking-email"
+          value={data.booking_email}
             onChange={(e) => updateField("booking_email", e.target.value)}
             className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
             placeholder="booking@ejemplo.com"
@@ -320,20 +327,22 @@ function DossierTab({ data, updateField }: { data: DossierData; updateField: (f:
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Management</label>
+          <label htmlFor="dossier-management" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Management</label>
           <input
             type="text"
-            value={data.management}
+            id="dossier-management"
+          value={data.management}
             onChange={(e) => updateField("management", e.target.value)}
             className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
             placeholder="Nombre del management"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Sitio Web</label>
+          <label htmlFor="dossier-website" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Sitio Web</label>
           <input
             type="url"
-            value={data.website}
+            id="dossier-website"
+          value={data.website}
             onChange={(e) => updateField("website", e.target.value)}
             className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
             placeholder="https://..."
@@ -402,8 +411,9 @@ function RiderTab({ data, updateField }: { data: DossierData; updateField: (f: k
 
       {/* Special Notes */}
       <div>
-        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">📝 Notas Especiales</label>
+        <label htmlFor="rider-rider_special_notes" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">📝 Notas Especiales</label>
         <textarea
+          id="rider-rider_special_notes"
           value={data.rider_special_notes}
           onChange={(e) => updateField("rider_special_notes", e.target.value)}
           rows={3}
@@ -434,18 +444,24 @@ function RiderSection({
         {icon} {title}
       </h4>
       <div className="space-y-3">
-        {fields.map(({ key, label, placeholder }) => (
-          <div key={key}>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</label>
-            <input
-              type="text"
-              value={data[key]}
-              onChange={(e) => updateField(key, e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
-              placeholder={placeholder}
-            />
-          </div>
-        ))}
+        {fields.map(({ key, label, placeholder }) => {
+          const fieldId = `rider-${String(key)}`;
+          return (
+            <div key={key}>
+              <label htmlFor={fieldId} className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                {label}
+              </label>
+              <input
+                id={fieldId}
+                type="text"
+                value={data[key]}
+                onChange={(e) => updateField(key, e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                placeholder={placeholder}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

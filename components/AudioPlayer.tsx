@@ -87,12 +87,11 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
     });
   }, [id, isPlaying]);
 
-  // Auto-select best source on mount
+  // Auto-select best source on mount, and re-select when the track changes
   useEffect(() => {
-    if (sources.length > 0 && !currentSource) {
-      setCurrentSource(sources[0]);
-    }
-  }, [sources, currentSource]);
+    setCurrentSource(sources.length > 0 ? sources[0] : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, src]);
 
   // Handle YouTube iframe API messages
   useEffect(() => {
