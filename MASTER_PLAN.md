@@ -689,7 +689,9 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | T4 | CI en Node 24 con Playwright, sitemap/robots/manifest/JSON-LD, contraste AA, Lighthouse y axe | Completada |
 
 > Verificación: 249/249 unit · tsc 0 · next lint sin warnings · build OK · matriz prod 50/50 · E2E prod 5/5 + 3/3 + 1/1 + 2/2 + 1/1 · axe 0 violaciones críticas · Lighthouse `/shows` 95 perf y `/dashboard` 60 perf, ambos SEO 100.
-> Pendiente de decisión del usuario: `BLOB_READ_WRITE_TOKEN` (las subidas fallan en prod), `SESSION_SECRET` en `.env.example`, seed P5.2 en producción, backfill de `artists.user_id`, rate limit distribuido y el refactor del dashboard a Server Components.
+> Pendiente de decisión del usuario: `SESSION_SECRET` en `.env.local` (ya documentado en `.env.example`), seed P5.2 en producción, backfill de `artists.user_id`, rate limit distribuido y el refactor del dashboard a Server Components.
+>
+> **Blob resuelto (OIDC).** `BLOB_READ_WRITE_TOKEN` ya no se usa: `lib/blob.ts` dejó de pasar el token explícito y el SDK resuelve por OIDC contra el store conectado. La variable solo va a estar en `.env.local` hasta que se revoque.
 
 > Spec ejecutable: `docs/PHASE_P6.md`. Decisiones registradas: suscriptor-por-defecto sí, registro artista cerrado, promoción por release o show aprobado, submissions=portal / approvals=consola, exportador unificado (B), carrusel solo catálogo, tarjetas ricas sin detalle, menú sin X, visualizador M, rate limit solo en escrituras más abusables.
 >
