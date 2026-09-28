@@ -72,8 +72,8 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 dark:text-slate-500">
-          <p>&copy; {year} PressPlay. Todos los derechos reservados.</p>
+        <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600 dark:text-slate-400">
+          <p className="text-slate-600 dark:text-slate-400">&copy; {year} PressPlay. Todos los derechos reservados.</p>
           <p className="flex items-center gap-1">
             Hecho con <span className="text-red-500">&#9829;</span> para artistas musicales
           </p>

@@ -160,7 +160,7 @@ export default function DashboardPage() {
                   {sortedTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
                       <a href={`/track/${track.id}`} className="block h-full">
-                        <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
+                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} />
                       </a>
                     </SlideIn>
                   ))}
@@ -389,7 +389,7 @@ export default function DashboardPage() {
                     <SlideIn key={track.id} index={i}>
                       <div className="relative group">
                         <a href={`/track/${track.id}`} className="block h-full">
-                          <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
+                          <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} />
                         </a>
                         <a
                           href={`/releases/${track.id}/edit`}
@@ -606,7 +606,7 @@ export default function DashboardPage() {
                   {sortedTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
                       <a href={`/track/${track.id}`} className="block h-full">
-                        <EPKCard track={track} onLoginPrompt={() => setShowLoginModal(true)} />
+                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} />
                       </a>
                     </SlideIn>
                   ))}

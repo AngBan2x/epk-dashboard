@@ -6,9 +6,45 @@ import { ArtistSocialLinks } from "@/components/ArtistSocialLinks";
 import { SubscriptionButton } from "@/components/subscriber/SubscriptionButton";
 import { SubscriberCount } from "@/components/subscriber/SubscriberCount";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import type { Track } from "@/types/music";
+import { safeString } from "@/lib/null-safe";
 
 export const dynamic = "force-dynamic";
+
+const BASE_URL = "https://epk-dashboard.vercel.app";
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const artist = await getArtistById(params.id);
+  if (!artist) {
+    return { title: "Artista no encontrado", robots: { index: false, follow: false } };
+  }
+
+  const name = safeString(artist.name);
+  const description = `Electronic Press Kit de ${name}${
+    artist.genre ? `, género ${safeString(artist.genre)}` : ""
+  }${artist.location ? `, desde ${safeString(artist.location)}` : ""}. Bio, releases, shows y rider técnico.`;
+  const image = artist.profile_image ?? artist.banner_image ?? null;
+
+  return {
+    title: `${name} — EPK`,
+    description,
+    alternates: { canonical: `/artists/${params.id}` },
+    openGraph: {
+      type: "profile",
+      title: `${name} | PressPlay`,
+      description,
+      url: `${BASE_URL}/artists/${params.id}`,
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${name} | PressPlay`,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
 
 export default async function ArtistDetailPage({ params }: { params: { id: string } }) {
   const artist = await getArtistById(params.id);
@@ -24,8 +60,22 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
     console.error("Failed to fetch tracks for artist:", params.id, e);
   }
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "MusicGroup",
+    name: safeString(artist.name),
+    genre: safeString(artist.genre) || undefined,
+    description: safeString(artist.biography) || undefined,
+    url: `${BASE_URL}/artists/${params.id}`,
+    ...(artist.profile_image ? { image: artist.profile_image } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ArtistHero
         name={artist.name}
         genre={artist.genre}

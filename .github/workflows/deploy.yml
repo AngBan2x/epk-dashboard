@@ -18,7 +18,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # El binario nativo de better-sqlite3 está compilado para el ABI de
+          # Node 24; con Node 20 los tests unitarios fallan al cargar el módulo.
+          node-version: 24
           cache: "pnpm"
 
       - run: pnpm install --frozen-lockfile
@@ -34,6 +36,14 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: E2E (Playwright)
+        run: pnpm test:e2e
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CI: "1"
 
       - name: Deploy to Vercel (Preview)
         if: github.event_name == 'pull_request'
