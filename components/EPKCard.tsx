@@ -12,6 +12,7 @@ import {
   capitalizeReleaseType,
   getCoverImage,
 } from "@/lib/null-safe";
+import { imageOptimizationProps } from "@/lib/image-config";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -127,7 +128,7 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
             alt={`Portada de ${title}`}
             width={400}
             height={400}
-            unoptimized
+            {...imageOptimizationProps(coverImage)}
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
             onError={() => setCoverBroken(true)}
           />

@@ -18,16 +18,13 @@
     "db:seed:artists": "tsx scripts/seed-artists.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1135.0",
     "@libsql/client": "^0.18.0",
     "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.8.2",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.6.3",
-    "googleapis": "^178.1.1",
     "next": "14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -37,12 +34,10 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.3.3",
     "@playwright/test": "^1.52.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
-    "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.11",

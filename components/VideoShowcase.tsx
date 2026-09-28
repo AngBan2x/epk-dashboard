@@ -3,6 +3,7 @@
 import Image from "next/image";
 import React, { useState } from "react";
 import { safeString } from "@/lib/null-safe";
+import { imageOptimizationProps } from "@/lib/image-config";
 import { VideoPlayerModal } from "./VideoPlayerModal";
 
 interface VideoShowcaseProps {
@@ -66,7 +67,7 @@ export function VideoShowcase({
           alt={resolvedTitle}
           width={640}
           height={360}
-          unoptimized
+          {...imageOptimizationProps(thumbnail)}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
 

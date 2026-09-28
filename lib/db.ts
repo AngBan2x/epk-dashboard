@@ -1211,6 +1211,28 @@ export async function getLikeCount(trackId: string): Promise<number> {
   return result.count;
 }
 
+export async function getTotalLikesForTracks(trackIds: string[]): Promise<number> {
+  const ids = Array.from(new Set(trackIds.filter(Boolean)));
+  if (ids.length === 0) return 0;
+
+  if (isTursoEnabled()) {
+    await ensureTursoSchemaIfNeeded();
+    const placeholders = ids.map(() => "?").join(", ");
+    const row = await tursoExecSingle(
+      `SELECT COUNT(*) as count FROM likes WHERE track_id IN (${placeholders})`,
+      ids
+    );
+    return row ? Number(row.count) : 0;
+  }
+
+  const db = getLocalDb();
+  const placeholders = ids.map(() => "?").join(", ");
+  const result = db
+    .prepare(`SELECT COUNT(*) as count FROM likes WHERE track_id IN (${placeholders})`)
+    .get(...ids) as { count: number };
+  return result.count;
+}
+
 export async function getUserLikes(userId: string): Promise<Like[]> {
   if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM likes WHERE user_id = ? ORDER BY created_at DESC", [userId]);

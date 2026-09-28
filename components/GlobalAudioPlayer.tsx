@@ -1,10 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useAudioPlayer } from "@/context/AudioPlayerContext";
-import { AudioVisualizer } from "@/components/AudioVisualizer";
+import { imageOptimizationProps } from "@/lib/image-config";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
+
+const AudioVisualizer = dynamic(() => import("@/components/AudioVisualizer").then((m) => m.AudioVisualizer), {
+  ssr: false,
+});
 
 export function GlobalAudioPlayer() {
   const { activeTrack, isPlaying, isLoading, error, duration, currentTime, volume, isVisualizerOpen, isYouTubeMode, togglePlay, clearTrack, seek, setVolume, toggleVisualizer, audioRef } = useAudioPlayer();
@@ -140,7 +145,7 @@ export function GlobalAudioPlayer() {
 
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {activeTrack.coverImage && (
-                      <Image src={activeTrack.coverImage} alt={activeTrack.title} width={48} height={48} unoptimized className="w-12 h-12 rounded-lg object-cover shadow-md" />
+                      <Image src={activeTrack.coverImage} alt={activeTrack.title} width={48} height={48} {...imageOptimizationProps(activeTrack.coverImage)} className="w-12 h-12 rounded-lg object-cover shadow-md" />
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -265,7 +270,7 @@ export function GlobalAudioPlayer() {
               >
                 <div className="flex items-center gap-3">
                   {activeTrack.coverImage && (
-                    <Image src={activeTrack.coverImage} alt={activeTrack.title} width={32} height={32} unoptimized className="w-8 h-8 rounded-lg object-cover" />
+                      <Image src={activeTrack.coverImage} alt={activeTrack.title} width={32} height={32} {...imageOptimizationProps(activeTrack.coverImage)} className="w-8 h-8 rounded-lg object-cover" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate">{activeTrack.title}</p>
