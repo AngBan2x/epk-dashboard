@@ -9,8 +9,10 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `pnpm test:unit` | 165 tests (Vitest, 14 archivos). Requiere Node 22 en local: `& "$env:TEMP\opencode\node22\node.exe" "node_modules\vitest\vitest.mjs" run` |
-| `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast |
+| `npx vitest run` | **225 tests** (Vitest, 18 archivos). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
+| `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast. Usa `PLAYWRIGHT_BASE_URL=https://epk-dashboard.vercel.app` para correr contra producción |
+| `npx tsx scripts/turso-check.ts` | Verifica la higiene de datos en Turso por SQL directo (tracks, shows, usuarios QA, huerfanos). Es la fuente de verdad, no las lecturas de API (la réplica va retrasada) |
+| `npx tsx scripts/qa-cleanup.ts --apply` | Limpia datos de QA de producción. **Dry-run por defecto**: siempre revisa el dry-run antes de aplicar |
 
 ## Stack
 
@@ -53,14 +55,17 @@ tests/             # Vitest + Playwright
 ## Auth
 
 - bcryptjs 10 rounds, httpOnly session cookie (HMAC-SHA256 signed via `lib/auth.ts`, backward-compatible con tokens viejos)
-- **Roles**: artist, admin, subscriber
+- **Roles**: artist, admin, subscriber. **Desde P6 el registro público crea solo `subscriber`** (se eliminó el selector de artista); la promoción a `artist` ocurre al aprobar su primer release o show, en `POST /api/admin/approvals/[id]` vía `lib/artist-promotion.ts` (idempotente). Un suscriptor SÍ puede entrar a crear releases/shows: siempre quedan `pending`/`approved=false`.
 - **Admin credentials**: admin@epk.local / <CONTRASENA_ROTADA>
-- Token: `{ userId, role, iat, exp }` (exp = 24h si no rememberMe)
+- Token: `{ userId, role, iat, exp, invalidateSessionBefore? }` — **`exp` siempre presente** (24 h, o 30 días con rememberMe); `invalidateSessionBefore` + `reissueSessionToken` permiten invalidar sesiones tras un cambio de rol, con compatibilidad hacia atrás con tokens antiguos.
+- **Aprobaciones (P6)**: `submissions` es el portal del artista (solo lo propio, sin escritura de decisiones) y `approvals` es la consola admin (escritor único `POST /api/admin/approvals/[id]`, motivo mínimo de 10 caracteres validado en backend, `revision` y auditoría).
 
 ## Base de Datos
 
 - **Dual-mode**: Turso (producción) o SQLite local (dev)
 - **9 tablas**: users, artists, tracks, releases, shows, submissions, metrics_history, notifications, subscriptions (`tracks.admin_notes` y `track_submissions` con `admin_id`/`reviewed_at` añadidos en P4.5)
+- **Cascadas (P6)**: `deleteArtist` y `deleteUser` borran dependencias (suscripciones, dossiers, shows, tracks por `artist_name` y sus `metrics_history`/`likes`). `tracks` se relaciona por nombre, no por FK: por eso el borrado va por `artist_name`.
+- **Scripts de datos**: `scripts/seed-influential-catalog.ts` (P5.2, **NO aplicado en prod**), `scripts/backfill-artist-owners.ts` (6 de 7 artistas siguen con `user_id` NULL) y `scripts/qa-cleanup.ts`. Los tres con dry-run por defecto y `--apply` para escribir.
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
 - **REGLA**: Usar funciones de `lib/db.ts` en vez de `getDbWrite()` directo en API routes

@@ -4,6 +4,19 @@
 **Origen:** 13 problemas reportados por el usuario con capturas + 2 barridos de evidencia (accesibilidad/responsive, integridad/seguridad). Todo verificado con archivo:linea antes de planificar.
 **Subagentes:** show-form-builder, header-builder, carousel-builder, dashboard-builder, api-builder, approval-workflow-builder, auth-builder, db-migrator, security-auditor, quality-auditor, visual-tester, api-tester.
 
+## Resultado por bloque
+
+| Bloque | Estado | Nota |
+|---|---|---|
+| 1 Issues 1-10 | Hecho | animacion, cards, filtros, header, SortSelect |
+| 2 Carrusel | Hecho | solo catalogo dashboard, Embla |
+| 3 Descargas | Hecho | exportador unificado server-side, stale corregido |
+| 4 Roles | Hecho | suscriptor por defecto + hook de promocion |
+| 5 Admin split | Hecho | submissions portal / approvals consola |
+| 6 Visualizador | Hecho | FFT 1024, bandas 30 Hz-18 kHz, peak-hold |
+| 7 Seguridad S1-S8 | Hecho | 8/8 aplicados y auditados |
+| 8 a11y AX1-AX7 | Hecho | 7/7 aplicados |
+
 ## Decisiones del usuario (registradas, no reabrir sin motivo)
 1. Descargas: **opción B** (exportador unificado server-side).
 2. Modelo **suscriptor-por-defecto confirmado**; (2a) registro directo de artista **cerrado**; (2b) la promoción la dispara aprobar su primer release **o** show.
@@ -86,7 +99,13 @@ AX1 `LoginModal` (Escape/dialog/alert) · AX2 modales de aprobaciones (Escape/ro
 - **Oleada 3** (seguridad S1+S2 con auth-builder/api-builder si no cupo en Oleada 2; si cupo, solo verificación).
 - **Oleada 4 (verificación global)**: security-auditor (auditoría authZ de C+S, reporta sin auto-fixear) + quality-auditor (unit Node 22 + E2E por bloque, headed) + visual-tester (capturas/DOM, checklist teclado y contraste). Cierre por bloque: commit/push → matriz + funcional + headed + capturas en prod → AI_LOG → release si se completa la fase.
 
-## Supuestos registrados (no reabrir sin motivo)
+## Supuestos verificados
+
+- Re-login tras promocion: verificado (el login lee el rol de la BD y el token siempre lleva xp).
+- marketing_emails no bloquea avisos oficiales: sin cambios en P6.
+- Limpieza de tests en fterAll: los E2E de aprobaciones y suscriptores se corrigieron y limpian.
+- DDL DEFAULT 'artist' se deja como esta; la API manda y fuerza subscriber.
+- FROM_EMAIL/dominio y cuota Resend: siguen pendientes, ninguna prueba de correo ejecutada.
 
 - Re-login obligatorio tras promoción (notificado al usuario).
 - `marketing_emails` no bloquea avisos oficiales (criterio P4.8).
