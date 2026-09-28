@@ -152,6 +152,7 @@ async function notifyUser(
     message: string;
     data: Record<string, unknown>;
     emailData: EmailTemplateData;
+    category?: "release" | "show" | "show_update" | "system";
   }
 ): Promise<void> {
   try {
@@ -162,6 +163,18 @@ async function notifyUser(
     }
 
     if (user.deleted_at) {
+      summary.skipped += 1;
+      return;
+    }
+
+    const preferences = user.preferences;
+    const wantsCategory =
+      input.category === "release"
+        ? preferences?.new_release_alerts !== false
+        : input.category === "show" || input.category === "show_update"
+          ? preferences?.show_alerts !== false
+          : true;
+    if (!wantsCategory) {
       summary.skipped += 1;
       return;
     }
@@ -262,6 +275,7 @@ export async function notifyArtistSubscribers(
         message: input.message,
         data: input.data,
         emailData,
+        category: input.kind,
       });
     }
 

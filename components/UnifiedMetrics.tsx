@@ -56,11 +56,11 @@ export function UnifiedMetrics({
             {formatNumber(saves)}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Saves
+            Guardados
           </p>
           {saves === 0 && (
-            <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              Próximamente
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              Sin datos aún
             </p>
           )}
         </div>
@@ -69,11 +69,11 @@ export function UnifiedMetrics({
             {formatNumber(playlists)}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Playlists
+            Listas
           </p>
           {playlists === 0 && (
-            <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              Próximamente
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              Sin datos aún
             </p>
           )}
         </div>

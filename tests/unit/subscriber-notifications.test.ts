@@ -74,7 +74,7 @@ async function createFixture(): Promise<Fixture> {
 
 async function createSubscriber(
   artistId: string,
-  options: { notify_releases: boolean; notify_shows: boolean; push?: boolean }
+  options: { notify_releases: boolean; notify_shows: boolean; push?: boolean; prefs?: Partial<typeof DEFAULT_PREFS> }
 ): Promise<string> {
   const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
   const userId = `fanout-${randomUUID()}`;
@@ -85,7 +85,7 @@ async function createSubscriber(
     email: `fanout-sub-${suffix}@example.com`,
     password_hash: "x",
     role: "subscriber",
-    preferences: { ...DEFAULT_PREFS, push_notifications: options.push ?? true },
+    preferences: { ...DEFAULT_PREFS, push_notifications: options.push ?? true, ...(options.prefs ?? {}) },
     avatar: null,
     email_verified: false,
     deleted_at: null,
@@ -379,5 +379,65 @@ describe("P4.6b plantillas de email nuevas", () => {
     expect(template.subject).toContain("pospuesto");
     expect(template.html).toContain("2026-12-31");
     expect(template.text).toContain("Nueva fecha: 2026-12-31");
+  });
+});
+
+describe("P6 T3.3 las preferencias de categoria se respetan de verdad", () => {
+  beforeAll(() => {
+    delete process.env.RESEND_API_KEY;
+  });
+
+  it("new_release_alerts en false impide el aviso de release", async () => {
+    const fixture = await createFixture();
+    const subscriberId = await createSubscriber(fixture.artistId, {
+      notify_releases: true,
+      notify_shows: true,
+      prefs: { new_release_alerts: false },
+    });
+
+    const summary = await notifyArtistSubscribers({
+      artistId: fixture.artistId,
+      kind: "release",
+      title: "Nuevo release",
+      message: "Ya disponible",
+      data: {},
+      emailType: "new_release",
+      emailData: { trackTitle: "X", artistName: "Y" },
+    });
+
+    expect(summary.notified).toBe(0);
+    const notifications = await getUserNotifications(subscriberId);
+    expect(notifications).toHaveLength(0);
+  });
+
+  it("show_alerts en false impide el aviso de show pero no el de release", async () => {
+    const fixture = await createFixture();
+    const subscriberId = await createSubscriber(fixture.artistId, {
+      notify_releases: true,
+      notify_shows: true,
+      prefs: { show_alerts: false },
+    });
+
+    const showSummary = await notifyArtistSubscribers({
+      artistId: fixture.artistId,
+      kind: "show",
+      title: "Nuevo show",
+      message: "Ya disponible",
+      data: {},
+      emailType: "new_show",
+      emailData: { showVenue: "Sala", artistName: "Y" },
+    });
+    expect(showSummary.notified).toBe(0);
+
+    const releaseSummary = await notifyArtistSubscribers({
+      artistId: fixture.artistId,
+      kind: "release",
+      title: "Nuevo release",
+      message: "Ya disponible",
+      data: {},
+      emailType: "new_release",
+      emailData: { trackTitle: "X", artistName: "Y" },
+    });
+    expect(releaseSummary.notified).toBeGreaterThan(0);
   });
 });
