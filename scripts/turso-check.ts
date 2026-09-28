@@ -32,7 +32,7 @@ async function main() {
     ["users", "SELECT COUNT(*) c FROM users"],
     ["track_submissions", "SELECT COUNT(*) c FROM track_submissions"],
     ["qa_tracks", "SELECT COUNT(*) c FROM tracks WHERE title LIKE 'QA %' OR id LIKE 'qa-%'"],
-    ["qa_shows", "SELECT COUNT(*) c FROM shows WHERE venue LIKE 'QA %' OR title LIKE 'QA %'"],
+    ["qa_shows", "SELECT COUNT(*) c FROM shows WHERE venue_name LIKE 'QA %' OR title LIKE 'QA %'"],
     ["qa_users", "SELECT COUNT(*) c FROM users WHERE email LIKE '%example.com'"],
     ["subscribers", "SELECT COUNT(*) c FROM users WHERE role='subscriber'"],
     ["artists", "SELECT COUNT(*) c FROM artists"],
