@@ -33,6 +33,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (user.deleted_at) {
+      return NextResponse.json(
+        {
+          error:
+            "Esta cuenta está suspendida. Puedes recuperarla con tu contraseña durante los 30 días de gracia.",
+          code: "ACCOUNT_SUSPENDED",
+        },
+        { status: 403 }
+      );
+    }
+
     const validPassword = await bcrypt.compare(validated.password, user.password_hash);
     if (!validPassword) {
       return NextResponse.json(
@@ -50,6 +61,7 @@ export async function POST(req: NextRequest) {
       email: user.email,
       role: user.role,
       iat: now,
+      invalidateSessionBefore: now,
       rememberMe,
     });
 

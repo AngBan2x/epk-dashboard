@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -54,6 +54,7 @@ export default function ApprovalsPage() {
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [revisionTarget, setRevisionTarget] = useState<Submission | null>(null);
   const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const modalTitleRef = useRef<HTMLHeadingElement>(null);
   const rejectModalTitleRef = useRef<HTMLHeadingElement>(null);
   const revisionModalTitleRef = useRef<HTMLHeadingElement>(null);
@@ -65,9 +66,32 @@ export default function ApprovalsPage() {
     }
   }, [user, authLoading, router]);
 
-  useEffect(() => {
-    fetchApprovals();
+  const fetchApprovals = useCallback(async (pageNumber = 1) => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (filter !== 'all') params.set('status', filter);
+      if (search) params.set('search', search);
+      params.set('page', String(pageNumber));
+      params.set('limit', '20');
+      const res = await fetch(`/api/admin/approvals?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissions(data.submissions);
+        setStats(data.stats);
+        setPagination(data.pagination);
+        setPage(pageNumber);
+      }
+    } catch (error) {
+      console.error('Failed to fetch approvals:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [filter, search]);
+
+  useEffect(() => {
+    fetchApprovals(1);
+  }, [fetchApprovals]);
 
   // Handle Escape key for modals
   useEffect(() => {
@@ -112,28 +136,6 @@ export default function ApprovalsPage() {
       setTimeout(() => revisionModalTitleRef.current?.focus(), 100);
     }
   }, [showRevisionModal]);
-
-  const fetchApprovals = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (filter !== 'all') params.set('status', filter);
-      if (search) params.set('search', search);
-      params.set('page', '1');
-      params.set('limit', '20');
-      const res = await fetch(`/api/admin/approvals?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissions(data.submissions);
-        setStats(data.stats);
-        setPagination(data.pagination);
-      }
-    } catch (error) {
-      console.error('Failed to fetch approvals:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAction = async (id: string, action: 'approve' | 'reject' | 'revision', reason?: string) => {
     try {
@@ -384,24 +386,20 @@ export default function ApprovalsPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Página {pagination.page} de {pagination.totalPages} · {pagination.total} total
+                Página {page} de {pagination.totalPages} · {pagination.total} total
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    // TODO: implement pagination
-                  }}
-                  disabled={pagination.page <= 1}
-                  className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  onClick={() => fetchApprovals(pagination.page - 1)}
+                  disabled={pagination.page <= 1 || loading}
+                  className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                   Anterior
                 </button>
                 <button
-                  onClick={() => {
-                    // TODO: implement pagination
-                  }}
-                  disabled={pagination.page >= pagination.totalPages}
-                  className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  onClick={() => fetchApprovals(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.totalPages || loading}
+                  className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                   Siguiente
                 </button>

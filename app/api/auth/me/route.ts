@@ -29,7 +29,23 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (user.deleted_at) {
+      const response = NextResponse.json(
+        { error: "La cuenta está suspendida", code: "ACCOUNT_SUSPENDED" },
+        { status: 403, headers: noStore }
+      );
+      response.cookies.set("auth_session", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 0,
+        path: "/",
+      });
+      return response;
+    }
+
     const { password_hash, ...userWithoutPassword } = user;
+    void password_hash;
     return NextResponse.json(userWithoutPassword, { headers: noStore });
   } catch (error) {
     console.error("[API/auth/me] Error:", error);
