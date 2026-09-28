@@ -25,6 +25,8 @@ export function ArtistHero({
   actions,
 }: ArtistHeroProps) {
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [bannerBroken, setBannerBroken] = useState(false);
+  const [profileBroken, setProfileBroken] = useState(false);
   const close = useCallback(() => setLightbox(null), []);
 
   useEffect(() => {
@@ -50,8 +52,20 @@ export function ArtistHero({
         aria-label={bannerImage ? "Ver banner ampliado" : undefined}
         title={bannerImage ? "Ver banner ampliado" : undefined}
       >
-        {bannerImage && (
-          <Image src={bannerImage} alt="" fill unoptimized className="object-cover" />
+        {bannerImage && !bannerBroken && (
+          <Image
+            src={bannerImage}
+            alt={`Banner de ${name}`}
+            fill
+            unoptimized
+            className="object-cover"
+            onError={() => setBannerBroken(true)}
+          />
+        )}
+        {(bannerBroken || !bannerImage) && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-sm font-medium text-white/80">{name}</span>
+          </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
       </div>
@@ -67,14 +81,15 @@ export function ArtistHero({
               aria-label={profileImage ? "Ver foto de perfil ampliada" : undefined}
               title={profileImage ? "Ver foto de perfil ampliada" : undefined}
             >
-              {profileImage ? (
+              {profileImage && !profileBroken ? (
                 <Image
                   src={profileImage}
-                  alt={name}
+                  alt={`Foto de ${name}`}
                   width={80}
                   height={80}
                   unoptimized
                   className="w-full h-full object-cover"
+                  onError={() => setProfileBroken(true)}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-slate-400">

@@ -72,17 +72,17 @@ export function VideoPlayerModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl bg-dark-900 border border-dark-700 rounded-2xl overflow-hidden shadow-2xl"
+        className="relative w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header del Modal */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-dark-800 bg-dark-950/60">
-          <h3 id="video-modal-title" className="text-base font-semibold text-white truncate">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
+          <h3 id="video-modal-title" className="text-base font-semibold text-slate-900 dark:text-white truncate">
             {resolvedTitle}
           </h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-dark-800 hover:bg-dark-700 text-dark-300 hover:text-white flex items-center justify-center transition"
+            className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 dark:hover:text-white flex items-center justify-center transition"
             aria-label="Cerrar modal de video"
           >
             ✕
@@ -111,7 +111,7 @@ export function VideoPlayerModal({
               />
             )
           ) : (
-            <div className="text-center p-8 text-dark-400">
+            <div className="text-center p-8 text-slate-600 dark:text-slate-300">
               <span className="text-4xl block mb-2">🎬</span>
               <p className="text-sm">No se encontró una fuente de video válida para este track.</p>
             </div>

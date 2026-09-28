@@ -6,7 +6,7 @@ import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper"
 import { LyricsSectionWrapper } from "@/components/LyricsSectionWrapper";
 
 import { ImageGalleryWrapper } from "@/components/ImageGalleryWrapper";
-import { DownloadCenter } from "@/components/DownloadCenter";
+import { CatalogDownloadButton } from "@/components/CatalogDownloadButton";
 import { VideoShowcase } from "@/components/VideoShowcase";
 
 export const dynamic = "force-dynamic";
@@ -292,9 +292,17 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 <LastfmMetrics artist={track.artist_name} trackTitle={track.title} />
               </SlideIn>
 
-              {/* Download Center */}
               <SlideIn index={7}>
-                <DownloadCenter artistName={track.artist_name} trackTitle={track.title} trackCount={1} />
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Ficha técnica para prensa
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Descarga el catálogo completo del EPK con métricas, enlaces y detalles de
+                    producción de cada lanzamiento.
+                  </p>
+                  <CatalogDownloadButton />
+                </div>
               </SlideIn>
             </div>
           </div>
