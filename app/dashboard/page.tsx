@@ -4,7 +4,8 @@ import { Metadata } from "next";
 
 import { EPKCard } from "@/components/EPKCard";
 import { BioSection } from "@/components/BioSection";
-import { ArtistSocialLinks } from "@/components/ArtistSocialLinks";
+// C6: `ArtistSocialLinks` se retiró del catálogo. Sus datos ya son públicos en
+// `/artists/[id]` y aquí solo se duplicaban.
 import { CatalogArtistsCarousel } from "@/components/dashboard/CatalogArtistsCarousel";
 import { ShowsBooking } from "@/components/ShowsBooking";
 import { LoginModal } from "@/components/LoginModal";
@@ -22,6 +23,7 @@ import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
 import { formatDateES } from "@/lib/null-safe";
 import { showStatusLabel } from "@/lib/show-status";
 import { sortList } from "@/lib/search";
+import { collectVideoIds, type YouTubeStatsRecord } from "@/lib/youtube";
 import { SortSelect, useListSort } from "@/components/SortSelect";
 
 const TRACK_ACCESSORS = {
@@ -99,6 +101,7 @@ export default function DashboardPage() {
   const [showFormOpen, setShowFormOpen] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [sortState, setSortState] = useListSort(DEFAULT_SORT);
+  const [youtubeStats, setYoutubeStats] = useState<YouTubeStatsRecord>({});
 
   useEffect(() => {
     const base = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
@@ -113,11 +116,45 @@ export default function DashboardPage() {
   }, [user?.id]);
 
   const { tracks, artists, artistProfile, artistShows } = data;
+
+  /**
+   * Fase E — UN solo fetch con todos los ids para las 3 rejillas.
+   * Antes cada `EPKCard` pedía `/api/youtube/stats?videoId=...` en su
+   * `useEffect`: un catálogo de N tracks = N llamadas upstream por visitante,
+   * y el `useEffect` se re-disparaba en cada reordenación (SortSelect).
+   *
+   * La dependencia es el string de ids, no el array: `setData` crea un array
+   * nuevo en cada recarga y con `[tracks]` se volvería a pedir el lote entero
+   * aunque los ids sean los mismos.
+   */
+  const youtubeIdsKey = collectVideoIds(tracks).join(",");
+  useEffect(() => {
+    if (!youtubeIdsKey) {
+      setYoutubeStats({});
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/youtube/stats?ids=${youtubeIdsKey}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!cancelled) setYoutubeStats(json?.stats ?? {});
+      })
+      .catch(() => {
+        if (!cancelled) setYoutubeStats({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [youtubeIdsKey]);
+
   const artistTracks = artistProfile ? tracks.filter((t) => t.artist_name === artistProfile.name) : tracks;
   const sortedTracks = sortList(tracks, sortState, TRACK_ACCESSORS);
   const sortedArtistTracks = sortList(artistTracks, sortState, TRACK_ACCESSORS);
   const isAdmin = user?.role === "admin";
   const isSubscriber = !!user && !isAdmin && !artistProfile;
+  /** Stats del lote para una tarjeta concreta (ya resueltas, sin fetch). */
+  const statsFor = (track: Track) =>
+    track.youtube_video_id ? youtubeStats[track.youtube_video_id] ?? null : null;
 
   if (loading) {
     return (
@@ -160,7 +197,7 @@ export default function DashboardPage() {
                   {sortedTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
                       <a href={`/track/${track.id}`} className="block h-full">
-                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} />
+                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} youtubeStats={statsFor(track)} />
                       </a>
                     </SlideIn>
                   ))}
@@ -389,7 +426,7 @@ export default function DashboardPage() {
                     <SlideIn key={track.id} index={i}>
                       <div className="relative group">
                         <a href={`/track/${track.id}`} className="block h-full">
-                          <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} />
+                          <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} youtubeStats={statsFor(track)} />
                         </a>
                         <a
                           href={`/releases/${track.id}/edit`}
@@ -411,7 +448,7 @@ export default function DashboardPage() {
 
               {/* Dossier / Rider + Descargas unificadas */}
               {artistProfile && (
-                <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+                <div className="mb-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
                   <SlideIn index={artistTracks.length + 2}>
                     <DossierEditor
                       artistId={artistProfile.id}
@@ -579,22 +616,6 @@ export default function DashboardPage() {
                   </p>
                 </PitchHeading>
 
-                <div className="mt-4 space-y-3">
-                  {artists
-                    .filter((a) => Array.isArray(a.social_links) && a.social_links.length > 0)
-                    .map((a) => (
-                      <div key={a.id} className="flex flex-wrap items-center gap-3">
-                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                          {a.name}
-                        </span>
-                        <ArtistSocialLinks
-                          socialLinks={a.social_links}
-                          artistName={a.name}
-                          ariaLabel={`Redes sociales de ${a.name}`}
-                        />
-                      </div>
-                    ))}
-                </div>
               </section>
 
               {/* All tracks */}
@@ -606,7 +627,7 @@ export default function DashboardPage() {
                   {sortedTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
                       <a href={`/track/${track.id}`} className="block h-full">
-                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} />
+                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} youtubeStats={statsFor(track)} />
                       </a>
                     </SlideIn>
                   ))}

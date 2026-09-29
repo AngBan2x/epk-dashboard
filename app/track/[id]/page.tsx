@@ -148,10 +148,10 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 </div>
               </div>
 
-              {/* Metrics Bar */}
+              {/* Metrics Bar. Fase E: sin `likeCount={0}` inventado — si no hay
+                  dato de YouTube, la celda muestra "—" y lo explica. */}
               <UnifiedMetrics
                 streamCount={streamCount}
-                likeCount={0}
                 saves={track.metrics?.saves ?? 0}
                 playlists={track.metrics?.playlist_additions ?? 0}
                 youtubeVideoId={track.youtube_video_id}

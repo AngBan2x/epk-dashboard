@@ -7,6 +7,7 @@ import type {
   LastfmTopTrack,
 } from "@/lib/lastfm";
 import { formatNumber } from "@/lib/null-safe";
+import { reasonMessageEs, reasonNoteEs, type IntegrationReason } from "@/lib/integration-reasons";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,6 +21,8 @@ interface LastfmData {
   artist: LastfmArtistInfo | null;
   track: LastfmTrackInfo | null;
   topTracks: LastfmTopTrack[];
+  /** Fase E: por qué no hay datos, si no los hay. */
+  reason?: IntegrationReason | null;
 }
 
 function Skeleton() {
@@ -46,16 +49,35 @@ export default function LastfmMetrics({ artist, trackTitle }: LastfmMetricsProps
       params.set("method", "track");
     }
     fetch(`/api/lastfm?${params}`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        // Fase E: la ruta ya no devuelve 200 mudo. Un 502/503/429 llega con
+        // `reason`, y "no hay datos" (200 + not_found) es otro caso.
+        const json = (await res.json().catch(() => null)) as LastfmData | null;
+        // Cuerpo ilegible = el proveedor no nos dio una respuesta usable.
+        const fallback: LastfmData = {
+          artist: null,
+          track: null,
+          topTracks: [],
+          reason: "upstream",
+        };
+        return json ?? fallback;
+      })
       .then((json) => {
         setData(json);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setData({ artist: null, track: null, topTracks: [], reason: "network" });
+        setLoading(false);
+      });
   }, [artist, trackTitle]);
 
   if (loading) return <Skeleton />;
   if (!data?.artist && !data?.track && (!data?.topTracks || data.topTracks.length === 0)) {
+    // Fase E: "no hay datos en Last.fm" y "Last.fm está caído" ya no se pintan
+    // igual. `not_found` es el único caso en el que "sin datos" es cierto.
+    const reason = data?.reason ?? null;
+    const integracionCaida = reason !== null && reason !== "not_found";
     return (
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
         <SectionHeader
@@ -64,7 +86,19 @@ export default function LastfmMetrics({ artist, trackTitle }: LastfmMetricsProps
           subtitle="Listeners y reproducciones de tu catálogo"
           badges={<Badge variant="rose">Last.fm</Badge>}
         />
-        <EmptyState emoji="📈" message="Sin datos de Last.fm para este artista" />
+        <EmptyState
+          emoji={integracionCaida ? "⚠️" : "📈"}
+          message={
+            integracionCaida && reason
+              ? reasonMessageEs(reason, "Last.fm")
+              : "Sin datos de Last.fm para este artista"
+          }
+        />
+        {integracionCaida && reason && (
+          <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+            {reasonNoteEs(reason, "Last.fm")}
+          </p>
+        )}
       </div>
     );
   }

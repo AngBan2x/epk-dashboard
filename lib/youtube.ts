@@ -1,3 +1,11 @@
+import {
+  classifyUpstreamStatus,
+  integrationFailure,
+  integrationSuccess,
+  type IntegrationReason,
+  type IntegrationResult,
+} from './integration-reasons';
+
 export interface YouTubeVideo {
   id: string;
   title: string;
@@ -78,6 +86,15 @@ export function getAppleMusicEmbedUrl(albumId: string): string {
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
+/**
+ * Fase E: máximo de ids por llamada al API v3 (`videos?id=A,B,C`).
+ * Documentado por Google; no subirlo sin verificar el límite de cuota.
+ */
+export const YOUTUBE_BATCH_LIMIT = 50;
+
+/** Timeout de red por lote, para que una llamada colgada no cuelgue la ruta. */
+const YOUTUBE_TIMEOUT_MS = 5_000;
+
 export interface YouTubeVideoStats {
   viewCount: number;
   likeCount: number;
@@ -88,38 +105,178 @@ export interface YouTubeVideoStats {
   description: string; // P3.27: For chapter detection
 }
 
+/** Solo lo que la UI necesita pintar. */
+export type YouTubeStatPair = { viewCount: number; likeCount: number };
+
+/** `videoId -> stats`. Objeto plano (serializable) para pasar de Server a Client. */
+export type YouTubeStatsRecord = Record<string, YouTubeStatPair>;
+
+interface YouTubeVideosPayload {
+  items?: Array<{
+    id?: string;
+    snippet?: {
+      title?: string;
+      description?: string;
+      thumbnails?: { high?: { url?: string }; default?: { url?: string } };
+    };
+    contentDetails?: { duration?: string };
+    statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
+  }>;
+  error?: { errors?: Array<{ reason?: string }>; message?: string };
+}
+
+function parseVideoItem(item: NonNullable<YouTubeVideosPayload['items']>[number]): YouTubeVideoStats {
+  const stats = item.statistics;
+  const snippet = item.snippet;
+  return {
+    viewCount: parseInt(stats?.viewCount || '0', 10),
+    likeCount: parseInt(stats?.likeCount || '0', 10),
+    commentCount: parseInt(stats?.commentCount || '0', 10),
+    duration: item.contentDetails?.duration || '',
+    title: snippet?.title || '',
+    thumbnail: snippet?.thumbnails?.high?.url || snippet?.thumbnails?.default?.url || '',
+    description: snippet?.description || '',
+  };
+}
+
+/** Mapea el cuerpo de error de Google a un motivo discriminado. */
+function classifyYouTubePayloadError(payload: YouTubeVideosPayload): IntegrationReason | null {
+  const reason = payload.error?.errors?.[0]?.reason;
+  if (!reason) return null;
+  if (reason === 'dailyLimitExceeded' || reason === 'quotaExceeded' || reason === 'rateLimitExceeded') {
+    return 'quota';
+  }
+  if (reason === 'keyInvalid' || reason === 'accessNotConfigured' || reason === 'forbidden') {
+    return 'no_key';
+  }
+  return 'upstream';
+}
+
 /**
- * Fetch video statistics via the YouTube Data API v3.
- * Returns `null` when the API key is missing or the request fails.
+ * Una llamada al API v3 para hasta {@link YOUTUBE_BATCH_LIMIT} ids.
+ * Es el motivo de que la UI deje de pedir `/videos` una vez por track.
+ * Devuelve `{ id, stats }`: YouTube no garantiza el orden de `items` ni que
+ * devuelva todos los pedidos, así que la posición no sirve para emparejar.
  */
-export async function getVideoStats(videoId: string): Promise<YouTubeVideoStats | null> {
+async function fetchVideosChunk(
+  videoIds: string[],
+): Promise<IntegrationResult<Array<{ id: string; stats: YouTubeVideoStats }>>> {
   const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey || !videoId) return null;
+  if (!apiKey) return integrationFailure('no_key');
+  if (videoIds.length === 0) return integrationSuccess([]);
 
   try {
-    const url = `${YOUTUBE_API_BASE}/videos?id=${videoId}&part=statistics,contentDetails,snippet&key=${apiKey}`;
-    const res = await fetch(url);
-    const data = await res.json();
+    const url =
+      `${YOUTUBE_API_BASE}/videos?id=${videoIds.map(encodeURIComponent).join(',')}` +
+      `&part=statistics,contentDetails,snippet&key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(YOUTUBE_TIMEOUT_MS),
+      next: { revalidate: 300 },
+    } as RequestInit);
 
-    if (!data.items || data.items.length === 0) return null;
+    const payload = (await res.json().catch(() => ({}))) as YouTubeVideosPayload;
 
-    const item = data.items[0];
-    const stats = item.statistics;
-    const snippet = item.snippet;
-    const contentDetails = item.contentDetails;
+    // Fase E: faltaba el `res.ok`. Un 403 por cuota se parseaba antes como
+    // éxito y terminaba en `null` indistinguible de "el video no existe".
+    if (!res.ok) return integrationFailure(classifyUpstreamStatus(res.status));
+    if (payload?.error) {
+      const reason = classifyYouTubePayloadError(payload);
+      if (reason) return integrationFailure(reason);
+    }
 
-    return {
-      viewCount: parseInt(stats.viewCount || '0', 10),
-      likeCount: parseInt(stats.likeCount || '0', 10),
-      commentCount: parseInt(stats.commentCount || '0', 10),
-      duration: contentDetails?.duration || '',
-      title: snippet?.title || '',
-      thumbnail: snippet?.thumbnails?.high?.url || snippet?.thumbnails?.default?.url || '',
-      description: snippet?.description || '',
-    };
-  } catch {
-    return null;
+    const items = (payload.items ?? []).filter((item) => typeof item?.id === 'string' && item.id);
+    if (items.length === 0) return integrationFailure('not_found');
+    return integrationSuccess(
+      items.map((item) => ({ id: item.id as string, stats: parseVideoItem(item) })),
+    );
+  } catch (error) {
+    const isTimeout =
+      error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+    if (!isTimeout) {
+      console.error('[youtube] fallo de red al pedir estadísticas:', error);
+    }
+    return integrationFailure(isTimeout ? 'upstream' : 'network');
   }
+}
+
+/**
+ * Fase E — mata el N+1. Antes `EPKCard` llamaba a `getVideoStats` una vez por
+ * track, así que un artista con N releases gastaba N unidades de cuota por
+ * visitante. Ahora N ids entran en ⌈N/50⌉ llamadas (1 en la práctica).
+ *
+ * Los ids que YouTube no devuelve NO son un error: simplemente no aparecen en
+ * el mapa, y la UI los pinta como "—".
+ */
+export async function getVideoStatsBatch(
+  videoIds: string[],
+): Promise<IntegrationResult<Map<string, YouTubeVideoStats>>> {
+  const unique = Array.from(
+    new Set(videoIds.map((id) => (typeof id === 'string' ? id.trim() : '')).filter(Boolean)),
+  );
+  if (unique.length === 0) return integrationSuccess(new Map());
+  if (!process.env.YOUTUBE_API_KEY) return integrationFailure('no_key');
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < unique.length; i += YOUTUBE_BATCH_LIMIT) {
+    chunks.push(unique.slice(i, i + YOUTUBE_BATCH_LIMIT));
+  }
+
+  const results = await Promise.all(chunks.map((chunk) => fetchVideosChunk(chunk)));
+
+  // Gravedad: cuota > sin clave > red > upstream > not_found. Un chunk
+  // `not_found` junto a otro con datos no invalida los datos.
+  const fatal = results.find((r) => !r.ok && r.reason !== 'not_found');
+  if (fatal && !fatal.ok) return integrationFailure(fatal.reason);
+
+  const map = new Map<string, YouTubeVideoStats>();
+  for (const result of results) {
+    if (result.ok) {
+      for (const { id, stats } of result.data) map.set(id, stats);
+    }
+  }
+  if (map.size === 0) return integrationFailure('not_found');
+  return integrationSuccess(map);
+}
+
+/**
+ * Fetch de las estadísticas de UN video.
+ * Fase E: devuelve el motivo discriminado (`no_key` / `not_found` / `quota` /
+ * `network` / `upstream`) en vez de un `null` que no explicaba nada, y
+ * comprueba `res.ok`, que faltaba.
+ */
+export async function getVideoStats(
+  videoId: string,
+): Promise<IntegrationResult<YouTubeVideoStats>> {
+  if (!videoId) return integrationFailure('not_found');
+  const res = await getVideoStatsBatch([videoId]);
+  if (!res.ok) return res;
+  const stats = res.data.get(videoId);
+  if (!stats) return integrationFailure('not_found');
+  return integrationSuccess(stats);
+}
+
+/**
+ * Resuelve el lote y lo aplana a un objeto serializable para pasarlo de un
+ * Server Component a uno cliente (`Map` no sobrevive al RSC boundary).
+ */
+export function toStatsRecord(
+  map: Map<string, YouTubeVideoStats> | null,
+): YouTubeStatsRecord {
+  const record: YouTubeStatsRecord = {};
+  if (!map) return record;
+  for (const [id, stats] of map) {
+    record[id] = { viewCount: stats.viewCount, likeCount: stats.likeCount };
+  }
+  return record;
+}
+
+/** Extrae los `youtube_video_id` válidos de una lista de tracks. */
+export function collectVideoIds(
+  items: Array<{ youtube_video_id?: string | null }>,
+): string[] {
+  return items
+    .map((item) => (typeof item.youtube_video_id === 'string' ? item.youtube_video_id.trim() : ''))
+    .filter(Boolean);
 }
 
 /**

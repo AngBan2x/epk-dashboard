@@ -16,6 +16,7 @@ import { imageOptimizationProps } from "@/lib/image-config";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import type { YouTubeStatPair } from "@/lib/youtube";
 
 interface EPKCardProps {
   track: Track;
@@ -23,9 +24,22 @@ interface EPKCardProps {
   initialLikeCount?: number;
   onLoginPrompt?: () => void;
   priority?: boolean;
+  /**
+   * Fase E: el lote de YouTube lo resuelve quien monta la rejilla (una sola
+   * llamada para N tarjetas) y lo pasa por prop. Antes la tarjeta pedía sus
+   * propias stats en un `useEffect`, o sea N llamadas upstream por visitante.
+   */
+  youtubeStats?: YouTubeStatPair | null;
 }
 
-export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onLoginPrompt, priority = false }: EPKCardProps) {
+export function EPKCard({
+  track,
+  initialLiked = false,
+  initialLikeCount = 0,
+  onLoginPrompt,
+  priority = false,
+  youtubeStats = null,
+}: EPKCardProps) {
   const { user } = useAuth();
   const title = safeString(track.title);
   const artistName = safeString(track.artist_name);
@@ -34,26 +48,21 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
   const isrc = safeString(track.isrc);
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialLikeCount);
-  const [ytLikes, setYtLikes] = useState(0);
-  const [ytViews, setYtViews] = useState(0);
   const [coverBroken, setCoverBroken] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [loading, setLoading] = useState(false);
+  const ytLikes = youtubeStats?.likeCount ?? 0;
+  const ytViews = youtubeStats?.viewCount ?? 0;
   const streams = formatNumber((track.metrics?.streams ?? 0) + ytViews);
 
-  useEffect(() => {
-    if (track.youtube_video_id) {
-      fetch(`/api/youtube/stats?videoId=${track.youtube_video_id}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (data) {
-            setYtLikes(data.likeCount);
-            setYtViews(data.viewCount);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [track.youtube_video_id]);
+  // El track declara un video de YouTube pero el lote no trajo sus stats:
+  // no inventamos el dato, lo decimos.
+  const youtubeMissing = !!track.youtube_video_id && !youtubeStats;
+  const statsTooltip = youtubeMissing
+    ? "No se pudieron obtener las métricas de YouTube para este video"
+    : youtubeStats
+      ? `Incluye vistas y likes de YouTube (${formatNumber(youtubeStats.viewCount)} vistas)`
+      : "Streams registrados en PressPlay (este track no tiene video de YouTube)";
 
   // Badge "Nuevo Lanzamiento" — track released in the last 7 days (UTC days, TZ-safe)
   const isNewRelease = (() => {
@@ -215,8 +224,8 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
         {/* Stats footer: streams, saves, likes */}
         <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span className="inline-flex items-center gap-1" title={statsTooltip}>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A2 2 0 0010 9.87v4.263a2 2 0 001.555.832l3.197-2.132a2 2 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               {streams}
             </span>
             <span className="inline-flex items-center gap-1">
@@ -224,7 +233,16 @@ export function EPKCard({ track, initialLiked = false, initialLikeCount = 0, onL
               {formatNumber(track.metrics?.saves ?? 0)}
             </span>
           </div>
-          <div className={`inline-flex items-center gap-1 ${liked ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`}>
+          <div
+            className={`inline-flex items-center gap-1 ${liked ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`}
+            title={
+              youtubeMissing
+                ? "No se pudieron obtener los likes de YouTube: se muestra solo el total de PressPlay"
+                : youtubeStats
+                  ? "Suma de los likes de PressPlay y los likes de YouTube"
+                  : "Likes registrados en PressPlay"
+            }
+          >
             <span className={animating ? "animate-heartbeat" : ""} style={{ fontSize: "0.875rem", lineHeight: 1 }}>
               {liked ? "❤️" : "🤍"}
             </span>
