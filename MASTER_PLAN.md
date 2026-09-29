@@ -689,9 +689,13 @@ El comando `/fase` se ejecuta desde el agente principal, invocando subagentes di
 | T4 | CI en Node 24 con Playwright, sitemap/robots/manifest/JSON-LD, contraste AA, Lighthouse y axe | Completada |
 
 > Verificación: 249/249 unit · tsc 0 · next lint sin warnings · build OK · matriz prod 50/50 · E2E prod 5/5 + 3/3 + 1/1 + 2/2 + 1/1 · axe 0 violaciones críticas · Lighthouse `/shows` 95 perf y `/dashboard` 60 perf, ambos SEO 100.
-> Pendiente de decisión del usuario: `SESSION_SECRET` en `.env.local` (ya documentado en `.env.example`), seed P5.2 en producción, backfill de `artists.user_id`, rate limit distribuido y el refactor del dashboard a Server Components.
+> Pendiente de decisión del usuario: `SESSION_SECRET` en `.env.local` (ya documentado en `.env.example`), `WEBHOOK_SECRET` (sin definir en Vercel), seed P5.2 en producción, backfill de `artists.user_id`, rate limit distribuido y el refactor del dashboard a Server Components.
 >
-> **Blob resuelto (OIDC).** `BLOB_READ_WRITE_TOKEN` ya no se usa: `lib/blob.ts` dejó de pasar el token explícito y el SDK resuelve por OIDC contra el store conectado. La variable solo va a estar en `.env.local` hasta que se revoque.
+> **Blob resuelto y cerrado (OIDC).** `lib/blob.ts` dejó de pasar el token explícito y el SDK resuelve por OIDC contra el store conectado, porque un `token` explícito tiene prioridad sobre OIDC en `@vercel/blob` (`chunk-YYMLUMXS.js:169`). Verificado en producción y **`BLOB_READ_WRITE_TOKEN` revocado**: el proyecto ya no tiene ningún secreto de larga vida para almacenamiento. Commits `8f22b25` y `7c25d1e`.
+>
+> **Ronda rc.29 → rc.31 planificada** (15 problemas de UI/datos, todos diagnosticados con `archivo:línea` en `docs/PLAN_RC29_RC31.md`): agrupar lanzamientos por release con numeración por disco, columna `track_number` (opcional, con auto-numeración), logotipos oficiales para 7 redes que hoy son aproximaciones geométricas inventadas, Webflow → BandLab, quitar el bloque de redes del catálogo, marginar los links de la página de artista, y unificar las pestañas del admin (patrón de subrayado, sin el azul falso de "Envíos" y sin la pestaña "Aprobaciones" duplicada).
+>
+> **Hallazgo de seguridad latente:** `app/artists/[id]/page.tsx:58` no filtra por estado, así que un release `pending` sería visible en la página pública del artista. Hoy no se ve nada oculto (9 tracks, todos `approved`); se cierra al añadir el `status = 'approved'` de la nueva `getArtistCatalog`.
 
 > Spec ejecutable: `docs/PHASE_P6.md`. Decisiones registradas: suscriptor-por-defecto sí, registro artista cerrado, promoción por release o show aprobado, submissions=portal / approvals=consola, exportador unificado (B), carrusel solo catálogo, tarjetas ricas sin detalle, menú sin X, visualizador M, rate limit solo en escrituras más abusables.
 >
