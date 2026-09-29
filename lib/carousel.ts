@@ -1,40 +1,24 @@
 /**
  * Carousel — PressPlay v4.0.0
- * Shared constants & typed defaults for Embla Carousel configuration.
+ * Única fuente de verdad de la configuración numérica de Embla Carousel.
+ *
+ * El carrusel del catálogo muestra **1 artista por página** en todos los
+ * breakpoints: cada slide es `basis-full` (`components/carousel/CarouselItem.tsx`)
+ * y por lo tanto `slidesToScroll` es siempre 1. Aquí vivía antes un
+ * `slidesConfig` responsive 1/2/4 junto a `getSlidesForWidth()`; era código
+ * muerto (nadie lo importaba) y, cableado, habría hecho avanzar el carrusel
+ * 2 o 4 slides cuando solo se ve 1, así que se eliminó para no dejar dos
+ * fuentes de verdad en conflicto.
+ *
  * Framework-agnostic: used by the useCarousel hook and any consumer.
  *
  * Branding: indigo/violet/pink/emerald palette — keep dark-mode aware styles
- * outside this file; this file only contains numeric/breakpoint config.
+ * outside this file; this file only contains numeric config.
  */
 
-/** Number of slides visible per breakpoint */
-export const slidesConfig = {
-  mobile: {
-    minWidth: 0,
-    maxWidth: 639,
-    slidesVisible: 1,
-    slidesToScroll: 1,
-  },
-  tablet: {
-    minWidth: 640,
-    maxWidth: 1023,
-    slidesVisible: 2,
-    slidesToScroll: 2,
-  },
-  desktop: {
-    minWidth: 1024,
-    maxWidth: Infinity,
-    slidesVisible: 4,
-    slidesToScroll: 4,
-  },
-} as const;
-
-/** Autoplay default options */
+/** Autoplay: retardo por defecto en ms. El hook pausa en hover/foco del track. */
 export const autoplayDefaults = {
   delay: 4000,
-  stopOnInteraction: true,
-  stopOnMouseEnter: true,
-  resetOnExit: true,
 } as const;
 
 /** Default Embla options merged with user overrides */
@@ -42,35 +26,6 @@ export const defaultEmblaOptions = {
   loop: true,
   containScroll: "trimSnaps" as const,
   align: "start" as const,
+  /** 1 slide visible y 1 slide por avance → una página = un artista. */
   slidesToScroll: 1,
 } as const;
-
-/** Resolve how many slides to show based on viewport width */
-export function getSlidesForWidth(width: number): {
-  slidesVisible: number;
-  slidesToScroll: number;
-} {
-  for (const key of ["desktop", "tablet", "mobile"] as const) {
-    const cfg = slidesConfig[key];
-    if (width >= cfg.minWidth && width <= cfg.maxWidth) {
-      return { slidesVisible: cfg.slidesVisible, slidesToScroll: cfg.slidesToScroll };
-    }
-  }
-  // Fallback to mobile
-  return {
-    slidesVisible: slidesConfig.mobile.slidesVisible,
-    slidesToScroll: slidesConfig.mobile.slidesToScroll,
-  };
-}
-
-/** Type-safe Embla carousel API reference (minimal subset we use) */
-export type EmblaApi = {
-  canScrollPrev: () => boolean;
-  canScrollNext: () => boolean;
-  scrollPrev: () => void;
-  scrollNext: () => void;
-  scrollTo: (index: number) => void;
-  selectedScrollSnap: () => number;
-  scrollSnapList: () => number[];
-  reInit: () => void;
-};

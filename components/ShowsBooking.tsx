@@ -6,6 +6,7 @@ import type { Show, ShowStatus } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { CountBadge, Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { showStatusClass, showStatusLabel, paymentMethodLabel } from "@/lib/show-status";
 
 interface ShowsBookingProps {
@@ -105,18 +106,20 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
       </div>
 
       {shows.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-          <p className="text-3xl mb-2">🎤</p>
-          <p>No hay shows programados</p>
-          {editable && onAdd && (
-            <button
-              onClick={onAdd}
-              className="mt-3 text-sm text-primary-600 dark:text-primary-400 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              Agregar el primer show
-            </button>
-          )}
-        </div>
+        <EmptyState
+          emoji="🎤"
+          message="No hay shows programados"
+          cta={
+            editable && onAdd ? (
+              <button
+                onClick={onAdd}
+                className="text-sm text-primary-600 dark:text-primary-400 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                Agregar el primer show
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {shows.map((show) => {
