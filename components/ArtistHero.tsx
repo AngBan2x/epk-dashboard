@@ -69,7 +69,12 @@ export function ArtistHero({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
       </div>
-      <div className="max-w-4xl mx-auto px-4">
+      {/* C1 follow-up: este contenedor es el UNICO que recorta el header, porque
+          ArtistHero se renderiza FUERA de <main> (ver app/artists/[id]/page.tsx,
+          donde el <main className="max-w-7xl"> empieza despues). Mientras aqui
+          ponia `max-w-4xl` y el main `max-w-7xl`, el nombre del artista quedaba
+          inset ~194px respecto a las tarjetas de abajo. Se iguala a 7xl. */}
+      <div className="max-w-7xl mx-auto px-4">
         <div className="mb-8">
           <div className="flex items-end gap-4 -mt-10 mb-4">
             <div
