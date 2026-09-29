@@ -197,9 +197,13 @@ function ShowCard({ show }: { show: Show }) {
   const [descOpen, setDescOpen] = useState(false);
 
   const venue = safeString(show.venue_name) || 'Venue por confirmar';
-  const description = safeString(show.description);
-  const location = [safeString(show.city), safeString(show.country)].filter(Boolean).join(', ');
-  const ticketHref = safeString(show.ticket_url) || safeString(show.ticket_link);
+  // `safeString` usa "—" como fallback por defecto, y ese em dash es *truthy*:
+  // con `||` nunca se llegaria al fallback y `ticket_url` null se
+  // renderizaba como <a href="—">, que el navegador resuelve como ruta
+  // relativa y daba 404. Por eso aqui el fallback explicito es "".
+  const description = safeString(show.description, "");
+  const location = [safeString(show.city, ""), safeString(show.country, "")].filter(Boolean).join(', ');
+  const ticketHref = safeString(show.ticket_url, "") || safeString(show.ticket_link, "");
   const hasLongDescription = description.length > 100;
 
   return (
