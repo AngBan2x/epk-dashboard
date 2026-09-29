@@ -5789,6 +5789,109 @@ El usuario reporto 13 problemas con capturas (animacion shows, carrusel ausente,
 
 **Gates:** `tsc` 0, `vitest` **249/249**, `lint` sin warnings, `build` OK.
 
-**Pendiente del usuario en Vercel:** pulsar **Revoke Token** y comprobar que `BLOB_READ_WRITE_TOKEN` desaparece de las variables del proyecto. El token se compartio en texto plano durante la conversacion, asi que **debe revocarse**.
+**Cierre verificado por el usuario:** subio una **foto de banner** despues de la revocacion -> "funciona perfectamente". Como el codigo desplegado ya no pasa ningun token y la variable fue eliminada del proyecto, la subida **solo pudo funcionar por OIDC**. La **Fase A queda cerrada**.
 
-**Fuera de alcance:** Resend (`FROM_EMAIL` ausente, `pressplay.eu.org` pendiente, cuota agotada), rate limit distribuido, refactor de `/dashboard` a Server Components, export RGPD y recuperación de contraseña, y store de Blob privado (el acceso se fija al crear el store y las imágenes del EPK son públicas por diseño).
+### Cierre de la Fase A + 15 problemas de UI (2026-09-28) · Documentacion
+
+**Estado de la revocacion:** el usuario pulso **Revoke Token** y confirmo que `BLOB_READ_WRITE_TOKEN` ya no aparece en las variables del proyecto de Vercel. El proyecto **ya no tiene ningun secreto de larga vida para almacenamiento**, que era el objetivo del Plan A.
+
+**Variables que el usuario quito de Vercel:** `BLOB_READ_WRITE_TOKEN`, las 5 `R2_*`, `UNSPLASH_SECRET_KEY` y las demas. `.env.local` conserva las tres `UNSPLASH_*` porque `scripts/seed-artist-images.ts:27` usa `ACCESS_KEY`; verificado con `git grep` que `UNSPLASH` no aparece en `app/`, `components/`, `lib/`, `context/`, `middleware.ts` ni `next.config.js`, asi que en produccion no las lee nadie.
+
+**Commits de la Fase A:** `8f22b25` (Blob a OIDC) y `7c25d1e` (copy del boton). Gates de ambos: `tsc` 0, `vitest` 249/249, `lint` sin warnings, `build` OK.
+
+**15 problemas verificados con `archivo:linea` y anadidos al plan** (`docs/PLAN_RC29_RC31.md`):
+
+| # | Problema | Diagnostico real |
+|---|---|---|
+| 1 | Redes en el catalogo | `app/dashboard/page.tsx:582-597`, bloque sin encabezado. No es fuga de privacidad, es duplicacion |
+| 2 | Espaciado vertical de los links | `app/artists/[id]/page.tsx:101-110`: `pt-6` sin margen inferior |
+| 3 | SVGs irreconocibles | `lib/social-platforms.ts` mezcla 9 logotipos reales con **7 aproximaciones geometricas inventadas** (threads, apple-music, soundcloud, amazon-music, audiomack, mixcloud, webflow) |
+| 4 | Webflow sin sentido | `:201-212`; no existe `bandlab` pese a estar especificada en `.opencode/agents/social-links-builder.md:149-154`. **0 filas con webflow** en Turso |
+| 5.1 | Pestana Envios en azul | `app/admin/page.tsx:580` tiene `text-blue-600` hardcodeado, el mismo azul de la activa (`:561`) |
+| 5.2 | Pestanas duplicadas | `:577-584` y `:615-620` apuntan ambas a `/admin/approvals` |
+| 5.3 | Estilos de pestana inconsistentes | Tracks/Releases/Notificaciones con subrayado, Artistas/Shows con `bg-emerald-500` solido |
+
+**Decisiones tomadas por el usuario sobre esos problemas:** quitar el bloque del catalogo · logotipos oficiales · agrupar lanzamientos **por release (opcion B)** · numeracion por disco · `track_number` **opcional con auto-numeracion** · pestanas con **subrayado** + `aria-current`.
+
+**Hallazgo de seguridad (latente, no activo).** `app/artists/[id]/page.tsx:58` llama a `getTracksByArtist` (`lib/db.ts:2016`), que **no filtra por estado**. En cuanto un suscriptor cree un release (queda `pending`), se vera publico en la pagina del artista. Verificado contra Turso que hoy **no se esta viendo nada oculto**: 9 tracks, todos `approved`, 0 con `release_id`. Se cierra con el `status = 'approved'` de la nueva `getArtistCatalog`.
+
+**Hallazgo de modelo de datos que condiciona C2.** Un release y un single suelto son **indistinguibles**: ambos son filas de `tracks` con `release_id IS NULL`. `getParentReleases()` (`lib/db.ts:2048`) y `getApprovedReleases()` (`:2063`) filtran solo por eso, asi que devuelven ambos, y **no existe ningun `EXISTS`** que detecte si un track tiene hijos. Ademas **no hay columna `track_number`**: los hijos se ordenan por `start_time ASC` (`:2035`), y los hijos heredan `cover_image` del padre (`seed:515`), asi que un album de 10 pistas son 11 tarjetas con la imagen identica.
+
+**Volumen real de la semilla D2 (contado sobre el script):** 9 releases → **74 tarjetas EPKCard**. Por eso D2 va al final del orden: entrar antes de C1/C2 dejaría la pagina de Pink Floyd con 32 tarjetas planas de 198px.
+
+**Se reutiliza, no se reescribe:** `components/ReleaseTrackList.tsx` (133 lineas) ya tiene reproductor global con `startTimestamp`/`endTimestamp` (`:29-39`), boton de play con estados (`:68-93`), resaltado de pista activa (`:57-61`) y duracion o rango (`:110-120`). `app/releases/[id]/page.tsx:36` ya carga padre + hijos y detecta `isMultiTrack`. Falta en `ReleaseTrackList`: numeracion por disco (hoy `:65` usa `index + 1` plano), titulo enlazado a `/track/${id}` (hoy `:102` es texto plano) y colapso a 6. Ademas el prop `releaseTitle` (`:9`) esta declarado y **nunca se usa**.
+
+**Paralelismo documentado** (`docs/PLAN_RC29_RC31.md` §6): solo la Fase D se paraleliza. Las fases colisionan en 3 archivos: `app/artists/[id]/page.tsx` (B1 + C1 + C7 + E), `components/EPKCard.tsx` (C1 + E, y E es **estructural**) y `app/dashboard/page.tsx` (B3 + C6). **E tiene que ir antes que C1** porque reescribe como llega el dato a la tarjeta.
+
+**Pendiente del usuario:** `WEBHOOK_SECRET` sin definir en Vercel. Se genera en local con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` y se pega en Vercel como Secret **sin pasar por el chat** (leccion del token de Blob, que quedo expuesto en texto plano y hubo que revocarlo).
+
+**Fuera de alcance:** Resend (`FROM_EMAIL` ausente, `pressplay.eu.org` pendiente, cuota agotada), rate limit distribuido, refactor de `/dashboard` a Server Components, export RGPD y recuperacion de contrasena, y store de Blob privado (el acceso se fija al crear el store y las imagenes del EPK son publicas por diseno).
+
+---
+
+## Track 1 + D1 — Iconos, pestanas del admin y cuentas de artistas (2026-09-28)
+
+**Estado:** C8, C9, C10, C11, C12 y D1 completados y verificados. Commits en `main`.
+
+### C8 + C9 — Logotipos oficiales y Webflow -> BandLab
+
+`lib/social-platforms.ts` mezclaba 9 logotipos reales con **7 aproximaciones geometricas dibujadas a mano**. Los paths hoy salen de **simple-icons (CC0)** y se descargan por script (`scripts/apply-brand-icons.cjs`), no se transcriben: el bug original fue exactamente escribirlos a ojo.
+
+| Plataforma | Antes | Path |
+|---|---|---|
+| threads | donut con una barra | `1176` |
+| apple-music | 2 rectangulos + 2 circulos | `1620` |
+| soundcloud | circulo con barras | `1064` |
+| amazon-music | nota + sonrisa | `6777` |
+| audiomack | triangulo con muescas | `2116` |
+| mixcloud | circulos + barras | `287` |
+| **webflow -> bandlab** | "W" de palos | `505` |
+
+Ademas los 16platformas quedan con `fillRule: "nonzero"` (threads y audiomack usaban `evenodd`, incompatible con los paths de simple-icons). El script valida que el `viewBox` descargado sea `0 0 24 24` antes de escribir, que es el que usa `SocialPlatformIcon`.
+
+**Webflow -> BandLab:** `.opencode/agents/social-links-builder.md:149-154` ya especificaba BandLab, pero nunca se implemento y salio Webflow en su lugar. Verificado contra Turso que no hay **0 filas con `webflow`**, asi que no se pierde nada. El sitio web personal ya lo cubre `dossiers.website`.
+
+**Verificacion visual:** `scripts/verify-social-icons.cjs` renderiza los 16 iconos a 16/20/24 px en claro y oscuro (`tests/screenshots/social-icons/icons-16-20-24.png`). **Los 7 antes irreconocibles ahora se identifican de un vistazo** a 16 px. `scripts/verify-social-editor.cjs` confirma en `/profile` (con la cuenta de artista) que el editor desplegado tiene 16 inputs y 16 iconos, BandLab presente y Webflow ausente.
+
+### C10 + C11 + C12 — Pestañas del admin
+
+- **C10:** `app/admin/page.tsx` tenia `text-blue-600 dark:text-blue-400` **hardcodeado** en el enlace "Envíos", el mismo azul de la pestaña activa, de ahi la sensacion de "estoy en Envíos". Ahora el enlace usa el token inactivo.
+- **C11:** "Envíos" y "Aprobaciones" apuntaban ambos a `/admin/approvals`. Se **elimina "Aprobaciones"** y se conserva "Envíos", que ademas aporta el contador de pendientes. Verificado que el header no enlaza ahi, asi que el duplicado estaba solo en el admin.
+- **C12:** coexistian dos familias visuales — Tracks/Releases/Notificaciones con `border-b-2` y Artistas/Shows con `bg-emerald-500 text-white` solido. Se unifica al **subrayado** (mayoritario, 3 de 5) conservando el color de marca por dominio, mediante `TAB_ACCENT` + `adminTabClass()` a nivel de modulo para que las 6 entradas no puedan divergir. Se anade `aria-current="page"`, que faltaba.
+
+**Verificacion visual:** `scripts/verify-tabs-icons.cjs` -> **23/23 PASS** en claro y oscuro. Comprueba que queda **1 sola pestaña con `border-b-2` y 1 solo `aria-current`**, que "Envíos" no lleva azul, que "Aprobaciones" desaparecio y que las 5 pestañas activan correctamente.
+
+### D1 — Las 6 cuentas de artistas
+
+Nuevo `scripts/seed-artist-owners.ts`, dry-run por defecto. Reutiliza `createUser` de `lib/db` en vez de duplicar el INSERT.
+
+**Un error mio que se salvo solo:** la primera version hacia `INSERT ... created_at, updated_at`, pero la tabla `users` **no tiene `updated_at`** (`PRAGMA table_info` → `id, name, email, password_hash, role, created_at, preferences, avatar, email_verified, deleted_at, last_login`). Fallo en los 6 y creo **0** cuentas, sin estado parcial. Corregido delegando en `createUser`.
+
+**Aplicado y verificado por SQL directo contra Turso:**
+
+| Comprobacion | Resultado |
+|---|---|
+| Artistas con `user_id` | **7 de 7** (antes 1 de 7) |
+| Artistas sin `user_id` | **0** |
+| Huerfanos (`user_id` sin fila en `users`) | **0** |
+| Emails duplicados | **0** |
+| `password_hash` vacios o sin bcrypt | **0** |
+| Admin intacto | `admin@epk.local` / Admin EPK / admin |
+
+Cuentas creadas: `eagles@`, `ed-sheeran@`, `kate-bush@`, `nirvana@`, `queen@`, `the-weeknd@` (todas `@pressplay.app`, `role=artist`).
+
+**Idempotencia probada:** la tercera corrida consecutive dice "Con dueno: 7 / Sin dueno: 0 / No hay artistas sin dueno" y no escribe nada. Las contrasenas son aleatorias de 32 bytes, no se muestran y no se guardan en ningun sitio, asi que **nadie puede entrar con esas cuentas**.
+
+### Bloqueador encontrado y resuelto: SESSION_SECRET
+
+`lib/auth.ts:18-19` lanza si `NODE_ENV=production` y no hay `SESSION_SECRET`, y `.env.local` no lo tenia. Efecto: **`pnpm start` no permitia iniciar sesion localmente**, que es justamente el modo que exige el workflow para medir Lighthouse y hacer headed. Se manifesto como `login failed` -> 500 en `POST /api/auth/login`.
+
+Resuelto generando un `SESSION_SECRET` en `.env.local` (gitignored). Es el item que carried pendiente desde la auditoria; el de Vercel ya estaba puesto y por eso produccion nunca lo suffrio.
+
+### Lecciones
+
+1. **Los paths de icono no se escriben a mano.** El bug original (7 de 16 irreconocibles) nacio de dibujar geometria a ojo. Descargarlos de simple-icons con un script que valida el `viewBox` elimina la clase de error.
+2. **Verificar a 16 px, no "que compile".** Un path mal copiado compila y se ve igual de mal; la unica forma de detectarlo es renderizarlo al tamano real de uso (`size="sm"` usa `w-4`).
+3. **Delegar los INSERT en la capa de `lib/db`.** La tabla `users` tiene menos columnas de las que asumi, y duplicar el INSERT en un script es lo que provoco el fallo. `createUser` ya sabe el esquema.
+4. **`pnpm build` en Windows exige parar el servidor antes**: el `prebuild` borra `data/music_catalog.db` y da EPERM si esta abierto. Ocurrio en esta tanda.
+5. **El admin no tiene perfil de artista**, asi que `/profile` con esa cuenta **no monta el editor de redes**. Un test de UI que use la cuenta equivocada da falsos negativos: paso en la primera pasada de C8/C9.

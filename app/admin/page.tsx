@@ -101,6 +101,30 @@ type AdminTab = "tracks" | "releases" | "submissions" | "notifications" | "artis
 
 type ShowApprovalAction = "approve" | "reject" | "revision";
 
+/**
+ * Un solo patron visual para todas las pestañas de contenido (C12): subrayado
+ * con `border-b-2` y el color de marca del dominio. Antes coexistian dos
+ * familias — Tracks/Releases/Notificaciones con subrayado y Artistas/Shows con
+ * `bg-emerald-500` solido — y el `text-blue-600` hardcodeado de "Envíos" hacia
+ * que pareciera la pestaña activa (C10).
+ */
+const TAB_ACCENT: Record<AdminTab, { border: string; text: string }> = {
+  tracks: { border: "border-blue-600", text: "text-blue-600 dark:text-blue-400" },
+  releases: { border: "border-amber-600", text: "text-amber-600 dark:text-amber-400" },
+  submissions: { border: "border-blue-600", text: "text-blue-600 dark:text-blue-400" },
+  notifications: { border: "border-blue-600", text: "text-blue-600 dark:text-blue-400" },
+  artists: { border: "border-emerald-600", text: "text-emerald-600 dark:text-emerald-400" },
+  shows: { border: "border-emerald-600", text: "text-emerald-600 dark:text-emerald-400" },
+};
+
+function adminTabClass(active: AdminTab, tab: AdminTab): string {
+  const accent = TAB_ACCENT[tab];
+  const base = "px-4 py-2 text-sm font-medium rounded-t-lg transition-colors";
+  return active === tab
+    ? `${base} bg-white dark:bg-slate-800 border-b-2 ${accent.border} ${accent.text}`
+    : `${base} text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300`;
+}
+
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -555,69 +579,52 @@ export default function AdminPage() {
         <div className="mb-6 border-b border-slate-200 dark:border-slate-700">
           <nav className="flex flex-wrap gap-4" aria-label="Admin tabs">
             <button
+              type="button"
               onClick={() => setActiveTab("tracks")}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                activeTab === "tracks"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-              }`}
+              aria-current={activeTab === "tracks" ? "page" : undefined}
+              className={adminTabClass(activeTab, "tracks")}
             >
               Tracks ({tracks.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("releases")}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                activeTab === "releases"
-                  ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border-b-2 border-amber-600"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-              }`}
+              aria-current={activeTab === "releases" ? "page" : undefined}
+              className={adminTabClass(activeTab, "releases")}
             >
               Releases ({releases.length})
             </button>
+            {/* Enlace a otra ruta, no a un tab: nunca lleva estilo de activa (C10). */}
             <a
               href="/admin/approvals"
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                "text-blue-600 dark:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
+              className="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
             >
               Envíos ({submissions.filter(s => s.status === "pending").length} pendientes) →
             </a>
             <button
+              type="button"
               onClick={() => setActiveTab("notifications")}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                activeTab === "notifications"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-              }`}
+              aria-current={activeTab === "notifications" ? "page" : undefined}
+              className={adminTabClass(activeTab, "notifications")}
             >
               Notificaciones ({notifications.filter(n => !n.read).length} sin leer)
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("artists")}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                activeTab === "artists"
-                  ? "bg-emerald-500 text-white"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
+              aria-current={activeTab === "artists" ? "page" : undefined}
+              className={adminTabClass(activeTab, "artists")}
             >
               Artistas ({artists.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("shows")}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                activeTab === "shows"
-                  ? "bg-emerald-500 text-white"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
+              aria-current={activeTab === "shows" ? "page" : undefined}
+              className={adminTabClass(activeTab, "shows")}
             >
               Shows ({shows.length})
             </button>
-            <a
-              href="/admin/approvals"
-              className="px-4 py-2 text-sm font-medium rounded-t-lg transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              Aprobaciones →
-            </a>
           </nav>
         </div>
 
