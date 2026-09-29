@@ -127,7 +127,7 @@ export function Header() {
             <ThemeToggle />
             {isDesktop && <NotificationBell />}
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={containerRef}>
                 <button
                   ref={buttonRef}
                   onClick={() => setAccountOpen((v) => !v)}
@@ -142,7 +142,6 @@ export function Header() {
                 </button>
                 {accountOpen && (
                   <div
-                    ref={containerRef}
                     role="menu"
                     className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-2 z-50"
                   >

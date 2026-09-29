@@ -16,6 +16,18 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
+/**
+ * URL absoluta: impide que un valor relativo como "—" o "tu-sitio.com"
+ * llegue a la DB y luego se renderice como `<a href>` roto (404).
+ * `nullish` porque el campo es opcional: null/undefined siguen siendo validos.
+ */
+const OptionalUrl = z
+  .string()
+  .nullish()
+  .refine((v) => v == null || v === "" || /^https?:\/\/\S+$/i.test(v), {
+    message: "debe ser una URL absoluta (http:// o https://)",
+  });
+
 const CreateShowSchema = z.object({
   artist_id: z.string().min(1, "artist_id requerido"),
   venue_name: z.string().min(1, "venue_name requerido"),
@@ -26,11 +38,11 @@ const CreateShowSchema = z.object({
   time: z.string().nullish(),
   price_range: z.string().nullish(),
   status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
-  ticket_url: z.string().nullish(),
+  ticket_url: OptionalUrl,
   payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).nullish(),
   postponement_reason: z.string().nullish(),
-  flyer_url: z.string().nullish(),
-  ticket_link: z.string().nullish(),
+  flyer_url: OptionalUrl,
+  ticket_link: OptionalUrl,
   description: z.string().nullish(),
   guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).nullish(),
   notes: z.string().nullish(),
@@ -45,11 +57,11 @@ const UpdateShowSchema = z.object({
   time: z.string().nullish(),
   price_range: z.string().nullish(),
   status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
-  ticket_url: z.string().nullish(),
+  ticket_url: OptionalUrl,
   payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).nullish(),
   postponement_reason: z.string().nullish(),
-  flyer_url: z.string().nullish(),
-  ticket_link: z.string().nullish(),
+  flyer_url: OptionalUrl,
+  ticket_link: OptionalUrl,
   description: z.string().nullish(),
   guest_artists: z.array(z.object({ name: z.string(), role: z.string().optional() })).nullish(),
   notes: z.string().nullish(),

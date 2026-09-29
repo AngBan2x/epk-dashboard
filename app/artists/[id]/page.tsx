@@ -60,12 +60,14 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
     console.error("Failed to fetch tracks for artist:", params.id, e);
   }
 
+  // `safeString` devuelve "—" (truthy) como fallback por defecto, asi que con
+  // `|| undefined` el JSON-LD emitia "—" en vez de omitir el campo.
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "MusicGroup",
     name: safeString(artist.name),
-    genre: safeString(artist.genre) || undefined,
-    description: safeString(artist.biography) || undefined,
+    genre: safeString(artist.genre, "") || undefined,
+    description: safeString(artist.biography, "") || undefined,
     url: `${BASE_URL}/artists/${params.id}`,
     ...(artist.profile_image ? { image: artist.profile_image } : {}),
   };
