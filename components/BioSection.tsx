@@ -6,6 +6,27 @@ import { safeString } from "@/lib/null-safe";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 
+/**
+ * Celda de métrica. `min-w-0` permite que la celda se encoja dentro del grid.
+ * El valor usa `line-clamp-2` y no `truncate`: `truncate` es una sola linea con
+ * puntos suspensivos, asi que a 192px (las 4 columnas de la pagina de artista)
+ * "Rock Alternativo / Acoustic" se cortaba a "Rock Alternativo /…". Con dos
+ * lineas cabe, y `title` conserva el texto integro para quien lo necesite.
+ */
+function MetricCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+      <p
+        className="line-clamp-2 text-sm font-semibold text-slate-900 dark:text-slate-100"
+        title={value}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 interface BioSectionProps {
   artistName?: string;
   genre?: string;
@@ -68,24 +89,42 @@ export function BioSection({
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Artista</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{safeString(artistName)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Género</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{safeString(genre)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Ubicación</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{safeString(location)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Oyentes Mensuales</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {monthlyListeners > 0 ? new Intl.NumberFormat("es-VE").format(monthlyListeners) : "N/A"}
-              </p>
+          {/*
+            Métricas del artista.
+            El número de columnas se decide con una *container query*
+            (`@container`), no con un breakpoint de viewport: dentro de la
+            columna de Bio del carrusel (~520px) el componente sigue midiendo
+            ~520px aunque el viewport tenga 1440px, así que nunca se parte en
+            4 columnas apretadas. Pasa a 4 columnas solo cuando SU contenedor
+            alcanza 640px (la página de artista, con 814px de grid).
+            Si el navegador no soporta container queries, se queda en 2×2.
+          */}
+          <div className="mb-6 [container-type:inline-size]">
+            {/*
+              Tres escalones medidos sobre la app, no inventados:
+              - <22rem (~352px): 1 columna. Es el caso del carrusel en movil
+                (slide de 308px): con 2 columnas las celdas quedaban de 100px
+                y "Valencia, Venezuela" se cortaba.
+              - 22rem-40rem: 2 columnas. Carrusel en desktop (columna de bio de
+                ~520px) -> celdas de 250px, sin truncar. Bloque de bio del
+                dashboard (~560px) aqui.
+              - >=40rem: 4 columnas. Pagina de artista (grid de 814px) -> 192px
+                por celda, igual que antes del cambio.
+              Sin soporte de container queries queda en 1 columna, que es la
+              lectura segura.
+            */}
+            <div className="grid grid-cols-1 gap-4 [@container(min-width:22rem)]:grid-cols-2 [@container(min-width:40rem)]:grid-cols-4">
+              <MetricCell label="Artista" value={safeString(artistName)} />
+              <MetricCell label="Género" value={safeString(genre)} />
+              <MetricCell label="Ubicación" value={safeString(location)} />
+              <MetricCell
+                label="Oyentes Mensuales"
+                value={
+                  monthlyListeners > 0
+                    ? new Intl.NumberFormat("es-VE").format(monthlyListeners)
+                    : "N/A"
+                }
+              />
             </div>
           </div>
 

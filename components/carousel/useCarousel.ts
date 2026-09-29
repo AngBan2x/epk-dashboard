@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { defaultEmblaOptions } from "@/lib/carousel";
+import { autoplayDefaults, defaultEmblaOptions } from "@/lib/carousel";
 
 type EmblaApi = NonNullable<ReturnType<typeof useEmblaCarousel>[1]>;
 type EmblaHandler = (api: EmblaApi) => void;
@@ -16,9 +16,9 @@ export interface UseCarouselOptions {
 
 export function useCarousel({
   autoplay = false,
-  autoplayDelay = 4000,
+  autoplayDelay = autoplayDefaults.delay,
   loop = true,
-  slidesToScroll = 1,
+  slidesToScroll = defaultEmblaOptions.slidesToScroll,
 }: UseCarouselOptions = {}) {
   const options = {
     ...defaultEmblaOptions,

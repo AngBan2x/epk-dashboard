@@ -22,7 +22,7 @@ export function CarouselItem({
       role="group"
       aria-roledescription="slide"
       aria-label={`${label} ${index + 1} de ${total}`}
-      className={`min-w-0 shrink-0 grow-0 basis-full sm:basis-1/2 xl:basis-1/3 2xl:basis-1/4 ${className}`}
+      className={`min-w-0 shrink-0 grow-0 basis-full ${className}`}
     >
       {children}
     </div>
