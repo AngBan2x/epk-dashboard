@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/Card";
 import type { Track } from "@/types/music";
 import {
@@ -30,6 +31,12 @@ interface EPKCardProps {
    * propias stats en un `useEffect`, o sea N llamadas upstream por visitante.
    */
   youtubeStats?: YouTubeStatPair | null;
+  /**
+   * Enlace a la ficha: `/track/{id}` para un single suelto, `/releases/{id}`
+   * para un álbum. Sin esto la tarjeta es puramente visual y la ficha queda
+   * inalcanzable desde la página del artista.
+   */
+  detailHref?: string;
 }
 
 export function EPKCard({
@@ -39,6 +46,7 @@ export function EPKCard({
   onLoginPrompt,
   priority = false,
   youtubeStats = null,
+  detailHref,
 }: EPKCardProps) {
   const { user } = useAuth();
   const title = safeString(track.title);
@@ -179,7 +187,29 @@ export function EPKCard({
         )}
       </div>
       <CardContent className="flex flex-col flex-grow p-4">
-        <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-white">{title}</h3>
+        {/* C1: `truncate` sin `title` dejaba el texto completo inaccesible
+            (bug de a11y) para lectores de pantalla y para hover. */}
+        {/*
+          C2: `detailHref` convierte el título en enlace a la ficha. Se hace
+          así y no envolviendo la tarjeta en un `<a>` porque dentro hay
+          botones (play, like): anidar un enlace alrededor de un botón es HTML
+          invalido y rompe la navegacion por teclado y por lector de pantalla.
+          Sin este prop, un single suelto se quedaba sin ninguna forma de
+          llegar a su ficha.
+        */}
+        <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-white">
+          {detailHref ? (
+            <Link
+              href={detailHref}
+              className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+              title={title}
+            >
+              {title}
+            </Link>
+          ) : (
+            <span title={title}>{title}</span>
+          )}
+        </h3>
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{artistName}</p>
 
         {/* Metadata: Release type, Duration, Release Date, ISRC */}

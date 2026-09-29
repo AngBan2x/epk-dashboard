@@ -1,4 +1,4 @@
-import { getArtistById, getTracksByArtist } from "@/lib/db";
+import { getArtistById, getArtistCatalog, type ArtistCatalogGroup } from "@/lib/db";
 import { BioSection } from "@/components/BioSection";
 import { ArtistTracksSection } from "@/components/ArtistTracksSection";
 import { ArtistHero } from "@/components/ArtistHero";
@@ -55,14 +55,19 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
     notFound();
   }
 
-  let tracks: Track[] = [];
+  // C2: catálogo agrupado por release (álbum → EPKCard + lista de pistas).
+  // `getArtistCatalog` filtra por `status = 'approved'`: sin eso, un release
+  // `pending` de un suscriptor quedaba visible públicamente en esta página.
+  let catalog: ArtistCatalogGroup[] = [];
   try {
-    // `getTracksByArtist` filtra por `status = 'approved'`: sin eso, un release
-    // `pending` de un suscriptor quedaba visible públicamente en esta página.
-    tracks = await getTracksByArtist(params.id);
+    catalog = await getArtistCatalog(params.id);
   } catch (e) {
-    console.error("Failed to fetch tracks for artist:", params.id, e);
+    console.error("Failed to fetch artist catalog:", params.id, e);
   }
+
+  // Aplanado para el lote de YouTube y el recuento de DownloadCenter: los
+  // mismos renglones que antes devolvía getTracksByArtist, sin 2ª consulta.
+  const tracks: Track[] = catalog.flatMap((group) => [group.release, ...group.tracks]);
 
   // Fase E: UN lote de YouTube para todos los tracks (antes, uno por tarjeta).
   // Se resuelve aquí, en el servidor, y baja como objeto plano: el `Map` no
@@ -121,9 +126,15 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
           </>
         }
       />
-      <main className="max-w-4xl mx-auto px-4 pb-12">
+      {/* C1: `max-w-7xl` (1280px) en vez de `max-w-4xl` (896px). Con
+          `xl:grid-cols-4` y 896px cada EPKCard medía 198px y el título se
+          cortaba siempre; a 1280px con px-4 las tarjetas quedan en ~294px,
+          el mismo ancho del catálogo. */}
+      <main className="max-w-7xl mx-auto px-4 pb-12">
+        {/* C7: `mb-6` separa los botones de redes de BioSection; antes solo
+            había `pt-6` y los botones quedaban pegados al borde superior. */}
         {artist.social_links && artist.social_links.length > 0 && (
-          <div className="pt-6">
+          <div className="pt-6 mb-6">
             <ArtistSocialLinks
               socialLinks={artist.social_links}
               artistName={artist.name}
@@ -154,7 +165,7 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
           />
         </div>
 
-        <ArtistTracksSection tracks={tracks} youtubeStats={youtubeStats} />
+        <ArtistTracksSection groups={catalog} youtubeStats={youtubeStats} />
       </main>
     </div>
   );

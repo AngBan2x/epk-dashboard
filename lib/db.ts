@@ -2092,6 +2092,85 @@ export async function getApprovedReleases(): Promise<Track[]> {
   return rows.map(parseTrack);
 }
 
+// ─── Catálogo del artista agrupado por release (C2) ─────────────────────────
+// Modelo de datos: un release (álbum/EP con pistas) y un single suelto son
+// INDISTINGUIBLES en el esquema — ambos son filas de `tracks` con
+// `release_id IS NULL` y no hay columna que los separe. La única señal que los
+// distingue es que el álbum tiene hijos (`tracks.release_id = t.id`), y por
+// eso la consulta lleva el `EXISTS`: sin él, un álbum de 10 pistas se
+// publicaría como 11 EPKCards con la MISMA portada (los hijos heredan
+// `cover_image` del padre).
+//
+// Una sola consulta, sin N+1: se traen TODAS las filas aprobadas del artista,
+// los padres vienen con `has_children` calculado en SQL y los hijos se
+// agrupan en JS por `release_id`. Si la consulta devolviera únicamente los
+// padres —el `WHERE (release_id IS NULL OR EXISTS …)` del plan— haría falta
+// una segunda ronda por grupo para rellenar las pistas.
+export interface ArtistCatalogGroup {
+  /** Fila padre: el álbum, o el single suelto (entonces `tracks` va vacío). */
+  release: Track;
+  /** Hijos aprobados en orden de pista. Vacío cuando `release` es single. */
+  tracks: Track[];
+}
+
+// `COALESCE(disc_number, 1)` y `COALESCE(track_number, 999)` replican el orden
+// de `getTracksByReleaseId`: en SQLite los NULL suben solos en un ORDER BY
+// ASC, así que sin COALESCE una pista sin numerar saltaría a la cabecera de
+// su disco. `release_date DESC` va primero porque es el orden de los grupos.
+const ARTIST_CATALOG_SQL = `
+  SELECT t.*,
+         EXISTS (SELECT 1 FROM tracks c
+                  WHERE c.release_id = t.id AND c.status = 'approved') AS has_children
+    FROM tracks t
+   WHERE t.artist_name = (SELECT name FROM artists WHERE id = ?)
+     AND t.status = 'approved'
+   ORDER BY t.release_date DESC,
+            COALESCE(t.disc_number, 1) ASC,
+            COALESCE(t.track_number, 999) ASC,
+            t.start_time ASC
+`;
+
+// SQLite/better-sqlite3 devuelven 1/0; Turso (libsql) puede devolver
+// boolean o string. Cualquier cosa que no sea un "0" explícito cuenta como
+// true, así que normalizamos en ambos sentidos.
+function asSqlFlag(value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") return value !== "" && value !== "0" && value !== "false";
+  return Boolean(value);
+}
+
+export async function getArtistCatalog(artistId: string): Promise<ArtistCatalogGroup[]> {
+  let rows: Record<string, unknown>[];
+  if (isTursoEnabled()) {
+    rows = (await tursoExec(ARTIST_CATALOG_SQL, [artistId])) as Record<string, unknown>[];
+  } else {
+    rows = getLocalDb().prepare(ARTIST_CATALOG_SQL).all(artistId) as Record<string, unknown>[];
+  }
+
+  const heads: { track: Track; hasChildren: boolean }[] = [];
+  const childrenByRelease = new Map<string, Track[]>();
+
+  for (const row of rows) {
+    const track = parseTrack(row);
+    if (track.release_id) {
+      const bucket = childrenByRelease.get(track.release_id);
+      if (bucket) bucket.push(track);
+      else childrenByRelease.set(track.release_id, [track]);
+    } else {
+      heads.push({ track, hasChildren: asSqlFlag(row.has_children) });
+    }
+  }
+
+  // Los hijos cuyo padre no está en `heads` (padre `pending`/`draft` o de otro
+  // artista) se descartan solos: nunca existen grupos sin fila padre.
+  return heads.map(({ track, hasChildren }) => {
+    const children = childrenByRelease.get(track.id) ?? [];
+    return { release: track, tracks: hasChildren || children.length > 0 ? children : [] };
+  });
+}
+
 export async function createTrack(data: {
   id: string;
   title: string;
