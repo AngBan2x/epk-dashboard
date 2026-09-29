@@ -122,14 +122,23 @@ export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, rele
 
             {/* Track info */}
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-medium truncate ${
-                isCurrentTrack
-                  ? "text-primary-700 dark:text-primary-300"
-                  : "text-slate-900 dark:text-slate-100"
-              }`}>
+              {/* `truncate` corta en una sola linea, asi que sin `title` el
+                  nombre largo ("Todo vue…") era irrecuperable. Mismo fallo de
+                  a11y que se corrigio en el h3 de EPKCard. */}
+              <p
+                className={`text-sm font-medium truncate ${
+                  isCurrentTrack
+                    ? "text-primary-700 dark:text-primary-300"
+                    : "text-slate-900 dark:text-slate-100"
+                }`}
+                title={track.title}
+              >
                 {track.title}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              <p
+                className="text-xs text-slate-500 dark:text-slate-400 truncate"
+                title={safeString(track.artist_name, "")}
+              >
                 {track.artist_name}
               </p>
             </div>
