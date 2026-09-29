@@ -199,6 +199,7 @@ function initLocalTables(): void {
       gallery_images TEXT,
       external_links TEXT,
       disc_number INTEGER DEFAULT 1,
+      track_number INTEGER,
       is_double_single INTEGER DEFAULT 0,
       sides_b TEXT,
       isrc TEXT,
@@ -214,6 +215,8 @@ function initLocalTables(): void {
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
+  // M0: safe ALTER TABLE for pre-existing local DBs (idempotent via try/catch)
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN track_number INTEGER`); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -670,6 +673,8 @@ function parseTrack(row: Record<string, unknown>): Track {
     // P2.5: New fields
     external_links: safeParseJSON<ExternalLinks | null>((row.external_links as string) ?? null, null),
     disc_number: row.disc_number ? Number(row.disc_number) : undefined,
+    // M0: explicit track number within its disc (null = unnumbered)
+    track_number: row.track_number != null ? Number(row.track_number) : undefined,
     is_double_single: row.is_double_single ? Number(row.is_double_single) === 1 : undefined,
     sides_b: safeParseJSON<string[] | null>((row.sides_b as string) ?? null, null),
     isrc: (row.isrc as string) ?? null,
@@ -2029,17 +2034,25 @@ export async function getTracksByArtist(artistId: string): Promise<Track[]> {
 }
 
 // P3 Batch 2: Multi-track releases — tracks by release_id
+// M0: ordering is disc-aware. The COALESCE is NOT optional: in SQLite (and
+// Turso/SQLite) NULLs sort FIRST on an ascending ORDER BY, so without it an
+// unnumbered track would jump to the head of its disc instead of trailing it.
+// 999 pushes unnumbered tracks to the end of their disc, where start_time
+// then acts as the tiebreaker.
+const RELEASE_TRACKS_ORDER =
+  "ORDER BY COALESCE(disc_number, 1) ASC, COALESCE(track_number, 999) ASC, start_time ASC";
+
 export async function getTracksByReleaseId(releaseId: string): Promise<Track[]> {
   if (isTursoEnabled()) {
     const rows = await tursoExec(
-      "SELECT * FROM tracks WHERE release_id = ? ORDER BY start_time ASC",
+      `SELECT * FROM tracks WHERE release_id = ? ${RELEASE_TRACKS_ORDER}`,
       [releaseId]
     );
     return rows.map((r) => parseTrack(r as Record<string, unknown>));
   }
   const db = getLocalDb();
   const rows = db
-    .prepare("SELECT * FROM tracks WHERE release_id = ? ORDER BY start_time ASC")
+    .prepare(`SELECT * FROM tracks WHERE release_id = ? ${RELEASE_TRACKS_ORDER}`)
     .all(releaseId) as Record<string, unknown>[];
   return rows.map(parseTrack);
 }
@@ -2095,6 +2108,8 @@ export async function createTrack(data: {
   // P2.5: New fields
   external_links?: import("@/types/music").ExternalLinks | null;
   disc_number?: number;
+  // M0: track number within its disc. null/undefined = unnumbered (falls back to start_time ordering)
+  track_number?: number | null;
   is_double_single?: boolean;
   sides_b?: string[] | null;
   isrc?: string | null;
@@ -2128,6 +2143,7 @@ export async function createTrack(data: {
     // P2.5: New fields
     external_links: data.external_links || null,
     disc_number: data.disc_number ?? 1,
+    track_number: data.track_number ?? null,
     is_double_single: data.is_double_single ?? false,
     sides_b: data.sides_b || null,
     isrc: data.isrc || null,
@@ -2145,9 +2161,9 @@ if (isTursoEnabled()) {
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
-        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental,
+        external_links, disc_number, track_number, is_double_single, sides_b, isrc, composers, is_instrumental,
         release_id, start_time, end_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         track.id, track.title, track.artist_name, track.release_type, track.release_date,
         track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -2158,6 +2174,7 @@ if (isTursoEnabled()) {
         track.gallery_images ? JSON.stringify(track.gallery_images) : null,
         track.external_links ? JSON.stringify(track.external_links) : null,
         track.disc_number,
+        track.track_number,
         track.is_double_single ? 1 : 0,
         track.sides_b ? JSON.stringify(track.sides_b) : null,
         track.isrc,
@@ -2175,9 +2192,9 @@ if (isTursoEnabled()) {
         id, title, artist_name, release_type, release_date, duration, cover_image,
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
-        external_links, disc_number, is_double_single, sides_b, isrc, composers, is_instrumental,
+        external_links, disc_number, track_number, is_double_single, sides_b, isrc, composers, is_instrumental,
         release_id, start_time, end_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       track.id, track.title, track.artist_name, track.release_type, track.release_date,
       track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -2188,6 +2205,7 @@ if (isTursoEnabled()) {
       track.gallery_images ? JSON.stringify(track.gallery_images) : null,
       track.external_links ? JSON.stringify(track.external_links) : null,
       track.disc_number,
+      track.track_number,
       track.is_double_single ? 1 : 0,
       track.sides_b ? JSON.stringify(track.sides_b) : null,
       track.isrc,
@@ -2220,6 +2238,8 @@ export async function updateTrack(id: string, updates: Partial<{
   video_embed_url: string | null;
   gallery_images: string[] | null;
   is_instrumental: boolean;
+  // M0: track number within its disc (null clears it)
+  track_number?: number | null;
   status: import("@/types/music").ReleaseStatus;
 }>): Promise<Track | null> {
   const existing = await getTrackById(id);

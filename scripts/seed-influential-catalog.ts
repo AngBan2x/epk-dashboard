@@ -530,6 +530,7 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
           release_id: parentReleaseId,
           start_time: st.startTime,
           end_time: st.endTime,
+          track_number: st.trackNumber,
         });
         console.log(`    ✅ Track creado: ${st.title} (disc ${st.discNumber}, #${st.trackNumber}, ${st.startTime}s-${st.endTime}s)`);
       } else {

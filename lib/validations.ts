@@ -55,7 +55,29 @@ export const TrackSchema = z.object({
   stems_urls: StemsUrlsSchema,
   video_embed_url: z.string().url().nullable().optional(),
   gallery_images: z.array(z.string()).nullable().optional(),
+  // M0: numero de pista dentro del disco. Entero >= 0, null = sin numerar.
+  // .finite() rechaza NaN/Infinity, que en SQLite se persistirian como REAL.
+  track_number: z.number().int().min(0).finite().nullable().optional(),
 });
+
+/**
+ * M0 — validador de `track_number` para las rutas que hacen passthrough por
+ * allowlist (PATCH /api/tracks/:id, PUT /api/releases) sin esquema Zod global.
+ * Sin esta cota, un cliente podria escribir cualquier tipo (string, objeto,
+ * NaN) en la columna y romper el orden del release.
+ */
+export const TrackNumberSchema = z
+  .number({ invalid_type_error: "track_number debe ser un entero" })
+  .int("track_number debe ser un entero")
+  .min(0, "track_number no puede ser negativo")
+  .finite("track_number debe ser finito")
+  .nullable();
+
+export function validateTrackNumber(value: unknown): number | null | undefined {
+  const parsed = TrackNumberSchema.safeParse(value);
+  if (!parsed.success) return undefined;
+  return parsed.data;
+}
 
 export const ArtistSchema = z.object({
   name: z.string().min(1),
