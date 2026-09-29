@@ -90,72 +90,83 @@ Cuando el usuario reporte un bug o pida un fix:
 
 ### Modelos Utilizados
 
-> Investigación 2026-09-24 (models.dev + docs Zen). Tiers gratuitos recogen datos para mejora salvo indicación — **nunca poner secretos (tokens, keys, PII) en prompts**.
+> Investigación 2026-09-28 (models.dev API + `opencode models`). Tiers gratuitos recogen datos para mejora salvo indicación — **nunca poner secretos (tokens, keys, PII) en prompts**.
 
-| Modelo | Cantidad | Uso principal |
-|--------|----------|---------------|
-| `opencode/nemotron-3-ultra-free` | 10 | Orquestación, reasoning, APIs, DB, auth, security, testing |
-| `opencode/mimo-v2.6-flash-free` | 12 | Builders UI, docs, `small_model` (sucesor v2.5; 200K ctx en Zen) |
-| `opencode/nemotron-3.5-lightning-free` | 6 | UI rápida, deploy, releases |
-| `openrouter/.../nemotron-3-nano-omni...` | 1 | visual-tester (único vision-capable probado) |
+**Nemotron retirado de los subagentes por decisión del usuario (2026-09-28): son demasiado lentos.** Solo quedan 3 modelos:
+
+| Modelo | Contexto | Input | Cantidad | Uso principal |
+|--------|----------|-------|----------|---------------|
+| `opencode/space-bunny-free` | 1M | text, image, video | 18 | Orquestación, reasoning, APIs, DB, auth, security, testing, y el agente interno `compaction` |
+| `opencode/mimo-v2.6-flash-free` | 200K | text, image, audio, video | 8 | Builders UI, y `small_model` para títulos |
+| `opencode/muse-spark-1.3` | 1M | text, image, video, pdf, audio | 4 | `visual-tester` (ver screenshots), deploy, releases y documentación |
+
+**Los 3 aceptan imágenes**, así que `visual-tester` ya no necesita el modelo vision de Nemotron. `opencode/nemotron-3-ultra-free` además era **solo texto** (sin imagen), por lo que nunca servía para análisis visual.
+
+### Compaction
+
+Configurado en `opencode.json`: `auto: true`, `prune: true`, `reserved: 20000`.
+
+**No existe un umbral en porcentaje.** El esquema (`https://opencode.ai/config.json`) solo admite `auto`, `prune`, `tail_turns`, `preserve_recent_tokens` y `reserved`; y es **global**, no por agente (`AgentConfig` no acepta `compaction`). `reserved` son **tokens absolutos**, no porcentaje.
+
+Con `reserved: 20000` la compactación salta al **90% del modelo de 200K** (mimo, el que más se usa) y al **98% de los de 1M**. Para 90% en los de 1M haría falta `reserved: 100000`, pero eso dejaría a mimo compactando al 50% y lo volvería inusable.
 
 ### Banco de pruebas (NO asignar sin evaluar con evidencia)
-`qwen3-coder-30b-a3b`, `devstral-2512`, `kimi-k2.7-code-highspeed`, `qwen3.8-27b`, `gemini-2.5-flash` (todos $0 OpenRouter, code-capables), `muse-spark-1.3` (alternativa orquestador; evidencia: sesión 2026-09-23/24).
+`qwen3-coder-30b-a3b`, `devstral-2512`, `qwen3.8-27b`, `gemini-2.5-flash` (todos $0 OpenRouter, code-capables).
 
 ### No asignar
-`ling-3.0-flash-fin` (dominio financiero), `jev-*` (no es chat, decisiones estructuradas), stealth unknowns (`space-bunny`, `big-pickle`, `dots3`…) en roles críticos, nada pago (`kimi-k2.7-code`, `deepseek-v4-flash`, `muse-spark-1.2` son pagos).
+`ling-3.0-flash-fin` (dominio financiero), `jev-*` (no es chat, decisiones estructuradas), nada pago (`kimi-k2.7-code`, `deepseek-v4-flash`, `muse-spark-1.2`, `kimi-k2.7-code-highspeed` son de pago).
 
 ### Builders (17)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `api-builder` | mimo-v2.6-flash-free | Endpoints REST |
-| `auth-builder` | nemotron-3-ultra-free | Autenticación |
-| `dashboard-builder` | nemotron-3.5-lightning-free | UI/Components |
-| `db-builder` | nemotron-3-ultra-free | Schema DB |
-| `landing-page-builder` | nemotron-3.5-lightning-free | Landing page |
-| `header-builder` | nemotron-3.5-lightning-free | Header |
-| `epk-card-builder` | nemotron-3-ultra-free | EPK Cards |
-| `carousel-builder` | nemotron-3.5-lightning-free | Carousels |
-| `approval-workflow-builder` | nemotron-3-ultra-free | Aprobaciones |
-| `show-form-builder` | mimo-v2.6-flash-free | Shows |
-| `notification-builder` | mimo-v2.6-flash-free | Notificaciones |
-| `search-builder` | mimo-v2.6-flash-free | Búsqueda |
-| `subscriber-builder` | mimo-v2.6-flash-free | Suscriptores |
+| `api-builder` | space-bunny-free | Endpoints REST |
+| `auth-builder` | space-bunny-free | Autenticación |
+| `dashboard-builder` | mimo-v2.6-flash-free | UI/Components |
+| `db-builder` | space-bunny-free | Schema DB |
+| `landing-page-builder` | mimo-v2.6-flash-free | Landing page |
+| `header-builder` | mimo-v2.6-flash-free | Header |
+| `epk-card-builder` | mimo-v2.6-flash-free | EPK Cards |
+| `carousel-builder` | mimo-v2.6-flash-free | Carousels |
+| `approval-workflow-builder` | space-bunny-free | Aprobaciones |
+| `show-form-builder` | space-bunny-free | Shows |
+| `notification-builder` | space-bunny-free | Notificaciones |
+| `search-builder` | space-bunny-free | Búsqueda |
+| `subscriber-builder` | space-bunny-free | Suscriptores |
 | `social-links-builder` | mimo-v2.6-flash-free | Links sociales |
-| `account-settings-builder` | mimo-v2.6-flash-free | Configuración cuenta |
-| `release-form-builder` | mimo-v2.6-flash-free | Formularios releases |
+| `account-settings-builder` | space-bunny-free | Configuración cuenta |
+| `release-form-builder` | space-bunny-free | Formularios releases |
 | `artist-dashboard-builder` | mimo-v2.6-flash-free | Dashboard artista |
 
 ### QA & Security (3)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `quality-auditor` | nemotron-3-ultra-free | Tests E2E |
-| `visual-tester` | nemotron-3-ultra-free | Screenshots/DOM |
-| `security-auditor` | nemotron-3-ultra-free | Seguridad |
+| `quality-auditor` | space-bunny-free | Tests E2E |
+| `visual-tester` | muse-spark-1.3 | Screenshots/DOM |
+| `security-auditor` | space-bunny-free | Seguridad |
 
 ### DevOps & Docs (3)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `release-manager` | nemotron-3.5-lightning-free | Releases |
-| `vercel-deployer` | nemotron-3.5-lightning-free | Deploy Vercel |
-| `doc-writer` | mimo-v2.6-flash-free | Documentación |
+| `release-manager` | muse-spark-1.3 | Releases |
+| `vercel-deployer` | muse-spark-1.3 | Deploy Vercel |
+| `doc-writer` | muse-spark-1.3 | Documentación |
 
 ### Orchestration (2)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `orchestrator` | nemotron-3-ultra-free | Coordinación general |
-| `fase-orchestrator` | mimo-v2.6-flash-free | Orquestación por fases |
+| `orchestrator` | space-bunny-free | Coordinación general |
+| `fase-orchestrator` | space-bunny-free | Orquestación por fases |
 
 ### Testing (2)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `playwright-tester` | nemotron-3-ultra-free | Tests E2E |
-| `api-tester` | nemotron-3-ultra-free | Testear endpoints |
+| `playwright-tester` | space-bunny-free | Tests E2E |
+| `api-tester` | space-bunny-free | Testear endpoints |
 
 ### Database (1)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `db-migrator` | nemotron-3-ultra-free | Migraciones DB |
+| `db-migrator` | space-bunny-free | Migraciones DB |
 
 ### Branding (1)
 | Subagente | Modelo | Uso |
@@ -245,20 +256,22 @@ Cuando el usuario reporte un bug o pida un fix:
 ## Agentes opencode
 
 ### Modelo Principal
-- **Modelo**: `opencode/nemotron-3-ultra-free`
-- **Razón**: Mayor ventana de contexto, mejor reasoning para orquestación
-- **Visión**: No (usar `test-visual` + screenshots para análisis visual manual)
+- **Modelo**: `opencode/space-bunny-free`
+- **Razón**: 1M de contexto, mejor reasoning para orquestación, y acepta imágenes
+- **Visión**: Sí (`text, image, video`) — ya no hace falta `test-visual` para leer un screenshot
+- **`small_model`**: `opencode/mimo-v2.6-flash-free` (títulos y tareas cortas)
 
 ### Subagentes Principales
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `visual-tester` | `nemotron-3-nano-omni` | Análisis de imágenes (vision-capable) |
-| `orchestrator` | `nemotron-3-ultra-free` | Coordinación general |
-| `api-builder` | `mimo-v2.6-flash-free` | APIs y endpoints |
-| `db-builder` | `nemotron-3-ultra-free` | Base de datos |
-| `quality-auditor` | `nemotron-3-ultra-free` | Testing y QA |
+| `visual-tester` | `muse-spark-1.3` | Análisis de imágenes (1M ctx + image, video, pdf, audio) |
+| `orchestrator` | `space-bunny-free` | Coordinación general |
+| `api-builder` | `space-bunny-free` | APIs y endpoints |
+| `db-builder` | `space-bunny-free` | Base de datos |
+| `quality-auditor` | `space-bunny-free` | Testing y QA |
+| `dashboard-builder` | `mimo-v2.6-flash-free` | Builders UI (el más rápido) |
 
-> Nota: el flujo de análisis de imágenes con plugin `image-detector` + tool `analyze-image` **no está implementado** (eliminado de esta doc). Para análisis visual usar `test-visual` / screenshots + lectura directa.
+> La fuente de verdad de los modelos es **`opencode.json`**. Los `.md` de `.opencode/agents/` **no declaran `model:`** a propósito, para que no haya dos sitios que mantener sincronizados. Este archivo es documentación legible, no configuración.
 
 ## Flujo de Trabajo (OBLIGATORIO)
 
