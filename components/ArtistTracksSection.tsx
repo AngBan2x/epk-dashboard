@@ -4,12 +4,19 @@ import { useState } from "react";
 import { EPKCard } from "@/components/EPKCard";
 import { LoginModal } from "@/components/LoginModal";
 import type { Track } from "@/types/music";
+import type { YouTubeStatsRecord } from "@/lib/youtube";
 
 interface ArtistTracksSectionProps {
   tracks: Track[];
+  /**
+   * Fase E: lote de YouTube resuelto en el Server Component (`artists/[id]`)
+   * y pasado hacia abajo. Sin esto cada `EPKCard` pediría sus propias stats
+   * y una visita = N llamadas upstream.
+   */
+  youtubeStats?: YouTubeStatsRecord;
 }
 
-export function ArtistTracksSection({ tracks }: ArtistTracksSectionProps) {
+export function ArtistTracksSection({ tracks, youtubeStats = {} }: ArtistTracksSectionProps) {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const handleLoginPrompt = () => {
@@ -27,6 +34,7 @@ export function ArtistTracksSection({ tracks }: ArtistTracksSectionProps) {
             key={track.id}
             track={track}
             onLoginPrompt={handleLoginPrompt}
+            youtubeStats={track.youtube_video_id ? youtubeStats[track.youtube_video_id] ?? null : null}
           />
         ))}
       </div>

@@ -2018,17 +2018,22 @@ export async function searchShows(
 }
 
 // ─── Tracks by Artist ──────────────────────────────────────────────────────────
+// Fase E: `status = 'approved'` cierra la fuga de borradores/pendientes.
+// Antes esta función no filtraba por estado, así que un release `pending` de
+// un suscriptor aparecía en la página pública del artista y en el export de
+// prensa. Verificado contra Turso: los tracks existentes están `approved`, así
+// que el filtro no oculta nada real.
 export async function getTracksByArtist(artistId: string): Promise<Track[]> {
   if (isTursoEnabled()) {
     const rows = await tursoExec(
-      "SELECT * FROM tracks WHERE artist_name = (SELECT name FROM artists WHERE id = ?) ORDER BY title",
+      "SELECT * FROM tracks WHERE artist_name = (SELECT name FROM artists WHERE id = ?) AND status = 'approved' ORDER BY title",
       [artistId]
     );
     return rows.map((r) => parseTrack(r as Record<string, unknown>));
   }
   const db = getLocalDb();
   const rows = db
-    .prepare("SELECT * FROM tracks WHERE artist_name = (SELECT name FROM artists WHERE id = ?) ORDER BY title")
+    .prepare("SELECT * FROM tracks WHERE artist_name = (SELECT name FROM artists WHERE id = ?) AND status = 'approved' ORDER BY title")
     .all(artistId) as Record<string, unknown>[];
   return rows.map(parseTrack);
 }

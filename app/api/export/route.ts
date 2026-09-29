@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { buildExportBundle, ExportError } from "@/lib/export-bundle";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * `POST /api/export` es publico (el DownloadCenter se monta tambien en la pagina
+ * del artista, sin sesion) y cada peticion lee fresco de Turso, asi que sin limite
+ * es abusable. 20 generaciones por minuto y IP: de sobra para prensa, y corta
+ * los bucles de scraping.
+ */
+const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
 const ExportBodySchema = z.object({
+  // B5 pendiente: añadir "pdf" aquí y a `ExportFormat` en
+  // components/DownloadCenter.tsx, junto con las plantillas de lib/pdf/.
+  // Bloqueado: este track no puede instalar `pdfkit` (dependencia nueva).
+  // Aceptar "pdf" sin generador devolvería un JSON con extensión .pdf.
   format: z
     .enum(["html", "json"], { errorMap: () => ({ message: 'format debe ser "html" o "json"' }) })
     .optional(),
@@ -48,6 +62,9 @@ function formatIssues(issues: z.ZodIssue[]): string {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = enforceRateLimit(req, "export", null, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  if (blocked) return blocked;
+
   let rawBody: unknown = null;
   try {
     rawBody = await req.json();

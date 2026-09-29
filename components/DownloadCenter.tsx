@@ -1,11 +1,15 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState } from "react";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Badge, CountBadge } from "@/components/ui/Badge";
 import { safeString } from "@/lib/null-safe";
 
 type ExportSection = "dossier" | "rider" | "catalog";
+// B5 pendiente: aqui ira `| "pdf"` cuando se permita instalar `pdfkit`.
+// No se anade ya a proposito: el backend no sabe generar PDF, asi que aceptarlo
+// devolveria un JSON con extension .pdf. Ver el TODO de B5 en
+// docs/PLAN_RC29_RC31.md.
 type ExportFormat = "html" | "json";
 
 interface DownloadOption {
@@ -22,7 +26,6 @@ interface DownloadCenterProps {
   artistName?: string;
   trackCount?: number;
   className?: string;
-  onSaved?: () => void | Promise<void>;
 }
 
 type Status = "idle" | "loading" | "error";
@@ -38,12 +41,10 @@ export function DownloadCenter({
   artistName = "Artista",
   trackCount = 0,
   className = "",
-  onSaved,
 }: DownloadCenterProps) {
   const safeName = artistName.replace(/[^a-zA-Z0-9]/g, "") || "Artista";
   const [statusById, setStatusById] = useState<Record<string, Status>>({});
   const [error, setError] = useState<string | null>(null);
-  const [dossierRevision, setDossierRevision] = useState(0);
 
   const options: DownloadOption[] = [
     {
@@ -80,20 +81,20 @@ export function DownloadCenter({
     },
   ];
 
-  useEffect(() => {
-    if (!onSaved) return;
-  }, [onSaved]);
-
-  const refreshDossier = useCallback(async () => {
-    if (!artistId) return;
-    try {
-      await fetch(`/api/dossiers?artist_id=${artistId}`, { cache: "no-store" });
-      setDossierRevision((n) => n + 1);
-    } catch {
-      setDossierRevision((n) => n + 1);
-    }
-  }, [artistId]);
-
+  // No hay un boton de "Actualizar datos del dossier" a proposito.
+  //
+  // Antes existia `refreshDossier`: hacia `GET /api/dossiers?artist_id=...`,
+  // descartaba la respuesta y solo incrementaba un contador `dossierRevision`
+  // que se volcaba en `data-dossier-revision`, atributo que no leia nadie en el
+  // repo (verificado con git grep sobre app/, components/, lib/, scripts/ y
+  // tests/). Es decir: era codigo muerto.
+  //
+  // Se puede eliminar porque no hay nada que "actualizar": no hay cache de
+  // dossier, ni archivo pregenerado, ni columna de version en la base de datos.
+  // `POST /api/export` lee fresco de Turso en cada clic
+  // (`lib/export-bundle.ts:92-102`) y responde con `Cache-Control: no-store`
+  // (`app/api/export/route.ts:78`), asi que el flujo "guardar y se actualiza
+  // solo" ya funciona y no necesita un boton que no hacia nada.
   const handleDownload = async (option: DownloadOption) => {
     if (!artistId) {
       setError("Necesitas un perfil de artista para generar el dossier y el rider.");
@@ -146,7 +147,6 @@ export function DownloadCenter({
   return (
     <div
       className={`bg-white rounded-2xl border border-slate-200 p-6 dark:border-slate-700 dark:bg-slate-800 ${className}`}
-      data-dossier-revision={dossierRevision}
     >
       <SectionHeader
         emoji="📥"
@@ -191,19 +191,6 @@ export function DownloadCenter({
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={refreshDossier}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          Actualizar datos del dossier
-        </button>
-        <span className="text-[11px] text-slate-500 dark:text-slate-400">
-          Se generan en el servidor con la última versión guardada.
-        </span>
       </div>
 
       {error && (

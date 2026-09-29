@@ -60,7 +60,12 @@ function exportFilename(
   if (sections.length === 1) {
     const section = sections[0];
     if (section === "catalog") {
-      return artistId ? `PressPlay_Catalogo_${slug}_${date}.${extension}` : `EPK_Dossier_${date}.${extension}`;
+      // El catálogo público (sin artist_id) también se llama "Catalogo": antes
+      // heredaba el nombre del dossier, `EPK_Dossier_<fecha>.<ext>`, porque solo
+      // lo usaba el botón JSON y nadie miraba el nombre.
+      return artistId
+        ? `PressPlay_Catalogo_${slug}_${date}.${extension}`
+        : `PressPlay_Catalogo_${date}.${extension}`;
     }
     if (section === "rider") return `PressPlay_Rider_Tecnico_${slug}.${extension}`;
     return `PressPlay_Dossier_${slug}.${extension}`;

@@ -3,12 +3,14 @@ import { BioSection } from "@/components/BioSection";
 import { ArtistTracksSection } from "@/components/ArtistTracksSection";
 import { ArtistHero } from "@/components/ArtistHero";
 import { ArtistSocialLinks } from "@/components/ArtistSocialLinks";
+import { DownloadCenter } from "@/components/DownloadCenter";
 import { SubscriptionButton } from "@/components/subscriber/SubscriptionButton";
 import { SubscriberCount } from "@/components/subscriber/SubscriberCount";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { Track } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
+import { collectVideoIds, getVideoStatsBatch, toStatsRecord } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
 
@@ -55,9 +57,29 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
 
   let tracks: Track[] = [];
   try {
+    // `getTracksByArtist` filtra por `status = 'approved'`: sin eso, un release
+    // `pending` de un suscriptor quedaba visible públicamente en esta página.
     tracks = await getTracksByArtist(params.id);
   } catch (e) {
     console.error("Failed to fetch tracks for artist:", params.id, e);
+  }
+
+  // Fase E: UN lote de YouTube para todos los tracks (antes, uno por tarjeta).
+  // Se resuelve aquí, en el servidor, y baja como objeto plano: el `Map` no
+  // sobrevive al límite Server → Client.
+  let youtubeStats: ReturnType<typeof toStatsRecord> = {};
+  const videoIds = collectVideoIds(tracks);
+  if (videoIds.length > 0) {
+    try {
+      const batch = await getVideoStatsBatch(videoIds);
+      if (batch.ok) {
+        youtubeStats = toStatsRecord(batch.data);
+      } else {
+        console.error(`[artists/${params.id}] métricas de YouTube no disponibles: ${batch.reason}`);
+      }
+    } catch (e) {
+      console.error(`[artists/${params.id}] fallo al pedir el lote de YouTube:`, e);
+    }
   }
 
   // `safeString` devuelve "—" (truthy) como fallback por defecto, asi que con
@@ -121,7 +143,18 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
           pressHighlights={artist.press_highlights}
         />
 
-        <ArtistTracksSection tracks={tracks} />
+        {/* B1: descargas de prensa también en la página pública del artista.
+            Es el mismo DownloadCenter del dashboard: solo recibe props planas
+            (artistId, artistName, trackCount) y ya es un client component. */}
+        <div className="mt-8">
+          <DownloadCenter
+            artistId={artist.id}
+            artistName={artist.name}
+            trackCount={tracks.length}
+          />
+        </div>
+
+        <ArtistTracksSection tracks={tracks} youtubeStats={youtubeStats} />
       </main>
     </div>
   );

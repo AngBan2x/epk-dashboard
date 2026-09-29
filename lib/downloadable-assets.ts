@@ -353,12 +353,12 @@ function catalogTrackHtml(track: Track): string {
   </div>`;
 }
 
-function catalogBody(payload: ExportPayload): string {
+function catalogBody(payload: ExportPayload, headingHtml = "🎵 PressPlay — Dossier de Prensa"): string {
   const now = payload.generatedAt ?? new Date();
   const tracks = safeArray<Track>(payload.tracks);
 
   return `
-  <h1>🎵 PressPlay — Dossier de Prensa</h1>
+  <h1>${headingHtml}</h1>
   <p class="meta">Generado el ${escapeHtml(formatDateLong(now))}</p>
   ${payload.artistId ? `<p class="meta"><strong>Artista:</strong> ${escapeHtml(safeString(payload.artistName))}</p>` : ""}
   <p class="meta">Total de tracks en catálogo: <strong>${tracks.length}</strong></p>
@@ -544,8 +544,17 @@ export function buildDossierHtml(payload: ExportPayload): string {
   );
 }
 
+/**
+ * Catálogo standalone. El título y el encabezado son propios del catálogo: antes
+ * ambos decían "EPK Dossier de Prensa", que es el título de la otra sección y
+ * confundía al abrir el archivo.
+ */
 export function buildCatalogHtml(payload: ExportPayload): string {
-  return htmlDocument(`EPK Dossier de Prensa`, CATALOG_STYLES, catalogBody(payload));
+  return htmlDocument(
+    `PressPlay &mdash; Catálogo`,
+    CATALOG_STYLES,
+    catalogBody(payload, "🎵 PressPlay — Catálogo")
+  );
 }
 
 export function buildBundleHtml(payload: ExportPayload, sections: readonly ExportSection[]): string {
