@@ -62,44 +62,42 @@ interface SeedTrack {
   isrc?: string;
 }
 
-const SEED_SUFFIX = "-seed";
-
 const SEED_ARTISTS: SeedArtist[] = [
   {
-    name: "Pink Floyd" + SEED_SUFFIX,
-    slug: "pink-floyd" + SEED_SUFFIX,
+    name: "Pink Floyd",
+    slug: "pink-floyd",
     biography: "Pink Floyd fue una banda británica de rock progresivo y psicodélico formada en Londres en 1965. Conocidos por sus composiciones filosóficas, experimentación sonora, portadas icónicas y espectáculos en vivo elaborados.",
     genre: "Progressive Rock / Psychedelic Rock",
     location: "Londres, Reino Unido",
     monthly_listeners: 22000000,
   },
   {
-    name: "Radiohead" + SEED_SUFFIX,
-    slug: "radiohead" + SEED_SUFFIX,
+    name: "Radiohead",
+    slug: "radiohead",
     biography: "Radiohead es una banda británica de rock alternativo formada en Abingdon, Oxfordshire, en 1985. Pioneros en la fusión de rock, electrónica y música experimental, han redefinido los límites del rock moderno.",
     genre: "Alternative Rock / Experimental / Art Rock",
     location: "Abingdon, Oxfordshire, Reino Unido",
     monthly_listeners: 35000000,
   },
   {
-    name: "Björk" + SEED_SUFFIX,
-    slug: "bjork" + SEED_SUFFIX,
+    name: "Björk",
+    slug: "bjork",
     biography: "Björk Guðmundsdóttir es una cantautora, productora y actriz islandesa. Su música ecléctica abarca electrónica, trip-hop, art pop, avant-garde y música clásica. Innovadora incansable en producción y performance.",
     genre: "Art Pop / Experimental / Electronic",
     location: "Reikiavik, Islandia",
     monthly_listeners: 8500000,
   },
   {
-    name: "David Bowie" + SEED_SUFFIX,
-    slug: "david-bowie" + SEED_SUFFIX,
+    name: "David Bowie",
+    slug: "david-bowie",
     biography: "David Robert Jones, conocido como David Bowie, fue un cantautor y actor británico. Camaleónico pionero del glam rock, art rock, soul y música electrónica. Una de las figuras más influyentes de la música popular.",
     genre: "Art Rock / Glam Rock / Pop / Experimental",
     location: "Londres, Reino Unido",
     monthly_listeners: 18000000,
   },
   {
-    name: "Kraftwerk" + SEED_SUFFIX,
-    slug: "kraftwerk" + SEED_SUFFIX,
+    name: "Kraftwerk",
+    slug: "kraftwerk",
     biography: "Kraftwerk es una banda alemana pionera de la música electrónica formada en Düsseldorf en 1970. Su sonido minimalista, robótico y basado en sintetizadores sentó las bases del techno, synth-pop y la EDM moderna.",
     genre: "Electronic / Krautrock / Synth-pop",
     location: "Düsseldorf, Alemania",
@@ -110,8 +108,8 @@ const SEED_ARTISTS: SeedArtist[] = [
 const SEED_RELEASES: SeedRelease[] = [
   // Pink Floyd - 2 álbumes
   {
-    artistName: "Pink Floyd" + SEED_SUFFIX,
-    title: "The Dark Side of the Moon" + SEED_SUFFIX,
+    artistName: "Pink Floyd",
+    title: "The Dark Side of the Moon",
     releaseType: "Album",
     releaseDate: "1973-03-01",
     coverImage: "https://example.com/covers/dark-side-moon.jpg",
@@ -129,8 +127,8 @@ const SEED_RELEASES: SeedRelease[] = [
     ],
   },
   {
-    artistName: "Pink Floyd" + SEED_SUFFIX,
-    title: "The Wall" + SEED_SUFFIX,
+    artistName: "Pink Floyd",
+    title: "The Wall",
     releaseType: "Album",
     releaseDate: "1979-11-30",
     coverImage: "https://example.com/covers/the-wall.jpg",
@@ -160,8 +158,8 @@ const SEED_RELEASES: SeedRelease[] = [
   },
   // Radiohead - 2 álbumes
   {
-    artistName: "Radiohead" + SEED_SUFFIX,
-    title: "OK Computer" + SEED_SUFFIX,
+    artistName: "Radiohead",
+    title: "OK Computer",
     releaseType: "Album",
     releaseDate: "1997-05-21",
     coverImage: "https://example.com/covers/ok-computer.jpg",
@@ -181,8 +179,8 @@ const SEED_RELEASES: SeedRelease[] = [
     ],
   },
   {
-    artistName: "Radiohead" + SEED_SUFFIX,
-    title: "Kid A" + SEED_SUFFIX,
+    artistName: "Radiohead",
+    title: "Kid A",
     releaseType: "Album",
     releaseDate: "2000-10-02",
     coverImage: "https://example.com/covers/kid-a.jpg",
@@ -201,8 +199,8 @@ const SEED_RELEASES: SeedRelease[] = [
   },
   // Björk - 1 EP
   {
-    artistName: "Björk" + SEED_SUFFIX,
-    title: "Vulnicura Strings" + SEED_SUFFIX,
+    artistName: "Björk",
+    title: "Vulnicura Strings",
     releaseType: "EP",
     releaseDate: "2016-11-04",
     coverImage: "https://example.com/covers/vulnicura-strings.jpg",
@@ -216,8 +214,8 @@ const SEED_RELEASES: SeedRelease[] = [
   },
   // David Bowie - 2 singles con lados B
   {
-    artistName: "David Bowie" + SEED_SUFFIX,
-    title: "\"Heroes\"" + SEED_SUFFIX,
+    artistName: "David Bowie",
+    title: "\"Heroes\"",
     releaseType: "Single",
     releaseDate: "1977-09-23",
     coverImage: "https://example.com/covers/heroes-single.jpg",
@@ -245,8 +243,8 @@ const SEED_RELEASES: SeedRelease[] = [
     ],
   },
   {
-    artistName: "David Bowie" + SEED_SUFFIX,
-    title: "Ashes to Ashes" + SEED_SUFFIX,
+    artistName: "David Bowie",
+    title: "Ashes to Ashes",
     releaseType: "Single",
     releaseDate: "1980-08-01",
     coverImage: "https://example.com/covers/ashes-to-ashes.jpg",
@@ -275,8 +273,8 @@ const SEED_RELEASES: SeedRelease[] = [
   },
   // Kraftwerk - 2 singles con lados B
   {
-    artistName: "Kraftwerk" + SEED_SUFFIX,
-    title: "The Model / Computer Love" + SEED_SUFFIX,
+    artistName: "Kraftwerk",
+    title: "The Model / Computer Love",
     releaseType: "Single",
     releaseDate: "1981-12-04",
     coverImage: "https://example.com/covers/the-model.jpg",
@@ -304,8 +302,8 @@ const SEED_RELEASES: SeedRelease[] = [
     ],
   },
   {
-    artistName: "Kraftwerk" + SEED_SUFFIX,
-    title: "Tour de France" + SEED_SUFFIX,
+    artistName: "Kraftwerk",
+    title: "Tour de France",
     releaseType: "Single",
     releaseDate: "1983-06-01",
     coverImage: "https://example.com/covers/tour-de-france.jpg",
@@ -337,6 +335,7 @@ const SEED_RELEASES: SeedRelease[] = [
 async function main() {
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
+  const cleanup = args.includes("--cleanup");
   const help = args.includes("--help") || args.includes("-h");
 
   if (help) {
@@ -348,22 +347,82 @@ Usage:
 
 Options:
   --apply     Escribir cambios en la DB (default: dry-run)
+  --cleanup   Borrar lo que creo este script (default: dry-run)
   --help, -h  Mostrar esta ayuda
 
 Crea catálogo determinista multi-track:
-- 2 artistas × 2 álbumes (Pink Floyd, Radiohead) → 22 tracks con release_id, disc_number, start_time, end_time
-- 1 artista × 1 EP (Björk) → 5 tracks
-- 2 artistas × 2 singles con lados B (David Bowie, Kraftwerk) → 8 tracks con is_double_single, sides_b
+- Pink Floyd → 2 álbumes (The Dark Side of the Moon, The Wall, este de 2 discos)
+- Radiohead → 2 álbumes (OK Computer, Kid A)
+- Björk → 1 EP (Vulnicura Strings)
+- David Bowie y Kraftwerk → 4 singles con lados B (is_double_single, sides_b)
 
-Total: 5 artistas, 7 releases, 35 tracks
+Total: 5 artistas, 9 releases, 65 pistas hijas (+ 9 filas padre = 74 en la web).
 
-Todos los slugs/nombres llevan sufijo "${SEED_SUFFIX}" para no colisionar con datos reales.
+Nombres y slugs SIN sufijo, a propósito: son artistas reales, para que un artista
+que se registra vea los tipos de lanzamiento con los que puede trabajar. Para
+revertir, usa --cleanup: borra por la clave estable del catálogo de este archivo.
 Upsert por clave estable: artist_name + title + release_id (para tracks) o artist_name + title (para releases padre).
     `);
     process.exit(0);
   }
 
   console.log(`\n${apply ? "🌱 SEMBRANDO" : "🔍 DRY-RUN"} - Influential Catalog (P5.2)\n`);
+
+  // ------------------------------------------------------------------
+  // --cleanup: borra exactamente lo que creó este script.
+  // Necesario desde que los nombres ya NO llevan el sufijo "-seed": no se
+  // puede identificar el seed por convención de nombre, así que se borra por
+  // la clave estable del catálogo de este mismo archivo (artist_name + title),
+  // que es la misma que usa el upsert. Un artista solo se borra si se queda
+  // sin tracks: así no se lleva por delante nada que no sea suyo.
+  // ------------------------------------------------------------------
+  if (cleanup) {
+    console.log("Alcance del borrado (clave estable: artist_name + title del catálogo de este script):");
+    for (const sr of SEED_RELEASES) {
+      console.log(`  - ${sr.artistName} — ${sr.title} (${sr.releaseType}, ${sr.tracks.length} pistas)`);
+    }
+    console.log(`\nArtistas que se borrarian solo si quedan sin tracks: ${SEED_ARTISTS.map((a) => a.name).join(", ")}`);
+
+    if (!apply) {
+      console.log("\n🔍 DRY-RUN. No se borró nada. Añade --cleanup --apply para ejecutarlo.");
+      return;
+    }
+
+    let delTracks = 0;
+    let delReleases = 0;
+    for (const sr of SEED_RELEASES) {
+      const matching = (await getAllTracks()).filter(
+        (t) => t.artist_name === sr.artistName && t.title === sr.title
+      );
+      if (matching.length === 0) {
+        console.log(`  ⏭️  No existe: ${sr.artistName} — ${sr.title}`);
+        continue;
+      }
+      for (const t of matching) {
+        if (isTursoEnabled()) await tursoExec("DELETE FROM tracks WHERE id = ?", [t.id]);
+        else getDbWrite().prepare("DELETE FROM tracks WHERE id = ?").run(t.id);
+        delTracks++;
+      }
+      delReleases += 1;
+      console.log(`  🗑️  ${sr.artistName} — ${sr.title}: ${matching.length} filas borradas`);
+    }
+
+    let delArtists = 0;
+    for (const sa of SEED_ARTISTS) {
+      const left = (await getAllTracks()).filter((t) => t.artist_name === sa.name);
+      if (left.length > 0) {
+        console.log(`  ⏭️  Se conserva "${sa.name}": quedan ${left.length} tracks ajenos a este seed`);
+        continue;
+      }
+      if (isTursoEnabled()) await tursoExec("DELETE FROM artists WHERE name = ?", [sa.name]);
+      else getDbWrite().prepare("DELETE FROM artists WHERE name = ?").run(sa.name);
+      delArtists++;
+      console.log(`  🗑️  Artista "${sa.name}" eliminado (sin tracks)`);
+    }
+
+    console.log(`\nBorrado: ${delTracks} tracks, ${delReleases} releases, ${delArtists} artistas.`);
+    return;
+  }
 
   let stats = {
     artistsCreated: 0,
