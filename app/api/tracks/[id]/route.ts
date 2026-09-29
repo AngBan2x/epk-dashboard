@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateTrack, getTrackById } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { validateTrackNumber } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -49,10 +50,24 @@ export async function PATCH(
     }
 
     // Only allow specific fields to be patched
-    const allowedFields = ["lyrics", "is_instrumental", "production_details", "start_time", "end_time", "gallery_images"];
+    const allowedFields = ["lyrics", "is_instrumental", "production_details", "start_time", "end_time", "gallery_images", "track_number"];
     const updates: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (field in body) {
+        // M0: this route is a passthrough, so numbers must be bounded here.
+        // Rejects NaN / Infinity / negatives / non-integers with a 400 instead
+        // of letting raw input reach the column (mass-assignment guard).
+        if (field === "track_number") {
+          const trackNumber = validateTrackNumber(body[field]);
+          if (trackNumber === undefined) {
+            return NextResponse.json(
+              { error: "track_number debe ser un entero >= 0 o null" },
+              { status: 400 }
+            );
+          }
+          updates[field] = trackNumber;
+          continue;
+        }
         updates[field] = body[field];
       }
     }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDbWrite, isTursoConfigured } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
 import { validateRequest } from "@/lib/auth";
+import { validateTrackNumber } from "@/lib/validations";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
 import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
@@ -249,8 +250,21 @@ export async function PUT(req: NextRequest) {
       "stems_urls", "video_embed_url", "gallery_images", "disc_number",
       "is_double_single", "sides_b", "isrc", "composers", "is_instrumental",
       "streams", "metrics", "production_details", "lyrics",
-      "start_time", "end_time",
+      "start_time", "end_time", "track_number",
     ]);
+
+    // M0: this PUT is a passthrough allowlist, so track_number needs a bound
+    // before it reaches SQL. Anything not an integer >= 0 (or null) is a 400.
+    if ("track_number" in updates) {
+      const trackNumber = validateTrackNumber(updates.track_number);
+      if (trackNumber === undefined) {
+        return NextResponse.json(
+          { error: "track_number debe ser un entero >= 0 o null" },
+          { status: 400 }
+        );
+      }
+      updates.track_number = trackNumber;
+    }
 
     const safeKeys = Object.keys(updates).filter((k) => ALLOWED_COLUMNS.has(k));
     if (safeKeys.length === 0 && status === undefined) {

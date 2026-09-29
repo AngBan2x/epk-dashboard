@@ -23,6 +23,8 @@ interface TrackInput {
   isrc: string;
   start_time: number;
   end_time: number;
+  /** M0: numero de pista dentro del disco. null = sin numerar. */
+  track_number: number | null;
 }
 
 export default function EditReleasePage() {
@@ -50,7 +52,7 @@ export default function EditReleasePage() {
     status: "draft" as ReleaseStatus,
   });
 
-  const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "", start_time: 0, end_time: 0 }]);
+  const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "", start_time: 0, end_time: 0, track_number: null }]);
   const [lyrics, setLyrics] = useState("");
   const [productionDetails, setProductionDetails] = useState({
     daw: "",
@@ -117,6 +119,7 @@ export default function EditReleasePage() {
               isrc: t.isrc || "",
               start_time: t.start_time ?? 0,
               end_time: t.end_time ?? 0,
+              track_number: t.track_number ?? null,
             })));
           }
         }
@@ -258,11 +261,11 @@ export default function EditReleasePage() {
     }
   };
 
-  const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "", start_time: 0, end_time: 0 }]);
+  const addTrack = () => setTracks([...tracks, { title: "", duration: "", isrc: "", start_time: 0, end_time: 0, track_number: null }]);
   const removeTrack = (index: number) => setTracks(tracks.filter((_, i) => i !== index));
-  const updateTrack = (index: number, field: keyof TrackInput, value: string | number) => {
+  const updateTrack = (index: number, field: keyof TrackInput, value: string | number | null) => {
     const newTracks = [...tracks];
-    (newTracks[index] as unknown as Record<string, string | number>)[field] = value;
+    (newTracks[index] as unknown as Record<string, string | number | null>)[field] = value;
     setTracks(newTracks);
   };
 
@@ -501,7 +504,27 @@ export default function EditReleasePage() {
                         <button type="button" onClick={() => removeTrack(index)} className="p-2 text-red-500 hover:text-red-600">✕</button>
                       )}
                     </div>
-                    <div className="flex gap-2 ml-4 pt-1">
+                    <div className="flex gap-2 ml-4 pt-1 items-center">
+                      <label
+                        htmlFor={`track-number-${index}`}
+                        className="text-xs text-slate-500 dark:text-slate-400"
+                      >
+                        Nº
+                      </label>
+                      <input
+                        id={`track-number-${index}`}
+                        type="number"
+                        value={track.track_number ?? ""}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          // Vacio = sin numerar (null), no 0
+                          updateTrack(index, "track_number", raw === "" ? null : parseInt(raw, 10) || 0);
+                        }}
+                        className="w-20 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs"
+                        placeholder="Nº"
+                        min="0"
+                        step="1"
+                      />
                       <input
                         type="number"
                         value={track.start_time}

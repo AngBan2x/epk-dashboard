@@ -43,13 +43,41 @@ export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, rele
     return null;
   }
 
+  // M0: number per disc, not a flat index. Groups consecutive rows by
+  // disc_number, restarts the counter on every new disc, and only shows a
+  // "Disco N" header when the release actually spans more than one disc.
+  // An explicit track_number wins; unnumbered tracks fall back to their
+  // position within the disc so nothing renders blank.
+  const discGroups: { disc: number; rows: { track: Track; number: number }[] }[] = [];
+  for (const track of tracks) {
+    const disc = Number.isFinite(track.disc_number) && track.disc_number ? Number(track.disc_number) : 1;
+    const lastGroup = discGroups[discGroups.length - 1];
+    if (!lastGroup || lastGroup.disc !== disc) {
+      discGroups.push({ disc, rows: [{ track, number: 0 }] });
+    } else {
+      lastGroup.rows.push({ track, number: lastGroup.rows.length });
+    }
+  }
+  const showDiscHeaders = discGroups.length > 1;
+
   return (
     <div className="space-y-2">
-      {tracks.map((track, index) => {
+      {discGroups.map((group) => (
+        <div key={`disc-${group.disc}`} className="space-y-2">
+          {showDiscHeaders && (
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 pt-2">
+              Disco {group.disc}
+            </h4>
+          )}
+          {group.rows.map(({ track, number }) => {
         const isCurrentTrack = globalPlayer?.activeTrack?.id === track.id;
         const isPlaying = isCurrentTrack && globalPlayer?.isPlaying;
         const isLoading = isCurrentTrack && globalPlayer?.isLoading;
         const isError = isCurrentTrack && globalPlayer?.error;
+        const trackNumber =
+          track.track_number != null && Number.isFinite(track.track_number)
+            ? track.track_number
+            : number + 1;
 
         return (
           <div
@@ -60,9 +88,9 @@ export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, rele
                 : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
           >
-            {/* Track number */}
+            {/* Track number (M0: per disc) */}
             <span className="text-sm font-medium text-slate-500 dark:text-slate-400 w-6 text-center">
-              {index + 1}
+              {trackNumber}
             </span>
 
             {/* Play button */}
@@ -127,7 +155,9 @@ export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, rele
             )}
           </div>
         );
-      })}
+          })}
+        </div>
+      ))}
     </div>
   );
 }

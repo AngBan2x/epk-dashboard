@@ -64,6 +64,8 @@ export interface Track {
   // P2.5: New fields
   external_links?: ExternalLinks | null;
   disc_number?: number;
+  // M0: numero de pista dentro del disco (nullable)
+  track_number?: number;
   is_double_single?: boolean;
   sides_b?: string[] | null;
   isrc?: string | null;
@@ -126,6 +128,8 @@ export interface RawTrackRow {
   // P2.5: New fields
   external_links?: string | null;
   disc_number?: number | null;
+  // M0: numero de pista dentro del disco
+  track_number?: number | null;
   is_double_single?: number | null;
   sides_b?: string | null;
   isrc?: string | null;

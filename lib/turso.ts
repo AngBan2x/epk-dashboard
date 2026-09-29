@@ -96,6 +96,8 @@ export async function ensureTursoSchema(): Promise<boolean> {
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN release_id TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN start_time REAL DEFAULT 0`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN end_time REAL DEFAULT 0`); } catch {}
+  // M0: numeracion explicita de pista por disco (nullable, sin DEFAULT)
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN track_number INTEGER`); } catch {}
   // P3 Batch 2: Release form fields
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN genre TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN description TEXT`); } catch {}
