@@ -17,8 +17,16 @@ function MetricCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
       <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+      {/*
+        `line-clamp-3`, no 2. Las celdas miden ~180px (4 columnas en la
+        pagina de artista) y a 2 lineas caben ~28 caracteres. "Alternative Rock
+        / Experimental / Art Pop" son 42 y "Abingdon, Oxfordshire, Reino
+        Unido" 35: la segunda linea salia con dos letras ("Ar...") y elipsis,
+        que se lee como dato roto. Con 3 lineas caben. `title` ya estaba, asi
+        que el dato completo nunca se perdia, pero verse bien no es opcional.
+      */}
       <p
-        className="line-clamp-2 text-sm font-semibold text-slate-900 dark:text-slate-100"
+        className="line-clamp-3 text-sm font-semibold text-slate-900 dark:text-slate-100"
         title={value}
       >
         {value}
