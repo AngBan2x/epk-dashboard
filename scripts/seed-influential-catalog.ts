@@ -388,23 +388,49 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
       return;
     }
 
+    // Las hijas NO tienen el titulo del release, asi que buscar por
+    // (artist_name, title) solo encuentra al padre y deja 63 huerfanas por el
+    // camino. Se borra por la ESTRUCTURA: se localiza el padre por la clave
+    // estable y se eliminan todas las filas con su release_id.
     let delTracks = 0;
     let delReleases = 0;
     for (const sr of SEED_RELEASES) {
-      const matching = (await getAllTracks()).filter(
-        (t) => t.artist_name === sr.artistName && t.title === sr.title
-      );
-      if (matching.length === 0) {
+      const all = await getAllTracks();
+      const parent = all.find((t) => t.artist_name === sr.artistName && t.title === sr.title);
+      if (!parent) {
         console.log(`  ⏭️  No existe: ${sr.artistName} — ${sr.title}`);
         continue;
       }
-      for (const t of matching) {
+      const children = all.filter((t) => t.release_id === parent.id);
+      const toDelete = [...children, parent];
+      for (const t of toDelete) {
         if (isTursoEnabled()) await tursoExec("DELETE FROM tracks WHERE id = ?", [t.id]);
         else getDbWrite().prepare("DELETE FROM tracks WHERE id = ?").run(t.id);
         delTracks++;
       }
       delReleases += 1;
-      console.log(`  🗑️  ${sr.artistName} — ${sr.title}: ${matching.length} filas borradas`);
+      console.log(
+        `  🗑️  ${sr.artistName} — ${sr.title}: 1 release + ${children.length} pistas borradas`
+      );
+    }
+
+    // Huerfanas: pistas con release_id que ya no apunta a ninguna fila. Passan
+    // si un cleanup anterior borro al padre sin las hijas, y dejarlas seria
+    // peor que no haber sembrado: ocupan sitio y ensucian el catalogo. Se
+    // acota a los artistas de este script para no tocar datos ajenos.
+    const seedArtistNames = new Set(SEED_ARTISTS.map((a) => a.name));
+    const after = await getAllTracks();
+    const ids = new Set(after.map((t) => t.id));
+    const orphans = after.filter(
+      (t) => t.release_id && !ids.has(t.release_id) && seedArtistNames.has(t.artist_name)
+    );
+    for (const t of orphans) {
+      if (isTursoEnabled()) await tursoExec("DELETE FROM tracks WHERE id = ?", [t.id]);
+      else getDbWrite().prepare("DELETE FROM tracks WHERE id = ?").run(t.id);
+      delTracks++;
+    }
+    if (orphans.length > 0) {
+      console.log(`  🧹  ${orphans.length} pistas huerfanas (release_id sin padre) eliminadas`);
     }
 
     let delArtists = 0;
@@ -526,6 +552,10 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
           spotify_url: null,
           youtube_video_id: null,
           itunes_track_id: null,
+          // Sin esto el padre queda en 'draft' (default del esquema) y todo lo
+          // público, que filtra `status = 'approved'`, no lo muestra: el album
+          // entero desaparece de la pagina del artista.
+          status: "approved",
           metrics: { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] },
           production_details: { daw: null, guitars: null, effects_chain: null, tuning: null, key: null },
           lyrics: null,
@@ -576,6 +606,9 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
           spotify_url: null,
           youtube_video_id: null,
           itunes_track_id: null,
+          // Por lo mismo que en el padre: sin esto la pista queda en 'draft' y
+          // no sale en el catalogo publico ni en el PDF.
+          status: "approved",
           metrics: { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] },
           production_details: { daw: null, guitars: null, effects_chain: null, tuning: null, key: null },
           lyrics: null,
