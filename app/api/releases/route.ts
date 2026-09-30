@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { InValue } from "@libsql/client";
 import { z } from "zod";
-import { getDbWrite, isTursoConfigured, getApprovedTrackById, isArtistOwnerOfTrackName } from "@/lib/db";
-import { getTursoClient } from "@/lib/turso";
+import {
+  bustSelectCache,
+  getApprovedTrackById,
+  getLocalDbWrite,
+  getTursoClientSync,
+  isArtistOwnerOfTrackName,
+} from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { validateTrackNumber } from "@/lib/validations";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -30,27 +36,47 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
+// ── UNA sola fuente de verdad para la decisión Turso/local (GAP-B residual) ──
+//
+// Antes los helpers de esta ruta ramificaban con `isTursoConfigured()` de
+// `@/lib/db` —que es alias de `isTursoEnabled()`, lee `process.env` en TIEMPO DE
+// LLAMADA— y ejecutaban con `getTursoClient()` de `@/lib/turso` —que lee el env
+// al IMPORTAR el módulo, `lib/turso.ts:31-32`. Con el env llegando después de esa
+// primera evaluación, el caso normal en un bundle de Vercel, la primera decía
+// "turso" y la segunda devolvía `null`: se lanzaba `"Turso client not
+// available"` y la ruta respondía 500 en vez de degradar. Dos fuentes de verdad
+// que no pueden coincidir, y una línea de `throw` en el hueco entre ellas.
+//
+// `getTursoClientSync() !== null` cierra el hueco: devuelve `null` si y solo si
+// `isTursoEnabled()` es falso, y los dos leen `process.env` en tiempo de llamada.
+// Es el mismo criterio que aplicaron E3 en `app/api/tracks/route.ts` y en las
+// otras cinco rutas que aplanó.
+//
+// El handle local es `getLocalDbWrite()` y solo se abre cuando NO hay cliente:
+// `getLocalDb()` es de solo lectura y esta ruta escribe (POST/PUT/DELETE), así
+// que detrás de un cliente nunca se abre un `better-sqlite3` en un bundle de
+// Vercel. Antes no existía este brazo —`getDbWrite()` era el que se llamaba, y
+// la rama local no tenía forma de degradar—.
 async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
-  if (isTursoConfigured()) {
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso client not available");
-    const result = await client.execute({ sql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    const result = await client.execute({
+      sql: bustSelectCache(sql),
+      args: (params ?? []) as InValue[],
+    });
     return result.rows as unknown[];
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDbWrite().prepare(sql);
   return params ? stmt.all(...params) : stmt.all();
 }
 
 async function dbRun(sql: string, params?: unknown[]): Promise<void> {
-  if (isTursoConfigured()) {
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso client not available");
-    await client.execute({ sql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    await client.execute({ sql, args: (params ?? []) as InValue[] });
     return;
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDbWrite().prepare(sql);
   stmt.run(...(params ?? []));
 }
 

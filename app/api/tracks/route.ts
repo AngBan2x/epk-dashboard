@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { InValue } from "@libsql/client";
 import {
-  bustSelectCache,
   getAllTracks,
+  getApprovedTracks,
   createTrack,
   updateTrack,
   deleteTrack,
   getTrackById,
   getArtistByName,
-  getLocalDb,
-  getTursoClientSync,
 } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
@@ -69,25 +66,22 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
-// UNA sola fuente de verdad: `getTursoClientSync()` devuelve `null` si y solo si
-// `isTursoEnabled()` es falso, y los dos leen `process.env` en tiempo de llamada.
-// Antes la rama la elegía `isTursoConfigured()` de `@/lib/db` y la ejecutaba
-// `getTursoClient()` de `@/lib/turso`, que lee el env al IMPORTAR el módulo
-// (`lib/turso.ts:31-32`): con el env cargando tarde, la primera decía "turso" y la
-// segunda `null`, se lanzaba y la ruta respondía 500 en vez de listar nada. Y la
-// rama local usaba `getDbWrite()`, que solo funcionaba por accidente.
-async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
-  const client = getTursoClientSync();
-  if (client) {
-    const result = await client.execute({
-      sql: bustSelectCache(sql),
-      args: (params ?? []) as InValue[],
-    });
-    return result.rows as unknown[];
-  }
-  const stmt = getLocalDb().prepare(sql);
-  return params ? stmt.all(...params) : stmt.all();
-}
+// ── Por qué no hay SQL suelto en esta ruta ──────────────────────────────────
+// La versión anterior traía su propio `dbQuery`, que ramificaba con
+// `isTursoConfigured()` de `@/lib/db` (lee `process.env` en TIEMPO DE LLAMADA)
+// pero ejecutaba con `getTursoClient()` de `@/lib/turso` (lee el env al
+// IMPORTAR el módulo, `lib/turso.ts:31-32`): con el env cargando tarde —el caso
+// normal en un bundle de Vercel— la primera decía "turso" y la segunda devolvía
+// `null`, se lanzaba y la ruta respondía 500 en vez de listar nada. El patrón
+// bueno es `getTursoClientSync() !== null`: devuelve `null` si y solo si
+// `isTursoEnabled()` es falso, y los dos leen `process.env` en tiempo de
+// llamada, así que no hay dos fuentes de verdad que puedan discrepar.
+//
+// Ya no hace falta aquí: el listado público pasó a `getApprovedTracks()`
+// (`lib/db.ts`), que es donde vive la decisión de backend Y el acotado de la
+// forma de la respuesta. Ver el comentario de ese lector para por qué el
+// `SELECT *` con `WHERE status='approved'` no bastaba: el `admin_notes` de un
+// rechazo viajaba dentro de la fila aprobada.
 
 // GET /api/tracks — Listar tracks: admin ve todos, público solo aprobados
 export async function GET(req: NextRequest) {
@@ -100,8 +94,9 @@ export async function GET(req: NextRequest) {
       // Admin sees all tracks
       tracks = await getAllTracks();
     } else {
-      // Public/non-admin: only approved tracks
-      tracks = await dbQuery("SELECT * FROM tracks WHERE status = 'approved' ORDER BY created_at DESC");
+      // Public/non-admin: only approved tracks, and in the whitelisted `Track`
+      // shape. `admin_notes` is not part of that type, so it cannot travel out.
+      tracks = await getApprovedTracks();
     }
 
     // Pagination: ?page=1&limit=10
