@@ -39,10 +39,31 @@ export async function buildPressPdf(
 ): Promise<Buffer> {
   // `bufferPages` es imprescindible: los pies de pagina se pintan al final,
   // cuando ya se sabe cuantas paginas hay, y eso exige poder volver a ellas.
+  //
+  // `font: null` NO es cosmetico. El constructor de PDFKit hace
+  // `initFonts(options.font)`, y `initFonts` carga la fuente por defecto con
+  // `this.font(defaultFont)` cuando defaultFont es truthy. Sin esto pide
+  // `require('#standard-fonts/Helvetica')` en el constructor, ANTES de que
+  // registremos las Noto Serif, y ese require es dinamico: el tracer de Next no
+  // lo ve y el directorio no viaja a la funcion de Vercel. En produccion:
+  //   Cannot find module '/var/task/.../pdfkit/js/standard-fonts/Helvetica.cjs'
+  // Pasando `null` en vez de dejar `undefined`, el default `'Helvetica'` no se
+  // aplica y nunca se toca una fuente estandar. Hay un test que lo fija
+  // (tests/unit/pdf-standard-fonts.test.ts).
+  //
+  // Consecuencia a tener en cuenta: `doc._font` empieza a null, asi que hay que
+  // poner fuente antes de cada `text()`. Todo el layout lo hace, y si algún dia
+  // se escribe texto sin fuente falla de forma ruidosa, que es lo preferable a
+  // depender de ficheros que el despliegue puede no llevar.
   const doc = new PDFDocument({
     size: PDF_PAGE.size,
     margin: PDF_PAGE.margin,
     bufferPages: true,
+    // El `as` es necesario porque los tipos de pdfkit declaran `font?: string`.
+    // Se miente aqui a proposito: `null` es exactamente lo que hace que el
+    // constructor no cargue Helvetica, y el PDF lo demuestra (si esto se rompe,
+    // falla tests/unit/pdf-standard-fonts.test.ts).
+    font: null as unknown as string,
     info: {
       Title: `${safeString(payload.artistName, "PressPlay")} — PressPlay`,
       Author: "PressPlay",

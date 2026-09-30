@@ -4,19 +4,19 @@ const nextConfig = {
     // pdfkit depende de `fontkit` en tiempo de ejecucion y usa `fs` para sus
     // fuentes estandar: si webpack lo empaqueta, `POST /api/export` con
     // `format:"pdf"` revienta con "Cannot find module" en produccion.
+    //
+    // Y NO hay reglas de `outputFileTracingIncludes` a proposito. Cualquier glob
+    // que apunte a `node_modules` hace fallar el despliegue con pnpm:
+    //   "The framework produced an invalid deployment package for a Serverless
+    //    Function. Typically this means that the framework produces files in
+    //    symlinked directories."
+    // pnpm representa sus paquetes con symlinks y Vercel rechaza el paquete. Por
+    // eso el generador de PDF no lee ficheros en tiempo de ejecucion: las Noto
+    // Serif van incrustadas en `lib/pdf/fonts.generated.ts` y las fuentes
+    // estandar de pdfkit se evitan del todo con `font: null` en el constructor
+    // (ver lib/pdf/index.ts). Asi no hay nada que tracear ni symlinks que
+    //anglingar el despliegue.
     serverComponentsExternalPackages: ["better-sqlite3", "pdfkit"],
-    outputFileTracingIncludes: {
-      // OBLIGATORIO: el constructor de PDFKit llama a `initFonts()`, que carga
-      // la fuente estandar por defecto (Helvetica) con
-      // `require('#standard-fonts/Helvetica')` ANTES de que se registre ninguna
-      // fuente propia. Ese `require` es dinamico, asi que el tracer de Next no
-      // lo ve y el directorio no viaja a la funcion: el PDF daba 500 en
-      // produccion y 200 en local, con este error:
-      //   Cannot find module '/var/task/.../pdfkit/js/standard-fonts/Helvetica.cjs'
-      // Registrar Noto Serif despues no lo evita: el fallo ocurre en el
-      // constructor, antes de tocar nada nuestro.
-      "/api/export": ["./node_modules/pdfkit/js/standard-fonts/*"],
-    },
   },
   images: {
     remotePatterns: [
