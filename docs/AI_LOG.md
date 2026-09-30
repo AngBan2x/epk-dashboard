@@ -6169,10 +6169,139 @@ En `AGENTS.md` queda escrito, con los cuatro hallazgos de Ola 3 que **no** salie
 | Extraer texto de PDF con el CMap `ToUnicode` | Un PDF mal maquetado es un PDF válido: solo se ve leyendo su contenido |
 | Comprobar que un test falla al revertir | Disciplina, no herramienta |
 
+## RC.31 — 15 problemas, 2 huecos y el flujo de promoción
+
+Documento de fase: `docs/PLAN_RC31.md`. Ocho agentes en cuatro olas, con
+propiedad exclusiva de ficheros para que nadie editara lo que otro tenía.
+Los commits los hizo el orquestador: cinco agentes en paralelo sobre un mismo
+índice git se pisan.
+
+### La fuga que no era una fuga
+
+El error en pantalla era *"Error al iniciar reproducción — archivo no disponible"*.
+La causa documentada en `AI_LOG.md:1268` era CORS: *"removido crossOrigin para
+evitar CORS con CDN Apple"*.
+
+Medido con `curl -I` y `Origin: https://epk-dashboard.vercel.app`:
+
+```
+audio-ssl.itunes.apple.com -> 200 OK
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Headers: range
+  Accept-Ranges: bytes
+```
+
+**El CDN sí manda ACAO.** El arreglo de 1268 resolvía un problema que no
+existía. Lo que fallaba eran las 6 URLs de preview de `scripts/seed-f9-catalog.ts`,
+**caducadas: 404**. Una URL fresca de la Search API da 200.
+
+Es el mismo patrón que el `standard-fonts/Helvetica` del PDF: un arreglo
+plausible que se llevaba el mérito de un síntoma que tenía otra causa. La
+herramienta que lo desmontó fue un `curl` de una línea, no un MCP.
+
+### El parser que duraba mal
+
+`tracks.duration` es texto, y coexistían cinco convenciones: `"3:45"`,
+`"05:55"`, `"00:00"`, `""` y `"—"`. El parser de suma estaba **duplicado** en
+`ReleaseTracklistSection.tsx:35-37` y `app/track/[id]:96-98`, y destruía solo
+`[m, s]`:
+
+```ts
+const [m, s] = "1:02:03".split(":").map(Number);  // m=1, s=2 -> 62 s
+```
+
+`"1:02:03"` son 3723 segundos. El guard `isNaN` **no salta**, porque
+`[1, 2, 3]` no contiene `NaN`. Y no era hipotético: `lib/youtube.ts:366-374`
+emite `H:MM:SS` y `app/releases/new/page.tsx:207` lo escribe en `duration`.
+
+Un test de una hora valía más que tres code reviews.
+
+### El suscriptor no podía llegar a ser artista
+
+`AGENTS.md` decía *"un suscriptor SÍ puede entrar a crear releases/shows"*. El
+código hacía lo contrario: `app/api/shows/route.ts:123` y
+`app/api/releases/route.ts:116` devolvían 403 a `subscriber`.
+
+Lo importante es por qué eso no se arregla aflojando el rol. Desde P6 el
+registro público solo crea `subscriber`, y un suscriptor **no tiene fila en
+`artists`**. Encima, `userHasApprovedContent` (`lib/artist-promotion.ts:112-116`)
+solo mira `track_submissions`; para shows exige `getArtistByUserId(userId)`, que
+un suscriptor no tiene. Así que **aflojar el rol habría puesto filas `pending`
+en `tracks`/`shows`, donde la maquinaria de promoción no las ve** — la
+promoción seguiría sin dispararse, y habríamos ensanchado dos endpoints de
+escritura.
+
+El camino correcto ya existía en el servidor: `POST /api/submissions` no pide
+rol, toma el `userId` de la sesión en vez de un header falsificable y fuerza
+`pending`. Lo que faltaba era la UI. El portal `/submissions` es la solución.
+
+De paso: **la promoción vía show es estructuralmente imposible**, no difícil.
+
+### Lo que se cerró
+
+| | Antes | Después |
+|---|---|---|
+| `GET /api/releases?id=X` anónimo | `SELECT *` crudo, con `admin_notes` y borradores | whitelist de `parseTrack` |
+| `GET /api/tracks` anónimo | `SELECT *`, con `admin_notes` incluido | `getApprovedTracks()` |
+| `GET /api/dossiers` | sin sesión ni propiedad | 401 |
+| `/api/dashboard` shows | sin filtrar, a anónimos | aprobados para no-admin |
+| `ReleaseActions` | 33 líneas, sin chequeo de rol | `useAuth` + propiedad |
+| `/releases/:id/edit` | cualquier cuenta autenticada | `requireRole` en middleware |
+| `/api/artists` | dos fuentes de verdad, 500 si discrepaban | un lector |
+| Pistas con audio | 6 | **63** |
+| Filas con carátula real | 0 | **71** |
+| Duración de los 9 padres | `00:00` | suma de las hijas |
+| `release_id` en el JSON | ausente | presente, con test de forma |
+| Anillos de foco en aprobaciones | 16 con doble contorno rosa | uno solo |
+
+### Verificado en producción, no en local
+
+`GET /api/releases?id=rel-3b6a6c89` → `duration: "8:21"`, `admin_notes` ausente,
+28 claves que son exactamente la whitelist de `parseTrack`. `/api/artists` → 12.
+`/releases/rel-3b6a6c89` anónimo → sin "Editar Release" y sin "Aprobado".
+`/api/dossiers` → 401.
+
+Rejilla de releases, columnas computadas:
+
+| Viewport | Columnas | Ancho | Títulos truncados | Anidados |
+|---|---|---|---|---|
+| 1440 | 4 | 294px | 0 | 0 |
+| 1280 | 4 | 294px | 0 | 0 |
+| 1024 | 3 | 315px | 0 | 0 |
+| 768 | 2 | 356px | 0 | 0 |
+| 390 | 1 | 358px | 0 | 0 |
+
+El requisito era 4 por página **sin** volver al truncamiento que motivó
+`bfdda30`. Los 0 truncados son el dato importante; el 4 es el fácil.
+
+### Una lección sobre las herramientas
+
+El MCP de Vercel quedó autenticado pero con **scope vacío**: `list_teams`
+devuelve `[]`. Sirve para nada todavía. La verificación se hizo contra
+producción con `curl`/`Invoke-RestMethod` y con `chromium` de Playwright,
+que además prueba el comportamiento en vez de los logs.
+
+Un detalle del harness que se comió tiempo: `Invoke-RestMethod` sobre
+`{"artists":[...]}` devuelve un objeto, y `.Count` sobre un PSCustomObject da
+1, no el número de elementos. Parecía una API rota y era el test. Lo mismo con
+`/api/dossiers`: el primer intento leyó 200 y el segundo 401, porque el deploy
+se había promovido entre medias.
+
+### Gates
+
+`tsc` limpio · lint sin avisos · **542/542 en 39 ficheros** · build sin ejecutar
+local (el prebuild borra la SQLite local; el MCP de Vercel no tiene scope para
+leer el log del build). Regresión rc30 de la ficha técnica limpia en los 5
+anchos contra producción, en las dos ramas.
+
 ## Pendientes que siguen abiertos
 
-- **El catálogo JSON no incluye `release_id`**, así que en el export legible por máquina no se puede saber a qué álbum pertenece una pista. No se ha tocado.
-- **`/api/artists` sirve la réplica SQLite en local y Turso en producción**: en local devuelve 7 artistas y en Turso hay 12. `isTursoConfigured()` y `isTursoEnabled()` no coinciden. Por eso los ids cambian entre entornos y por eso los guiones de verificación no pueden fiarse de esa API.
+- **3 releases sin carátula real**: *Ashes to Ashes*, *Tour de France*, *The Model / Computer Love*. El single no está en iTunes y poner la carátula del álbum del que sale la pista habría repetido el fallo de Unsplash. 9 filas quedan con la foto genérica.
+- **20 pistas sin audio**, con motivo: iTunes titula "Stonemilker" a secas y el seed dice "(Strings)"; *Tour de France* de 2003 (20 años después); *Heroes* de 1977 solo aparece el remaster; *Speak to Me* solo existe como Roger Waters (Redux); y 7 releases que son álbumes, no canciones. Necesitan otra fuente o upload propio.
+- **`lib/artist-promotion.ts:139` usa `getDbWrite()`** en el camino de aprobación. Funciona por el `isTursoEnabled()` que lo precede, pero es el patrón que AGENTS.md ya no prohíbe: la regla corregida es *nunca decidir el backend con dos fuentes de verdad, y nunca abrir el handle local si hay cliente*. Merece su propia ola.
+- **`lib/turso.ts` sigue capturando `process.env` al importar** (`getTurso()`). Convertirlo en getter es lo correcto y está recomendado, pero cambia el comportamiento de las 8 rutas del patrón a la vez, así que quedó para una ola con verificación propia. Y conviene renombrar su `isTursoConfigured()`: colisiona con el de `@/lib/db`, con semántica distinta, y esa colisión costó el diagnóstico entero de GAP-B.
+- **`scripts/rc29-artist-shots.ts:277-284` está roto desde antes de RC.31**: `querySelector('a[href="/releases/{id}"]').parentElement` coge el primer enlace de ese href, que es el del título de la `EPKCard`, así que `visibleRows` cuenta 0. Arreglarlo requiere buscar el panel por clase.
+- **El catálogo de la vista de invitado del dashboard sigue siendo global**: sin `artist_id` no hay forma de acotarlo, así que el copy lo dice ("los N lanzamientos aprobados de PressPlay") en vez de prometer un catálogo de artista.
 - `WEBHOOK_SECRET`: lo define el usuario.
 - Resend: falta `FROM_EMAIL` y hay cuota agotada.
 - `syncLocalToTurso` omite `track_number` y otras columnas.
