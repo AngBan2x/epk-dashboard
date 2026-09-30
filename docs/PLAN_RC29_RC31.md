@@ -122,9 +122,25 @@ Estado real verificado: **no hay caché, ni archivo pregenerado, ni columna de v
 | B4 | Catálogo en HTML. El backend **ya está listo**: `format: "html"` en `app/api/export/route.ts:9` y `buildCatalogHtml` en `lib/downloadable-assets.ts:547`. Clonar `CatalogDownloadButton` reutilizando `filenameFromDisposition` de `DownloadCenter.tsx:124-127`. Corregir dos bugs que se activarían: el catálogo público se nombra `EPK_Dossier_*.html` (`lib/export-bundle.ts:63`) y se titula "EPK Dossier de Prensa" (`lib/downloadable-assets.ts:548`) | `components/CatalogDownloadButton.tsx`, `lib/export-bundle.ts:63`, `lib/downloadable-assets.ts:548` | S |
 | B5 | **PDF real con pdfkit.** Añadir `"pdf"` al enum de Zod (`:9`) y a `ExportFormat` (`DownloadCenter.tsx:8-9`). Crear `lib/pdf/` con 3 plantillas maquetadas a mano y una fuente TTF Unicode registrada para los acentos. Subir el grid de opciones a `sm:grid-cols-2 lg:grid-cols-4` porque pasa de 4 a 8 botones | `package.json`, `app/api/export/route.ts:9`, `lib/pdf/*`, `components/DownloadCenter.tsx` | M |
 
-**Opción de PDF descartada:** Chromium headless (`@sparticuz/chromium` + `puppeteer-core`, ~50-60 MB). El cold start de 2-6 s contra el `maxDuration` de 10-15 s de Vercel haría fallar la descarga constantemente, sobre todo con visitantes anónimos. `pdfkit` es JS puro (~1-3 MB, sin binarios) y cabe de sobra en el bundle. Se acepta que no hay CSS grid ni flex: hay que maquetar a mano y mantener el diseño en paralelo al HTML.
+#### B5 — HECHO (pdfkit añadido, con tres correcciones que no estaban previstas)
 
-**Gate:** `tsc`, `vitest`, `build`, E2E de descargas, y **apertura visual del PDF generado**. → **rc.30**
+El bloqueo era artificial: `pnpm add pdfkit --ignore-scripts` no destruye el binario de `better-sqlite3` (con `--ignore-scripts` no se dispara ningún rebuild nativo), y `pdfkit` es JS puro. Instalado, y **verificado en producción**.
+
+**Lo que salió distinto de lo planificado:**
+
+1. **Acentos.** Los Helvetica de PDFKit son WinAnsi y pierden el castellano. Se incrustan dos Noto Serif (OFL-1.1) en `lib/pdf/fonts.generated.ts` como base64, generados por `scripts/build-pdf-font-embed.ts`. Nota: PDFKit **no lanza** ante un glifo ausente, dibuja `.notdef` en silencio, así que el saneado de caracteres no es cosmético.
+2. **El grid no se subió a `lg:grid-cols-4`.** Hay 5 opciones, no 8: 4 de html/json + 1 de PDF. Con 5 items en 4 columnas la última fila queda descuadrada, así que se dejó en 2 columnas.
+3. **`ExportBundle.body` pasó a `string | Buffer`** y la ruta responde `new Uint8Array(body)`.
+
+**Tres fallos que solo aparecieron en producción** (y que costaron 3 deploys deCyclo):
+
+- **Ficha de pista partida entre páginas.** La cabecera se quedaba al pie de una página y sus metadatos (`DAW`, `TONALIDAD`, `LETRA`) aparecían huérfanos en la siguiente, sin indicar a qué pista pertenecían. El PDF era perfectamente válido. Arreglado con `measureTrackEntry`, que reserva la ficha entera.
+- **`Cannot find module .../pdfkit/js/standard-fonts/Helvetica.cjs`.** El constructor de PDFKit llama a `initFonts(options.font)`, que carga la fuente por defecto con un `require` **dinámico**. El tracer de Next no lo ve y el directorio no llega a la función. Se evita con `font: null` en el constructor.
+- **Vercel rechazaba el despliegue** (`invalid deployment package ... symlinked directories`) por cualquier glob de `outputFileTracingIncludes` a `node_modules` con pnpm. Por eso ahora no hay ninguna regla de tracing: la fuente va incrustada y las estándar no se necesitan.
+
+**Cómo se comprueba un PDF sin mirarlo a ojo:** `tests/helpers/pdf-text.ts` extrae el texto de cada página leyendo el CMap `ToUnicode` (el texto va como IDs de glifo en arrays `TJ`). `tests/unit/pdf-layout.test.ts` bloquea las dos regresiones, y se comprobó que **falla** al revertir el arreglo.
+
+**Gate:** `tsc`, `vitest` (378), `build`, lint, descarga desde la UI en Chromium, y apertura visual del PDF. → **rc.29, hecho y verificado en producción**
 
 ---
 
@@ -267,15 +283,22 @@ Estado real: 6 de 7 artistas sin `user_id`, todos con 1 track y 0 shows.
 
 **Riesgo aceptado:** son cuentas de artistas reales con capacidad de login. Mitigado con contraseña aleatoria desconocida; ningún correo se envía porque no hay `FROM_EMAIL`.
 
-### D2. Semilla con nombres reales
+### D2. Semilla con nombres reales — HECHO y verificado en producción
 
-`scripts/seed-influential-catalog.ts` ya usa artistas y discos reales (Pink Floyd con *The Dark Side of the Moon* y *The Wall* con tracklist y duraciones reales, Radiohead, Björk, David Bowie, Kraftwerk). El único obstáculo es `SEED_SUFFIX = "-seed"` en la línea 65, que ensucia el nombre visible y **rompe el match de Last.fm** (`app/dashboard/page.tsx:487` pasa `artistProfile.name` a Last.fm, o sea el match es por nombre de display).
+`scripts/seed-influential-catalog.ts` ya usaba artistas y discos reales; lo único que faltaba era quitar el sufijo, que además rompía el match de Last.fm (`app/dashboard/page.tsx` pasa `artistProfile.name` y el match es por nombre de display). Además secrestó el defecto de que **sin sufijo el seed deja de ser borrable a ojo**, así que hizo falta un `--cleanup` de verdad.
 
-- Quitar `SEED_SUFFIX` de los 5 artistas y sus 5 slugs, y actualizar la cabecera (líneas 3-16).
-- **Colisión verificada: ninguna.** Ninguno de los 5 existe en el catálogo actual.
-- Añadir modo `--cleanup` que borra por `(artist_name, title)` contra el catálogo del propio archivo, porque los nombres ya no son únicos.
-- Review del dry-run antes de `--apply`.
-- Actualizar `docs/PHASE_P5.md`, que dice "no aplicado en producción".
+- Quitado `SEED_SUFFIX` de los 5 artistas y sus 5 slugs. **Trampa al hacerlo:** el primer regex (`/" \+ SEED_SUFFIX/`) se come la comilla de cierre del string y rompe el archivo entero. Hay que quitar solo la concatenación.
+- **Colisión verificada: ninguna.** Dry-run dio 5 artistas, 9 releases y 65 pistas nuevas, 0 existentes.
+- `--cleanup`added: borra por estructura (localiza el padre y elimina lo que cuelgue de su `release_id`) y limpia huérfanos. La primera versión borraba por `(artist_name, title)`, que solo encuentra al padre: dejaba 63 hijas colgadas y las reportaba como "tracks ajenos". Un cleanup que deja restos es peor que no tenerlo.
+- Aplicado a Turso y **verificado en producción**.
+
+**Lo que salió por el camino, y es lo importante:**
+
+`createTrack` declaraba `status` en su firma y **no lo escribía en ningún INSERT**. La columna se quedaba en el default del esquema, `draft`, y como todo lo público filtra `status = 'approved'`, las 74 filas eran invisibles: `turso-check` daba `tracks: 83` y la página del artista no mostraba ni un álbum. Los 375 tests pasaban con la base vacía. Es exactamente el tipo de fallo que solo aparece cuando hay datos de verdad, y por eso D2 (el último item) valía más como prueba que como dato.
+
+**Estado final en Turso:** 12 artistas, 83 pistas, las 83 `approved`, 0 huérfanos. Por artista: Pink Floyd 2 grupos/30 hijas, Radiohead 2/22, Björk 1/5, David Bowie 2/4, Kraftwerk 2/4.
+
+**Nota:** `artists_sin_dueno` pasa de 0 a 5. Los artistas del seed no tienen cuenta de usuario **a propósito** (son material de referencia, no perfiles de gente real), a diferencia de los 7 con dueño que creó D1.
 
 ---
 

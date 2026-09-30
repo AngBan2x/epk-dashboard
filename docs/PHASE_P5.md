@@ -1,6 +1,6 @@
 # PHASE P5 — Polish + Demo + Release v4.0.0 (SPEC, pendiente tras P4)
 
-**Estado:** PARCIAL (2026-09-27) — P5.1, P5.3, P5.4 y P5.5 completadas durante la tanda P5/P6; P5.2 implementado en script pero NO aplicado en produccion (decision del usuario); P5.6 sigue siendo prerelease (decision del usuario).
+**Estado:** PARCIAL (2026-09-30) — P5.1, P5.3, P5.4 y P5.5 completadas durante la tanda P5/P6; **P5.2 aplicado en producción** (2026-09-30, con nombres reales y sin sufijo `-seed`, ver `docs/PLAN_RC29_RC31.md` §4 D2); P5.6 sigue siendo prerelease (decisión del usuario).
 **Subagentes:** carousel-builder, social-links-builder, show-form-builder, quality-auditor, release-manager, db-migrator/seed.
 
 ## P5.1 Carruseles infinitos — HECHO (alcance reducido por decision del usuario: solo catalogo del dashboard)
