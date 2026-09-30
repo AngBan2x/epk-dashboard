@@ -105,6 +105,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     console.error("[API/Export] Error:", error);
-    return NextResponse.json({ error: "Error al generar la exportación" }, { status: 500 });
+    // TEMPORAL: expone el mensaje real para diagnosticar el 500 del PDF en
+    // produccion, donde no hay acceso a los logs de Vercel desde el entorno de
+    // trabajo. Se revierte en cuanto se encuentre la causa.
+    return NextResponse.json(
+      { error: "Error al generar la exportación", debug: String((error as Error)?.message ?? error) },
+      { status: 500 }
+    );
   }
 }
