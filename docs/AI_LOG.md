@@ -6087,3 +6087,93 @@ Turso: **12 artistas, 83 pistas, las 83 `approved`, 0 huérfanos**.
 - **`syncLocalToTurso`** conserva deuda previa: omite `track_number` y otras columnas de P3/P5.
 - `app/shows/page.tsx` conserva `<h1>Shows & Events</h1>` en inglés porque el E2E lo exige; si se fuerza el copy español, hay que actualizar el test.
 
+---
+title: "AI_LOG — 2026-09-30 — La ficha de un album estaba maquetada como si fuera una pista"
+date: 2026-09-30
+tags: [ai-log, rc30, releases, seed, container-queries]
+---
+
+# 2026-09-30 — Releases: la ficha de un album vacía y la ficha técnica rota
+
+Reportado con capturas de `/track/rel-5878039e` (Kid A). Tres síntomas visibles y **una sola causa de fondo: la página de `/track/[id]` solo se había mirado con pistas sueltas.** Es la tercera vez que sale el mismo patrón (C2 con los albums, `createTrack` sin `status`, y ahora esto): la lógica funciona con el caso de siempre y nadie la mira con el otro.
+
+## 1. Las 9 portadas de la semilla estaban rotas
+
+Los 9 releases apuntaban a `https://example.com/covers/*.jpg`. `example.com` es el dominio de ejemplo reservado por la RFC: nunca resuelve. Salía el icono de imagen rota sobre un fondo vacío.
+
+74 filas correctas y 9 portadas rotas, y ningún test lo vio porque **los tests no miran la red**.
+
+Sustituidas por fotos de Unsplash, que es el único dominio genérico que ya estaba en `images.remotePatterns` y el mismo que usa la galería. De 19 candidatas, **18 resuelven y 1 da 404**: `scripts/check-image-urls.ts` las comprueba con HEAD y descarta las que no devuelven 200 + `image/*`. Se verifican dos veces: antes de sembrar y después, leyendo `cover_image` de la propia base.
+
+Además, `CoverImage` (nuevo) hace lo que el anterior no podía. Antes la decisión era `getCoverImage(track) ? <img> : <marcador>`, que **solo cubre la URL vacía**: una URL muerta se aceptaba igual. Ahora hay `onError` de verdad con estado, y cualquier portada rota cae al marcador con la inicial.
+
+## 2. Un album se renderizaba con la plantilla de una pista
+
+La ficha de Kid A era seis tarjetas vacías: "Letra no disponible" con un botón *Expandir* que no expandía nada, "Videoclip Oficial - Sin video" sobre una imagen gigante, "Sin datos de producción", "No hay enlaces externos disponibles", unas métricas de Last.fm que eran de **otra canción**, y un reproductor con "No hay audio disponible" y un play que no hacía nada.
+
+Y sin la **lista de pistas**, que es justo lo que viene a buscar un periodista a un álbum.
+
+Ahora se detecta si el elemento tiene hijas y cambia la plantilla:
+
+- **Nueva `ReleaseTracklistSection`**: pistas por disco y número (orden M0), duración, enlace a la ficha de cada una.
+- Se ocultan letra, videoclip, enlaces y detalle de producción. Cada tarjeta se oculta además **solo si no tiene nada que mostrar**, no por ser un álbum: un padre con un enlace real lo seguiría viendo.
+- Se omite Last.fm, que mide canciones.
+- Se oculta el reproductor: la fila padre existe solo para agrupar y no tiene audio.
+- Las métricas de streams/likes/guardados/listas se sustituyen por **pistas, discos y duración total**, que en un álbum sí significan algo. Antes ponía "0 Streams / Sin video de YouTube" en Kid A, que suena a que el álbum no se ha escuchado nunca.
+- El SEO decía "Álbum - 00:00 - 0 streams" en buscadores y previews de enlaces.
+
+## 3. La ficha técnica estaba rota, y no por su cuenta
+
+`CatalogDownloadButton` usa `sm:grid-cols-2`, que responde al **viewport**. En la barra lateral de `/track/[id]` el componente mide 304-347px aunque el viewport sea de 1440px, y se partía en 2 celdas de 146px. Dentro, la fila se come el ancho con badge (32) + hueco (12) + hueco (12) + botón (80) = 136px, dejando **0px** para el texto: cada palabra en su propia línea.
+
+Medido con `scripts/rc30-measure-ficha.ts`:
+
+```
+  390px   card=358  celda=316  texto=154   OK
+  768px   card=720  celda=333  texto=171   OK
+ 1024px   card=304  celda=125  texto=  0   ROTO
+ 1280px   card=347  celda=146  texto=  0   ROTO
+ 1440px   card=347  celda=146  texto=  0   ROTO
+```
+
+Ahora decide columnas por **container query** con umbral de 30rem, siguiendo la convención que ya estableció `BioSection.tsx` y por el mismo motivo: un breakpoint de viewport no sabe cuánto mide el componente. Es el problema que C3 encontró en el carrusel, en otro sitio.
+
+`DownloadCenter` tiene markup **idéntico** y no lo sufría solo porque su contenedor es de 1248px. Si se reutiliza en un sitio estrecho, ahora está protegido.
+
+## De paso
+
+`BioSection` pasa a `line-clamp-3`. Las celdas miden ~180px y a 2 líneas caben ~28 caracteres: "Alternative Rock / Experimental / Art Pop" (42) salía como "... / Ar..." con la segunda línea casi vacía, que se lee como dato roto.
+
+## Verificación
+
+`scripts/rc30-track-regression.ts` recorre un álbum y una pista suelta en 1440/1280/1024/768/390px y comprueba portada cargada, ficha técnica legible, que el álbum tenga tracklist y **sin** tarjetas vacías, y que la pista suelta **no** tenga nada de eso.
+
+- Local: 10/10
+- Producción: 10/10
+- **Comprobado que falla al revertir** el arreglo: 7 fallos, exactamente en 1024-1440px, que es donde la barra lateral es estrecha.
+
+Un detalle: la comprobación de portada daba falsos negativos por mirar `naturalWidth` a los 1200ms sin esperar. En una corrida de reversión reportó "portada rota" a 1440px cuando lo único roto era la ficha técnica, y eso manda a mirar al sitio equivocado. Ahora espera a que la imagen resuelva.
+
+## Los MCP de Vercel y Turso
+
+Añadidos los dos, con los endpoints confirmados en la documentación oficial (no inventados): `https://mcp.vercel.com` y `https://mcp.turso.ai/mcp`, ambos remotos con OAuth. OpenCode está en la lista de clientes soportados de Vercel.
+
+**Requieren reiniciar opencode** y luego `opencode mcp auth vercel` / `opencode mcp auth turso`.
+
+En `AGENTS.md` queda escrito, con los cuatro hallazgos de Ola 3 que **no** salieron de un servidor, para que no se piense que un MCP los sustituye:
+
+| Técnica | Para qué |
+|---|---|
+| Leer `.next/server/app/api/<ruta>/route.js.nft.json` | Es el mismo manifiesto que usa Vercel para decidir qué viaja en la lambda |
+| Interceptar `Module._load` | Demostró que pedía Helvetica el constructor de PDFKit, no nuestro código |
+| Extraer texto de PDF con el CMap `ToUnicode` | Un PDF mal maquetado es un PDF válido: solo se ve leyendo su contenido |
+| Comprobar que un test falla al revertir | Disciplina, no herramienta |
+
+## Pendientes que siguen abiertos
+
+- **El catálogo JSON no incluye `release_id`**, así que en el export legible por máquina no se puede saber a qué álbum pertenece una pista. No se ha tocado.
+- **`/api/artists` sirve la réplica SQLite en local y Turso en producción**: en local devuelve 7 artistas y en Turso hay 12. `isTursoConfigured()` y `isTursoEnabled()` no coinciden. Por eso los ids cambian entre entornos y por eso los guiones de verificación no pueden fiarse de esa API.
+- `WEBHOOK_SECRET`: lo define el usuario.
+- Resend: falta `FROM_EMAIL` y hay cuota agotada.
+- `syncLocalToTurso` omite `track_number` y otras columnas.
+
