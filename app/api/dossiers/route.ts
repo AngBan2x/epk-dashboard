@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDossierByArtistId, upsertDossier, type DossierData } from "@/lib/db";
-import { getTursoClient } from "@/lib/turso";
-import { isTursoConfigured, getDbWrite } from "@/lib/db";
+import {
+  getArtistById,
+  getDossierByArtistId,
+  upsertDossier,
+  type DossierData,
+} from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -12,27 +15,47 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
+/**
+ * Propiedad real contra `artists.user_id`, no contra un `user_id` de query.
+ *
+ * Antes la comprobación era un `SELECT` crudo que ramificaba entre
+ * `getTursoClient()` de `@/lib/turso` (que lee `process.env` al importar el
+ * módulo) y `getDbWrite()`. Dos fuentes de verdad para una decisión y, en el peor
+ * caso, una escritura en la réplica local de producción. `getArtistById()` ya
+ * ramifica con `isTursoEnabled()` en tiempo de llamada por los dos lados.
+ */
 async function isArtistOwner(userId: string, artistId: string): Promise<boolean> {
-  if (isTursoConfigured()) {
-    const client = getTursoClient();
-    if (!client) return false;
-    const result = await client.execute({
-      sql: "SELECT id FROM artists WHERE id = ? AND user_id = ?",
-      args: [artistId, userId],
-    });
-    return result.rows.length > 0;
-  }
-  const db = getDbWrite();
-  const row = db.prepare("SELECT id FROM artists WHERE id = ? AND user_id = ?").get(artistId, userId);
-  return !!row;
+  if (!userId || !artistId) return false;
+  const artist = await getArtistById(artistId);
+  return !!artist && artist.user_id === userId;
 }
 
 export async function GET(req: NextRequest) {
   try {
+    // S1: el GET devolvía el dossier completo —bio, contacto, booking, management—
+    // sin ninguna comprobación de sesión ni de propiedad, con `isArtistOwner`
+    // definido tres líneas más arriba y usado solo en el PUT. Con solo conocer un
+    // `artist_id` (que viaja en la URL pública de la ficha del artista) bastaba
+    // para leerlos.
+    //
+    // El material de prensa sigue siendo público por la vía que lo publica:
+    // `POST /api/export`, que es anónimo a propósito (`app/api/export/route.ts:9-14`)
+    // y renderiza las mismas secciones dossier y rider, `contact_email` y
+    // `management` incluidos. Este endpoint deja de ser el camino alternativo sin
+    // sesión, y queda con la misma puerta que su escritura: admin o dueño.
+    const session = await validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const artistId = searchParams.get("artist_id");
     if (!artistId) {
       return NextResponse.json({ error: "artist_id requerido" }, { status: 400 });
+    }
+
+    if (session.role !== "admin" && !(await isArtistOwner(session.userId, artistId))) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const dossier = await getDossierByArtistId(artistId);

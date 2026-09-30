@@ -62,7 +62,8 @@ export function ShowCover({ show, artistName }: ShowCoverProps) {
   const [broken, setBroken] = useState(false);
 
   const flyer = safeString(show.flyer_url, "");
-  const venue = safeString(show.venue_name, "") || "Venue por confirmar";
+  const venueName = safeString(show.venue_name, "");
+  const venue = venueName || "Venue por confirmar";
   const location = [safeString(show.city, ""), safeString(show.country, "")]
     .filter(Boolean)
     .join(", ");
@@ -84,12 +85,16 @@ export function ShowCover({ show, artistName }: ShowCoverProps) {
   }
 
   const gradient = COVER_GRADIENT_BY_STATUS[show.status] ?? BRAND_GRADIENT;
+  // El titular es el nombre del artista cuando se pudo resolver y el venue cuando
+  // no (un show puede haberlo creado un administrador sin artista vinculado). No
+  // se marca de quién es el show: sale el mismo markup en los dos casos.
   const headline = artistName || venue;
-  const chip = location
-    ? `📍 ${location}`
-    : artistName
-      ? `🎤 ${venue}`
-      : "📍 Ubicación por confirmar";
+  // El chip lleva solo el dato que el titular NO muestra, y solo si se conoce de
+  // verdad. Antes caía en "📍 Ubicación por confirmar" cuando no había ciudad/país
+  // ni nombre de artista: el venue ya era el titular y el chip afirmaba en voz
+  // alta lo mismo que el titular acababa de enseñar.
+  const secondary = location || venueName;
+  const chip = secondary && secondary !== headline ? `📍 ${secondary}` : null;
 
   return (
     // Decorativo: el nombre del venue y la ubicación ya se anuncian debajo.
@@ -110,9 +115,13 @@ export function ShowCover({ show, artistName }: ShowCoverProps) {
           {initialsOf(headline)}
         </span>
         <p className="w-full truncate text-xl font-extrabold text-white">{headline}</p>
-        <span className="max-w-full truncate rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900">
-          {chip}
-        </span>
+        {/* Sin chip no hay hueco: la tarjeta queda con iniciales + titular y el
+            "Ubicación por confirmar" de abajo sigue siendo la única advertencia. */}
+        {chip && (
+          <span className="max-w-full truncate rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900">
+            {chip}
+          </span>
+        )}
       </div>
     </div>
   );

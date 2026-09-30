@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useRef, useCallback, type ReactNode, type RefObject } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { capitalizeReleaseType, getCoverImage } from '@/lib/null-safe';
+import { Badge, CountBadge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface Submission {
   id: string;
@@ -37,6 +44,57 @@ interface Pagination {
   totalPages: number;
 }
 
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'revision';
+type StatKey = 'pending' | 'approved' | 'rejected' | 'revision' | 'total';
+type BadgeVariant = 'slate' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'violet';
+
+const PAGE_LIMIT = 20;
+/** El backend valida el motivo con el mismo mínimo: aquí solo se anticipa al usuario. */
+const MIN_REASON_LENGTH = 10;
+
+/**
+ * Un único indicador de foco en toda la página, y el del sistema.
+ *
+ * `app/globals.css:59-62` desactiva el outline global **solo** para los
+ * elementos cuyo class contiene `focus-visible:ring`. Con `focus:ring-*` ese
+ * selector no aplica, así que cada uno de esos 16 controles pintaba su anillo de
+ * color (verde/rojo/azul) **y además** el `:focus-visible` global, que es rosa
+ * `--ring`: dos indicadores, con un contorno rosa alrededor de un botón verde.
+ * `focus-visible:` resuelve las dos cosas a la vez.
+ */
+const FOCUS_RING =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800';
+
+const LABEL_CLASS = 'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1';
+
+const FIELD_CLASS = `w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 ${FOCUS_RING}`;
+
+/** Superficie de la consola: la misma de `app/admin/page.tsx` y `BroadcastPanel`. */
+const SURFACE_CLASS = 'rounded-2xl border border-slate-200 dark:border-slate-800';
+
+const STATUS_LABELS: Record<StatKey, string> = {
+  pending: 'Pendiente',
+  approved: 'Aprobado',
+  rejected: 'Rechazado',
+  revision: 'Revisión',
+  total: 'Total',
+};
+
+/**
+ * El color del estado vive en la primitiva `Badge`, no en el marcado: así los
+ * pills heredan el borde y el tamaño de todo el sistema en vez de defining su
+ * propia variante sin borde (que era lo que pasaba antes).
+ */
+const STATUS_TONE: Record<FilterKey, BadgeVariant> = {
+  all: 'slate',
+  pending: 'amber',
+  approved: 'emerald',
+  rejected: 'rose',
+  revision: 'indigo',
+};
+
+const STAT_KEYS: readonly StatKey[] = ['pending', 'approved', 'rejected', 'revision', 'total'];
+
 export default function ApprovalsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -44,7 +102,7 @@ export default function ApprovalsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'revision'>('pending');
+  const [filter, setFilter] = useState<FilterKey>('pending');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Submission | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -75,14 +133,14 @@ export default function ApprovalsPage() {
       if (filter !== 'all') params.set('status', filter);
       if (search) params.set('search', search);
       params.set('page', String(pageNumber));
-      params.set('limit', '20');
+      params.set('limit', String(PAGE_LIMIT));
       const res = await fetch(`/api/admin/approvals?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setSubmissions(data.submissions);
         setStats(data.stats);
         setPagination(data.pagination);
-        setArtistlessCount(typeof data.artistless_count === "number" ? data.artistless_count : 0);
+        setArtistlessCount(typeof data.artistless_count === 'number' ? data.artistless_count : 0);
         setPage(pageNumber);
       }
     } catch (error) {
@@ -96,7 +154,7 @@ export default function ApprovalsPage() {
     fetchApprovals(1);
   }, [fetchApprovals]);
 
-  // Handle Escape key for modals
+  // Escape cierra el modal que esté abierto, de la más específica a la más general.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -113,7 +171,8 @@ export default function ApprovalsPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showRejectModal, showRevisionModal, selected]);
 
-  // Focus management for detail modal
+  // Foco: se recuerda el control que abrió el modal, se mueve el foco al título y
+  // al cerrar se devuelve. Sin esto el foco se pierde detrás del overlay.
   useEffect(() => {
     if (selected) {
       lastFocusedElement.current = document.activeElement as HTMLElement;
@@ -124,7 +183,6 @@ export default function ApprovalsPage() {
     }
   }, [selected]);
 
-  // Focus management for reject modal
   useEffect(() => {
     if (showRejectModal) {
       lastFocusedElement.current = document.activeElement as HTMLElement;
@@ -132,7 +190,6 @@ export default function ApprovalsPage() {
     }
   }, [showRejectModal]);
 
-  // Focus management for revision modal
   useEffect(() => {
     if (showRevisionModal) {
       lastFocusedElement.current = document.activeElement as HTMLElement;
@@ -196,14 +253,14 @@ export default function ApprovalsPage() {
   };
 
   const handleRejectConfirm = () => {
-    if (rejectTarget && rejectReason.trim().length >= 10) {
+    if (rejectTarget && rejectReason.trim().length >= MIN_REASON_LENGTH) {
       handleAction(rejectTarget.id, 'reject', rejectReason);
       closeRejectModal();
     }
   };
 
   const handleRevisionConfirm = () => {
-    if (revisionTarget && revisionReason.trim().length >= 10) {
+    if (revisionTarget && revisionReason.trim().length >= MIN_REASON_LENGTH) {
       handleAction(revisionTarget.id, 'revision', revisionReason);
       closeRevisionModal();
     }
@@ -237,68 +294,89 @@ export default function ApprovalsPage() {
     );
   }
 
-  const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-    approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-    rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-    revision: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  };
-
-  const statusLabels: Record<string, string> = {
-    pending: 'Pendiente',
-    approved: 'Aprobado',
-    rejected: 'Rechazado',
-    revision: 'Revisión',
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Aprobaciones</h1>
-          <p className="text-slate-500 dark:text-slate-400">Revisa y aprueba envíos de artistas</p>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      {/* Ruta de vuelta: mismo lenguaje visual que la barra de pestañas de /admin,
+          que antes no tenía equivalente y dejaba la página sin salida. */}
+      <nav
+        aria-label="Ruta del panel de administración"
+        className="border-b border-slate-200 bg-white dark:border-slate-800"
+      >
+        <div className="mx-auto max-w-6xl px-4">
+          <Link
+            href="/admin"
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white ${FOCUS_RING}`}
+          >
+            <span aria-hidden>←</span> Panel de Administración
+          </Link>
         </div>
+      </nav>
 
-        {/* Promotion toast */}
+      {/* Encabezado con el degradado de marca de /shows y ArtistHero: el texto
+          blanco necesita la veladura `bg-black/30` para pasar 4.5:1 sobre el rosa. */}
+      <header className="relative overflow-hidden bg-gradient-to-r from-indigo-600 via-violet-600 to-pink-500">
+        <div aria-hidden className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-white/10" />
+        <div aria-hidden className="absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-white/10" />
+        <div aria-hidden className="absolute inset-0 bg-black/30" />
+        <div className="relative mx-auto max-w-6xl px-4 py-8 md:py-10">
+          <h1 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">
+            Aprobaciones
+          </h1>
+          <p className="mt-2 text-sm text-white md:text-base">
+            Revisa y aprueba envíos de artistas
+          </p>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-8">
         {promotionMessage && (
           <div
             role="alert"
-            className="mb-6 p-4 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 animate-slide-in"
+            className="mb-6 rounded-lg border border-emerald-300 bg-emerald-100 p-4 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 animate-slide-in"
           >
             ✅ {promotionMessage}
           </div>
         )}
 
-        {/* Stats */}
+        {/* Stats — son a la vez cifras y filtros, así que van en `aria-pressed`. */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            {(['pending', 'approved', 'rejected', 'revision', 'total'] as const).map((key) => (
-              <button
-                key={key}
-                onClick={() => setFilter(key === 'total' ? 'all' : key)}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  filter === key || (key === 'total' && filter === 'all')
-                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
-                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300'
-                }`}
-              >
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">{stats[key]}</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  {key === 'total' ? 'Total' : statusLabels[key]}
-                </div>
-              </button>
-            ))}
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
+            {STAT_KEYS.map((key) => {
+              const active = key === 'total' ? filter === 'all' : filter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setFilter(key === 'total' ? 'all' : key)}
+                  className={`p-4 text-left transition-colors ${FOCUS_RING} ${
+                    // Cada rama declara el color de borde completo: dos utilitarios
+                    // de `border-color` en la misma etiqueta los desempata el orden
+                    // del stylesheet, no el orden de las clases.
+                    active
+                      ? 'rounded-2xl border border-primary-500 bg-primary-50 dark:bg-primary-950/40 dark:border-primary-500'
+                      : 'rounded-2xl border border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <span className="block text-2xl font-bold text-slate-900 dark:text-white">
+                    {stats[key]}
+                  </span>
+                  <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
+                    {STATUS_LABELS[key]}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
         {artistlessCount > 0 && (
           <div
             role="status"
-            className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+            className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
           >
             <strong className="font-semibold">
-              {artistlessCount} {artistlessCount === 1 ? "envío pertenece" : "envíos pertenecen"} a artistas
+              {artistlessCount} {artistlessCount === 1 ? 'envío pertenece' : 'envíos pertenecen'} a artistas
               sin cuenta vinculada
             </strong>
             <p className="mt-1 text-xs">
@@ -310,54 +388,82 @@ export default function ApprovalsPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="mb-6">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por título o artista..."
-            className="w-full md:w-80 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            aria-label="Buscar envíos"
-          />
-        </div>
+        {/* Búsqueda */}
+        <Card className={`${SURFACE_CLASS} mb-6 p-4 md:p-5`}>
+          <div>
+            <label htmlFor="approvals-search" className={LABEL_CLASS}>
+              Buscar envíos
+            </label>
+            <input
+              id="approvals-search"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por título o artista..."
+              aria-label="Buscar envíos"
+              className={`${FIELD_CLASS} md:max-w-md`}
+            />
+          </div>
+        </Card>
 
-        {/* Submissions list */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+        {/* Cola de envíos */}
+        <Card className={`${SURFACE_CLASS} overflow-hidden`}>
+          <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+            <SectionHeader
+              title="Envíos"
+              subtitle="Aprobar, rechazar o pedir cambios antes de que salgan al catálogo"
+              badges={<CountBadge>{submissions.length}</CountBadge>}
+            />
+          </div>
+
           {loading ? (
-            <div className="p-8 text-center text-slate-400">Cargando...</div>
+            <>
+              <p className="sr-only" role="status">
+                Cargando envíos
+              </p>
+              <div className="divide-y divide-slate-100 dark:divide-slate-700" aria-hidden>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="flex items-center gap-4 p-4">
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/5" />
+                      <Skeleton className="h-3 w-1/4" />
+                    </div>
+                    <Skeleton className="h-10 w-28" />
+                  </div>
+                ))}
+              </div>
+            </>
           ) : submissions.length === 0 ? (
-            <div className="p-8 text-center text-slate-400">
-              No hay envíos {filter !== 'all' ? `con estado "${statusLabels[filter]}"` : ''}
-              {search ? ` para "${search}"` : ''}
-            </div>
+            <EmptyState
+              emoji="📭"
+              message={`No hay envíos ${
+                filter !== 'all' ? `con estado "${STATUS_LABELS[filter]}"` : ''
+              }${search ? ` para "${search}"` : ''}`}
+            />
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {submissions.map((sub) => {
                 const data = parseTrackData(sub.track_data);
                 const revision = sub.revision || 0;
+                const busy = actionLoading === sub.id;
                 return (
-                  <div key={sub.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h3 className="font-semibold text-slate-900 dark:text-white truncate">
+                  <div
+                    key={sub.id}
+                    className="p-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/30"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <h3 className="truncate font-semibold text-slate-900 dark:text-white">
                             {data.title || 'Sin título'}
                           </h3>
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[sub.status] || ''}`}>
-                            {sub.status_label || statusLabels[sub.status] || sub.status}
-                          </span>
-                          {revision > 0 && (
-                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                              Revisión #{revision}
-                            </span>
-                          )}
+                          <Badge variant={STATUS_TONE[sub.status] ?? 'slate'}>
+                            {sub.status_label || STATUS_LABELS[sub.status] || sub.status}
+                          </Badge>
+                          {revision > 0 && <Badge variant="violet">Revisión #{revision}</Badge>}
                           {sub.artist_has_owner === false && (
-                            <span
-                              title="Este artista no tiene cuenta vinculada: no recibirá la notificación de la decisión."
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-                            >
-                              Sin cuenta vinculada
+                            <span title="Este artista no tiene cuenta vinculada: no recibirá la notificación de la decisión.">
+                              <Badge variant="amber">Sin cuenta vinculada</Badge>
                             </span>
                           )}
                         </div>
@@ -365,43 +471,28 @@ export default function ApprovalsPage() {
                           {data.artist_name || 'Artista desconocido'} · {formatDate(sub.created_at)}
                         </p>
                         {sub.admin_notes && (
-                          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 italic">
+                          <p className="mt-1 text-sm italic text-slate-500 dark:text-slate-400">
                             Nota: {sub.admin_notes}
                           </p>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
                           onClick={() => setSelected(sub)}
-                          className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         >
                           Ver
-                        </button>
+                        </Button>
                         {sub.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleAction(sub.id, 'approve')}
-                              disabled={actionLoading === sub.id}
-                              className="px-3 py-1.5 text-sm text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                            >
-                              Aprobar
-                            </button>
-                            <button
-                              onClick={() => openRejectModal(sub)}
-                              disabled={actionLoading === sub.id}
-                              className="px-3 py-1.5 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors disabled:opacity-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                            >
-                              Rechazar
-                            </button>
-                            <button
-                              onClick={() => openRevisionModal(sub)}
-                              disabled={actionLoading === sub.id}
-                              className="px-3 py-1.5 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                            >
-                              Revisión
-                            </button>
-                          </>
+                          <DecisionActions
+                            disabled={busy}
+                            onApprove={() => handleAction(sub.id, 'approve')}
+                            onReject={() => openRejectModal(sub)}
+                            onRevision={() => openRevisionModal(sub)}
+                          />
                         )}
                       </div>
                     </div>
@@ -411,250 +502,339 @@ export default function ApprovalsPage() {
             </div>
           )}
 
-          {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4 dark:border-slate-800">
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Página {page} de {pagination.totalPages} · {pagination.total} total
               </p>
               <div className="flex gap-2">
-                <button
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => fetchApprovals(pagination.page - 1)}
                   disabled={pagination.page <= 1 || loading}
-                  className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                   Anterior
-                </button>
-                <button
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => fetchApprovals(pagination.page + 1)}
                   disabled={pagination.page >= pagination.totalPages || loading}
-                  className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                   Siguiente
-                </button>
+                </Button>
               </div>
             </div>
           )}
-        </div>
+        </Card>
+      </main>
 
-        {/* Detail Modal */}
-        {selected && (
+      {/* Detalle */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setSelected(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
           <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setSelected(null)}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
+            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 id="modal-title" ref={modalTitleRef} tabIndex={-1} className="text-xl font-bold text-slate-900 dark:text-white">
-                  {parseTrackData(selected.track_data).title || 'Sin título'}
-                </h2>
-                <button
-                  onClick={() => setSelected(null)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus:ring-2 focus:ring-emerald-500"
-                  aria-label="Cerrar"
-                >
-                  ✕
-                </button>
-              </div>
-              {(() => {
-                const data = parseTrackData(selected.track_data);
-                const revision = selected.revision || 0;
-                return (
-                  <>
-                    <div className="space-y-3 text-sm">
-                      <div>
-                        <span className="text-slate-500 dark:text-slate-400">Artista:</span>{' '}
-                        <span className="text-slate-900 dark:text-white">{data.artist_name}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 dark:text-slate-400">Tipo:</span>{' '}
-                        <span className="text-slate-900 dark:text-white">{capitalizeReleaseType(data.release_type)}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 dark:text-slate-400">Fecha:</span>{' '}
-                        <span className="text-slate-900 dark:text-white">{data.release_date}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 dark:text-slate-400">Duración:</span>{' '}
-                        <span className="text-slate-900 dark:text-white">{data.duration}</span>
-                      </div>
-                      {revision > 0 && (
-                        <div>
-                          <span className="text-slate-500 dark:text-slate-400">Revisión:</span>{' '}
-                          <span className="text-slate-900 dark:text-white font-medium">#{revision}</span>
-                        </div>
-                      )}
-                      {getCoverImage(data) && (
-                        <div>
-                          <span className="text-slate-500 dark:text-slate-400">Portada:</span>
-                          <Image
-                            src={getCoverImage(data)!}
-                            alt="Cover"
-                            width={600}
-                            height={160}
-                            unoptimized
-                            className="mt-2 w-full h-40 object-cover rounded-lg"
-                          />
-                        </div>
-                      )}
-                      {data.lyrics && (
-                        <div>
-                          <span className="text-slate-500 dark:text-slate-400">Letra:</span>
-                          <p className="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-line max-h-32 overflow-y-auto">
-                            {data.lyrics}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    {selected.status === 'pending' && (
-                      <div className="flex gap-2 mt-6">
-                        <button
-                          onClick={() => handleAction(selected.id, 'approve')}
-                          disabled={actionLoading === selected.id}
-                          className="flex-1 px-4 py-2.5 text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg font-medium transition-colors disabled:opacity-50 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                        >
-                          Aprobar
-                        </button>
-                        <button
-                          onClick={() => { openRejectModal(selected); setSelected(null); }}
-                          disabled={actionLoading === selected.id}
-                          className="flex-1 px-4 py-2.5 text-white bg-red-500 hover:bg-red-600 rounded-lg font-medium transition-colors disabled:opacity-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                        >
-                          Rechazar
-                        </button>
-                        <button
-                          onClick={() => { openRevisionModal(selected); setSelected(null); }}
-                          disabled={actionLoading === selected.id}
-                          className="flex-1 px-4 py-2.5 text-white bg-blue-500 hover:bg-blue-600 rounded-lg font-medium transition-colors disabled:opacity-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                        >
-                          Revisión
-                        </button>
-                      </div>
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <h2
+                id="modal-title"
+                ref={modalTitleRef}
+                tabIndex={-1}
+                className="text-xl font-bold text-slate-900 dark:text-white"
+              >
+                {parseTrackData(selected.track_data).title || 'Sin título'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                aria-label="Cerrar"
+                className={`rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300 ${FOCUS_RING}`}
+              >
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+
+            {(() => {
+              const data = parseTrackData(selected.track_data);
+              const revision = selected.revision || 0;
+              const cover = getCoverImage(data);
+              return (
+                <>
+                  <dl className="space-y-3 text-sm">
+                    <DetailRow term="Artista">{data.artist_name}</DetailRow>
+                    <DetailRow term="Tipo">{capitalizeReleaseType(data.release_type)}</DetailRow>
+                    <DetailRow term="Fecha">{data.release_date}</DetailRow>
+                    <DetailRow term="Duración">{data.duration}</DetailRow>
+                    {revision > 0 && <DetailRow term="Revisión">#{revision}</DetailRow>}
+                    {cover && (
+                      <DetailRow term="Portada">
+                        <Image
+                          src={cover}
+                          alt={`Portada de ${data.title || 'sin título'}`}
+                          width={600}
+                          height={160}
+                          unoptimized
+                          className="mt-2 h-40 w-full rounded-lg object-cover"
+                        />
+                      </DetailRow>
                     )}
-                  </>
-                );
-              })()}
-            </div>
+                    {data.lyrics && (
+                      <DetailRow term="Letra">
+                        <span className="mt-1 block max-h-32 overflow-y-auto whitespace-pre-line text-slate-700 dark:text-slate-300">
+                          {data.lyrics}
+                        </span>
+                      </DetailRow>
+                    )}
+                  </dl>
+                  {selected.status === 'pending' && (
+                    <DecisionActions
+                      grow
+                      disabled={actionLoading === selected.id}
+                      onApprove={() => handleAction(selected.id, 'approve')}
+                      onReject={() => {
+                        openRejectModal(selected);
+                        setSelected(null);
+                      }}
+                      onRevision={() => {
+                        openRevisionModal(selected);
+                        setSelected(null);
+                      }}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Reject Modal */}
-        {showRejectModal && rejectTarget && (
-          <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={closeRejectModal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reject-modal-title"
-          >
-            <div
-              className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 id="reject-modal-title" ref={rejectModalTitleRef} tabIndex={-1} className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                Rechazar envío
-              </h2>
-              <div className="mb-4">
-                <label
-                  htmlFor="reject-reason"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
-                >
-                  Razón del rechazo (mín. 10 caracteres)
-                </label>
-                <textarea
-                  id="reject-reason"
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Explica por qué se rechaza este envío..."
-                  className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white min-h-[100px] focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  aria-describedby="reject-char-count"
-                />
-                <div id="reject-char-count" className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex justify-end">
-                  <span className={rejectReason.length < 10 ? 'text-red-500' : 'text-emerald-500'}>
-                    {rejectReason.length}/10 caracteres mínimos
-                  </span>
-                </div>
-              </div>
-              <div className="flex gap-2" role="alert" aria-live="polite">
-                <button
-                  onClick={handleRejectConfirm}
-                  disabled={rejectReason.length < 10 || actionLoading === rejectTarget?.id}
-                  className="flex-1 px-4 py-2.5 text-white bg-red-500 hover:bg-red-600 rounded-lg font-medium transition-colors disabled:opacity-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                >
-                  Confirmar rechazo
-                </button>
-                <button
-                  onClick={closeRejectModal}
-                  className="px-4 py-2.5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Rechazo y revisión comparten estructura: un motivo con mínimo y un
+          contador. Un solo componente para los dos, con ids propios de cada uno. */}
+      {showRejectModal && rejectTarget && (
+        <ReasonModal
+          titleId="reject-modal-title"
+          titleRef={rejectModalTitleRef}
+          title="Rechazar envío"
+          fieldId="reject-reason"
+          counterId="reject-char-count"
+          label={`Razón del rechazo (mín. ${MIN_REASON_LENGTH} caracteres)`}
+          placeholder="Explica por qué se rechaza este envío..."
+          confirmLabel="Confirmar rechazo"
+          tone="danger"
+          value={rejectReason}
+          onChange={setRejectReason}
+          onClose={closeRejectModal}
+          onConfirm={handleRejectConfirm}
+          disabled={actionLoading === rejectTarget.id}
+        />
+      )}
 
-        {/* Revision Modal */}
-        {showRevisionModal && revisionTarget && (
+      {showRevisionModal && revisionTarget && (
+        <ReasonModal
+          titleId="revision-modal-title"
+          titleRef={revisionModalTitleRef}
+          title="Solicitar revisión"
+          fieldId="revision-reason"
+          counterId="revision-char-count"
+          label={`Comentarios para el artista (mín. ${MIN_REASON_LENGTH} caracteres)`}
+          placeholder="Indica qué necesita cambiar el artista..."
+          confirmLabel="Solicitar revisión"
+          tone="info"
+          value={revisionReason}
+          onChange={setRevisionReason}
+          onClose={closeRevisionModal}
+          onConfirm={handleRevisionConfirm}
+          disabled={actionLoading === revisionTarget.id}
+        />
+      )}
+    </div>
+  );
+}
+
+function DetailRow({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-1">
+      <dt className="text-slate-500 dark:text-slate-400">{term}</dt>
+      <dd className="min-w-0 text-slate-900 dark:text-white">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Las tres decisiones, en la fila de la lista y en el modal de detalle.
+ *
+ * En la lista van como botones de texto teñidos, igual que las acciones de
+ * `/admin` (`app/admin/page.tsx:942-972`): cuatro acciones sólidas en una fila
+ * gritan más que la fila entera. En el modal sí van sólidas, porque ahí son la
+ * única acción posible. Los tres comparten el mismo anillo `focus-visible:`.
+ */
+function DecisionActions({
+  disabled,
+  onApprove,
+  onReject,
+  onRevision,
+  grow = false,
+}: {
+  disabled: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+  onRevision: () => void;
+  grow?: boolean;
+}) {
+  const base = grow
+    ? 'flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50'
+    : 'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50';
+  const tone = grow
+    ? {
+        approve: 'bg-emerald-600 hover:bg-emerald-700',
+        reject: 'bg-rose-600 hover:bg-rose-700',
+        revision: 'bg-blue-600 hover:bg-blue-700',
+      }
+    : {
+        approve:
+          'text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950',
+        reject: 'text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950',
+        revision: 'text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950',
+      };
+
+  return (
+    <div className={grow ? 'mt-6 flex gap-2' : 'flex items-center gap-2'}>
+      <button
+        type="button"
+        onClick={onApprove}
+        disabled={disabled}
+        className={`${base} ${tone.approve} ${FOCUS_RING}`}
+      >
+        Aprobar
+      </button>
+      <button
+        type="button"
+        onClick={onReject}
+        disabled={disabled}
+        className={`${base} ${tone.reject} ${FOCUS_RING}`}
+      >
+        Rechazar
+      </button>
+      <button
+        type="button"
+        onClick={onRevision}
+        disabled={disabled}
+        className={`${base} ${tone.revision} ${FOCUS_RING}`}
+      >
+        Revisión
+      </button>
+    </div>
+  );
+}
+
+function ReasonModal({
+  titleId,
+  titleRef,
+  title,
+  fieldId,
+  counterId,
+  label,
+  placeholder,
+  confirmLabel,
+  tone,
+  value,
+  onChange,
+  onClose,
+  onConfirm,
+  disabled,
+}: {
+  titleId: string;
+  titleRef: RefObject<HTMLHeadingElement | null>;
+  title: string;
+  fieldId: string;
+  counterId: string;
+  label: string;
+  placeholder: string;
+  confirmLabel: string;
+  tone: 'danger' | 'info';
+  value: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  disabled: boolean;
+}) {
+  const tooShort = value.trim().length < MIN_REASON_LENGTH;
+  const confirmTone =
+    tone === 'danger'
+      ? 'bg-rose-600 hover:bg-rose-700'
+      : 'bg-blue-600 hover:bg-blue-700';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2
+          id={titleId}
+          ref={titleRef}
+          tabIndex={-1}
+          className="mb-4 text-xl font-bold text-slate-900 dark:text-white"
+        >
+          {title}
+        </h2>
+        <div className="mb-4">
+          <label htmlFor={fieldId} className={LABEL_CLASS}>
+            {label}
+          </label>
+          <textarea
+            id={fieldId}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            aria-describedby={counterId}
+            className={`${FIELD_CLASS} min-h-[100px] leading-relaxed`}
+          />
           <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={closeRevisionModal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="revision-modal-title"
+            id={counterId}
+            aria-live="polite"
+            className="mt-1 flex justify-end text-xs text-slate-500 dark:text-slate-400"
           >
-            <div
-              className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
+            <span
+              className={
+                tooShort
+                  ? 'font-semibold text-rose-600 dark:text-rose-400'
+                  : 'text-emerald-700 dark:text-emerald-400'
+              }
             >
-              <h2 id="revision-modal-title" ref={revisionModalTitleRef} tabIndex={-1} className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                Solicitar revisión
-              </h2>
-              <div className="mb-4">
-                <label
-                  htmlFor="revision-reason"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
-                >
-                  Comentarios para el artista (mín. 10 caracteres)
-                </label>
-                <textarea
-                  id="revision-reason"
-                  value={revisionReason}
-                  onChange={(e) => setRevisionReason(e.target.value)}
-                  placeholder="Indica qué necesita cambiar el artista..."
-                  className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white min-h-[100px] focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  aria-describedby="revision-char-count"
-                />
-                <div id="revision-char-count" className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex justify-end">
-                  <span className={revisionReason.length < 10 ? 'text-red-500' : 'text-emerald-500'}>
-                    {revisionReason.length}/10 caracteres mínimos
-                  </span>
-                </div>
-              </div>
-              <div className="flex gap-2" role="alert" aria-live="polite">
-                <button
-                  onClick={handleRevisionConfirm}
-                  disabled={revisionReason.length < 10 || actionLoading === revisionTarget?.id}
-                  className="flex-1 px-4 py-2.5 text-white bg-blue-500 hover:bg-blue-600 rounded-lg font-medium transition-colors disabled:opacity-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                >
-                  Solicitar revisión
-                </button>
-                <button
-                  onClick={closeRevisionModal}
-                  className="px-4 py-2.5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
+              {value.trim().length}/{MIN_REASON_LENGTH} caracteres mínimos
+            </span>
           </div>
-        )}
+        </div>
+        <div className="flex gap-2" role="alert" aria-live="polite">
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={tooShort || disabled}
+            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${confirmTone} ${FOCUS_RING}`}
+          >
+            {confirmLabel}
+          </button>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArtistByUserId, updateArtist, getDbWrite } from "@/lib/db";
-import { getTursoClient } from "@/lib/turso";
+import { getAllArtists, getArtistByUserId, updateArtist } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -48,16 +47,21 @@ export async function PATCH(req: NextRequest) {
     // Check UNIQUE constraint on name if changing
     const newName = name || artist.name;
     if (newName !== artist.name) {
-      let existing: any = null;
-      const turso = getTursoClient();
-      if (turso) {
-        const result = await turso.execute({ sql: "SELECT id FROM artists WHERE name = ? AND id != ?", args: [newName, artist.id] });
-        existing = result.rows[0];
-      } else {
-        const db = getDbWrite();
-        existing = db.prepare("SELECT id FROM artists WHERE name = ? AND id != ?").get(newName, artist.id);
-      }
-      if (existing) {
+      // Tercer patrón del repo, y el peor de los tres: la ruta no miraba ningún
+      // flag, solo la veracidad de `getTursoClient()` de `@/lib/turso`, que lee
+      // `process.env` al IMPORTAR el módulo (`lib/turso.ts:31-32`). Con el env
+      // llegando después de esa primera evaluación tomaba la rama local y
+      // escribía en la réplica SQLite de producción sin avisar — un 200 con un
+      // `PATCH` que no persistió, que es peor que un 500. Ahora la comprobación
+      // pasa por `getAllArtists()`, que ramifica con `isTursoEnabled()` en tiempo
+      // de llamada y por los dos lados, y desaparece `getDbWrite()`.
+      //
+      // El `===` reproduce el `WHERE name = ?` de antes: la columna no declara
+      // `COLLATE NOCASE`, así que SQLite comparaba por bytes y eso es case-sensitive.
+      const clash = (await getAllArtists()).find(
+        (candidate) => candidate.name === newName && candidate.id !== artist.id
+      );
+      if (clash) {
         return NextResponse.json({ error: "Este nombre artístico ya está en uso" }, { status: 409 });
       }
     }

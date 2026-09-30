@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDbWrite, isTursoConfigured } from "@/lib/db";
+import type { InValue } from "@libsql/client";
+import {
+  bustSelectCache,
+  getLocalDb,
+  getLocalDbWrite,
+  getTursoClientSync,
+} from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
 import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
-
-const TURSO_URL = process.env.TURSO_DATABASE_URL;
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
 export const dynamic = "force-dynamic";
 
@@ -15,34 +18,42 @@ async function validateAdminSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
-function createFreshClient() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createClient } = require("@libsql/client");
-  return createClient({ url: TURSO_URL!, authToken: TURSO_TOKEN! });
-}
-
+/**
+ * UNA sola fuente de verdad: `getTursoClientSync()` devuelve `null` SI Y SOLO SI
+ * `isTursoEnabled()` es falso (los dos leen `process.env` en tiempo de llamada),
+ * así que ramificar sobre `client !== null` hace imposible la discrepancia que
+ * antes existía entre `isTursoConfigured()` —que elegía la rama— y el cliente que
+ * ejecutaba, y además convierte el fallback local en algo incondicional en vez de
+ * depender de que un flag esté de acuerdo.
+ *
+ * Antes además leía `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` en el scope del
+ * módulo (`process.env` congelado al importar el bundle), con lo que un env
+ * cargado tarde caía en la rama local de una ruta de escritura.
+ *
+ * `getLocalDb()` es de solo lectura; `getLocalDbWrite()` solo se alcanza cuando no
+ * hay Turso, que es el único caso en que tiene sentido escribir en el archivo
+ * local. Nunca se abre en producción porque la rama de Turso devuelve antes.
+ */
 async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
-  if (isTursoConfigured()) {
-    const client = createFreshClient();
-    const bustSql = sql.trimStart().toUpperCase().startsWith("SELECT")
-      ? `${sql} /*admin${Date.now()}*/`
-      : sql;
-    const result = await client.execute({ sql: bustSql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    const result = await client.execute({
+      sql: bustSelectCache(sql),
+      args: (params ?? []) as InValue[],
+    });
     return result.rows as unknown[];
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDb().prepare(sql);
   return params ? stmt.all(...params) : stmt.all();
 }
 
 async function dbRun(sql: string, params?: unknown[]): Promise<void> {
-  if (isTursoConfigured()) {
-    const client = createFreshClient();
-    await client.execute({ sql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    await client.execute({ sql, args: (params ?? []) as InValue[] });
     return;
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDbWrite().prepare(sql);
   stmt.run(...(params ?? []));
 }
 

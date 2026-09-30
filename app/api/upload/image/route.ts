@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { InValue } from "@libsql/client";
 import { validateRequest } from "@/lib/auth";
-import { getTrackById, getDbWrite, isTursoConfigured } from "@/lib/db";
-import { getTursoClient } from "@/lib/turso";
+import {
+  bustSelectCache,
+  getLocalDb,
+  getLocalDbWrite,
+  getTrackById,
+  getTursoClientSync,
+} from "@/lib/db";
 import { uploadImage, deleteImage } from "@/lib/blob";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
@@ -45,27 +51,38 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role || "artist" };
 }
 
+// UNA sola fuente de verdad. Antes `isTursoConfigured()` de `@/lib/db` elegía la
+// rama y `getTursoClient()` de `@/lib/turso` —que lee `process.env` al IMPORTAR el
+// módulo, `lib/turso.ts:31-32`— ejecutaba: si el env llegaba después de esa primera
+// evaluación, la primera decía "turso" y la segunda devolvía `null`, se lanzaba y
+// el POST respondía 500. `getTursoClientSync()` es nulo si y solo si
+// `isTursoEnabled()` es falso, y los dos leen el env en tiempo de llamada, así que
+// ramificar sobre `client !== null` hace imposible la discrepancia y deja el
+// fallback local como caso ordinario y no como el final de un acuerdo de flags.
+//
+// `getLocalDbWrite()` solo se alcanza sin Turso, que es el único caso en que
+// escribir en el archivo local tiene sentido; nunca se abre en producción porque
+// la rama de Turso devuelve antes.
 async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
-  if (isTursoConfigured()) {
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso client not available");
-    const result = await client.execute({ sql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    const result = await client.execute({
+      sql: bustSelectCache(sql),
+      args: (params ?? []) as InValue[],
+    });
     return result.rows as unknown[];
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDb().prepare(sql);
   return params ? stmt.all(...params) : stmt.all();
 }
 
 async function dbRun(sql: string, params?: unknown[]): Promise<void> {
-  if (isTursoConfigured()) {
-    const client = getTursoClient();
-    if (!client) throw new Error("Turso client not available");
-    await client.execute({ sql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    await client.execute({ sql, args: (params ?? []) as InValue[] });
     return;
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDbWrite().prepare(sql);
   stmt.run(...(params ?? []));
 }
 
