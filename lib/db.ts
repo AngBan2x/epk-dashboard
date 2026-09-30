@@ -2046,6 +2046,51 @@ export async function getApprovedTrackById(id: string): Promise<Track | null> {
 }
 
 /**
+ * Listado PÚBLICO de `tracks`: solo aprobados, y con la forma acotada por
+ * `parseTrack`.
+ *
+ * ── Por qué no basta con filtrar en SQL ─────────────────────────────────────
+ * `GET /api/tracks` hacía `SELECT * FROM tracks WHERE status = 'approved'` y
+ * devolvía la fila CRUDA. El `WHERE` correcto no impedía la fuga: la columna
+ * `tracks.admin_notes` —el motivo interno por el que el admin rechaza— viaja
+ * en el `*` de una fila aprobada, así que un visitante anónimo se lo llevaba
+ * con un `curl` sin sesión. Es la misma clase de fuga que P4 tapó en
+ * `app/api/releases`, por la otra puerta: dos rutas distintas, un mismo `SELECT
+ * *` sobre `tracks`.
+ *
+ * Y el argumento de "el admin necesita la fila cruda" NO se sostiene en esta
+ * ruta: el brazo de admin ya pasaba por `getAllTracks()`, que hace
+ * `rows.map(parseTrack)`. El admin nunca recibió `description`, `genre`,
+ * `created_at` ni `admin_notes` por aquí. Por eso el lector público devuelve
+ * exactamente la misma forma que el admin ya tenía, y lo que cambia no es el
+ * contrato sino que los dos brazos coinciden.
+ *
+ * `getApprovedTrackById` resuelve el mismo problema para una fila suelta, con
+ * el brazo extra de las hijas de un release aprobado. Este no lo lleva porque
+ * el listado histórico solo ha publicado padres: `ORDER BY created_at DESC` con
+ * `status = 'approved'` es el alcance que la ruta llevaba antes, y ampliarlo o
+ * no es una decisión de producto, no una issue lateral de seguridad.
+ *
+ * Uso: `GET /api/tracks` para todo el que no sea admin. Para el admin, seguir
+ * con `getAllTracks()`.
+ */
+export async function getApprovedTracks(): Promise<Track[]> {
+  const sql = "SELECT * FROM tracks WHERE status = 'approved' ORDER BY created_at DESC";
+  if (isTursoEnabled()) {
+    try {
+      const rows = await tursoExec(sql);
+      return rows.map((r) => parseTrack(r as Record<string, unknown>));
+    } catch (error) {
+      console.error("Turso getApprovedTracks failed:", error);
+      throw new Error("Database error: Turso connection failed.");
+    }
+  }
+  const db = getLocalDb();
+  const rows = db.prepare(sql).all() as Record<string, unknown>[];
+  return rows.map(parseTrack);
+}
+
+/**
  * Resuelve si un usuario es el dueño verificado de las filas de `tracks` con
  * ese `artist_name`.
  *

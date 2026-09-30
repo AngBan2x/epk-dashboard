@@ -1,7 +1,28 @@
 #!/usr/bin/env tsx
 /**
  * Seed: Catálogo limpio con canciones reales verificadas
- * Todas las tracks tienen portadas iTunes HD y audio preview funcionales
+ *
+ * ── `audio_preview_url` va VACÍA a propósito (RC.31, P3) ───────────────────
+ * Este script antes traía 6 URLs de preview de iTunes escritas a mano. Las 6
+ * dan 404 hoy (comprobado con `curl -I`) y dos de ellas eran copia: `trk-001` y
+ * `trk-002` compartían el mismo UUID de asset cambiando el número de
+ * `AudioPreview`, y `trk-001` y `trk-006` compartían el mismo `mzaf_…`. El
+ * "Error al iniciar reproducción — archivo no disponible" que se veía en
+ * pantalla era eso: una URL muerta, no CORS.
+ *
+ * No se sustituyen por otra URL escrita a mano, porque eso es exactamente lo
+ * que las dejó caducas. Se dejan vacías y se rellenan con la fuente, que es lo
+ * único que sabe decir cuál es el preview DE ESTA pista:
+ *
+ *     npx tsx scripts/fetch-itunes-previews.ts --apply
+ *
+ * Ese script busca por artista+título EXACTOS, exige que la pareja
+ * `(trackId, previewUrl)` venga del mismo resultado de iTunes, y hace una
+ * petición HTTP real antes de escribir nada: una URL que no dé 200 no se
+ * escribe. Es el paso que falta entre este seed y un catálogo con audio.
+ *
+ * `itunes_track_id` sí se conserva: es un dato de catálogo, no una URL, y de él
+ * se construye el enlace de Apple Music (`lib/downloadable-assets.ts:299`).
  */
 import Database from "better-sqlite3";
 import path from "path";
@@ -28,7 +49,9 @@ interface SeedTrack {
   gallery_images: string[] | null;
 }
 
-// Catálogo limpio: canciones reales con metadatos verificados
+// Catálogo limpio: canciones reales con metadatos verificados.
+// `audio_preview_url: ""` = "sin preview todavía", NO es un dato. Lo resuelve
+// `scripts/fetch-itunes-previews.ts --apply` (ver la cabecera de este fichero).
 const cleanTracks: SeedTrack[] = [
   {
     id: "trk-001",
@@ -38,7 +61,7 @@ const cleanTracks: SeedTrack[] = [
     release_date: "1975-10-31",
     duration: "05:55",
     cover_image: "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/87/6c/6b/876c6bfa-ce5d-3c32-96db-3cd01c0bd60c/00602547208378.rgb.jpg/600x600bb.jpg",
-    audio_preview_url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/a7/d7/1f/a7d71f16-1b4b-4c80-9e32-c5ef7862c86d/mzaf_14085285085985977537.plus.aac.p.m4a",
+    audio_preview_url: "",
     spotify_url: "https://open.spotify.com/track/7tFiyTwD0nx5a1eklYtX2J",
     youtube_video_id: "fJ9rUzIMcZQ",
     itunes_track_id: "158672215",
@@ -57,7 +80,7 @@ const cleanTracks: SeedTrack[] = [
     release_date: "1991-09-10",
     duration: "05:01",
     cover_image: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/0b/79/01/0b790105-a58e-4ff9-96ca-d3c0c6c2a265/00720642442624.rgb.jpg/600x600bb.jpg",
-    audio_preview_url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/a7/d7/1f/a7d71f16-1b4b-4c80-9e32-c5ef7862c86d/mzaf_14085285085985977537.plus.aac.p.m4a",
+    audio_preview_url: "",
     spotify_url: "https://open.spotify.com/track/5ghIJDpPoe3CfHMGu71E6T",
     youtube_video_id: "hTWKbfoikeg",
     itunes_track_id: "1440733396",
@@ -76,7 +99,7 @@ const cleanTracks: SeedTrack[] = [
     release_date: "2019-11-29",
     duration: "03:20",
     cover_image: "https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/73/36/9b/73369b5e-4fc2-1a7f-c23a-d9c0f5e55c17/20UMGIM06519.rgb.jpg/600x600bb.jpg",
-    audio_preview_url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview113/v4/4e/e0/d0/4ee0d0a8-7c07-fb35-f5f1-eb7a47b2a47e/mzaf_14390765741177175017.plus.aac.p.m4a",
+    audio_preview_url: "",
     spotify_url: "https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b",
     youtube_video_id: "4NRXx6U8ABQ",
     itunes_track_id: "1488408568",
@@ -95,7 +118,7 @@ const cleanTracks: SeedTrack[] = [
     release_date: "1977-02-22",
     duration: "06:30",
     cover_image: "https://is1-ssl.mzstatic.com/image/thumb/Music/9f/83/b1/mzl.uzwblzco.jpg/600x600bb.jpg",
-    audio_preview_url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/aa/c7/e6/aac7e6a4-9a89-4a24-b7a1-06e51c5d4936/mzaf_3124561977042434406.plus.aac.p.m4a",
+    audio_preview_url: "",
     spotify_url: "https://open.spotify.com/track/40riOy7x9W7GXjyGp4pjAv",
     youtube_video_id: "BciS5krYL80",
     itunes_track_id: "1440672824",
@@ -114,7 +137,7 @@ const cleanTracks: SeedTrack[] = [
     release_date: "2017-01-06",
     duration: "03:53",
     cover_image: "https://is1-ssl.mzstatic.com/image/thumb/Music117/v4/3f/d7/c1/3fd7c190-ec33-9440-2cd3-0b2f8f3d5754/886446302577.jpg/600x600bb.jpg",
-    audio_preview_url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview127/v4/7a/a5/1f/7aa51fca-ab0b-9ba1-04d0-d7b40028dd44/mzaf_6174782736697399843.plus.aac.p.m4a",
+    audio_preview_url: "",
     spotify_url: "https://open.spotify.com/track/7qiZfU4dY1lWllzX7mPBI3",
     youtube_video_id: "JGwWNGJdvx8",
     itunes_track_id: "1193701079",
@@ -133,7 +156,7 @@ const cleanTracks: SeedTrack[] = [
     release_date: "1985-08-05",
     duration: "05:02",
     cover_image: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/f5/5a/7e/f55a7e0d-30fa-2be0-e7e8-fd7e9d2a7edb/5099960756428.jpg/600x600bb.jpg",
-    audio_preview_url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview122/v4/ec/2b/24/ec2b248d-f69d-9e10-e3b4-93e43f65af40/mzaf_14085285085985977537.plus.aac.p.m4a",
+    audio_preview_url: "",
     spotify_url: "https://open.spotify.com/track/75FEaRjZTKLhTrFGsfMUXR",
     youtube_video_id: "wp43OdtAAkM",
     itunes_track_id: "1440831175",
@@ -200,6 +223,18 @@ function main() {
 
   const totalTracks = db.prepare("SELECT COUNT(*) as count FROM tracks").get() as { count: number };
   console.log(`\n📊 Total tracks en DB: ${totalTracks.count}`);
+
+  // Aviso en voz alta: sin este paso el catálogo sale mudo y parece un fallo de
+  // reproducción, cuando lo que falta es un comando que nadie se sabe de memoria.
+  const sinPreview = cleanTracks.filter((t) => !t.audio_preview_url).length;
+  if (sinPreview > 0) {
+    console.log(
+      `\n🔇 ${sinPreview}/${cleanTracks.length} pistas sin audio_preview_url (a propósito, ver cabecera).`
+    );
+    console.log("   Para resolverlas desde iTunes y verificar cada URL antes de escribir:");
+    console.log("     npx tsx scripts/fetch-itunes-previews.ts --apply");
+  }
+
   console.log("✅ Seed completado exitosamente\n");
 
   db.close();

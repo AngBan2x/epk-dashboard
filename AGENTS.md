@@ -72,7 +72,11 @@ tests/             # Vitest + Playwright
 - **Scripts de datos**: `scripts/seed-influential-catalog.ts` (P5.2, **NO aplicado en prod**), `scripts/backfill-artist-owners.ts` (6 de 7 artistas siguen con `user_id` NULL) y `scripts/qa-cleanup.ts`. Los tres con dry-run por defecto y `--apply` para escribir.
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
-- **REGLA**: Usar funciones de `lib/db.ts` en vez de `getDbWrite()` directo en API routes. **P7: `getDbWrite()` apunta al SQLite local y está ROTO en producción (Turso); nunca usarlo en una ruta API**
+- **REGLA (corregida en RC.31)**: usar funciones de `lib/db.ts` en vez de SQL suelto en API routes. Y cuando una ruta necesite SQL propio, la decisión de backend se toma con **UNA sola fuente de verdad**: ramificar sobre `getTursoClientSync() !== null`, que devuelve `null` si y solo si `isTursoEnabled()` es falso y lee `process.env` en **tiempo de llamada**. El handle local (`getLocalDb()` para leer, `getLocalDbWrite()` para escribir) se abre **solo en el brazo sin cliente**, nunca antes.
+  - **Por qué cambió**: la regla anterior ("nunca `getDbWrite()` en una ruta API") era inejecutable. Sin Turso no hay handle de escritura, así que prohibirlos a todos dejaba las rutas de escritura sin forma de degradar. Lo que estaba mal no era el handle, era **la forma de decidir quién lo abre**.
+  - **El patrón roto que sustituye** (GAP-B): ramificar con `isTursoConfigured()` de `@/lib/db` (lee `process.env` al llamar) y ejecutar con `getTursoClient()` de `@/lib/turso` (lee el env al **importar**, `lib/turso.ts:31-32`). Con el env cargando tarde —el caso normal en un bundle de Vercel— la primera decía "turso" y la segunda `null`, se lanzaba y la ruta respondía **500**. Ya no queda ninguna ruta con este patrón.
+  - **`getDbWrite()` / `getLocalDbWrite()` siguen siendo legítimos** en un **script** (`scripts/*`, que necesita escribir sí o sí) y en el camino local de una ruta, siempre detrás del `getTursoClientSync() === null`. Lo prohibido es usarlos como fuente de decisión.
+  - **Deuda conocida**: `lib/artist-promotion.ts:139` sigue llamando `getDbWrite()` en el camino de aprobación de releases y shows. Funciona porque lo protege un `isTursoEnabled()`, pero es el patrón anterior y merece su propia ola.
 
 ## Reglas de Delegación (CRÍTICO)
 
