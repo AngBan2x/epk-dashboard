@@ -61,7 +61,18 @@ function record(r: Result) {
       const page = await browser.newPage({ viewport: { width, height: 1000 } });
       await page.goto(`${BASE}/track/${target.id}`, { waitUntil: "load", timeout: 90000 });
       await page.waitForSelector("h1", { timeout: 45000 });
-      await page.waitForTimeout(1200);
+      // La portada se carga por red, y comprobar `naturalWidth` sin esperar
+      // da falsos negativos: en una corrida de reversión dio "portada rota" en
+      // 1440px cuando lo que se habia roto era la ficha técnica. Se espera a
+      // que la imagen se resuelva en vez de mirar una vez y rezar.
+      await page
+        .waitForFunction(
+          "(() => { const i = document.querySelector('section img'); return !i || (i.complete && i.naturalWidth > 0); })()",
+          undefined,
+          { timeout: 20000 }
+        )
+        .catch(() => undefined);
+      await page.waitForTimeout(800);
       const text = (await page.evaluate("document.body.innerText")) as string;
 
       const checks: Record<string, boolean> = {
