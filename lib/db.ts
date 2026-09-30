@@ -2237,6 +2237,12 @@ export async function createTrack(data: {
     release_id: data.release_id ?? null,
     start_time: data.start_time ?? 0,
     end_time: data.end_time ?? 0,
+    // `status` estaba declarado en la firma y NO se escribia en ningun INSERT:
+    // la columna se quedaba con el default del esquema ('draft') y toda pista
+    // creada por aqui era invisible en lo publico, que filtra
+    // `status = 'approved'`. Se escribe ahora; el default sigue siendo 'draft'
+    // para no cambiar el comportamiento de las rutas que crean pendientes.
+    status: data.status ?? "draft",
   };
 
 if (isTursoEnabled()) {
@@ -2246,8 +2252,8 @@ if (isTursoEnabled()) {
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
         external_links, disc_number, track_number, is_double_single, sides_b, isrc, composers, is_instrumental,
-        release_id, start_time, end_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        release_id, start_time, end_time, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         track.id, track.title, track.artist_name, track.release_type, track.release_date,
         track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -2267,6 +2273,7 @@ if (isTursoEnabled()) {
         track.release_id,
         track.start_time,
         track.end_time,
+        track.status,
       ]
     );
   } else {
@@ -2277,8 +2284,8 @@ if (isTursoEnabled()) {
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
         external_links, disc_number, track_number, is_double_single, sides_b, isrc, composers, is_instrumental,
-        release_id, start_time, end_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        release_id, start_time, end_time, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       track.id, track.title, track.artist_name, track.release_type, track.release_date,
       track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -2298,6 +2305,7 @@ if (isTursoEnabled()) {
       track.release_id,
       track.start_time,
       track.end_time,
+      track.status,
     );
   }
 
