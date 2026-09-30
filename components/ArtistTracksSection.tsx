@@ -56,7 +56,16 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
       <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Lanzamientos</h2>
       {/* `items-start`: sin eso, una celda con 10 pistas estira a todas las
           de su fila y las EPKCard sueltas quedan flotando en el vacío. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+      {/*
+        C1 subio esta rejilla a 4 columnas porque la EPKCard suelta quedaba
+        comprimida a 198px. Pero desde C2 cada celda no es una tarjeta: es un
+        grupo (tarjeta del album + lista de sus pistas), y dentro de la fila de
+        la pista van numero, boton de play, titulo y "0:00 - 3:19". A 4
+        columnas el titulo se quedaba en ~120px y "Another Brick in the Wall"
+        salia como "Another ...". A 3 columnas el grupo mide ~400px y los
+        titulos se leen enteros, que es justo el objetivo de C1.
+      */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
         {groups.map(({ release, tracks }) => {
           const isOpen = !!expanded[release.id];
           const hidden = tracks.length - VISIBLE_TRACKS;
