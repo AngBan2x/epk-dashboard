@@ -5895,3 +5895,195 @@ Resuelto generando un `SESSION_SECRET` en `.env.local` (gitignored). Es el item 
 3. **Delegar los INSERT en la capa de `lib/db`.** La tabla `users` tiene menos columnas de las que asumi, y duplicar el INSERT en un script es lo que provoco el fallo. `createUser` ya sabe el esquema.
 4. **`pnpm build` en Windows exige parar el servidor antes**: el `prebuild` borra `data/music_catalog.db` y da EPERM si esta abierto. Ocurrio en esta tanda.
 5. **El admin no tiene perfil de artista**, asi que `/profile` con esa cuenta **no monta el editor de redes**. Un test de UI que use la cuenta equivocada da falsos negativos: paso en la primera pasada de C8/C9.
+
+---
+
+## Rediseño del carrusel de artistas del catálogo — 1 artista por página
+
+**Fecha:** 2026-09-29
+**Modelo:** MiMo v2.6 Flash Free (subagente `carousel-builder`)
+**Alcance:** componente (`components/`, `lib/carousel.ts`) — sin cambios de API ni de esquema
+
+### Problema
+Tres fallos encadenados en el carrusel "Artistas" de `/dashboard`:
+1. `BioSection` usaba `md:grid-cols-4` (breakpoint de **viewport**) dentro de una slide de ~300px → 17px de texto por celda.
+2. `useCarousel` fijaba `slidesToScroll: 1` mientras `lib/carousel.ts` declaraba una config responsive 1/2/4 con `getSlidesForWidth()` que **nadie importaba** (código muerto).
+3. El contador comparaba el índice de snap contra `artists.length` en vez de contra el número de páginas.
+
+### Decisiones
+- **`md:grid-cols-4` → container query.** `grid-cols-2` + `[@container(min-width:40rem)]:grid-cols-4` sobre un wrapper `[container-type:inline-size]`. El número de columnas depende del **ancho del propio componente**, no del viewport: dentro de la columna de Bio del carrusel (~520px) se queda en 2×2 (celdas de 250px, sin truncar) y en la página de artista (grid de 814px) sigue en 4 columnas (celdas de 192px), que es como estaba. **No hizo falta instalar `@tailwindcss/container-queries`**: Tailwind 3.4 genera la variante arbitraria `[@container(...)]:...` sin plugin (verificado con la CLI). Si el navegador no soporta container queries, queda el fallback 2×2. Añadido `min-w-0` + `truncate` + `title` en los 4 valores (helper local `MetricCell`).
+- **`lib/carousel.ts`: borrar, no cablear.** `slidesConfig`/`getSlidesForWidth`/`autoplayDefaults` decían 1/2/4 slides, que contradice el diseño aprobado (1 artista por página en cualquier breakpoint): cablearlos habría hecho avanzar el carrusel 2-4 slides cuando solo se ve 1. Se eliminan; quedan `defaultEmblaOptions.slidesToScroll = 1` y `autoplayDefaults.delay`, los dos ahora **cableados** en `useCarousel` como defaults → una sola fuente de verdad.
+- **Contador:** `Página {selectedIndex + 1} de {scrollSnaps.length}` (fallback a `artists.length` solo en el primer render, antes de que Embla mida).
+- **Slide:** `basis-full` en `CarouselItem` (antes `sm:basis-1/2 xl:basis-1/3 2xl:basis-1/4`) y la slide pasa a `grid grid-cols-1 gap-6 lg:grid-cols-2` → Bio izquierda, Shows derecha en desktop, apilado en móvil.
+- **Shows vacíos:** `ShowsBooking` ahora usa el design system `components/ui/EmptyState` en su rama vacía (antes un `div` ad-hoc), así la columna derecha nunca deja un hueco.
+
+### Verificación
+- `npx tsc --noEmit` ✅ · `npx next lint` ✅ (0 warnings) · `npx vitest run` ✅ **257/257**.
+- Visual con Playwright (`scripts/carousel-visual-check.ts`, claro + oscuro × desktop 1440 + móvil 390) → `screenshots/carousel-redesign/`. Medido en DOM: 1 slide = 100% del track (1198px desktop / 308px móvil), métricas 2×2 de 250px sin truncar en el carrusel y 4×1 de 192px en `/artists/[id]`, contador `Página 1 de 7` → `Página 2 de 7` al avanzar, columna de Shows con contenido (slide 1) y con `EmptyState` (slide 2).
+
+
+---
+
+## C1 + C7 + C2 - pagina publica del artista (ancho, margen social y catalogo agrupado)
+
+**Fecha:** 2026-09-29
+**Modelo:** MiMo v2.6 Flash Free (subagente `dashboard-builder`)
+**Alcance:** `app/artists/[id]/page.tsx`, `components/ArtistTracksSection.tsx`, `components/EPKCard.tsx`, `lib/db.ts`, mas `scripts/rc29-artist-shots.ts` y `tests/unit/artist-catalog.test.ts`
+
+### Que se hizo
+
+- **C1 (ancho + a11y):** `max-w-4xl` -> `max-w-7xl` en `app/artists/[id]/page.tsx`. La tarjeta pasa de **198px a 294px** (medido en DOM, el mismo ancho del catalogo). En `EPKCard.tsx` el `h3` con `truncate` gana `title={title}`, asi el texto completo es accesible con hover/lector de pantalla.
+- **C7 (margen social):** el wrapper de los links pasa de `pt-6` a `pt-6 mb-6` -> hueco medido de **24px** entre las redes y `BioSection` en claro y en oscuro.
+- **C2 (agrupar por release):** `getArtistCatalog(artistId)` en `lib/db.ts` con **una sola consulta** (sin N+1): `status = 'approved'` (cierra la fuga de borradores/pendientes) + `EXISTS` sobre `c.release_id = t.id` para distinguir album de single suelto (ambos son `release_id IS NULL`). Devuelve `ArtistCatalogGroup[]` como **array plano** para que no se pierda al cruzar Server -> Client. `ArtistTracksSection` renderiza EPKCard del padre (play, like, metricas) + panel con cabecera enlazada a `/releases/[id]`, `ReleaseTrackList` con 6 filas y boton `Ver los N restantes` con estado por release.
+
+### Datos de prueba y capturas
+
+- `scripts/rc29-artist-shots.ts` con modos `seed` / `clean` / `shots`: siembra un artista con album de 8 hijas + 2 singles, redes y bio, y comprueba 15 invariantes antes de capturar.
+- **No se pudo usar `pnpm start -p 3100`:** `pnpm build` esta prohibido en esta fase y `.next` lo comparten los agentes en paralelo. Solucion: copia temporal del repo **sin `.env.local`** (así Turso queda desactivado y se usa SQLite local) con `node_modules` via junction, servidor `next dev` aislado en el puerto 3210 y capturas en `tests/screenshots/rc29/` (`artist-light`, `artist-dark`, `artist-dark-expanded`, `release-detail-dark`, `artist-mobile-390-light/dark`). Al terminar: servidor parado, copia borrada y `clean` aplicado sobre `data/music_catalog.db` (11 tracks + 1 artista rc29-*).
+
+### Hallazgos
+
+1. **`next dev` (Node 24 + Next 14.2) se cae con `Assertion failed: (env) != nullptr`** en el worker al cerrar un contexto de Playwright y abrir otro -> `ERR_CONNECTION_REFUSED` a mitad del guion. Reproducido 4 veces. Se esquivó con **un solo contexto**: tema cambiando la clase `dark` en `<html>` y viewport con `setViewportSize(390)`. El guion ya no mata el proceso si algo falla (try/finally sobre `browser.close()`).
+2. **`ReleaseTrackList` trunca el titulo de la fila sin `title`** (p. ej. "Todo vue..."): mismo bug de a11y que el de C1. Esta en el archivo que lleva otro agente en paralelo, asi que queda como **follow-up** en vez de editarlo a ciegas.
+3. Con 3 releases el `xl:grid-cols-4` deja una celda vacia; es el mismo patron del catalogo, no es una regresion de C1.
+4. La pagina sigue incluyendo **11 tracks** en "Descargas para prensa" (1 album + 8 hijas + 2 singles): el dossier no esta agrupado, solo la rejilla visual.
+
+### Verificacion final
+
+- `npx tsc --noEmit` -> 0 errores · `npx next lint` -> 0 warnings · `npx vitest run` -> **342/342 (27 archivos)**.
+- Visual local: **15/15 comprobaciones** en claro, oscuro y movil 390 (ancho de tarjeta, `title`, hueco 24px, 3 EPKCards en vez de 11, 6 filas + `Ver los 2 restantes` -> 8, y navegacion a `/releases/rc29-album` con las pistas visibles).
+---
+title: "AI_LOG — 2026-09-30 — Ola 3 cerrada: C1/C7/C2/C4, B5 (PDF) y D2 (semilla)"
+date: 2026-09-30
+tags: [ai-log, rc29, pdf, seed, ui]
+---
+
+# 2026-09-30 — Cierre de la Ola 3 (C1/C7/C2/C4), B5 y D2
+
+Continuación de la Ola 2 (`195ff4f`). Todo lo de abajo está **verificado en producción**, no solo en local.
+
+## Qué se entregó
+
+| Item | Commit | Estado |
+|---|---|---|
+| C1 + C7 + C2 + C4 | `d21ab28` | Hecho, verificado en prod |
+| Regresión del header (inset 194px) | `304a9c8` | Hecho, verificado |
+| D2: quitar sufijo + `--cleanup` | `143cf27` | Hecho |
+| B5: PDF con pdfkit | `06062b6` | Hecho (3 correcciones después) |
+| Fuentes incrustadas | `7629b9d` | Hecho |
+| `font: null` y fin del tracing | `dcf5c16` | Hecho, **PDF 200 en prod** |
+| `createTrack` no escribía `status` | `35c01bb` | Hecho, D2 visible |
+| Catálogo a 3 columnas | `bfdda30` | Hecho |
+
+Gates finales: `tsc` 0, `lint` 0, `vitest` **378/378** (32 ficheros), `build` OK.
+
+---
+
+## Los cuatro fallos que hicieron falta de más
+
+Ninguno de los cuatro se veía en local. Es la clase de fallo que más caro sale en este proyecto, así que queda escrito.
+
+### 1. Regresión de C1 que introduje yo
+
+Al subir `main` de `max-w-4xl` a `max-w-7xl` para que las EPKCard dejaran de estar comprimidas, el `max-w-4xl` **interno de `ArtistHero`** pasó a recortar el header: el nombre del artista quedó inset **194px** respecto a las tarjetas de abajo. Visible en una captura de producción; invisible para 342 tests.
+
+El primer arreglo **fue incorrecto**: quité el `max-w-4xl` creyendo que era un `no-op` redundante. No lo era, porque `ArtistHero` se renderiza **fuera** de `<main>` (`app/artists/[id]/page.tsx:108` vs `:133`), así que ese contenedor es el único que lo recorta. quitarlo dejó el header a 1440px pegado al borde de la ventana. Lo detectó la misma comprobación que iba a validar el arreglo.
+
+`scripts/rc29-header-align.ts` mide los bordes de `main`, el `h1`, el contenedor del header y la primera tarjeta, y falla si la desalineación pasa de 8px. **Comprobé que detecta el fallo contra producción (208px, exit 1) antes de arreglar**, porque un check que siempre pasa no protege de nada.
+
+### 2. Ficha de pista partida entre páginas en el PDF
+
+`drawTrackRow` reservaba espacio con `ensureSpace` para la cabecera y nada más, así que las métricas, los metadatos y la letra se dibujaban con reservas locales. Resultado: la cabecera de "Se Va" al pie de una página y sus `DAW`/`TONALIDAD`/`LETRA` huérfanos en la siguiente, **sin nada que dijera a qué pista pertenecían**. En un dossier de prensa eso es directamente inútil.
+
+El PDF era perfectamente válido: `%PDF-` correcto, fuentes incrustadas, tamaño esperado. Por eso los tests de bytes no lo cazaron.
+
+`measureTrackEntry` reserva ahora la ficha entera, y las líneas de metadatos salen de la **misma** función que las dibuja para que medir y dibujar no puedan divergir. El documento pasó de 5 a 6 páginas: es el intercambio correcto.
+
+### 3. El PDF daba 500 en producción, y la causa no era donde yo miré
+
+Secuencia real: tres deploys deploying theories equivocadas.
+
+| Teoría | Resultado |
+|---|---|
+| Las TTF en `public/` no se leen en la lambda | Falsa. También fallaba en `lib/pdf/fonts/` |
+| Los `.nft.json` no traían las TTF | Falsa. Sí venían |
+| El build de Vercel estaba fallando | Falsa. `Build Completed in 40s` |
+
+La causa era doble, y ninguna de las dos la hubiera encontrado leyendo el código:
+
+1. `new PDFDocument()` llama a `initFonts(options.font)`, que carga Helvetica con un `require('#standard-fonts/Helvetica')` **dinámico**, antes de que exista nuestro código. El tracer de Next no lo ve, el directorio no llega a la función, y:
+   ```
+   Cannot find module '/var/task/.../pdfkit/js/standard-fonts/Helvetica.cjs'
+   ```
+   Se evita con `font: null`, que hace que `initFonts` se salte la fuente por defecto.
+
+2. Vercel rechazaba el despliegue completo con:
+   ```
+   The framework produced an invalid deployment package for a Serverless
+   Function. Typically this means that the framework produces files in
+   symlinked directories.
+   ```
+   Cualquier glob de `outputFileTracingIncludes` a `node_modules` con pnpm lo dispara. Por eso **ahora no hay ninguna regla de tracing**: la fuente va incrustada en el bundle y las estándar no se necesitan.
+
+Cómo se averiguó sin acceso a los logs de Vercel: `html` y `json` a 200 con `pdf` a 500 en la misma llamada acota el fallo; un commit con el mensaje de error en la respuesta dio la causa exacta (y se revirtió después, porque filtrar internos en un endpoint público no es aceptable); y la pila en local, interceptando `Module._load`, señaló al constructor y no a nuestro código.
+
+### 4. `createTrack` no escribía `status`
+
+`status` estaba declarado en la firma y **no aparecía en ninguno de los dos INSERT**. La columna se quedaba en el default del esquema (`draft`) y como todo lo público filtra `status = 'approved'`, **las 74 filas de D2 eran invisibles**: `turso-check` daba `tracks: 83` y la página del artista no mostraba ni un álbum. Sin un solo error en ningún sitio, y con 375 tests en verde porque la base estaba vacía.
+
+Es el argumento definitivo de por qué D2, aunque sea el último item y "solo datos", valía como prueba: los datos de verdad son los que destapan los fallos de lógica.
+
+De paso, el `--cleanup` que escribí antes **estaba roto**: borraba por `(artist_name, title)`, que solo encuentra al padre, así que dejaba 63 hijas huérfanas y las reportaba como "tracks ajenos". Un cleanup que deja restos es peor que no tenerlo, porque hay quien lo dará por bueno creyendo que la base está limpia. Ahora borra por estructura y limpia huérfanos con `release_id` colgante.
+
+---
+
+## Cómo se comprueba un PDF sin mirarlo a ojo
+
+`tests/helpers/pdf-text.ts` extrae el texto de cada página. No es trivial, y las trampas son suyas:
+
+- PDFKit incrusta las fuentes como **subset** y escribe el texto como IDs de glifo en hex dentro de arrays `TJ` (`[<0013> 20 <0014>] TJ`). Hay que leer el CMap `ToUnicode` de cada fuente.
+- Ese CMap usa la forma **array** de `bfrange` (`<lo> <hi> [<d0> <d1> ...]`), no la escalar. Sin esa rama todos los glifos salen como basura.
+- Un objeto `/Page` **no tiene stream**: su contenido está en `/Contents`. Buscar "páginas con stream" no encuentra ninguna.
+- El regex `/stream\r?\n/` **también matchea el "stream" de "endstream"**, desalinea los offsets y pierde páginas sin dar ningún error. Lleva lookbehind.
+- Cortar el stream en `"endstream"` es frágil: esa palabra puede salir por azar en datos binarios. Se usa `/Length`.
+- Los números dentro de un `TJ` son ajustes de **kerning**, no espacios. Contarlos como separador deforma `"2 / 7"` a `"2/7"` y hace fallar las aserciones del pie de página.
+
+`tests/unit/pdf-layout.test.ts` bloquea las dos regresiones, y `tests/unit/pdf-standard-fonts.test.ts` intercepta `Module._load` para fallar si algo pide `standard-fonts`. **Ambos se comprobaron revirtiendo el arreglo**: sin `font: null` falla, y sin `measureTrackEntry` falla.
+
+## Un error mío que casi se cuela
+
+Leí **"3 / 5"** en el pie de la página 5 de una captura y diagnostiqué la numeración como rota. El extractor de texto dijo 2/5, 3/5, 4/5, **5/5**: estaba bien, era un 5. Un píxel pequeño a tamaño completo engaña; el texto extraído no.
+
+## Rejilla del catálogo: de 4 columnas a 3
+
+Con albums reales en la base (The Wall tiene 20 pistas) los títulos se leían `"Another ..."`. C1 subió la rejilla a 4 columnas porque la EPKCard **suelta** quedaba en 198px, pero desde C2 cada celda es un grupo con la tarjeta **y** la lista de pistas, y en la fila de la pista compiten número, play, título y `"0:00 – 3:19"`. El título se quedaba en ~120px.
+
+A 3 columnas: 40 títulos medidos, 6 truncados y solo por 17-31px. La calibración de C1 no estaba mal; cambió el supuesto en que se apoyaba (celda = tarjeta).
+
+---
+
+## Estado de los datos
+
+Turso: **12 artistas, 83 pistas, las 83 `approved`, 0 huérfanos**.
+
+| Artista | Grupos | Pistas hijas |
+|---|---|---|
+| Pink Floyd | 2 | 30 |
+| Radiohead | 2 | 22 |
+| Björk | 1 | 5 |
+| David Bowie | 2 | 4 |
+| Kraftwerk | 2 | 4 |
+
+`artists_sin_dueno` pasa de 0 a 5 **a propósito**: los artistas del seed son material de referencia, no perfiles de gente real, a diferencia de los 7 con dueño que creó D1.
+
+## Advertencia sobre Turso en producción
+
+`/api/artists` en producción sirvió datos obsoletos durante ~20 minutos tras la resiembra (devolvió un id de artista ya borrado, y `X-Vercel-Cache: MISS`, `Age: 0`, o sea no era caché). El mismo host, el mismo token, y la ruta de detalle sí estaba al día. **La réplica va retrasada**: para leer el estado real hay que usar `npx tsx scripts/turso-check.ts`, no las lecturas de la API. Merece la pena confirmarlo cuando se pueda.
+
+## Pendientes que siguen abiertos
+
+- **`WEBHOOK_SECRET`**: lo define el usuario. Generar con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` y pegarlo en Vercel como Secret, sin pasarlo por el chat.
+- **Resend**: fuera de alcance. Falta `FROM_EMAIL`, el dominio está pendiente y la cuota está agotada.
+- **`syncLocalToTurso`** conserva deuda previa: omite `track_number` y otras columnas de P3/P5.
+- `app/shows/page.tsx` conserva `<h1>Shows & Events</h1>` en inglés porque el E2E lo exige; si se fuerza el copy español, hay que actualizar el test.
+
