@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { safeString } from "@/lib/null-safe";
+import { safeString, sumDurations } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
 
 interface ReleaseTracklistSectionProps {
@@ -31,15 +31,20 @@ export function ReleaseTracklistSection({ release, tracks }: ReleaseTracklistSec
   );
 
   const discs = [...new Set(ordered.map((t) => t.disc_number ?? 1))].sort((a, b) => a - b);
-  const totalSeconds = ordered.reduce((sum, t) => {
-    const [m, s] = safeString(t.duration, "0:00").split(":").map(Number);
-    if (Number.isNaN(m) || Number.isNaN(s)) return sum;
-    return sum + m * 60 + s;
-  }, 0);
-  const totalLabel =
-    totalSeconds > 0
-      ? `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`
-      : null;
+  /**
+   * P15 — la duración total sale de `sumDurations` (`lib/null-safe.ts`), no de
+   * un parser propio.
+   *
+   * El que había aquí hacía `const [m, s] = safeString(t.duration).split(":")`:
+   * con `"1:02:03"` el array es `[1, 2, 3]`, así que sumaba `1*60 + 2 = 62`
+   * segundos en vez de 3723, y el `isNaN` de guarda NO saltaba porque un
+   * array de números no contiene NaN. El error era silencioso y además se
+   * escribía de vuelta en la columna `duration`.
+   *
+   * `sumDurations` además devuelve `null` (no `0`) cuando no hay nada
+   * sumable, para no pintar "0:00" como si un disco recién creado durara cero.
+   */
+  const totalDuration = sumDurations(ordered.map((t) => t.duration));
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -50,7 +55,7 @@ export function ReleaseTracklistSection({ release, tracks }: ReleaseTracklistSec
         <p className="text-xs text-slate-500 dark:text-slate-400">
           {tracks.length} {tracks.length === 1 ? "pista" : "pistas"}
           {discs.length > 1 ? ` · ${discs.length} discos` : ""}
-          {totalLabel ? ` · ${totalLabel} en total` : ""}
+          {totalDuration ? ` · ${totalDuration.label} en total` : ""}
         </p>
       </div>
 

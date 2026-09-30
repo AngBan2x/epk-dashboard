@@ -1689,6 +1689,43 @@ export async function getAllArtists(): Promise<ArtistProfile[]> {
 
 // ─── Shows CRUD ─────────────────────────────────────────────────────────────
 
+/**
+ * Lector de shows APROBADOS y no borrados lógicamente: el que puede leer un
+ * visitante anónimo.
+ *
+ * Es el mismo agujero que S0/P4 tenía en `tracks`. `POST /api/shows:144` crea
+ * SIEMPRE con `approved = 0` para un artista (`session.role === "admin" &&
+ * validated.approved === true`), así que un show recién enviado es un borrador
+ * — y `/shows` no está en el `matcher` de `middleware.ts`, luego la página es
+ * pública. Con este lector, un show sin aprobar nunca llega al catálogo.
+ *
+ * OJO — `getAllShows()` (abajo) NO se puede reutilizar aquí: `scripts/qa-cleanup.ts`
+ * la usa para enumerar los shows QA de producción **incluidos los no
+ * aprobados**, y `tests/unit/shows.test.ts:254` crea shows con `approved = 0` y
+ * espera recuperarlos. Por eso son dos funciones y no una con un flag.
+ */
+export async function getApprovedShows(): Promise<Show[]> {
+  const sql =
+    "SELECT * FROM shows WHERE approved = 1 AND deleted_at IS NULL ORDER BY date ASC";
+  if (isTursoEnabled()) {
+    const rows = await tursoExec(sql);
+    return rows.map((r) => parseShow(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db.prepare(sql).all() as Record<string, unknown>[];
+  return rows.map(parseShow);
+}
+
+/**
+ * @deprecated Lector de MODERACIÓN, no de catálogo. Devuelve también los shows
+ * `approved = 0` y los `deleted_at` con fecha, que es justo lo que un
+ * visitante no debe ver. Consumidores actuales: `lib/artist-promotion.ts`
+ * (busca shows aprobados) y `scripts/qa-cleanup.ts` (limpia los QA sin
+ * aprobar). Las rutas públicas y las páginas deben usar `getApprovedShows()`.
+ *
+ * No se le cambió la semántica a propósito: hacerlo rompe los dos consumidores
+ * de arriba, que la necesitan así.
+ */
 export async function getAllShows(): Promise<Show[]> {
   if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM shows ORDER BY date ASC");
@@ -1730,6 +1767,66 @@ export async function getShowById(id: string): Promise<Show | null> {
   const db = getLocalDb();
   const row = db.prepare("SELECT * FROM shows WHERE id = ?").get(id) as Record<string, unknown> | undefined;
   return row !== undefined ? parseShow(row) : null;
+}
+
+/** Show por id, restringido a `approved = 1` y sin borrado lógico. Ver `getApprovedShows()`. */
+export async function getApprovedShowById(id: string): Promise<Show | null> {
+  const sql = "SELECT * FROM shows WHERE id = ? AND approved = 1 AND deleted_at IS NULL";
+  if (isTursoEnabled()) {
+    const row = await tursoExecSingle(sql, [id]);
+    return row ? parseShow(row) : null;
+  }
+  const db = getLocalDb();
+  const row = db.prepare(sql).get(id) as Record<string, unknown> | undefined;
+  return row !== undefined ? parseShow(row) : null;
+}
+
+/** Shows aprobados de un artista. Espejo público de `getShowsByArtist()`. */
+export async function getApprovedShowsByArtist(artistId: string): Promise<Show[]> {
+  const sql =
+    "SELECT * FROM shows WHERE artist_id = ? AND approved = 1 AND deleted_at IS NULL ORDER BY date ASC";
+  if (isTursoEnabled()) {
+    const rows = await tursoExec(sql, [artistId]);
+    return rows.map((r) => parseShow(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db.prepare(sql).all(artistId) as Record<string, unknown>[];
+  return rows.map(parseShow);
+}
+
+/**
+ * LectorMultiple para las vistas que agrupan por artista.
+ *
+ * PENDIENTE (fuera de mi ownership, reportado al orquestador):
+ * `app/api/dashboard/route.ts:46-52` construye `showsByArtist` con
+ * `getShowsByArtists()`, que NO filtra, y lo devuelve tal cual **incluso a
+ * visitantes anónimos** (la rama `if (!session)` de `:54-67`). Es la MISMA
+ * fuga que P12b por otra puerta: un show recién enviado por un artista es
+ * legible sin sesión desde `/api/dashboard`.
+ *
+ * El arreglo es una línea en esa ruta — cambiar `getShowsByArtists` por
+ * `getApprovedShowsByArtists` y dejar el show propio del artista como está
+ * (`:78`), igual que se hace con los tracks en `:40-42`:
+ *
+ *   const allShows = await (isAdmin
+ *     ? getShowsByArtists(ids)
+ *     : getApprovedShowsByArtists(ids));
+ *
+ * No lo he aplicado porque ese archivo no me pertenece. Queda el lector listo
+ * para que el arreglo sea mecánico.
+ */
+export async function getApprovedShowsByArtists(artistIds: string[]): Promise<Show[]> {
+  if (artistIds.length === 0) return [];
+  const sql = `SELECT * FROM shows WHERE artist_id IN (${artistIds
+    .map(() => "?")
+    .join(", ")}) AND approved = 1 AND deleted_at IS NULL ORDER BY date ASC`;
+  if (isTursoEnabled()) {
+    const rows = await tursoExec(sql, artistIds);
+    return rows.map((r) => parseShow(r as Record<string, unknown>));
+  }
+  const db = getLocalDb();
+  const rows = db.prepare(sql).all(...artistIds) as Record<string, unknown>[];
+  return rows.map(parseShow);
 }
 
 export async function createShow(data: CreateShowInput): Promise<Show> {
@@ -1887,6 +1984,85 @@ export async function getTrackById(id: string): Promise<Track | null> {
   const db = getLocalDb();
   const row = db.prepare("SELECT * FROM tracks WHERE id = ?").get(id) as Record<string, unknown> | undefined;
   return row !== undefined ? parseTrack(row) : null;
+}
+
+// ─── S0/P4 — lector de alcance PÚBLICO ───────────────────────────────────────
+//
+// `getTrackById` es el lector "administrativo": no filtra por estado, porque el
+// dashboard del artista y el panel de admin necesitan ver borradores,
+// pendientes y rechazados. El problema es que `GET /api/releases?id=X` sin
+// `user_id` lo usaba como si fuera público, y `GET /api/tracks/:id` tampoco.
+//
+// Consecuencia medida en este repo, no teórica: la columna `tracks.admin_notes`
+// (el motivo interno por el que el admin rechaza un release) existe en el
+// esquema local pero NO en `Track`/`parseTrack`. Un `SELECT *` la devolvía
+// cruda a cualquiera con el id. Y sin filtro de estado, un borrador o un
+// rechazo quedaban legibles —y por tanto indexables— en cuanto el artista
+// enviaba su primer release.
+//
+// Este lector cierra las dos cosas a la vez:
+//   1. `status = 'approved'` — nada sin publicar sale por la vía pública.
+//   2. `parseTrack` en vez de `SELECT *` — la forma de la respuesta queda
+//      acotada por el tipo `Track`, así que una columna nueva sensible no se
+//      filtra por forgotten: hay que añadirla al tipo para exponerla.
+//
+// Uso: rutas GET públicas. Para el dueño o el admin, la fila completa con todos
+// los estados se sigue resolving por `getTrackById` tras verificar ownership
+// contra `artists.user_id`.
+//
+// El segundo brazo de la condición (`release_id` de un padre aprobado) no es
+// decoración. `POST /api/releases:168` inserta las hijas SIEMPRE con
+// `status = 'draft'`, incluso cuando el padre se aprueba después. Sin ese
+// brazo, el álbum se publicaría vacío de contenido: el padre Approved pero
+// cada pista hija respondiendo 404, y con ella los enlaces de
+// `ArtistTracksSection.tsx:86`, que apuntan a `/releases/<id de la hija>`.
+export async function getApprovedTrackById(id: string): Promise<Track | null> {
+  const sql = `
+    SELECT t.* FROM tracks t
+     WHERE t.id = ?
+       AND (
+         t.status = 'approved'
+         OR (
+           t.release_id IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM tracks p
+              WHERE p.id = t.release_id AND p.status = 'approved'
+           )
+         )
+       )
+  `;
+  if (isTursoEnabled()) {
+    try {
+      const row = await tursoExecSingle(sql, [id]);
+      return row ? parseTrack(row) : null;
+    } catch (error) {
+      console.error("Turso getApprovedTrackById failed:", error);
+      throw new Error("Database error: Turso connection failed.");
+    }
+  }
+  const db = getLocalDb();
+  const row = db.prepare(sql).get(id) as Record<string, unknown> | undefined;
+  return row !== undefined ? parseTrack(row) : null;
+}
+
+/**
+ * Resuelve si un usuario es el dueño verificado de las filas de `tracks` con
+ * ese `artist_name`.
+ *
+ * `tracks` NO tiene FK a `artists`: se relaciona por nombre (ver el comentario
+ * de `deleteArtist`). Por eso el ownership se valida contra
+ * `artists.user_id`, igual que hacen `PUT`/`DELETE /api/releases`.
+ *
+ * Devuelve `false` si no hay artista con ese nombre (un track orphaned nunca
+ * es editable por nadie salvo por un admin).
+ */
+export async function isArtistOwnerOfTrackName(
+  artistName: string,
+  userId: string
+): Promise<boolean> {
+  if (!artistName || !userId) return false;
+  const artist = await getArtistByName(artistName);
+  return artist?.user_id != null && artist.user_id === userId;
 }
 
 export async function getTrackCount(): Promise<number> {

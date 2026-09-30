@@ -35,6 +35,48 @@ export const pdfTrack: Track = {
   stems_urls: { drums: "https://example.test/drums.wav" },
 } as Track;
 
+/**
+ * P15 — el caso real de los 9 padres del catálogo semilla: la fila del álbum
+ * trae `duration = "00:00"` porque es la fila agrupadora, no una pista
+ * reproducible. Sus hijas sí tienen duración real, en el formato `M:SS` del
+ * seed (`"3:45"`, un solo dígito de minuto).
+ */
+export const pdfAlbumParent: Track = {
+  ...pdfTrack,
+  id: "track-fixture-album",
+  title: "Cielo Roto",
+  release_type: "album",
+  duration: "00:00",
+  release_id: null,
+  disc_number: 1,
+  status: "approved",
+} as Track;
+
+export const pdfAlbumChild1: Track = {
+  ...pdfTrack,
+  id: "track-fixture-album-1",
+  title: "Cielo Roto I",
+  release_id: "track-fixture-album",
+  duration: "3:45",
+  disc_number: 1,
+  track_number: 1,
+  status: "approved",
+} as Track;
+
+export const pdfAlbumChild2: Track = {
+  ...pdfTrack,
+  id: "track-fixture-album-2",
+  title: "Cielo Roto II",
+  release_id: "track-fixture-album",
+  duration: "6:07",
+  disc_number: 1,
+  track_number: 2,
+  status: "approved",
+} as Track;
+
+/** El álbum con sus dos hijas: exactamente el caso que P15 arregla. */
+export const pdfAlbum: Track[] = [pdfAlbumParent, pdfAlbumChild1, pdfAlbumChild2];
+
 export const pdfDossier: DossierData = {  id: "dossier-fixture-1",
   artist_id: PDF_ARTIST_ID,
   biography: "Biografía con eñes y acentos: ¿qué? ¡sí!",

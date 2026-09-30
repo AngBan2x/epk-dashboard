@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getDbWrite, isTursoConfigured } from "@/lib/db";
+import { getDbWrite, isTursoConfigured, getApprovedTrackById, isArtistOwnerOfTrackName } from "@/lib/db";
 import { getTursoClient } from "@/lib/turso";
 import { validateRequest } from "@/lib/auth";
 import { validateTrackNumber } from "@/lib/validations";
@@ -78,14 +78,53 @@ export async function GET(req: NextRequest) {
     const visibilityClause = publicOnly ? " AND status = 'approved'" : "";
 
     if (id) {
-      let query = "SELECT * FROM tracks WHERE id = ?";
-      const params: string[] = [id];
       if (artistNames) {
+        // Camino `?id=X&user_id=Y`: el alcance ya está acotado por los nombres
+        // de artista del usuario. Para el dueño o el admin sigue viendo todos
+        // los estados; para el resto, solo `approved`. Se mantiene el `SELECT *`
+        // porque aquí el llamante ya está autenticado y por rol o por
+        // propiedad, y el formulario de edición necesita `description`/`genre`,
+        // que no forman parte del tipo `Track`.
+        let query = "SELECT * FROM tracks WHERE id = ?";
+        const params: string[] = [id];
         query += ` AND artist_name IN (${artistNames.map(() => "?").join(", ")})${visibilityClause}`;
         params.push(...artistNames);
+        const releases = await dbQuery(query, params);
+        return NextResponse.json(releases[0] || null);
       }
-      const releases = await dbQuery(query, params);
-      return NextResponse.json(releases[0] || null);
+
+      // Camino `?id=X` SIN `user_id`: este es público. Antes hacía
+      // `SELECT * FROM tracks WHERE id = ?` a secas, lo que devolvía la fila
+      // CRUDA: un `draft`/`pending`/`rejected` legible por cualquiera con el id
+      // y la columna `tracks.admin_notes` —el motivo interno de rechazo del
+      // admin— traveling en la respuesta porque `parseTrack` no la expone.
+      //
+      // Ahora: primero el lector de alcance público (aprobado + parseado). Solo
+      // si no está aprobado se exige sesión, y entonces se comprueba rol de
+      // admin o propiedad real contra `artists.user_id` (no un `user_id` de
+      // query, que sería falsificable).
+      const approved = await getApprovedTrackById(id);
+      if (approved) return NextResponse.json(approved);
+
+      const session = await validateSession(req);
+      if (!session) return NextResponse.json(null);
+
+      // `getTrackById` pasa por `parseTrack`, que NO expone `admin_notes`,
+      // `description` ni `genre`. Para el dueño y el admin eso es una pérdida
+      // real: el formulario de edición muestra el motivo del rechazo y
+      // edita la descripción. Por eso el camino privilegiado devuelve la fila
+      // cruda, igual que el camino `?id&user_id` de arriba, y el público es el
+      // único que pasa por `parseTrack`.
+      const privileged = await dbQuery("SELECT * FROM tracks WHERE id = ?", [id]) as Record<string, unknown>[];
+      const row = privileged[0];
+      if (!row) return NextResponse.json(null);
+
+      if (session.role === "admin") return NextResponse.json(row);
+
+      const owns = await isArtistOwnerOfTrackName(String(row.artist_name ?? ""), session.userId);
+      if (owns) return NextResponse.json(row);
+
+      return NextResponse.json(null);
     }
 
     let query = "SELECT * FROM tracks WHERE 1=1";

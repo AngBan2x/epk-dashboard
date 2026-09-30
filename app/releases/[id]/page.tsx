@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { getTrackById, getTracksByReleaseId } from "@/lib/db";
-import { formatDateES } from "@/lib/null-safe";
+import { capitalizeReleaseType, formatDateES } from "@/lib/null-safe";
 import { notFound } from "next/navigation";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import { ReleaseActions } from "@/components/ReleaseActions";
@@ -36,12 +36,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   const childTracks = await getTracksByReleaseId(params.id);
   const isMultiTrack = childTracks.length > 0;
 
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <main className="max-w-4xl mx-auto px-4 py-12">
@@ -65,19 +59,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <span className="px-2 py-1 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded">
-                {release.release_type?.charAt(0).toUpperCase() + (release.release_type?.slice(1) || "")}
+                {capitalizeReleaseType(release.release_type)}
               </span>
-              {release.status && (
-                <span className={`px-2 py-1 text-xs font-medium rounded ${
-                  release.status === "approved"
-                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                    : release.status === "pending"
-                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                }`}>
-                  {release.status === "approved" ? "Aprobado" : release.status === "pending" ? "Pendiente" : "Borrador"}
-                </span>
-              )}
             </div>
 
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -100,8 +83,12 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               )}
             </div>
 
-            {/* Actions */}
-            <ReleaseActions releaseId={params.id} />
+            {/* Actions + badge de estado (solo admin o dueño) */}
+            <ReleaseActions
+              releaseId={params.id}
+              artistName={release.artist_name}
+              status={release.status}
+            />
           </div>
         </div>
 

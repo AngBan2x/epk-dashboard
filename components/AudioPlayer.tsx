@@ -2,8 +2,8 @@
 
 import { useRef, useState, useContext, useEffect } from "react";
 import { safeString } from "@/lib/null-safe";
-import { AudioPlayerContext } from "@/context/AudioPlayerContext";
-import { getAudioSources, AudioSource } from "@/lib/audio-priority";
+import { AudioPlayerContext, type ActiveTrack } from "@/context/AudioPlayerContext";
+import { getAudioSources, hasPlayableSource, isUsableAudioUrl } from "@/lib/audio-priority";
 
 interface AudioPlayerProps {
   src: string | undefined;
@@ -20,20 +20,43 @@ interface AudioPlayerProps {
     start_time?: number | null;
     end_time?: number | null;
   };
+  /**
+   * Cola completa para avance automático. Si viene, el play monta la cola y
+   * arranca en **esta** pista (`queueStartIndex` solo como respaldo).
+   */
+  queue?: ActiveTrack[];
+  queueStartIndex?: number;
 }
 
 // Debounce map: track IDs that have already been counted in this session
 const countedStreams = new Set<string>();
 
-export function AudioPlayer({ src, title, id, artist, coverImage, track }: AudioPlayerProps) {
+export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, queueStartIndex = 0 }: AudioPlayerProps) {
   const localAudioRef = useRef<HTMLAudioElement>(null);
   const [localPlaying, setLocalPlaying] = useState(false);
-  const [currentSource, setCurrentSource] = useState<AudioSource | null>(null);
   const globalPlayer = useContext(AudioPlayerContext);
   const { isPlaying: globalIsPlaying, isLoading: globalIsLoading, error: globalError } = globalPlayer || {};
 
   // Determine available audio sources from track data
   const sources = track ? getAudioSources(track) : [];
+  // Orden de precedencia: preview (100) > spotify = apple music (90) > youtube (50)
+  const primarySource = sources[0] ?? null;
+
+  const resolvedId = id || src || track?.youtube_video_id || "unknown";
+
+  // ¿Suena algo? No "¿tiene links?": una pista con solo Spotify/Apple Music
+  // tiene `embedUrl` pero nadie lo renderiza, así que su play sería un botón
+  // que no hace nada (que es justo el bug que se pidió eliminar).
+  const canPlay = track ? hasPlayableSource(track) : isUsableAudioUrl(src);
+
+  /**
+   * `isYouTube` solo cuando NO hay preview: una pista con preview **y**
+   * `youtube_video_id` reproduce el preview e ignora YouTube por completo
+   * (decisión consciente: el preview es 30 s reales de audio y el vídeo
+   * sonaría con imagen de fondo y capítulos). Para una release con vídeo
+   * padre, quien quiera el vídeo monta la cola en modo YouTube.
+   */
+  const isYouTubeMode = !sources.some((s) => s.type === "preview") && sources.some((s) => s.type === "youtube");
 
   // Determine if this track is the current global track — prefer id comparison to avoid
   // YouTube-only tracks colliding on shared audioUrl "—"
@@ -44,10 +67,17 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
     : false;
 
   const isPlaying = globalPlayer ? isCurrentGlobal && globalIsPlaying : localPlaying;
-  const isError = globalPlayer && isCurrentGlobal && globalError;
+  const isError = Boolean(globalPlayer && isCurrentGlobal && globalError);
 
   let playButton: React.ReactNode;
-  if (isError) {
+  if (!canPlay) {
+    // Sin fuente reproducible: no se pinta un "▶" que no lleva a ningún lado.
+    playButton = (
+      <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+      </svg>
+    );
+  } else if (isError) {
     // P3.34: Error state
     playButton = (
       <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -87,87 +117,54 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
     });
   }, [id, isPlaying]);
 
-  // Auto-select best source on mount, and re-select when the track changes
-  useEffect(() => {
-    setCurrentSource(sources.length > 0 ? sources[0] : null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, src]);
-
-  // Handle YouTube iframe API messages
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://www.youtube.com') return;
-      const data = event.data;
-      if (data.event === 'onStateChange') {
-        if (data.data === 0) {
-          if (globalPlayer) {
-            globalPlayer.togglePlay();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [globalPlayer]);
-
   const togglePlay = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!src && !track) return;
-
-    const activeSource = currentSource || sources[0] || null;
-    if (!activeSource) return;
+    if (!canPlay) return;
 
     if (globalPlayer) {
       if (isCurrentGlobal) {
         globalPlayer.togglePlay();
-      } else {
-        // Check if this is a YouTube-only track
-        const isYouTubeOnly = sources.length === 1 && sources[0].type === 'youtube';
-        const previewSource = sources.find(s => s.type === 'preview');
-        const audioUrl = previewSource?.url || src || '';
-
-        globalPlayer.playTrack({
-          id: id || src || track?.youtube_video_id || 'unknown',
-          title: safeString(title),
-          artist: safeString(artist, "Artista EPK"),
-          audioUrl,
-          coverImage,
-          isYouTube: isYouTubeOnly,
-          youtubeVideoId: track?.youtube_video_id || undefined,
-          startTimestamp: track?.start_time || 0,
-          endTimestamp: track?.end_time || 0,
-        });
+        return;
       }
+
+      const audioUrl = sources.find((s) => s.type === "preview")?.url || src || "";
+      const activeTrack: ActiveTrack = {
+        id: resolvedId,
+        title: safeString(title),
+        artist: safeString(artist, "Artista EPK"),
+        audioUrl,
+        coverImage,
+        isYouTube: isYouTubeMode,
+        youtubeVideoId: track?.youtube_video_id || undefined,
+        startTimestamp: track?.start_time || 0,
+        endTimestamp: track?.end_time || 0,
+      };
+
+      if (queue && queue.length > 0) {
+        // El botón de cada fila arranca en SU pista dentro de la cola.
+        const at = queue.findIndex((item) => item.id === resolvedId);
+        globalPlayer.playQueue(queue, at !== -1 ? at : queueStartIndex);
+        return;
+      }
+
+      globalPlayer.playTrack(activeTrack);
       return;
     }
 
-    // Local playback logic
-    if (activeSource.type === 'preview' && activeSource.url) {
+    // Local playback logic (sin reproductor global)
+    if (primarySource?.type === "preview" && isUsableAudioUrl(primarySource.url)) {
       const audio = localAudioRef.current;
       if (!audio) return;
       if (localPlaying) {
         audio.pause();
       } else {
-        audio.src = activeSource.url;
-        audio.play();
+        audio.src = primarySource.url;
+        void audio.play().catch(() => {
+          setLocalPlaying(false);
+        });
       }
       setLocalPlaying(!localPlaying);
-    }
-  };
-
-  const switchSource = (source: AudioSource) => {
-    setCurrentSource(source);
-    if (globalPlayer && isCurrentGlobal) {
-      // setActiveSource not available on global context
-    } else {
-      setLocalPlaying(false);
-      setTimeout(() => {
-        if (source.type === 'preview') {
-          setLocalPlaying(true);
-        }
-      }, 100);
     }
   };
 
@@ -179,46 +176,51 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track }: Audio
     }
   };
 
+  const statusText = !canPlay
+    ? "No hay audio disponible"
+    : globalIsLoading && isCurrentGlobal
+      ? "Cargando..."
+      : isPlaying
+        ? "Reproduciendo..."
+        : "Reproducir";
+
   return (
     <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
       <div className="flex items-center gap-3">
+        {/* El `aria-label` se mantiene en "Reproducir"/"Pausar" a propósito: es lo
+            que localizan 20 tests E2E (`audio-player-stress.spec.ts`,
+            `audio-playback.spec.ts`). El estado vacío se comunica con `disabled`,
+            `aria-disabled` y el texto visible, no robando el nombre accesible. */}
         <button
           onClick={togglePlay}
-          className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0"
+          disabled={!canPlay}
+          aria-disabled={!canPlay}
+          className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-primary-600"
           aria-label={isPlaying ? "Pausar" : "Reproducir"}
         >
           {playButton}
         </button>
 
         <div className="flex-1 min-w-0">
-          {src || track?.audio_preview_url || track?.youtube_video_id ? (
-            <>
-              {/* Local Audio Element (for preview) */}
-              {(!globalPlayer || currentSource?.type === 'preview') && (
-                <audio
-                  ref={localAudioRef}
-                  src={src || track?.audio_preview_url || ''}
-                  onEnded={handleSourceEnd}
-                  onError={() => setLocalPlaying(false)}
-                  style={{ display: 'none' }}
-                />
-              )}
-
-              {/* Audio Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
-                  {globalIsLoading && isCurrentGlobal
-                    ? "Cargando..."
-                    : isPlaying
-                      ? "Reproduciendo..."
-                      : "Reproducir"}
-                  {currentSource && ` • ${currentSource.label}`}
-                </p>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-slate-400">No hay audio disponible</p>
+          {/* Local Audio Element (solo sin reproductor global: el global es quien
+              mezcla la cola) */}
+          {!globalPlayer && canPlay && primarySource?.type === "preview" && (
+            <audio
+              ref={localAudioRef}
+              src={primarySource.url}
+              onEnded={handleSourceEnd}
+              onError={() => setLocalPlaying(false)}
+              style={{ display: "none" }}
+            />
           )}
+
+          {/* Audio Info */}
+          <div className="flex-1 min-w-0">
+            <p className={`text-xs truncate ${canPlay ? "text-slate-600 dark:text-slate-300" : "text-slate-400"}`}>
+              {statusText}
+              {canPlay && primarySource && ` • ${primarySource.label}`}
+            </p>
+          </div>
         </div>
 
       </div>
