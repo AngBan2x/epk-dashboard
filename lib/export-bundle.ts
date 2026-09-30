@@ -25,7 +25,8 @@ export interface ExportBundleOptions {
 export interface ExportBundle {
   filename: string;
   contentType: string;
-  body: string;
+  /** `Buffer` para PDF, `string` para HTML/JSON. */
+  body: string | Buffer;
 }
 
 export class ExportError extends Error {
@@ -80,7 +81,7 @@ function singleSectionHtml(section: ExportSection, payload: ExportPayload): stri
 }
 
 export async function buildExportBundle(options: ExportBundleOptions): Promise<ExportBundle> {
-  const format: ExportFormat = options.format === "html" ? "html" : "json";
+  const format: ExportFormat = options.format === "html" || options.format === "pdf" ? options.format : "json";
   const sections = normalizeSections(options.include, format);
   const artistId = options.artistId?.trim() || null;
 
@@ -126,6 +127,19 @@ export async function buildExportBundle(options: ExportBundleOptions): Promise<E
       filename: sanitizeFilename(filename),
       contentType: "application/json; charset=utf-8",
       body: buildBundleJson(payload, sections),
+    };
+  }
+
+  if (format === "pdf") {
+    // Import perezoso: `lib/pdf` arrastra pdfkit (bundle de ~1 MB) y las
+    // exportaciones html/json —que son las de la portada— no lo necesitan. Asi
+    // el modulo se carga la primera vez que alguien pide un PDF y no en cada
+    // arranque del worker.
+    const { buildPressPdf } = await import("@/lib/pdf");
+    return {
+      filename: sanitizeFilename(filename),
+      contentType: "application/pdf",
+      body: await buildPressPdf(payload, sections),
     };
   }
 

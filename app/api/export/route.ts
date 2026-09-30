@@ -4,6 +4,8 @@ import { buildExportBundle, ExportError } from "@/lib/export-bundle";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+// pdfkit lee ficheros con `fs` y escribe en un stream de Node: no corre en edge.
+export const runtime = "nodejs";
 
 /**
  * `POST /api/export` es publico (el DownloadCenter se monta tambien en la pagina
@@ -15,12 +17,10 @@ const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
 const ExportBodySchema = z.object({
-  // B5 pendiente: añadir "pdf" aquí y a `ExportFormat` en
-  // components/DownloadCenter.tsx, junto con las plantillas de lib/pdf/.
-  // Bloqueado: este track no puede instalar `pdfkit` (dependencia nueva).
-  // Aceptar "pdf" sin generador devolvería un JSON con extensión .pdf.
   format: z
-    .enum(["html", "json"], { errorMap: () => ({ message: 'format debe ser "html" o "json"' }) })
+    .enum(["html", "json", "pdf"], {
+      errorMap: () => ({ message: 'format debe ser "html", "json" o "pdf"' }),
+    })
     .optional(),
   artist_id: z
     .string({ invalid_type_error: "artist_id debe ser texto" })
@@ -87,7 +87,12 @@ export async function POST(req: NextRequest) {
       include: parsed.data.include ?? null,
     });
 
-    return new NextResponse(bundle.body, {
+    // `Buffer` es un `Uint8Array` y `BodyInit` lo acepta, pero se pasa
+    // explicitamente: asi el tipo de la respuesta no depende de como Next.js
+    // defina `BodyInit` en cada version.
+    const body = typeof bundle.body === "string" ? bundle.body : new Uint8Array(bundle.body);
+
+    return new NextResponse(body, {
       status: 200,
       headers: {
         "Content-Type": bundle.contentType,
