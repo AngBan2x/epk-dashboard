@@ -112,7 +112,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "The Dark Side of the Moon",
     releaseType: "Album",
     releaseDate: "1973-03-01",
-    coverImage: "https://example.com/covers/dark-side-moon.jpg",
+    coverImage: "https://images.unsplash.com/photo-1471478331149-c72f17e33c73?w=600&q=80",
     tracks: [
       { title: "Speak to Me", duration: "1:07", trackNumber: 1, discNumber: 1, startTime: 0, endTime: 67 },
       { title: "Breathe (In the Air)", duration: "2:43", trackNumber: 2, discNumber: 1, startTime: 67, endTime: 230 },
@@ -131,7 +131,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "The Wall",
     releaseType: "Album",
     releaseDate: "1979-11-30",
-    coverImage: "https://example.com/covers/the-wall.jpg",
+    coverImage: "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=600&q=80",
     tracks: [
       { title: "In the Flesh?", duration: "3:19", trackNumber: 1, discNumber: 1, startTime: 0, endTime: 199 },
       { title: "The Thin Ice", duration: "2:27", trackNumber: 2, discNumber: 1, startTime: 199, endTime: 346 },
@@ -162,7 +162,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "OK Computer",
     releaseType: "Album",
     releaseDate: "1997-05-21",
-    coverImage: "https://example.com/covers/ok-computer.jpg",
+    coverImage: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=600&q=80",
     tracks: [
       { title: "Airbag", duration: "4:44", trackNumber: 1, discNumber: 1, startTime: 0, endTime: 284 },
       { title: "Paranoid Android", duration: "6:23", trackNumber: 2, discNumber: 1, startTime: 284, endTime: 667 },
@@ -183,7 +183,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "Kid A",
     releaseType: "Album",
     releaseDate: "2000-10-02",
-    coverImage: "https://example.com/covers/kid-a.jpg",
+    coverImage: "https://images.unsplash.com/photo-1524650359799-842906ca1c06?w=600&q=80",
     tracks: [
       { title: "Everything in Its Right Place", duration: "4:11", trackNumber: 1, discNumber: 1, startTime: 0, endTime: 251 },
       { title: "Kid A", duration: "4:44", trackNumber: 2, discNumber: 1, startTime: 251, endTime: 535 },
@@ -203,7 +203,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "Vulnicura Strings",
     releaseType: "EP",
     releaseDate: "2016-11-04",
-    coverImage: "https://example.com/covers/vulnicura-strings.jpg",
+    coverImage: "https://images.unsplash.com/photo-1521337581100-8ca9a73a5f79?w=600&q=80",
     tracks: [
       { title: "Stonemilker (Strings)", duration: "5:27", trackNumber: 1, discNumber: 1, startTime: 0, endTime: 327 },
       { title: "Lionsong (Strings)", duration: "4:54", trackNumber: 2, discNumber: 1, startTime: 327, endTime: 621 },
@@ -218,7 +218,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "\"Heroes\"",
     releaseType: "Single",
     releaseDate: "1977-09-23",
-    coverImage: "https://example.com/covers/heroes-single.jpg",
+    coverImage: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80",
     tracks: [
       {
         title: "\"Heroes\"",
@@ -247,7 +247,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "Ashes to Ashes",
     releaseType: "Single",
     releaseDate: "1980-08-01",
-    coverImage: "https://example.com/covers/ashes-to-ashes.jpg",
+    coverImage: "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=600&q=80",
     tracks: [
       {
         title: "Ashe to Ashes",
@@ -277,7 +277,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "The Model / Computer Love",
     releaseType: "Single",
     releaseDate: "1981-12-04",
-    coverImage: "https://example.com/covers/the-model.jpg",
+    coverImage: "https://images.unsplash.com/photo-1487180144351-b8472da7d491?w=600&q=80",
     tracks: [
       {
         title: "The Model",
@@ -306,7 +306,7 @@ const SEED_RELEASES: SeedRelease[] = [
     title: "Tour de France",
     releaseType: "Single",
     releaseDate: "1983-06-01",
-    coverImage: "https://example.com/covers/tour-de-france.jpg",
+    coverImage: "https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?w=600&q=80",
     tracks: [
       {
         title: "Tour de France (Version Française)",
