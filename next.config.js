@@ -1,7 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ["better-sqlite3"],
+    // pdfkit lee sus .afm y las TTF del PDF con `fs` y depende de `fontkit` en
+    // tiempo de ejecucion: si webpack lo empaqueta, `POST /api/export?format=pdf`
+    // revienta con "Cannot find module" en produccion.
+    serverComponentsExternalPackages: ["better-sqlite3", "pdfkit"],
+    outputFileTracingIncludes: {
+      // Las TTF del PDF se leen por ruta, asi que hay que declararlas o el
+      // despliegue de Vercel no las copia.
+      "/api/export": ["./public/fonts/*.ttf"],
+    },
   },
   images: {
     remotePatterns: [

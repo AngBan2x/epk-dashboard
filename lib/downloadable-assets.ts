@@ -3,7 +3,7 @@ import { escapeHtml } from "@/lib/email-templates";
 import type { Track, TopCountry } from "@/types/music";
 import type { DossierData } from "@/lib/db";
 
-export type ExportFormat = "html" | "json";
+export type ExportFormat = "html" | "json" | "pdf";
 export type ExportSection = "dossier" | "rider" | "catalog";
 
 export type DossierSource = DossierData | Readonly<Record<string, string | null>> | null;
@@ -24,9 +24,17 @@ export const EXPORT_SECTIONS: readonly ExportSection[] = ["dossier", "rider", "c
 const DEFAULT_SECTIONS: Record<ExportFormat, ExportSection[]> = {
   html: ["catalog"],
   json: ["catalog"],
+  // Igual que html/json: sin secciones explicitas se exporta el catalogo, que es
+  // la unica que no necesita `artist_id` (dossier y rider dan 400 sin el).
+  pdf: ["catalog"],
 };
 
-const RIDER_DEFAULTS = {
+/**
+ * Exportados (no privados) porque `lib/pdf/` construye el PDF con exactamente los
+ * mismos valores que el HTML: duplicar estas tablas haria que un PDF y un HTML
+ * del mismo artista dijeran cosas distintas.
+ */
+export const RIDER_DEFAULTS = {
   rider_pa_system: "Line Array - Minimo 15,000W RMS",
   rider_monitors: "Minimo 4 mezclas in-ear o wedge",
   rider_console: "Digital - minimo 32 canales",
@@ -90,7 +98,7 @@ const RIDER_STYLES_SCOPED = `    #rider-section h1 { font-size: 2rem; color: #0f
     #rider-section .item-value { font-size: 1rem; color: #0f172a; font-weight: 500; }
     #rider-section .notes { padding: 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; color: #92400e; font-size: 0.9rem; }`;
 
-function dossierRecord(payload: ExportPayload): Readonly<Record<string, string | null>> {
+export function dossierRecord(payload: ExportPayload): Readonly<Record<string, string | null>> {
   const source = payload.dossier;
   if (!source) return {};
   const record: Record<string, string | null> = {};
@@ -100,20 +108,20 @@ function dossierRecord(payload: ExportPayload): Readonly<Record<string, string |
   return record;
 }
 
-function dossierText(data: Readonly<Record<string, string | null>>, key: string, fallback = ""): string {
+export function dossierText(data: Readonly<Record<string, string | null>>, key: string, fallback = ""): string {
   const value = data[key];
   return typeof value === "string" && value.trim() !== "" ? value : fallback;
 }
 
-function riderValue(data: Readonly<Record<string, string | null>>, key: keyof typeof RIDER_DEFAULTS): string {
+export function riderValue(data: Readonly<Record<string, string | null>>, key: keyof typeof RIDER_DEFAULTS): string {
   return dossierText(data, key, RIDER_DEFAULTS[key]);
 }
 
-function formatDateLong(date: Date): string {
+export function formatDateLong(date: Date): string {
   return date.toLocaleDateString("es-VE", { year: "numeric", month: "long", day: "numeric" });
 }
 
-function formatCount(value: number): string {
+export function formatCount(value: number): string {
   return new Intl.NumberFormat("es-VE").format(value);
 }
 
@@ -266,7 +274,7 @@ function dossierBody(payload: ExportPayload, includeFooter: boolean): string {
   ${includeFooter ? dossierFooter(now) : ""}`;
 }
 
-function collectTrackLinks(track: Track): Array<{ label: string; href: string }> {
+export function collectTrackLinks(track: Track): Array<{ label: string; href: string }> {
   const links: Array<{ label: string; href: string }> = [];
   const push = (label: string, raw: unknown) => {
     const href = safeHref(raw);
@@ -308,35 +316,77 @@ function collectTrackLinks(track: Track): Array<{ label: string; href: string }>
   return links;
 }
 
-function catalogTrackHtml(track: Track): string {
+/**
+ * Datos de una pista ya aplanados y formateados, sin HTML. Es la unica fuente
+ * de verdad del catalogo: la consumen `catalogTrackHtml` y el generador de PDF
+ * (`lib/pdf/sections.ts`), de modo que ambos formatos muestran los mismos campos
+ * con los mismos valores.
+ */
+export interface CatalogTrackFields {
+  title: string;
+  releaseType: string;
+  releaseDate: string;
+  duration: string;
+  streams: string;
+  saves: string;
+  playlists: string;
+  daw: string;
+  key: string;
+  genre: string;
+  bpm: number | null;
+  topCountries: string;
+  links: Array<{ label: string; href: string }>;
+  lyrics: string;
+  hasStems: boolean;
+  galleryCount: number;
+}
+
+export function catalogTrackFields(track: Track): CatalogTrackFields {
   const production = track.production_details;
-  const streams = formatCount(safeNumber(track.metrics?.streams));
-  const saves = formatCount(safeNumber(track.metrics?.saves));
-  const playlists = formatCount(safeNumber(track.metrics?.playlist_additions));
-  const duration = escapeHtml(safeString(track.duration));
-  const countries = safeArray<TopCountry>(track.metrics?.top_countries)
-    .filter((entry) => safeString(entry.country, "") !== "")
-    .map((entry) => `${escapeHtml(safeString(entry.country, ""))} ${safeNumber(entry.pct)}%`)
-    .join(", ");
-  const links = collectTrackLinks(track);
-  const galleryCount = safeArray(track.gallery_images).length;
+  return {
+    title: safeString(track.title),
+    releaseType: safeString(track.release_type),
+    releaseDate: safeString(track.release_date),
+    duration: safeString(track.duration),
+    streams: formatCount(safeNumber(track.metrics?.streams)),
+    saves: formatCount(safeNumber(track.metrics?.saves)),
+    playlists: formatCount(safeNumber(track.metrics?.playlist_additions)),
+    daw: safeString(production?.daw, ""),
+    key: safeString(production?.key, ""),
+    genre: safeString(production?.genre, ""),
+    bpm: production?.bpm != null ? safeNumber(production.bpm) : null,
+    topCountries: safeArray<TopCountry>(track.metrics?.top_countries)
+      .filter((entry) => safeString(entry.country, "") !== "")
+      .map((entry) => `${safeString(entry.country, "")} ${safeNumber(entry.pct)}%`)
+      .join(", "),
+    links: collectTrackLinks(track),
+    lyrics: safeString(track.lyrics, ""),
+    hasStems: Boolean(track.stems_urls),
+    galleryCount: safeArray(track.gallery_images).length,
+  };
+}
+
+function catalogTrackHtml(track: Track): string {
+  const data = catalogTrackFields(track);
+  const duration = escapeHtml(data.duration);
+  const links = data.links;
 
   return `
   <div class="track">
-    <span class="badge">${escapeHtml(safeString(track.release_type))}</span>
-    <h2>${escapeHtml(safeString(track.title))}</h2>
+    <span class="badge">${escapeHtml(data.releaseType)}</span>
+    <h2>${escapeHtml(data.title)}</h2>
     <div class="stats">
-      <div class="stat"><div class="stat-value">${streams}</div><div class="stat-label">Streams</div></div>
-      <div class="stat"><div class="stat-value">${saves}</div><div class="stat-label">Saves</div></div>
-      <div class="stat"><div class="stat-value">${playlists}</div><div class="stat-label">Playlists</div></div>
+      <div class="stat"><div class="stat-value">${data.streams}</div><div class="stat-label">Streams</div></div>
+      <div class="stat"><div class="stat-value">${data.saves}</div><div class="stat-label">Saves</div></div>
+      <div class="stat"><div class="stat-value">${data.playlists}</div><div class="stat-label">Playlists</div></div>
       <div class="stat"><div class="stat-value">${duration}</div><div class="stat-label">Duración</div></div>
     </div>
-    <p class="meta"><strong>Lanzamiento:</strong> ${escapeHtml(safeString(track.release_date))}</p>
-    ${production?.daw ? `<p class="meta"><strong>DAW:</strong> ${escapeHtml(safeString(production.daw))}</p>` : ""}
-    ${production?.key ? `<p class="meta"><strong>Tonalidad:</strong> ${escapeHtml(safeString(production.key))}</p>` : ""}
-    ${production?.genre ? `<p class="meta"><strong>Género:</strong> ${escapeHtml(safeString(production.genre))}</p>` : ""}
-    ${production?.bpm != null ? `<p class="meta"><strong>BPM:</strong> ${safeNumber(production.bpm)}</p>` : ""}
-    ${countries ? `<p class="meta"><strong>Top países:</strong> ${countries}</p>` : ""}
+    <p class="meta"><strong>Lanzamiento:</strong> ${escapeHtml(data.releaseDate)}</p>
+    ${data.daw ? `<p class="meta"><strong>DAW:</strong> ${escapeHtml(data.daw)}</p>` : ""}
+    ${data.key ? `<p class="meta"><strong>Tonalidad:</strong> ${escapeHtml(data.key)}</p>` : ""}
+    ${data.genre ? `<p class="meta"><strong>Género:</strong> ${escapeHtml(data.genre)}</p>` : ""}
+    ${data.bpm != null ? `<p class="meta"><strong>BPM:</strong> ${data.bpm}</p>` : ""}
+    ${data.topCountries ? `<p class="meta"><strong>Top países:</strong> ${escapeHtml(data.topCountries)}</p>` : ""}
     ${
       links.length > 0
         ? `<p class="meta"><strong>Enlaces:</strong> <span class="links">${links
@@ -347,9 +397,9 @@ function catalogTrackHtml(track: Track): string {
             .join("")}</span></p>`
         : ""
     }
-    ${track.lyrics ? `<p class="meta"><strong>Letra:</strong></p><pre class="lyrics">${escapeHtml(safeString(track.lyrics))}</pre>` : ""}
-    ${track.stems_urls ? `<p class="meta">✅ Stems multicanal disponibles</p>` : ""}
-    ${galleryCount > 0 ? `<p class="meta"><strong>Galería:</strong> ${galleryCount} ${galleryCount === 1 ? "imagen" : "imágenes"}</p>` : ""}
+    ${data.lyrics ? `<p class="meta"><strong>Letra:</strong></p><pre class="lyrics">${escapeHtml(data.lyrics)}</pre>` : ""}
+    ${data.hasStems ? `<p class="meta">✅ Stems multicanal disponibles</p>` : ""}
+    ${data.galleryCount > 0 ? `<p class="meta"><strong>Galería:</strong> ${data.galleryCount} ${data.galleryCount === 1 ? "imagen" : "imágenes"}</p>` : ""}
   </div>`;
 }
 

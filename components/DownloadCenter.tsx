@@ -6,11 +6,7 @@ import { Badge, CountBadge } from "@/components/ui/Badge";
 import { safeString } from "@/lib/null-safe";
 
 type ExportSection = "dossier" | "rider" | "catalog";
-// B5 pendiente: aqui ira `| "pdf"` cuando se permita instalar `pdfkit`.
-// No se anade ya a proposito: el backend no sabe generar PDF, asi que aceptarlo
-// devolveria un JSON con extension .pdf. Ver el TODO de B5 en
-// docs/PLAN_RC29_RC31.md.
-type ExportFormat = "html" | "json";
+type ExportFormat = "html" | "json" | "pdf";
 
 interface DownloadOption {
   id: string;
@@ -78,6 +74,14 @@ export function DownloadCenter({
       format: "html",
       sections: ["catalog"],
       badge: "HTML",
+    },
+    {
+      id: "press-pdf",
+      name: "Dossier completo en PDF",
+      description: "Dossier, rider y catálogo en un único archivo listo para mandar a prensa",
+      format: "pdf",
+      sections: ["dossier", "rider", "catalog"],
+      badge: "PDF",
     },
   ];
 
