@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllTracks, createTrack, updateTrack, deleteTrack, getTrackById, getArtistByName, getDbWrite, isTursoConfigured } from "@/lib/db";
-import { getTursoClient } from "@/lib/turso";
+import type { InValue } from "@libsql/client";
+import {
+  bustSelectCache,
+  getAllTracks,
+  createTrack,
+  updateTrack,
+  deleteTrack,
+  getTrackById,
+  getArtistByName,
+  getLocalDb,
+  getTursoClientSync,
+} from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
 import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
@@ -59,6 +69,26 @@ async function validateSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
+// UNA sola fuente de verdad: `getTursoClientSync()` devuelve `null` si y solo si
+// `isTursoEnabled()` es falso, y los dos leen `process.env` en tiempo de llamada.
+// Antes la rama la elegía `isTursoConfigured()` de `@/lib/db` y la ejecutaba
+// `getTursoClient()` de `@/lib/turso`, que lee el env al IMPORTAR el módulo
+// (`lib/turso.ts:31-32`): con el env cargando tarde, la primera decía "turso" y la
+// segunda `null`, se lanzaba y la ruta respondía 500 en vez de listar nada. Y la
+// rama local usaba `getDbWrite()`, que solo funcionaba por accidente.
+async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
+  const client = getTursoClientSync();
+  if (client) {
+    const result = await client.execute({
+      sql: bustSelectCache(sql),
+      args: (params ?? []) as InValue[],
+    });
+    return result.rows as unknown[];
+  }
+  const stmt = getLocalDb().prepare(sql);
+  return params ? stmt.all(...params) : stmt.all();
+}
+
 // GET /api/tracks — Listar tracks: admin ve todos, público solo aprobados
 export async function GET(req: NextRequest) {
   try {
@@ -71,18 +101,7 @@ export async function GET(req: NextRequest) {
       tracks = await getAllTracks();
     } else {
       // Public/non-admin: only approved tracks
-      if (isTursoConfigured()) {
-        const client = getTursoClient();
-        if (!client) throw new Error("Turso client not available");
-        const result = await client.execute({
-          sql: "SELECT * FROM tracks WHERE status = 'approved' ORDER BY created_at DESC",
-          args: [],
-        });
-        tracks = result.rows;
-      } else {
-        const db = getDbWrite();
-        tracks = db.prepare("SELECT * FROM tracks WHERE status = 'approved' ORDER BY created_at DESC").all();
-      }
+      tracks = await dbQuery("SELECT * FROM tracks WHERE status = 'approved' ORDER BY created_at DESC");
     }
 
     // Pagination: ?page=1&limit=10

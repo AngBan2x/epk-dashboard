@@ -32,8 +32,13 @@ const LABEL_CLASS = 'block text-sm font-medium text-slate-700 dark:text-slate-30
 
 const FIELD_CLASS = `w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 ${FOCUS_RING}`;
 
+/**
+ * El aviso de pagos no atribuye el cobro a ningún rol concreto. Enumerar "el
+ * artista u organizador" era una suposición: un show lo puede crear un
+ * administrador, y entonces el cobro va a quien esté en la puerta del venue.
+ */
 const PAYMENT_DISCLAIMER =
-  'Los pagos se realizan directamente al artista u organizador del evento. PressPlay no procesa ni custodia dinero y no se responsabiliza por pagos perdidos o estafas.';
+  'Los pagos se realizan directamente con la persona o el negocio responsable del evento. PressPlay no procesa ni custodia dinero y no se responsabiliza por pagos perdidos o estafas.';
 
 function formatDateSpanish(dateStr: string | null): string {
   if (!dateStr) return 'Fecha por confirmar';
@@ -190,7 +195,7 @@ export default function ShowsPage() {
                   {loading
                     ? 'Cargando shows…'
                     : `${visibleShows.length} ${visibleShows.length === 1 ? 'show programado' : 'shows programados'}`}
-                  . Descubre fechas, venues y entradas de los artistas de PressPlay.
+                  . Descubre las fechas, los venues y las entradas del calendario de PressPlay.
                 </p>
               </div>
 

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDbWrite, isTursoConfigured } from "@/lib/db";
+import type { InValue } from "@libsql/client";
+import { bustSelectCache, getLocalDb, getTursoClientSync } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
-
-const TURSO_URL = process.env.TURSO_DATABASE_URL;
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
 export const dynamic = "force-dynamic";
 
@@ -13,23 +11,21 @@ async function validateAdminSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
-function createFreshClient() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createClient } = require("@libsql/client");
-  return createClient({ url: TURSO_URL!, authToken: TURSO_TOKEN! });
-}
-
+// Ver `app/api/admin/releases/route.ts` para por qué se ramifica sobre el cliente
+// y no sobre `isTursoConfigured()`. Resumen: `getTursoClientSync()` es nulo si y
+// solo si `isTursoEnabled()` es falso, los dos leen `process.env` en tiempo de
+// llamada, y antes el cliente se construía con `TURSO_URL`/`TURSO_TOKEN`
+// congelados en el scope del módulo.
 async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
-  if (isTursoConfigured()) {
-    const client = createFreshClient();
-    const bustSql = sql.trimStart().toUpperCase().startsWith("SELECT")
-      ? `${sql} /*admin${Date.now()}*/`
-      : sql;
-    const result = await client.execute({ sql: bustSql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    const result = await client.execute({
+      sql: bustSelectCache(sql),
+      args: (params ?? []) as InValue[],
+    });
     return result.rows as unknown[];
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDb().prepare(sql);
   return params ? stmt.all(...params) : stmt.all();
 }
 

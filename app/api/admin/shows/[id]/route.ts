@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDbWrite, isTursoConfigured } from "@/lib/db";
+import type { InValue } from "@libsql/client";
+import {
+  bustSelectCache,
+  getLocalDb,
+  getLocalDbWrite,
+  getTursoClientSync,
+} from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
 import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
-
-const TURSO_URL = process.env.TURSO_DATABASE_URL;
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
 export const dynamic = "force-dynamic";
 
@@ -15,34 +18,32 @@ async function validateAdminSession(req: NextRequest) {
   return { userId: session.userId, role: session.role };
 }
 
-function createFreshClient() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createClient } = require("@libsql/client");
-  return createClient({ url: TURSO_URL!, authToken: TURSO_TOKEN! });
-}
-
+// Ver `app/api/admin/releases/route.ts` para por qué se ramifica sobre el cliente
+// y no sobre `isTursoConfigured()`. Esta ruta era la más expuesta de las tres: el
+// PATCH decide `approved` y dispara el fan-out a suscriptores, así que caer en la
+// réplica local en producción approved un show y avisaba por email sin cambiar
+// nada en Turso. `getLocalDbWrite()` solo se alcanza sin Turso, que es el único
+// caso en que escribir en el archivo local tiene sentido.
 async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
-  if (isTursoConfigured()) {
-    const client = createFreshClient();
-    const bustSql = sql.trimStart().toUpperCase().startsWith("SELECT")
-      ? `${sql} /*admin${Date.now()}*/`
-      : sql;
-    const result = await client.execute({ sql: bustSql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    const result = await client.execute({
+      sql: bustSelectCache(sql),
+      args: (params ?? []) as InValue[],
+    });
     return result.rows as unknown[];
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDb().prepare(sql);
   return params ? stmt.all(...params) : stmt.all();
 }
 
 async function dbRun(sql: string, params?: unknown[]): Promise<void> {
-  if (isTursoConfigured()) {
-    const client = createFreshClient();
-    await client.execute({ sql, args: (params ?? []) as any[] });
+  const client = getTursoClientSync();
+  if (client) {
+    await client.execute({ sql, args: (params ?? []) as InValue[] });
     return;
   }
-  const db = getDbWrite();
-  const stmt = db.prepare(sql);
+  const stmt = getLocalDbWrite().prepare(sql);
   stmt.run(...(params ?? []));
 }
 

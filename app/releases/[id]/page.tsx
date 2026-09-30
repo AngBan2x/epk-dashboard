@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { getTrackById, getTracksByReleaseId } from "@/lib/db";
-import { capitalizeReleaseType, formatDateES } from "@/lib/null-safe";
+import { capitalizeReleaseType, formatDateES, sumDurations } from "@/lib/null-safe";
 import { notFound } from "next/navigation";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import { ReleaseActions } from "@/components/ReleaseActions";
@@ -35,6 +35,23 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   // Get child tracks if this is a multi-track release
   const childTracks = await getTracksByReleaseId(params.id);
   const isMultiTrack = childTracks.length > 0;
+
+  /**
+   * P15 — la duración sale de `sumDurations` (`lib/null-safe.ts`), no del valor
+   * crudo del padre.
+   *
+   * Este era el ÚNICO de los tres sitios de render que imprimía la etiqueta
+   * `⏱️` con el valor crudo del padre, al lado del contador de pistas. El padre
+   * no tiene duración propia fiable: el seed le pone `"00:00"` a los multipista y
+   * `app/releases/new/page.tsx` escribe lo que venga, así que el número no
+   * describe nada. `/track/[id]` y `ReleaseTracklistSection` ya suman las hijas.
+   *
+   * `sumDurations` devuelve `null` (no `0`) cuando no hay nada sumable, para no
+   * pintar `"0:00"` como si un disco recién creado durara cero; en ese caso se
+   * cae al valor del padre, que para un single suelto sí es el bueno.
+   */
+  const totalDuration = sumDurations(childTracks.map((t) => t.duration));
+  const durationLabel = (isMultiTrack ? totalDuration?.label : null) ?? (release.duration || null);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -75,8 +92,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               {release.release_date && (
                 <span>📅 {formatDateES(release.release_date, { month: "long" })}</span>
               )}
-              {release.duration && (
-                <span>⏱️ {release.duration}</span>
+              {durationLabel && (
+                <span>⏱️ {durationLabel}</span>
               )}
               {isMultiTrack && (
                 <span>🎵 {childTracks.length} pistas</span>
