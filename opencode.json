@@ -8,6 +8,14 @@
     "reserved": 20000
   },
   "mcp": {
+    "vercel": {
+      "type": "remote",
+      "url": "https://mcp.vercel.com"
+    },
+    "turso": {
+      "type": "remote",
+      "url": "https://mcp.turso.ai/mcp"
+    },
     "filesystem": {
       "type": "local",
       "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],

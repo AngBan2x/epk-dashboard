@@ -215,17 +215,37 @@ Con `reserved: 20000` la compactación salta al **90% del modelo de 200K** (mimo
 | `web-design-guidelines` | Vercel | Revisión UI/accessibility |
 | `improve-codebase-architecture` | Matt Pocock | Mejorar arquitectura |
 
-## MCP Servers (15)
+## MCP Servers (17)
 
-### Habilitados (6)
+### Habilitados (8)
 | Server | Tipo | Utilidad |
 |--------|------|----------|
 | filesystem | Local | Operaciones de archivos |
-| playwright | Local | Automatización navegador |
+| playwright | Local | Automatización navegador — **necesita Chrome real**: busca `chrome.exe` en `%LOCALAPPDATA%\Google\Chrome\Application\`, que aquí no está. Con `npx playwright install chrome` funciona. Mientras tanto, usar `chromium.launch()` del paquete de Playwright, que sí está instalado. Para **renderizar** un PDF hace falta `headless: false` (en headless descarga el PDF en vez de pintarlo) |
 | context7 | Remoto | Docs de frameworks |
 | gh_grep | Remoto | Buscar código en GitHub |
 | git | Local | Operaciones git |
 | fetch | Local | Fetch de contenido web |
+| **vercel** | Remoto (OAuth) | **Deploys y logs de Vercel.** Ver nota 1 |
+| **turso** | Remoto (OAuth) | **SQL directo y estado de la DB.** Ver nota 2 |
+
+Autenticación: `opencode mcp auth vercel` / `opencode mcp auth turso` (OAuth en el navegador, sin copiar tokens). Nota: la sesión actual no los tiene autenticados; hay que reiniciar opencode para que aparezcan.
+
+> **Nota 1 — por qué Vercel.** El 500 del PDF costó **tres despliegues** porque no había forma de ver el log. La causa estaba en una línea que el build sí imprimía:
+> `The framework produced an invalid deployment package for a Serverless Function. Typically this means that the framework produces files in symlinked directories.`
+> Con `vercel inspect --logs` eso se lee en segundos. Antes hubo que pedirle al usuario que pegara los logs a mano, dos veces.
+>
+> **Nota 2 — por qué Turso.** `getTursoClient()` devuelve `null` mientras `isTursoConfigured()` devuelve `true`, y `tursoExec` avisa «Turso no configurado» en un script que acaba de escribir 65 filas sin problema. Tener SQL directo y el estado de la réplica quita esa indirección, y `scripts/turso-check.ts` sigue siendo la fuente de verdad de la réplica local.
+
+### Lo que los MCP **no** reemplazan (leído de la Ola 3)
+Estos cuatro hallazgos resuelieron los fallos más caros de la tanda y **ninguno** vino de un servidor:
+
+| Técnica | Para qué sirve |
+|---|---|
+| Leer `.next/server/app/api/<ruta>/route.js.nft.json` | Es el **mismo manifiesto que usa Vercel** para decidir qué viaja en la lambda. Saying exactamente qué se empaqueta y qué no |
+| Interceptar `Module._load` para capturar la pila de un `require` | Demostró que pedía Helvetica **el constructor de PDFKit**, no nuestro código |
+| Extraer texto de PDF con el CMap `ToUnicode` (`tests/helpers/pdf-text.ts`) | Un PDF con la maquetación rota es un PDF **válido**: solo se ve leyendo su contenido |
+| **Comprobar que un test falla al revertir el arreglo** | Disciplina, no herramienta. Un check que siempre pasa no protege de nada, y por eso el 500 del PDF costó tres deploys |
 
 ### Deshabilitados (9)
 | Server | Tipo | Utilidad |
