@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAllShows, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById, createNotification } from "@/lib/db";
+import { getAllShows, getApprovedShows, getApprovedShowsByArtist, getApprovedShowById, getShowsByArtist, getShowById, createShow, updateShow, deleteShow, getArtistById, createNotification } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { sendNotificationEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -85,20 +85,53 @@ export async function GET(req: NextRequest) {
     const artistId = searchParams.get("artist_id");
     const showId = searchParams.get("id");
 
+    const session = await validateSession(req);
+
+    // Moderación: un admin autenticado conserva el alcance completo, que es lo
+    // que necesita para aprobar/rechazar. Sin sesión, o con una sesión que no
+    // es de admin, TODA la lectura pasa por los lectores de alcance público.
+    const isAdmin = session?.role === "admin";
+    const ownsShow = async (showArtistId: string): Promise<boolean> => {
+      if (!session || session.role !== "artist") return false;
+      const artist = await getArtistById(showArtistId);
+      return artist?.user_id != null && artist.user_id === session.userId;
+    };
+
     if (showId) {
-      const show = await getShowById(showId);
-      if (!show) {
-        return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
+      if (isAdmin) {
+        const show = await getShowById(showId);
+        if (!show) {
+          return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
+        }
+        return NextResponse.json({ ...show, status: computeDynamicStatus(show) as ShowStatus });
       }
-      return NextResponse.json({ ...show, status: computeDynamicStatus(show) as ShowStatus });
+      // Aprobado y no borrado → anyone.
+      const approved = await getApprovedShowById(showId);
+      if (approved) {
+        return NextResponse.json({ ...approved, status: computeDynamicStatus(approved) as ShowStatus });
+      }
+      // Sin aprobar: solo su dueño.
+      const owned = await getShowById(showId);
+      if (owned && (await ownsShow(owned.artist_id))) {
+        return NextResponse.json({ ...owned, status: computeDynamicStatus(owned) as ShowStatus });
+      }
+      return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }
 
     if (artistId) {
-      const shows = await getShowsByArtist(artistId);
+      const shows = isAdmin
+        ? await getShowsByArtist(artistId)
+        : await getApprovedShowsByArtist(artistId);
       return NextResponse.json({ shows: shows.map(s => ({ ...s, status: computeDynamicStatus(s) as ShowStatus })) });
     }
 
-    const shows = await getAllShows();
+    // S0/P12b: `/shows` NO está en el `matcher` de `middleware.ts`, así que la
+    // página es pública. Antes esta ruta devolvía `getAllShows()`, que es
+    // `SELECT * FROM shows ORDER BY date ASC` sin `approved = 1` ni
+    // `deleted_at IS NULL`: un show recién enviado por un artista salía en el
+    // catálogo público, porque `POST /api/shows:144` lo crea con
+    // `approved = 0` salvo que lo cree un admin con `approved: true`.
+    const shows = isAdmin ? await getAllShows() : await getApprovedShows();
     return NextResponse.json({ shows: shows.map(s => ({ ...s, status: computeDynamicStatus(s) as ShowStatus })) }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",

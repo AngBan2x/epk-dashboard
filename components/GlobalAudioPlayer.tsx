@@ -12,7 +12,11 @@ const AudioVisualizer = dynamic(() => import("@/components/AudioVisualizer").the
 });
 
 export function GlobalAudioPlayer() {
-  const { activeTrack, isPlaying, isLoading, error, duration, currentTime, volume, isVisualizerOpen, isYouTubeMode, togglePlay, clearTrack, seek, setVolume, toggleVisualizer, audioRef } = useAudioPlayer();
+  const {
+    activeTrack, isPlaying, isLoading, error, duration, currentTime, volume,
+    isVisualizerOpen, isYouTubeMode, queuePosition, hasNext, hasPrev,
+    togglePlay, next, prev, clearTrack, seek, setVolume, toggleVisualizer, audioRef,
+  } = useAudioPlayer();
   const [showVolume, setShowVolume] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -163,12 +167,48 @@ export function GlobalAudioPlayer() {
                   </div>
 
                   <button
+                    onClick={prev}
+                    disabled={!hasPrev}
+                    aria-disabled={!hasPrev}
+                    aria-label="Pista anterior"
+                    title={hasPrev ? "Pista anterior" : "No hay pista anterior"}
+                    className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-slate-500 dark:disabled:hover:text-slate-400 transition-colors flex-shrink-0"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </button>
+
+                  <button
                     onClick={togglePlay}
                     className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0"
                     aria-label={isPlaying ? "Pausar" : "Reproducir"}
                   >
                     {playButton}
                   </button>
+
+                  <button
+                    onClick={next}
+                    disabled={!hasNext}
+                    aria-disabled={!hasNext}
+                    aria-label="Pista siguiente"
+                    title={hasNext ? "Pista siguiente" : "No hay pista siguiente"}
+                    className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-slate-500 dark:disabled:hover:text-slate-400 transition-colors flex-shrink-0"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12.75 4.5l-7.5 7.5 7.5 7.5m6-15l-7.5 7.5 7.5 7.5" />
+                    </svg>
+                  </button>
+
+                  {queuePosition && (
+                    <span
+                      className="text-xs font-mono text-slate-400 dark:text-slate-500 flex-shrink-0"
+                      aria-label={`Pista ${queuePosition} de la cola`}
+                    >
+                      {queuePosition}
+                    </span>
+                  )}
+
                   <button
                     onClick={clearTrack}
                     className="p-2 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"

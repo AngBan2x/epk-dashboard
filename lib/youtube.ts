@@ -43,13 +43,25 @@ export function extractYouTubeId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * ÚNICA fuente de extracción de ids de Spotify.
+ * `lib/audio-priority.ts` importa estas tres funciones: antes cada fichero
+ * tenía su propia copia y divergían (`[\w-]{22}` vs `[\w-]+`, `song/` vs
+ * `album/|song/`), de modo que la misma URL daba fuente en un sitio y ninguna
+ * en el otro. Si necesitas tocarlas, tócalas aquí.
+ */
 export function extractSpotifyId(url: string): string | null {
-  const match = url.match(/(?:spotify\.com\/track\/|spotify:track:)([\w-]+)/);
+  const match = url.match(/(?:spotify\.com\/(?:[a-z]{2}-[a-z]{2}\/)?track\/|spotify:track:)([\w-]+)/);
   return match ? match[1] : null;
 }
 
 export function extractAppleMusicId(url: string): string | null {
-  const match = url.match(/(?:music\.apple\.com\/[a-z]{2}\/album\/[^\/]+\/|music\.apple\.com\/[a-z]{2}\/song\/[^\/]+\/)(\d+)/);
+  // El id va INMEDIATAMENTE después de `album/` o `song/`
+  // (`music.apple.com/us/song/1440857781/daft-punk`). La versión anterior pedía
+  // un slug antes del id (`song/[^\/]+/(\d+)`) y por eso **no casaba con ninguna
+  // URL real de Apple Music**: era el motivo de que el catálogo entero saliera
+  // sin fuente. Acepta ambas formas de URL, no el slug.
+  const match = url.match(/music\.apple\.com\/[a-z]{2}\/(?:album|song)\/(\d+)/);
   return match ? match[1] : null;
 }
 
@@ -72,6 +84,12 @@ export function getYouTubeThumbnail(videoId: string, quality: 'default' | 'mqdef
   return `https://img.youtube.com/vi/${videoId}/${q}.jpg`;
 }
 
+/**
+ * URLs de embed de terceros. **No se renderizan en ninguna vista**: la UI hace
+ * link-out. Se construyen porque forman parte del contrato de `AudioSource`,
+ * pero ninguna fuente de tipo `spotify`/`apple_music` cuenta como reproducible
+ * (`isPlayableAudioSource`), y por eso no habilitan un botón de play.
+ */
 export function getSpotifyEmbedUrl(trackId: string): string {
   return `https://open.spotify.com/embed/track/${trackId}?utm_source=generator`;
 }

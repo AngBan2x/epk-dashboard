@@ -1,9 +1,11 @@
 import {
+  buildReleaseDurations,
   catalogTrackFields,
   dossierRecord,
   dossierText,
   formatDateLong,
   riderValue,
+  type CatalogDurationContext,
   type ExportPayload,
   type ExportSection,
 } from "@/lib/downloadable-assets";
@@ -194,6 +196,10 @@ export function drawCatalogSection(doc: PdfDoc, payload: ExportPayload, tracks: 
 
   const artist = safeString(payload.artistName, "");
   const total = tracks.length;
+  // P15: mismo mapa de duraciones que consumen el HTML y el JSON, construido
+  // desde la MISMA lista filtrada. Si el PDF calculara su propio total, un álbum
+  // podría decir una cosa en el PDF y otra en el HTML del mismo artista.
+  const context: CatalogDurationContext = { releaseDurations: buildReleaseDurations(tracks) };
 
   doc
     .font(PDF_FONTS.serifBold)
@@ -214,7 +220,7 @@ export function drawCatalogSection(doc: PdfDoc, payload: ExportPayload, tracks: 
   doc.y += 18;
 
   tracks.forEach((track, index) => {
-    drawTrackRow(doc, index + 1, catalogTrackFields(track));
+    drawTrackRow(doc, index + 1, catalogTrackFields(track, context));
   });
 }
 

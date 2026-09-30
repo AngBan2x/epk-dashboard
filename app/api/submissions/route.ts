@@ -5,10 +5,35 @@ import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+type SessionRole = "admin" | "artist" | "subscriber";
+
+const KNOWN_ROLES: ReadonlyArray<SessionRole> = ["admin", "artist", "subscriber"];
+
+/**
+ * NO usar `session.role || "artist"`.
+ *
+ * Un token al que le falte el rol (o con un valor corrupto) llegaba a esta ruta
+ * como si fuera artista, y en el `GET` eso abre la rama de admin: `isAdmin`
+ * compara contra `"admin"`, así que ahí el daño era nulo. Pero es una bomba de
+ * relojería: en cuanto esta ruta comprobara el rol en algún punto —y P16 la
+ * acaba de convertir en el portal de entrada de todo suscriptor— el valor
+ * inventado pasa a ser el que decide. Un default permisivo no es un default,
+ * es una falta.
+ *
+ * Un token sin rol válido se trata como lo que es: sin rol. El resto de la ruta
+ * decide con ese dato (admin se compara explícitamente, y los envíos son de
+ * cualquiera con sesión).
+ */
+function resolveRole(rawRole: unknown): SessionRole | null {
+  return typeof rawRole === "string" && (KNOWN_ROLES as string[]).includes(rawRole)
+    ? (rawRole as SessionRole)
+    : null;
+}
+
 async function validateSession(req: NextRequest) {
   const session = await validateRequest(req);
   if (!session) return null;
-  return { userId: session.userId, role: session.role || "artist" };
+  return { userId: session.userId, role: resolveRole(session.role) };
 }
 
 // Schema for creating a submission (artist portal)

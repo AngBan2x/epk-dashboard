@@ -17,6 +17,9 @@ import { imageOptimizationProps } from "@/lib/image-config";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
+import { isQueueItemPlayable } from "@/lib/audio-priority";
+import { sumDurations } from "@/lib/null-safe";
 import type { YouTubeStatPair } from "@/lib/youtube";
 
 interface EPKCardProps {
@@ -35,8 +38,28 @@ interface EPKCardProps {
    * Enlace a la ficha: `/track/{id}` para un single suelto, `/releases/{id}`
    * para un álbum. Sin esto la tarjeta es puramente visual y la ficha queda
    * inalcanzable desde la página del artista.
+   *
+   * P8: con este prop la PORTADA pasa a ser la superficie clicable de la
+   * tarjeta (enlace propio, hermano del botón de like), no la tarjeta entera.
    */
   detailHref?: string;
+  /**
+   * Hijas aprobadas cuando `track` es la fila padre de un lanzamiento.
+   *
+   * Dos usos, ambos de P2/P15:
+   * - La duración del padre **se calcula** sumando las hijas. El seed deja
+   *   `"00:00"` en la fila padre (no tiene audio propio), así que mostrar la
+   *   columna tal cual pintaba "Album 00:00" como si fuera un tramo. Aunque el
+   *   agente B lo corrigió en Turso, el cálculo tiene que seguir aquí o vuelve
+   *   a pasar en cuanto se re-siembra.
+   * - La cola de reproducción. `queue` es la lista completa en formato
+   *   `ActiveTrack`; la monta quien tiene las hijas (`ArtistTracksSection`) y
+   *   la tarjeta solo la reenvía a `playQueue`. **El estado de la cola vive en
+   *   el contexto**, nunca en la tarjeta.
+   */
+  childrenTracks?: Track[];
+  /** Cola completa del lanzamiento, ya en formato `ActiveTrack`. */
+  queue?: ActiveTrack[];
 }
 
 export function EPKCard({
@@ -47,11 +70,22 @@ export function EPKCard({
   priority = false,
   youtubeStats = null,
   detailHref,
+  childrenTracks,
+  queue,
 }: EPKCardProps) {
   const { user } = useAuth();
+  const audio = useAudioPlayer();
   const title = safeString(track.title);
   const artistName = safeString(track.artist_name);
-  const duration = formatDuration(track.duration);
+  /**
+   * P15: el padre no tiene duración propia. Si trae hijas, la suma de sus
+   * duraciones es el dato real; el `formatDuration` de la columna es solo el
+   * respaldo para un single suelto. `sumDurations` devuelve `null` cuando nada
+   * es parseable, y `null` NO es `0`: un álbum recién creado sin duraciones no
+   * debe pintar "0:00" como si fuera real.
+   */
+  const totalFromChildren = childrenTracks ? sumDurations(childrenTracks.map((t) => t.duration)) : null;
+  const duration = totalFromChildren ? totalFromChildren.label : formatDuration(track.duration);
   const releaseDate = track.release_date ? formatDateES(track.release_date) : "—";
   const isrc = safeString(track.isrc);
   const [liked, setLiked] = useState(initialLiked);
@@ -80,6 +114,32 @@ export function EPKCard({
     const diffDays = diffDaysUTC(d, new Date());
     return diffDays >= 0 && diffDays <= 7;
   })();
+
+  /**
+   * P2: fila padre de un lanzamiento (álbum/EP) = NO reproducible por sí misma.
+   *
+   * Antes se montaba `<AudioPlayer>` con los datos del padre, que no tiene
+   * audio propio: `lib/db.ts` convierte el `audio_preview_url` vacío en el
+   * string **truthy** `"—"`, así que un `if (url)` no lo filtra y el botón
+   * quedaba activo sin hacer nada. Peor aún cuando el padre sí trae
+   * `youtube_video_id`: `hasPlayableSource` devuelve `true` (YouTube sí es
+   * fuente reproducible) y el botón "sonaba" un vídeo que no es la pista.
+   *
+   * Aquí la fila padre no se reproduce: se reproduce **la cola** de sus hijas,
+   * que es lo que el usuario pidió (cola completa con avance automático). El
+   * botón de la tarjeta queda deshabilitado y su etiqueta dice la verdad.
+   */
+  const isReleaseParent = Array.isArray(childrenTracks) && childrenTracks.length > 0;
+  /**
+   * `isQueueItemPlayable` (no `hasPlayableSource`) porque lo que hay que
+   * contar son los ítems de la COLA, y esa es exactamente la misma predicate
+   * que usa `createQueue` para elegir por dónde empezar. Preguntar por otra
+   * cosa ("¿esta fila suena?") daría un número distinto al que el reproductor
+   * va a poder seguir, y volvería a aparecer un "3 pistas" que al pulsar se
+   * salta a otra.
+   */
+  const playableRows = queue?.filter(isQueueItemPlayable) ?? [];
+  const hasQueue = isReleaseParent && playableRows.length > 0;
 
   useEffect(() => {
     // Fetch initial like count and user's liked state
@@ -136,10 +196,40 @@ export function EPKCard({
   };
 
   const coverImage = getCoverImage(track);
+  // La portada es la superficie clicable de la tarjeta, pero SOLO si hay ficha
+  // a la que ir. Sin `detailHref` sigue siendo una imagen y no un enlace falso.
+  const coverLink = detailHref ? (
+    <Link
+      href={detailHref}
+      tabIndex={-1}
+      aria-hidden="true"
+      className="absolute inset-0 z-0 block rounded-none focus:outline-none"
+    />
+  ) : null;
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
       <div className="aspect-square bg-slate-100 dark:bg-slate-700 relative overflow-hidden flex-shrink-0">
+        {/*
+          P8: la portada es la superficie clicable de la tarjeta, y es un
+          `<a>` PROPIO — hermano del botón de like, nunca su contenedor.
+
+          Envolver la tarjeta (o la portada) en un `<a>` es HTML inválido
+          cuando dentro hay un `<button>`: axe lo marca como
+          `nested-interactive` (WCAG 2A) y, más grave, el tabulador cae en un
+          enlace que contiene otro control y el lector de pantalla anuncia un
+          enlace gigante con un botón dentro. Por eso el enlace va como
+          hermano absoluto detrás (`z-0`) y el like por encima (`z-10`): el
+          clic en el like lo recibe el botón, el resto de la portada lo
+          recibe el enlace, y no hay un interactivo dentro de otro.
+
+          `tabIndex={-1}` + `aria-hidden` a propósito: la ficha ya se alcanza
+          con el enlace del título, que sí es tabulable y tiene nombre. Dos
+          enlaces con el mismo destino por tarjeta duplicarían la navegación
+          por teclado; el de la portada es solo la superficie de clic y la
+          superficie táctil de un alvo grande.
+        */}
+        {coverLink}
         {coverImage && !coverBroken ? (
           <Image
             src={coverImage}
@@ -152,7 +242,11 @@ export function EPKCard({
             priority={priority}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-3xl">
+          /* `pointer-events-none`: el placeholder es un `absolute inset-0`, y
+             como los elementos posicionados se pintan sobre el enlace de la
+             portada, sin esto se comía todos los clics y la portada dejaba de
+             ser clicable justo cuando no hay imagen. */
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-slate-400 text-3xl">
             🎵
           </div>
         )}
@@ -173,44 +267,73 @@ export function EPKCard({
             {liked ? "❤️" : "🤍"}
           </span>
         </button>
-        {/* Badge "Nuevo Lanzamiento" */}
-        {isNewRelease && (
-          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg animate-pulse">
-            ✨ Nuevo
-          </div>
-        )}
-        {/* P3.29: Badge for multi-track releases */}
-        {track.release_id && (
-          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
-            🎵 Multipista
+        {/*
+          Badges: "Nuevo" y "Multipista" compartían `absolute top-3 left-3`, así
+          que se montaban ENCIMA el uno del otro y en un lanzamiento recién
+          publicado solo se leía uno de los dos. Ahora van en una columna: el
+          primero arriba, el segundo debajo, sin salirse de la portada (son
+          como 22px de alto cada uno y la portada en 4 columnas mide 294px).
+
+          `pointer-events-none` por lo mismo que el placeholder: son
+          decorativos y, al ser una caja posicionada, tapaban el enlace de la
+          portada. El único control sobre la portada es el botón de like
+          (`z-10`).
+        */}
+        {(isNewRelease || track.release_id) && (
+          <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[70%] flex-col items-start gap-1">
+            {isNewRelease && (
+              <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg animate-pulse">
+                ✨ Nuevo
+              </span>
+            )}
+            {track.release_id && (
+              <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
+                🎵 Multipista
+              </span>
+            )}
           </div>
         )}
       </div>
       <CardContent className="flex flex-col flex-grow p-4">
-        {/* C1: `truncate` sin `title` dejaba el texto completo inaccesible
-            (bug de a11y) para lectores de pantalla y para hover. */}
         {/*
-          C2: `detailHref` convierte el título en enlace a la ficha. Se hace
-          así y no envolviendo la tarjeta en un `<a>` porque dentro hay
-          botones (play, like): anidar un enlace alrededor de un botón es HTML
-          invalido y rompe la navegacion por teclado y por lector de pantalla.
-          Sin este prop, un single suelto se quedaba sin ninguna forma de
-          llegar a su ficha.
+          P11 — el título es el texto que se trunca, y con 4 columnas la
+          tarjeta mide 294px (`max-w-7xl` 1280 − px-4 − 3 huecos de 24px).
+          A 294px un `truncate` de una línea deja el título en ~17-31px, es
+          decir ilegible: por eso el commit `bfdda30` bajó de 4 a 3 columnas.
+          El problema nunca fue el ancho, fue que el título solo tenía UNA
+          línea parapia.
+
+          Ahora hay DOS (`line-clamp-2`) + `break-words` para que una palabra
+          larga no desborde la celda. `line-clamp` es de Tailwind 3.3+ (aquí
+          3.4), no hace falta `@tailwindcss/line-clamp` a mano.
+
+          `title` en el `<h3>` (y no solo en el enlace interior) porque es el
+          `<h3>` el elemento que recorta: sin él, ni hover ni lector de
+          pantalla recuperan el nombre completo. Lo miden dos guiones
+          (`scripts/rc29-artist-shots.ts:275` con `h3[title]`,
+          `scripts/verify-wave3.cjs` sobre `a[href^="/track/"] h3`).
+
+          P8: `detailHref` convierte el título en enlace a la ficha. Se sigue
+          sin envolver la tarjeta en un `<a>` porque dentro hay botones
+          (play, like) y eso es HTML inválido; la portada ya aporta su
+          superficie de clic aparte (ver el `coverLink` de arriba).
         */}
-        <h3 className="font-semibold text-lg mb-1 truncate text-slate-900 dark:text-white">
+        <h3
+          className="font-semibold text-base sm:text-lg mb-1 line-clamp-2 break-words leading-snug text-slate-900 dark:text-white"
+          title={title}
+        >
           {detailHref ? (
             <Link
               href={detailHref}
               className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
-              title={title}
             >
               {title}
             </Link>
           ) : (
-            <span title={title}>{title}</span>
+            <span>{title}</span>
           )}
         </h3>
-        <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{artistName}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 mb-1 truncate">{artistName}</p>
 
         {/* Metadata: Release type, Duration, Release Date, ISRC */}
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-2">
@@ -242,14 +365,68 @@ export function EPKCard({
           )}
         </div>
 
-        <AudioPlayer
-          id={track.id}
-          src={track.audio_preview_url}
-          title={track.title}
-          artist={track.artist_name || undefined}
-          coverImage={coverImage || undefined}
-          track={track}
-        />
+        {/*
+          P2 — fila padre de un lanzamiento: no hay audio propio, así que no se
+          monta un reproductor que no puede hacer nada. En su lugar, un estado
+          explícito:
+
+          1. Botón DESHABILITADO con etiqueta honesta ("el lanzamiento no tiene
+             audio propio"). Se mantiene el ritmo visual de la tarjeta y el
+             control no promete nada.
+          2. La acción real: "Escuchar N pistas" monta la COLA completa en el
+             contexto, que es lo que el usuario decidió (cola con avance
+             automático). El estado de la cola no vive aquí: vive en
+             `useAudioPlayer()`, y esta tarjeta solo llama a `playQueue`.
+
+          Antes el padre montaba `<AudioPlayer>` con su `audio_preview_url`, que
+          `lib/db.ts` deja como el string truthy `"—"`: `hasPlayableSource` lo
+          daba por no reproducible y el botón quedaba inerte (y si el padre
+          traía `youtube_video_id`, el botón se activaba con un vídeo que no
+          era la pista).
+        */}
+        {isReleaseParent ? (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              title="El lanzamiento no tiene audio propio: se reproduce desde sus pistas"
+              aria-label={`${title} no tiene audio propio`}
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 011.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs leading-snug text-slate-500 dark:text-slate-400">
+                Este lanzamiento no tiene audio propio
+              </p>
+              {hasQueue && audio && (
+                <button
+                  type="button"
+                  onClick={() => audio.playQueue(queue as ActiveTrack[], 0)}
+                  className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Escuchar {playableRows.length}{" "}
+                  {playableRows.length === 1 ? "pista" : "pistas"}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <AudioPlayer
+            id={track.id}
+            src={track.audio_preview_url}
+            title={track.title}
+            artist={track.artist_name || undefined}
+            coverImage={coverImage || undefined}
+            track={track}
+          />
+        )}
 
         {/* Stats footer: streams, saves, likes */}
         <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { EPKCard } from "@/components/EPKCard";
-import { ReleaseTrackList } from "@/components/ReleaseTrackList";
+import { ReleaseTrackList, buildReleaseQueue } from "@/components/ReleaseTrackList";
 import { LoginModal } from "@/components/LoginModal";
 import { capitalizeReleaseType } from "@/lib/null-safe";
+import type { ActiveTrack } from "@/context/AudioPlayerContext";
 import type { ArtistCatalogGroup } from "@/lib/db";
 import type { Track } from "@/types/music";
 import type { YouTubeStatsRecord } from "@/lib/youtube";
@@ -49,6 +50,32 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
     setExpanded((prev) => ({ ...prev, [releaseId]: !prev[releaseId] }));
   };
 
+  /**
+   * P2: una cola por lanzamiento, construida una sola vez por grupo con
+   * `buildReleaseQueue` — la MISMA función que usa `ReleaseTrackList` para sus
+   * filas, para que el "Escuchar N pistas" de la tarjeta y las filas de abajo
+   * no puedan discrepar sobre cuántas pistas suenan y cuáles.
+   *
+   * `useMemo` y no un `map` en el render porque `playQueue` recibe el array
+   * entero en cada pulsación, y un array nuevo en cada render impediría
+   * asumir estabilidad aguas abajo.
+   *
+   * La clave es `release.id`: cambiar el orden de los grupos o desplegar uno
+   * NO reconstruye las colas de los demás.
+   */
+  const queues = useMemo(() => {
+    const map: Record<string, ActiveTrack[]> = {};
+    for (const { release, tracks } of groups) {
+      const built = buildReleaseQueue(
+        tracks,
+        release.cover_image || undefined,
+        release.youtube_video_id || undefined
+      );
+      if (built.length > 0) map[release.id] = built;
+    }
+    return map;
+  }, [groups]);
+
   if (groups.length === 0) return null;
 
   return (
@@ -57,15 +84,33 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
       {/* `items-start`: sin eso, una celda con 10 pistas estira a todas las
           de su fila y las EPKCard sueltas quedan flotando en el vacío. */}
       {/*
-        C1 subio esta rejilla a 4 columnas porque la EPKCard suelta quedaba
-        comprimida a 198px. Pero desde C2 cada celda no es una tarjeta: es un
-        grupo (tarjeta del album + lista de sus pistas), y dentro de la fila de
-        la pista van numero, boton de play, titulo y "0:00 - 3:19". A 4
-        columnas el titulo se quedaba en ~120px y "Another Brick in the Wall"
-        salia como "Another ...". A 3 columnas el grupo mide ~400px y los
-        titulos se leen enteros, que es justo el objetivo de C1.
+        P11 — 4 lanzamientos por página, que es lo que pidió el usuario.
+
+        En el `main` de `artists/[id]` (`max-w-7xl` = 1280px menos `px-4`):
+          390px  1 col  → 358px
+          768px  2 cols → 356px
+         1024px  3 cols → 314px
+         1280px  4 cols → 294px
+         1440px  4 cols → 294px (topado por max-w-7xl)
+
+        Los umbrales que otros guiones exigen (`cardWidth >= 250` en
+        `scripts/rc29-artist-shots.ts:373`, `card >= 260` en
+        `scripts/verify-wave3.cjs:41`) se siguen cumpliendo con holgura: el
+        más estrecho es 294px.
+
+        El motivo histórico de bajar a 3 columnas (`bfdda30`) NO era el ancho:
+        era que el título tenía UNA sola línea parapia (`truncate`), y a 294px
+        eso lo dejaba en 17-31px. Con dos líneas (`line-clamp-2` en el `<h3>`
+        de `EPKCard`) el título se lee entero a 294px, así que las 4 columnas
+        vuelven sin volver a perder legibilidad.
+
+        Y esto sigue siendo una REJILLA, no un carrusel: el carrusel del
+        catálogo (`components/carousel/**`, `lib/carousel.ts`) es de 1 artista
+        por página y `lib/carousel.ts` documenta que los slides responsivos se
+        borraron a propósito para no dejar dos fuentes de verdad. Reintroducirlos
+        aquí mezclaría ambos mecanismos sobre el mismo catálogo.
       */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
         {groups.map(({ release, tracks }) => {
           const isOpen = !!expanded[release.id];
           const hidden = tracks.length - VISIBLE_TRACKS;
@@ -73,11 +118,20 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
 
           return (
             <div key={release.id} className="flex flex-col gap-4 min-w-0">
-              {/* EPKCard de la fila padre: conserva play, like y métricas.
-                  `detailHref` apunta a la ficha que corresponda: un single
-                  suelto solo tiene `/track/{id}`, un álbum tiene su página
-                  `/releases/{id}` donde ya se listan las pistas. Sin esto un
-                  single se quedaba sin ninguna forma de abrir su ficha. */}
+              {/* EPKCard de la fila padre: conserva like, métricas y portada
+                  clickeable; el PLAY ya no lo conserva, y es deliberado.
+
+                  Un padre no tiene audio propio (`audio_preview_url` vacío, que
+                  `lib/db.ts` convierte en el truthy `"—"`), así que su botón de
+                  play era un control inerte. Con `childrenTracks` + `queue` la
+                  tarjeta cambia ese estado muerto por uno honesto: botón
+                  deshabilitado con la explicación y "Escuchar N pistas", que
+                  monta la cola completa en el contexto con avance automático.
+                  La duración mostrada también sale de las hijas (`sumDurations`).
+
+                  `detailHref` apunta a la ficha que corresponda: un single suelto
+                  solo tiene `/track/{id}`, un álbum tiene su página
+                  `/releases/{id}` donde ya se listan las pistas. */}
               <EPKCard
                 track={release}
                 onLoginPrompt={handleLoginPrompt}
@@ -85,6 +139,8 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
                 detailHref={
                   tracks.length > 0 ? `/releases/${release.id}` : `/track/${release.id}`
                 }
+                childrenTracks={tracks.length > 0 ? tracks : undefined}
+                queue={queues[release.id]}
               />
 
               {/* Solo un release con hijas dibuja lista: un single suelto
@@ -116,8 +172,16 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
                   </Link>
 
                   <div className="p-3">
+                    {/*
+                      `queueTracks` es la lista COMPLETA, no `visibleTracks`.
+                      Plegar a 6 es una decisión de pantalla, no de audio: si la
+                      cola saliera de las 6 filas visibles, "Escuchar 6 pistas"
+                      pararía en el sexto tema de un disco de 8 y el avance
+                      automático se acabaría antes de tiempo.
+                    */}
                     <ReleaseTrackList
                       tracks={visibleTracks}
+                      queueTracks={tracks}
                       releaseTitle={release.title}
                       releaseCoverImage={release.cover_image || undefined}
                       releaseYoutubeVideoId={release.youtube_video_id || undefined}

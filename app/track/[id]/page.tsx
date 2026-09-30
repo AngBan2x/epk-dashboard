@@ -17,7 +17,7 @@ import LastfmMetrics from "@/components/LastfmMetrics";
 import { UnifiedMetrics } from "@/components/UnifiedMetrics";
 import { PageTransition, SlideIn } from "@/components/MotionWrappers";
 import { getTrackById, getAllTracks, getArtistByName, getTracksByReleaseId } from "@/lib/db";
-import { safeString, formatNumber, capitalizeReleaseType, getCoverImage } from "@/lib/null-safe";
+import { safeString, formatNumber, capitalizeReleaseType, getCoverImage, sumDurations } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
 
 interface TrackDetailPageProps {
@@ -92,15 +92,15 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
   // El padre no tiene duracion propia: el seed le pone "00:00" y la portada
   // mostraba "Álbum 00:00" como si fuera un tramo. La duracion real se calcula
   // al sumar la de sus pistas.
-  const totalDuration = children.reduce((sum, t) => {
-    const [m, s] = safeString(t.duration, "0:00").split(":").map(Number);
-    if (Number.isNaN(m) || Number.isNaN(s)) return sum;
-    return sum + m * 60 + s;
-  }, 0);
-  const totalDurationLabel =
-    totalDuration > 0
-      ? `${Math.floor(totalDuration / 60)}:${String(totalDuration % 60).padStart(2, "0")}`
-      : null;
+  //
+  // P15: con `sumDurations` de `lib/null-safe.ts`, no con un parser propio. El
+  // que había aquí hacía `const [m, s] = value.split(":")`, que con tres
+  // segmentos ("1:02:03") sumaba 62 s en vez de 3723 — y el `isNaN` de guarda
+  // no saltaba, así que el error era silencioso. `sumDurations` además
+  // devuelve `null` (no `0`) cuando no hay nada sumable, para no pintar "0:00"
+  // como si un disco recién creado durara cero.
+  const totalDuration = sumDurations(children.map((t) => t.duration));
+  const totalDurationLabel = totalDuration?.label ?? null;
 
   return (
     <PageTransition>
@@ -445,11 +445,48 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                   <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
                     Ficha técnica para prensa
                   </h2>
+                  {/*
+                    P15 — el alcance de la descarga.
+
+                    Este bloque montaba `<CatalogDownloadButton />` SIN props, y
+                    sin `artist_id` el export devuelve el catálogo **global**:
+                    los 83 tracks de todos los artistas del PressPlay. El copy
+                    decía "el catálogo completo del EPK", que para un
+                    periodista es una afirmación falsa sobre lo que se
+                    descarga.
+
+                    Ahora el scope es el del artista de esta pista, y el copy lo
+                    dice. `artist` se resuelve con `getArtistByName` en el
+                    `Promise.all` de arriba; si un artista no está en la tabla
+                    `artists` (un release huérfano), `artist` es `null` y el
+                    componente degrada solo: el dossier y el rider salen
+                    deshabilitados con su explicación y el catálogo sigue
+                    funcionando, sin error ni 400.
+                  */}
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Descarga el catálogo completo del EPK con métricas, enlaces y detalles de
-                    producción de cada lanzamiento.
+                    {artist ? (
+                      <>
+                        Descarga el catálogo de{" "}
+                        <span className="font-medium text-slate-800 dark:text-slate-200">
+                          {safeString(artist.name)}
+                        </span>
+                        : dossier de prensa, rider técnico y fichas de cada
+                        lanzamiento aprobado, con métricas y enlaces.
+                      </>
+                    ) : (
+                      <>
+                        Descarga el catálogo público de PressPlay con métricas,
+                        enlaces y detalles de producción de cada lanzamiento
+                        aprobado. El dossier y el rider son por artista y
+                        todavía no hay ficha de artista para{" "}
+                        {safeString(track.artist_name)}.
+                      </>
+                    )}
                   </p>
-                  <CatalogDownloadButton />
+                  <CatalogDownloadButton
+                    artistId={artist?.id ?? null}
+                    artistName={artist ? safeString(artist.name) : safeString(track.artist_name, "PressPlay")}
+                  />
                 </div>
               </SlideIn>
             </div>

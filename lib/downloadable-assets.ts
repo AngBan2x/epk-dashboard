@@ -1,4 +1,10 @@
-import { safeString, safeNumber, safeArray } from "@/lib/null-safe";
+import {
+  parseDurationToSeconds,
+  safeArray,
+  safeNumber,
+  safeString,
+  sumDurations,
+} from "@/lib/null-safe";
 import { escapeHtml } from "@/lib/email-templates";
 import type { Track, TopCountry } from "@/types/music";
 import type { DossierData } from "@/lib/db";
@@ -316,6 +322,79 @@ export function collectTrackLinks(track: Track): Array<{ label: string; href: st
   return links;
 }
 
+/** Etiqueta de duración ya calculada (`"42:46"`), tal y como la emite `sumDurations`. */
+export interface ResolvedDuration {
+  seconds: number;
+  label: string;
+}
+
+/**
+ * P15 — los 9 padres del catálogo semilla tienen `duration = "00:00"`, y ese
+ * literal se imprimía en los tres formatos de prensa (HTML, PDF y JSON): un
+ * álbum de 10 pistas decía durar cero. La columna del padre no se rellena
+ * porque un release es la fila agrupadora, no una pista reproducible.
+ *
+ * La duración real sale de sumar las hijas (`tracks.release_id = padre.id`).
+ * Se usa `sumDurations()` del contrato de `lib/null-safe.ts` —que ya sabe
+ * distinguir `"—"`, `""`, `null` y `"H:MM:SS"`— en vez de un parser propio.
+ *
+ * El mapa se construye desde la lista YA filtrada que se está exportando: no se
+ * usan duraciones de hijas que el export público decidió no incluir, para no
+ * abrir un camino nuevo a filtrar datos de borradores.
+ */
+export function buildReleaseDurations(
+  tracks: readonly Track[]
+): Map<string, ResolvedDuration> {
+  const childrenByRelease = new Map<string, string[]>();
+  for (const track of safeArray<Track>(tracks)) {
+    const releaseId = safeString(track.release_id, "");
+    if (releaseId === "") continue;
+    const bucket = childrenByRelease.get(releaseId);
+    if (bucket) bucket.push(track.duration);
+    else childrenByRelease.set(releaseId, [track.duration]);
+  }
+
+  const durations = new Map<string, ResolvedDuration>();
+  for (const [releaseId, values] of childrenByRelease) {
+    const total = sumDurations(values);
+    if (total) durations.set(releaseId, total);
+  }
+  return durations;
+}
+
+/**
+ * Duración a imprimir para una pista, con el orden de preferencia:
+ * 1. la columna de la pista, si es una duración real (> 0 segundos);
+ * 2. la suma de sus hijas, si la tiene (el caso del padre con `"00:00"`);
+ * 3. la columna tal cual, para no inventar un dato que no existe.
+ *
+ * Una hija con `"00:00"` es un dato real — una pista de duración desconocida— y
+ * por eso no se sustituye: solo se reparan los padres, que sí son sumables.
+ */
+export function resolveCatalogDuration(
+  track: Track,
+  releaseDurations?: ReadonlyMap<string, ResolvedDuration> | null
+): string {
+  const declared = safeString(track.duration);
+  const parsed = parseDurationToSeconds(declared);
+  if (parsed != null && parsed > 0) return declared;
+
+  const total = releaseDurations?.get(safeString(track.id, ""));
+  if (total) return total.label;
+
+  return declared;
+}
+
+/**
+ * Contexto compartido por los tres formatos de prensa. Se construye una vez por
+ * render (`catalogBody`, `drawCatalogSection`, `buildCatalogJson`) a partir de
+ * la lista ya filtrada, para que HTML, PDF y JSON muestren la MISMA duración y
+ * no puedan divergir.
+ */
+export interface CatalogDurationContext {
+  releaseDurations: ReadonlyMap<string, ResolvedDuration>;
+}
+
 /**
  * Datos de una pista ya aplanados y formateados, sin HTML. Es la unica fuente
  * de verdad del catalogo: la consumen `catalogTrackHtml` y el generador de PDF
@@ -341,13 +420,16 @@ export interface CatalogTrackFields {
   galleryCount: number;
 }
 
-export function catalogTrackFields(track: Track): CatalogTrackFields {
+export function catalogTrackFields(
+  track: Track,
+  context?: CatalogDurationContext | null
+): CatalogTrackFields {
   const production = track.production_details;
   return {
     title: safeString(track.title),
     releaseType: safeString(track.release_type),
     releaseDate: safeString(track.release_date),
-    duration: safeString(track.duration),
+    duration: resolveCatalogDuration(track, context?.releaseDurations),
     streams: formatCount(safeNumber(track.metrics?.streams)),
     saves: formatCount(safeNumber(track.metrics?.saves)),
     playlists: formatCount(safeNumber(track.metrics?.playlist_additions)),
@@ -366,8 +448,8 @@ export function catalogTrackFields(track: Track): CatalogTrackFields {
   };
 }
 
-function catalogTrackHtml(track: Track): string {
-  const data = catalogTrackFields(track);
+function catalogTrackHtml(track: Track, context?: CatalogDurationContext | null): string {
+  const data = catalogTrackFields(track, context);
   const duration = escapeHtml(data.duration);
   const links = data.links;
 
@@ -406,6 +488,7 @@ function catalogTrackHtml(track: Track): string {
 function catalogBody(payload: ExportPayload, headingHtml = "🎵 PressPlay — Dossier de Prensa"): string {
   const now = payload.generatedAt ?? new Date();
   const tracks = safeArray<Track>(payload.tracks);
+  const context: CatalogDurationContext = { releaseDurations: buildReleaseDurations(tracks) };
 
   return `
   <h1>${headingHtml}</h1>
@@ -413,18 +496,28 @@ function catalogBody(payload: ExportPayload, headingHtml = "🎵 PressPlay — D
   ${payload.artistId ? `<p class="meta"><strong>Artista:</strong> ${escapeHtml(safeString(payload.artistName))}</p>` : ""}
   <p class="meta">Total de tracks en catálogo: <strong>${tracks.length}</strong></p>
 
-  ${tracks.map((track) => catalogTrackHtml(track)).join("\n")}`;
+  ${tracks.map((track) => catalogTrackHtml(track, context)).join("\n")}`;
 }
 
-function trackToJson(track: Track): Record<string, unknown> {
+function trackToJson(
+  track: Track,
+  context?: CatalogDurationContext | null
+): Record<string, unknown> {
   const production = track.production_details;
   return {
     id: safeString(track.id),
     title: safeString(track.title),
     artist_name: safeString(track.artist_name),
+    // GAP-A: sin `release_id` el export legible por máquina no decía a qué
+    // álbum pertenecía una pista. `disc_number`/`track_number` cierran el mismo
+    // hueco: permiten reconstruir el tracklist de un multidisco. Los tres se
+    // emiten tal cual, `null` cuando no hay dato, para no mentir con un 0.
+    release_id: track.release_id ?? null,
+    disc_number: track.disc_number ?? null,
+    track_number: track.track_number ?? null,
     release_type: safeString(track.release_type),
     release_date: safeString(track.release_date),
-    duration: safeString(track.duration),
+    duration: resolveCatalogDuration(track, context?.releaseDurations),
     cover_image: safeString(track.cover_image, ""),
     audio_preview_url: safeString(track.audio_preview_url, ""),
     metrics: {
@@ -535,6 +628,7 @@ export function buildRiderJson(payload: ExportPayload): string {
 export function buildCatalogJson(payload: ExportPayload): string {
   const now = payload.generatedAt ?? new Date();
   const tracks = safeArray<Track>(payload.tracks);
+  const context: CatalogDurationContext = { releaseDurations: buildReleaseDurations(tracks) };
 
   const document: Record<string, unknown> = {
     exported_at: now.toISOString(),
@@ -550,7 +644,7 @@ export function buildCatalogJson(payload: ExportPayload): string {
   }
   document.catalog = {
     total_tracks: tracks.length,
-    tracks: tracks.map((track) => trackToJson(track)),
+    tracks: tracks.map((track) => trackToJson(track, context)),
   };
 
   return JSON.stringify(document, null, 2);

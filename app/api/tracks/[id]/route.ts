@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateTrack, getTrackById } from "@/lib/db";
+import { updateTrack, getTrackById, getApprovedTrackById, isArtistOwnerOfTrackName } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { validateTrackNumber } from "@/lib/validations";
 
@@ -12,14 +12,40 @@ async function validateSession(req: NextRequest) {
 }
 
 // GET /api/tracks/:id — Get track by ID
+//
+// S0/P4: esta ruta es PÚBLICA (no está en el `matcher` de `middleware.ts`) y
+// usaba `getTrackById`, que no filtra por estado. Con eso, un borrador o un
+// release rechazado era legible por cualquiera que tuviera el id, y el
+// `admin_notes` interno también viajaba en la respuesta.
+//
+// Ahora sale por el lector de alcance público (aprobado + parseado con
+// `parseTrack`, que es la forma acotada por el tipo `Track`). El dueño
+// verificado y el admin siguen viendo los estados propios mediante
+// `artists.user_id`, que es la única fuente de ownership fiable aquí: `tracks`
+// se relaciona con `artists` por nombre, no por FK.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+
+    const approved = await getApprovedTrackById(id);
+    if (approved) return NextResponse.json(approved);
+
+    const session = await validateSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
+
     const track = await getTrackById(id);
     if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
+    if (session.role === "admin") return NextResponse.json(track);
+
+    const owns = await isArtistOwnerOfTrackName(track.artist_name, session.userId);
+    if (!owns) {
       return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
     return NextResponse.json(track);

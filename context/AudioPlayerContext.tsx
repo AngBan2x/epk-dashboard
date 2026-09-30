@@ -3,8 +3,24 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import { getAudioContext } from "@/lib/web-audio";
 import { getYouTubePlayer, destroyYouTubePlayer, YT_STATE } from "@/lib/youtube-player";
+import {
+  advanceQueue,
+  createQueue,
+  hasNextInQueue,
+  hasPrevInQueue,
+  prevQueueIndex,
+  queuePositionLabel,
+  reindexQueue,
+  shouldUseCrossOrigin,
+  type QueueState,
+  type QueueTrack,
+} from "@/lib/audio-priority";
 
-export interface ActiveTrack {
+/**
+ * Estructuralmente compatible con `QueueTrack` de `lib/audio-priority.ts`, así
+ * que una `ActiveTrack[]` entra en `playQueue()` sin cast.
+ */
+export interface ActiveTrack extends QueueTrack {
   id: string;
   title: string;
   artist?: string;
@@ -12,7 +28,8 @@ export interface ActiveTrack {
   coverImage?: string;
   isYouTube?: boolean;
   youtubeVideoId?: string;
-  // P3 Batch 2: YouTube timestamps for multi-track
+  // P3 Batch 2: capítulos sobre un MISMO vídeo (segmentar un vídeo).
+  // OJO: esto NO es la cola de pistas.
   startTimestamp?: number;
   endTimestamp?: number;
 }
@@ -27,7 +44,19 @@ export interface AudioPlayerContextType {
   volume: number;
   isVisualizerOpen: boolean;
   isYouTubeMode: boolean;
+  /** Pistas de la cola montada con `playQueue`. */
+  queue: QueueTrack[];
+  /** Índice de la pista en curso, o -1 si no hay cola. */
+  queueIndex: number;
+  /** "3/12", o "" sin cola. */
+  queuePosition: string;
+  hasNext: boolean;
+  hasPrev: boolean;
   playTrack: (track: ActiveTrack) => void;
+  /** Monta la cola completa y arranca en `startIndex`. */
+  playQueue: (items: ActiveTrack[], startIndex?: number) => void;
+  next: () => void;
+  prev: () => void;
   togglePlay: () => void;
   pause: () => void;
   clearTrack: () => void;
@@ -39,8 +68,11 @@ export interface AudioPlayerContextType {
 
 export const AudioPlayerContext = createContext<AudioPlayerContextType | undefined>(undefined);
 
+/** Referencia estable: un array nuevo en cada render re-renderiza el consumidor. */
+const EMPTY_QUEUE: QueueTrack[] = [];
+
 export function AudioPlayerProvider({ children }: { children: React.ReactNode }) {
-  const [activeTrack, setActiveTrack] = useState<ActiveTrack | null>(null);
+  const [activeTrack, setActiveTrackState] = useState<ActiveTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -49,6 +81,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const [error, setError] = useState<string | null>(null);
   const [isVisualizerOpen, setIsVisualizerOpen] = useState(false);
   const [isYouTubeMode, setIsYouTubeMode] = useState(false);
+  const [queueState, setQueueState] = useState<QueueState | null>(null);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const youtubeSyncRef = useRef<NodeJS.Timeout | null>(null);
@@ -56,7 +89,44 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const endTimestampRef = useRef<number>(0);
   const isYouTubeModeRef = useRef(false);
 
-  // Sync YouTube player state with context
+  // --- Espejos en refs -----------------------------------------------------
+  // Antes, `useEffect(..., [])` (y los `setTimeout` de los callbacks de YouTube)
+  // capturaban estado ya obsoleto. La cola se decide con funciones puras pero se
+  // aplica con estos espejos, que nunca quedan viejos.
+  const activeTrackRef = useRef<ActiveTrack | null>(null);
+  const isPlayingRef = useRef(false);
+  const volumeRef = useRef(0.85);
+  const queueRef = useRef<QueueState | null>(null);
+  /** Sube en cada carga: los callbacks de una pista ya descartada se ignoran. */
+  const loadTokenRef = useRef(0);
+  /** Puente entre `useEffect([])` / callbacks de YouTube y `advance`. */
+  const advanceRef = useRef<() => void>(() => {});
+  const sourceFailureRef = useRef<(track: ActiveTrack) => void>(() => {});
+
+  const setActiveTrack = useCallback((track: ActiveTrack | null) => {
+    activeTrackRef.current = track;
+    setActiveTrackState(track);
+  }, []);
+
+  const updatePlaying = useCallback((next: boolean) => {
+    isPlayingRef.current = next;
+    setIsPlaying(next);
+  }, []);
+
+  const setQueue = useCallback((next: QueueState | null) => {
+    queueRef.current = next;
+    setQueueState(next);
+  }, []);
+
+  volumeRef.current = volume;
+
+  const stopYouTubeSync = useCallback(() => {
+    if (youtubeSyncRef.current) {
+      clearInterval(youtubeSyncRef.current);
+      youtubeSyncRef.current = null;
+    }
+  }, []);
+
   const startYouTubeSync = useCallback(() => {
     if (youtubeSyncRef.current) clearInterval(youtubeSyncRef.current);
     youtubeSyncRef.current = setInterval(() => {
@@ -70,91 +140,91 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       setCurrentTime(ytTime);
       if (ytDuration > 0) setDuration(ytDuration);
 
-      // P3 Batch 2: Stop at endTimestamp for multi-track YouTube
+      // P3 Batch 2: fin de capítulo == fin de pista → avanzar.
       if (endTimestampRef.current > 0 && ytTime >= endTimestampRef.current) {
         yt.pause();
-        setIsPlaying(false);
-        stopYouTubeSync();
+        advanceRef.current();
         return;
       }
 
       if (ytState === YT_STATE.ENDED) {
-        setIsPlaying(false);
+        advanceRef.current();
       } else if (ytState === YT_STATE.PLAYING) {
-        setIsPlaying(true);
+        updatePlaying(true);
       } else if (ytState === YT_STATE.PAUSED) {
-        setIsPlaying(false);
+        updatePlaying(false);
       }
     }, 250);
-  }, []);
+  }, [updatePlaying]);
 
-  const stopYouTubeSync = useCallback(() => {
-    if (youtubeSyncRef.current) {
-      clearInterval(youtubeSyncRef.current);
-      youtubeSyncRef.current = null;
-    }
-  }, []);
-
-  const playTrack = useCallback((track: ActiveTrack) => {
-    const isYT = track.isYouTube === true && !!track.youtubeVideoId;
-
-    // Reset error on new track
-    setError(null);
-
-    // If same track and already playing, do nothing
-    if (activeTrack?.id === track.id && isPlaying) return;
-
-    // If same track and paused, just resume
-    if (activeTrack?.id === track.id && !isPlaying) {
-      if (isYT) {
-        const yt = getYouTubePlayer();
-        yt.play();
-        setIsPlaying(true);
-        startYouTubeSync();
-      } else if (audioRef.current) {
-        getAudioContext();
-        audioRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
-          console.error("Error resuming playback:", err);
-          setError("Error al reanudar reproducción");
-        });
-      }
+  /**
+   * Avance automático. Cuando se acaba la cola, `advanceQueue` devuelve `null`
+   * y aquí se **para** (no se reinicia): un bucle infinito silencioso sería
+   * peor que un final honesto. Las pistas no reproducibles se saltan solas.
+   */
+  const advance = useCallback((forcePlay = false) => {
+    const next = advanceQueue(queueRef.current);
+    if (!next) {
+      setIsLoading(false);
+      updatePlaying(false);
       return;
     }
+    setQueue(next);
+    loadTrackRef.current(next.items[next.index] as ActiveTrack, forcePlay || isPlayingRef.current);
+  }, [setQueue, updatePlaying]);
 
-    // New track
-    setIsPlaying(false);
+  /** `loadTrack` se declara después de `advance`; este ref rompe el ciclo. */
+  const loadTrackRef = useRef<(track: ActiveTrack, autoplay: boolean) => void>(() => {});
+
+  /**
+   * Carga una pista en el reproductor. `autoplay=false` deja la pista cargada
+   * y en pausa (botón "siguiente" con la cola en pausa).
+   */
+  const loadTrack = useCallback((track: ActiveTrack, autoplay: boolean) => {
+    const isYT = track.isYouTube === true && !!track.youtubeVideoId;
+    const token = ++loadTokenRef.current;
+    const isStale = () => token !== loadTokenRef.current;
+
+    setError(null);
+    setIsLoading(false);
+
     // Default 30s preview for YouTube tracks without explicit timestamps
     const effectiveEnd = isYT && (!track.endTimestamp || track.endTimestamp === 0)
       ? 30
       : (track.endTimestamp || 0);
+
     setActiveTrack({ ...track, endTimestamp: effectiveEnd });
     setIsYouTubeMode(isYT);
     isYouTubeModeRef.current = isYT;
-
-    // P3 Batch 2: Set timestamps for multi-track YouTube
     startTimestampRef.current = track.startTimestamp || 0;
     endTimestampRef.current = effectiveEnd;
 
     if (isYT) {
       // Pause HTML5 audio if playing and reset src to prevent conflicts
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
-        audioRef.current.load();
+      const idle = audioRef.current;
+      if (idle) {
+        idle.pause();
+        idle.src = "";
+        idle.crossOrigin = null;
+        idle.load();
       }
-      // Stop any existing YouTube sync interval before initializing new one
       stopYouTubeSync();
 
-      // YouTube mode
       setIsLoading(true);
       const yt = getYouTubePlayer();
       yt.init(track.youtubeVideoId!, {
         onReady: () => {
-          yt.setVolume(volume);
+          if (isStale()) return;
+          yt.setVolume(volumeRef.current);
           const doPlay = () => {
+            if (isStale()) return;
             setIsLoading(false);
+            if (!autoplay) {
+              updatePlaying(false);
+              return;
+            }
             yt.play();
-            setIsPlaying(true);
+            updatePlaying(true);
             startYouTubeSync();
           };
           if (track.startTimestamp && track.startTimestamp > 0) {
@@ -166,16 +236,19 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
           }
         },
         onStateChange: (state) => {
+          if (isStale()) return;
           if (state === YT_STATE.ENDED) {
-            setIsPlaying(false);
-            stopYouTubeSync();
+            // Antes solo paraba. Ahora avanza: eso es lo que convierte un
+            // release multipista en una cola con avance automático.
+            advanceRef.current();
           } else if (state === YT_STATE.PLAYING) {
-            setIsPlaying(true);
+            updatePlaying(true);
           } else if (state === YT_STATE.PAUSED) {
-            setIsPlaying(false);
+            updatePlaying(false);
           }
         },
         onError: (errorCode: number) => {
+          if (isStale()) return;
           const errorMessages: Record<number, string> = {
             2: "Parámetro inválido",
             3: "Error de reproducción",
@@ -184,73 +257,173 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
             150: "Video no disponible",
           };
           setError(errorMessages[errorCode] || "Error de YouTube desconocido");
-          setIsPlaying(false);
+          updatePlaying(false);
         },
       }, {
         start: track.startTimestamp || undefined,
         end: effectiveEnd > 0 ? effectiveEnd : undefined,
       });
-    } else {
-      // HTML5 audio mode
-      stopYouTubeSync();
-      destroyYouTubePlayer();
-      getAudioContext();
-      if (audioRef.current) {
-        audioRef.current.src = track.audioUrl;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
-          console.error("Error starting playback:", err);
-          setError("Error al iniciar reproducción — archivo no disponible");
-          setIsPlaying(false);
-        });
-      }
+      return;
     }
-  }, [activeTrack, isPlaying, volume, startYouTubeSync, stopYouTubeSync]);
+
+    // HTML5 audio mode
+    stopYouTubeSync();
+    destroyYouTubePlayer();
+    void getAudioContext();
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // El atributo va **imperativamente**, no por prop: `setActiveTrack` es
+    // asíncrono y si dependiera del render, la reproducción arrancaría con el
+    // `crossOrigin` de la pista anterior. Ver la medición en
+    // `shouldUseCrossOrigin`.
+    audio.crossOrigin = shouldUseCrossOrigin(track.audioUrl) ? "anonymous" : null;
+
+    if (!track.audioUrl || track.audioUrl.trim() === "") {
+      sourceFailureRef.current(track);
+      return;
+    }
+
+    audio.src = track.audioUrl;
+    if (!autoplay) {
+      updatePlaying(false);
+      return;
+    }
+    audio.play().then(() => {
+      if (isStale()) return;
+      updatePlaying(true);
+    }).catch((err) => {
+      if (isStale()) return;
+      console.error("Error starting playback:", err);
+      sourceFailureRef.current(track);
+    });
+  }, [setActiveTrack, updatePlaying, stopYouTubeSync, startYouTubeSync]);
+
+  // Se sincroniza tras cada render para que los listeners con `[]` y los
+  // callbacks de YouTube vean siempre la versión viva.
+  useEffect(() => {
+    loadTrackRef.current = loadTrack;
+    advanceRef.current = () => advance(true);
+    sourceFailureRef.current = (track: ActiveTrack) => {
+      const next = advanceQueue(queueRef.current);
+      const label = track.title ? `«${track.title}»` : "La pista";
+      if (next) {
+        setQueue(next);
+        loadTrackRef.current(next.items[next.index] as ActiveTrack, true);
+        setError(`${label} no se pudo reproducir — se saltó a la siguiente`);
+      } else {
+        setError(`${label} no tiene una fuente disponible`);
+        updatePlaying(false);
+      }
+    };
+  });
+
+  const playTrack = useCallback((track: ActiveTrack) => {
+    // Si ya está sonando, no se reinicia (comportamiento previo). Si es la
+    // misma pista en pausa, `togglePlay` es quien reanuda.
+    if (activeTrackRef.current?.id === track.id && isPlayingRef.current) return;
+
+    const state = queueRef.current;
+    const inQueue = state?.items.some((item) => item.id === track.id) ?? false;
+    // Ya estaba en la cola → se reinicia el índice ahí y **se conserva el
+    // resto**. No estaba → la cola pasa a ser esa pista sola.
+    const reindexed = inQueue ? reindexQueue(state, track) : createQueue([track], 0);
+
+    if (!reindexed) {
+      sourceFailureRef.current(track);
+      return;
+    }
+    setQueue(reindexed);
+    loadTrack(track, true);
+  }, [loadTrack, setQueue]);
+
+  const playQueue = useCallback((items: ActiveTrack[], startIndex = 0) => {
+    const created = createQueue(items, startIndex);
+    if (!created) {
+      // Ninguna pista de la lista es reproducible: no se toca lo que esté
+      // sonando y se dice por qué, en vez de dejar un botón inerte.
+      const first = Array.isArray(items) ? items[0] : undefined;
+      setError(
+        first?.title
+          ? `«${first.title}» no tiene ninguna fuente de audio disponible`
+          : "Ninguna pista de esta lista tiene audio disponible",
+      );
+      return;
+    }
+    setQueue(created);
+    loadTrack(created.items[created.index] as ActiveTrack, true);
+  }, [loadTrack, setQueue]);
+
+  const next = useCallback(() => {
+    const state = queueRef.current;
+    if (!state) return;
+    if (!hasNextInQueue(state)) {
+      updatePlaying(false);
+      return;
+    }
+    advance(false);
+  }, [advance, updatePlaying]);
+
+  const prev = useCallback(() => {
+    const state = queueRef.current;
+    if (!state) return;
+    const index = prevQueueIndex(state);
+    if (index === state.index) {
+      updatePlaying(false);
+      return;
+    }
+    setQueue({ items: state.items, index });
+    loadTrackRef.current(state.items[index] as ActiveTrack, isPlayingRef.current);
+  }, [setQueue, updatePlaying]);
 
   const togglePlay = useCallback(() => {
-    if (!activeTrack) return;
+    if (!activeTrackRef.current) return;
 
     setError(null);
 
-    if (isYouTubeMode) {
+    if (isYouTubeModeRef.current) {
       const yt = getYouTubePlayer();
-      if (isPlaying) {
+      if (isPlayingRef.current) {
         yt.pause();
-        setIsPlaying(false);
+        updatePlaying(false);
         stopYouTubeSync();
       } else {
+        void getAudioContext();
         yt.play();
-        setIsPlaying(true);
+        updatePlaying(true);
         startYouTubeSync();
       }
-    } else {
-      const audio = audioRef.current;
-      if (!audio) return;
-
-      getAudioContext();
-
-      if (isPlaying) {
-        audio.pause();
-        setIsPlaying(false);
-      } else {
-        audio.play().then(() => setIsPlaying(true)).catch((err) => {
-          console.error("Error toggling playback:", err);
-          setError("Error al reanudar reproducción");
-        });
-      }
+      return;
     }
-  }, [activeTrack, isPlaying, isYouTubeMode, startYouTubeSync, stopYouTubeSync]);
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    void getAudioContext();
+
+    if (isPlayingRef.current) {
+      audio.pause();
+      updatePlaying(false);
+    } else {
+      audio.play().then(() => updatePlaying(true)).catch((err) => {
+        console.error("Error toggling playback:", err);
+        setError("Error al reanudar reproducción");
+      });
+    }
+  }, [updatePlaying, startYouTubeSync, stopYouTubeSync]);
 
   const pause = useCallback(() => {
-    if (isYouTubeMode) {
+    if (isYouTubeModeRef.current) {
       const yt = getYouTubePlayer();
       yt.pause();
-      setIsPlaying(false);
+      updatePlaying(false);
       stopYouTubeSync();
     } else if (audioRef.current) {
       audioRef.current.pause();
-      setIsPlaying(false);
+      updatePlaying(false);
     }
-  }, [isYouTubeMode, stopYouTubeSync]);
+  }, [updatePlaying, stopYouTubeSync]);
 
   const clearTrack = useCallback(() => {
     // Always clean up YouTube player and sync regardless of current mode
@@ -260,10 +433,12 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = "";
+      audioRef.current.crossOrigin = null;
       audioRef.current.load();
     }
+    loadTokenRef.current++;
     setActiveTrack(null);
-    setIsPlaying(false);
+    updatePlaying(false);
     setCurrentTime(0);
     setDuration(0);
     setIsVisualizerOpen(false);
@@ -271,7 +446,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     isYouTubeModeRef.current = false;
     startTimestampRef.current = 0;
     endTimestampRef.current = 0;
-  }, [stopYouTubeSync, destroyYouTubePlayer]);
+    setQueue(null);
+  }, [setActiveTrack, setQueue, updatePlaying, stopYouTubeSync]);
 
   const seek = useCallback((time: number) => {
     if (!Number.isFinite(time)) return;
@@ -286,7 +462,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       clamped = Math.max(start, time);
     }
 
-    if (isYouTubeMode) {
+    if (isYouTubeModeRef.current) {
       const yt = getYouTubePlayer();
       yt.seek(clamped);
       setCurrentTime(clamped);
@@ -294,19 +470,20 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       audioRef.current.currentTime = clamped;
       setCurrentTime(clamped);
     }
-  }, [isYouTubeMode]);
+  }, []);
 
   const setVolume = useCallback((val: number) => {
     const clamped = Math.max(0, Math.min(1, val));
+    volumeRef.current = clamped;
     setVolumeState(clamped);
 
-    if (isYouTubeMode) {
+    if (isYouTubeModeRef.current) {
       const yt = getYouTubePlayer();
       yt.setVolume(clamped);
     } else if (audioRef.current) {
       audioRef.current.volume = clamped;
     }
-  }, [isYouTubeMode]);
+  }, []);
 
   const toggleVisualizer = useCallback(() => {
     setIsVisualizerOpen((prev) => !prev);
@@ -319,14 +496,15 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
-      // P3 Batch 2: Stop at endTimestamp for HTML5 audio
+      // P3 Batch 2: fin de capítulo en HTML5 → avanzar.
       if (endTimestampRef.current > 0 && audio.currentTime >= endTimestampRef.current) {
         audio.pause();
-        setIsPlaying(false);
+        advanceRef.current();
       }
     };
     const handleLoadedMetadata = () => setDuration(audio.duration || 0);
-    const handleEnded = () => setIsPlaying(false);
+    // Antes era `() => setIsPlaying(false)`: paraba en la pista. Ahora avanza.
+    const handleEnded = () => advanceRef.current();
     const handleLoadingStart = () => setIsLoading(true);
     const handleWaiting = () => setIsLoading(true);
     const handleCanPlay = () => {
@@ -337,8 +515,13 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     const handleError = () => {
       if (isYouTubeModeRef.current) return;
       setIsLoading(false);
-      setError("Error de reproducción — archivo no disponible");
-      setIsPlaying(false);
+      const track = activeTrackRef.current;
+      if (track) {
+        sourceFailureRef.current(track);
+      } else {
+        setError("Error de reproducción — archivo no disponible");
+        setIsPlaying(false);
+      }
     };
     const handleStalled = () => {
       setIsLoading(true);
@@ -390,7 +573,15 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         volume,
         isVisualizerOpen,
         isYouTubeMode,
+        queue: queueState?.items ?? EMPTY_QUEUE,
+        queueIndex: queueState?.index ?? -1,
+        queuePosition: queuePositionLabel(queueState),
+        hasNext: hasNextInQueue(queueState),
+        hasPrev: hasPrevInQueue(queueState),
         playTrack,
+        playQueue,
+        next,
+        prev,
         togglePlay,
         pause,
         clearTrack,
@@ -401,12 +592,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       }}
     >
       {children}
-      <audio
-        ref={audioRef}
-        preload="metadata"
-        crossOrigin="anonymous"
-        className="hidden"
-      />
+      {/* `crossOrigin` NO va como prop: se fija imperativamente en `loadTrack`
+          antes de asignar `src` (ver `shouldUseCrossOrigin` en lib/audio-priority). */}
+      <audio ref={audioRef} preload="metadata" className="hidden" />
     </AudioPlayerContext.Provider>
   );
 }

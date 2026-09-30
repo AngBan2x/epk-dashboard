@@ -20,7 +20,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ShowForm } from "@/components/ShowForm";
 import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
-import { formatDateES } from "@/lib/null-safe";
+import { formatDateES, safeString } from "@/lib/null-safe";
 import { showStatusLabel } from "@/lib/show-status";
 import { sortList } from "@/lib/search";
 import { collectVideoIds, type YouTubeStatsRecord } from "@/lib/youtube";
@@ -196,9 +196,28 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {sortedTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
-                      <a href={`/track/${track.id}`} className="block h-full">
-                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} youtubeStats={statsFor(track)} />
-                      </a>
+                      {/*
+                        P8: la tarjeta NO va dentro de un `<a>`.
+
+                        Este bloque envolvía `<EPKCard>` entera en
+                        `<a href={/track/${track.id}}>`, y dentro hay un `<button>`
+                        de like y otro de play. Anidar un enlace alrededor de un
+                        botón es HTML inválido: axe lo reporta como
+                        `nested-interactive` (WCAG 2A) en `/dashboard`, y el
+                        tabulador cae en un enlace que contiene otro control.
+
+                        El enlace lo lleva la tarjeta: la portada es su propia
+                        superficie de clic (`EPKCard`, hermano del botón de
+                        like) y el título es el enlace tabulable. Aquí solo se
+                        pasa `detailHref`.
+                      */}
+                      <EPKCard
+                        track={track}
+                        priority={i === 0}
+                        onLoginPrompt={() => setShowLoginModal(true)}
+                        youtubeStats={statsFor(track)}
+                        detailHref={`/track/${track.id}`}
+                      />
                     </SlideIn>
                   ))}
                 </div>
@@ -250,6 +269,41 @@ export default function DashboardPage() {
                   </a>
                 </div>
               </div>
+
+              {/*
+                P2 (CTA) — "Enviar música" también para suscriptores.
+
+                Este es el caso para el que la cuenta existe: cualquiera puede
+                enviar un release, y `/submissions` es donde se ve en qué estado
+                    está cada envío (pendiente, aprobado, rechazado) y qué motivo dio
+                    la revisión. Es el equivalente de "mis envíos" para el
+                suscriptor, y por eso va con los otros dos pasos en lugar de
+                escondida en un menú.
+
+                Solo autenticados: este bloque entero es la vista de
+                suscriptor, que ya exige `user`; la vista de invitado no lo
+                monta.
+              */}
+              <a
+                href="/submissions"
+                className="mt-4 flex flex-col gap-2 rounded-2xl border border-primary-200 bg-primary-50/60 p-5 transition hover:border-primary-400 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-900 dark:bg-primary-950/30 dark:hover:border-primary-700 dark:hover:bg-primary-950/50 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                    <svg className="w-4 h-4 shrink-0 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    ¿Ya tienes música?
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-600 dark:text-slate-400">
+                    Envía un release o un show y sigue su estado de revisión desde el portal de
+                    envíos. No necesitas ser artista para empezar.
+                  </span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 sm:self-auto">
+                  Enviar música
+                </span>
+              </a>
 
               {artists.length > 0 && (
                 <div className="mt-6">
@@ -346,6 +400,29 @@ export default function DashboardPage() {
                     href="/profile"
                     color="hover:bg-blue-50 dark:hover:bg-blue-950"
                   />
+                  {/*
+                    P2 (CTA) — "Enviar música" al portal de envíos.
+
+                    El enlace estaba metido dentro de `components/ReleaseActions.tsx`
+                    (fichero de otro agente) porque `/dashboard` es la entrada
+                    natural y ese no lo era. Aquí ya no hace falta: el portal de
+                    envíos (`/submissions`) es exactamente donde se ve lo que
+                    has enviado y en qué estado está, así que es una acción
+                    rápida más, del mismo peso que las otras tres.
+
+                    Solo para usuarios autenticados: el portal exige sesión
+                    (`GET /api/submissions` responde 401 sin cookie) y un
+                    anónimo que pulse estoicrobota en `/login`. La vista de
+                    invitado no monta este bloque.
+                  */}
+                  {user && (
+                    <QuickAction
+                      label="Enviar música"
+                      icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>}
+                      href="/submissions"
+                      color="hover:bg-violet-50 dark:hover:bg-violet-950"
+                    />
+                  )}
                 </div>
               </section>
 
@@ -424,16 +501,37 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {sortedArtistTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
-                      <div className="relative group">
-                        <a href={`/track/${track.id}`} className="block h-full">
-                          <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} youtubeStats={statsFor(track)} />
-                        </a>
+                      {/*
+                        P8: aquí había dos enlaces apilados sobre la MISMA
+                        tarjeta: un `<a href=/track/{id}>` envolviendo la
+                        `EPKCard` entera (con su botón de like y su play
+                        dentro) y encima, en `absolute bottom-2 right-2`, un
+                        segundo `<a href=/releases/{id}/edit>` que se pintaba
+                        encima del pie de métricas de la tarjeta y se comía sus
+                        clics.
+
+                        Ahora la tarjeta no está dentro de ningún enlace (lleva
+                        `detailHref` y su portada es la superficie de clic) y
+                        "Editar" es un enlace **hermano**, debajo, en su propia
+                        fila. Ademas se muestra siempre: `opacity-0
+                        group-hover:opacity-100` es un enlace invisible en táctil
+                        —no hay hover— y en un viewport de 4 columnas cabía
+                        justo encima del contador de likes.
+                      */}
+                      <div className="flex h-full flex-col">
+                        <EPKCard
+                          track={track}
+                          priority={i === 0}
+                          onLoginPrompt={() => setShowLoginModal(true)}
+                          youtubeStats={statsFor(track)}
+                          detailHref={`/track/${track.id}`}
+                        />
                         <a
                           href={`/releases/${track.id}/edit`}
-                          className="absolute bottom-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm text-xs font-medium text-slate-700 dark:text-slate-300 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950 dark:hover:text-amber-300 shadow-sm"
+                          className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-amber-800 dark:hover:bg-amber-950 dark:hover:text-amber-300"
                         >
-                          <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          Editar
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          Editar {safeString(track.title, "release")}
                         </a>
                       </div>
                     </SlideIn>
@@ -626,9 +724,15 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
                   {sortedTracks.map((track, i) => (
                     <SlideIn key={track.id} index={i}>
-                      <a href={`/track/${track.id}`} className="block h-full">
-                        <EPKCard track={track} priority={i === 0} onLoginPrompt={() => setShowLoginModal(true)} youtubeStats={statsFor(track)} />
-                      </a>
+                      {/* P8: sin `<a>` envolviendo la tarjeta. Ver la nota del
+                          panel de admin, que tenía el mismo defecto. */}
+                      <EPKCard
+                        track={track}
+                        priority={i === 0}
+                        onLoginPrompt={() => setShowLoginModal(true)}
+                        youtubeStats={statsFor(track)}
+                        detailHref={`/track/${track.id}`}
+                      />
                     </SlideIn>
                   ))}
                   {tracks.length === 0 && (
@@ -652,12 +756,36 @@ export default function DashboardPage() {
                   <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
                     ¿Trabajas en prensa o Contrataciones?
                   </h2>
+                  {/*
+                    P15 — el alcance, por escrito.
+
+                    Esta vista es la de invitado: no hay artista en contexto, así
+                    que la descarga es legítimamente la GLOBAL. El problema era
+                    el copy, que decía "el catálogo completo del EPK" sin decir
+                    de quién, y el `CatalogDownloadButton` sin props que lo
+                    confirmaba. Ahora el texto dice las tres cosas que el
+                    backend hace de verdad:
+
+                    - es el catálogo de los {n} lanzamientos APROBADOS de
+                      PressPlay (no hay un artist's id al que acotarlo);
+                    - el dossier y el rider son por artista y salen
+                      deshabilitados aquí, con su explicación, en vez de fallar
+                      con un 400 (los necesita un usuario autenticado con
+                      perfil: `/artists/{id}`);
+                    - el nombre del archivo lo pone el servidor en
+                      `Content-Disposition`, no esta página.
+                  */}
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Descarga el catálogo completo del EPK en JSON con métricas, enlaces y detalles
-                    de producción de cada lanzamiento.
+                    Descarga el catálogo público de PressPlay:{" "}
+                    <strong className="font-semibold text-slate-800 dark:text-slate-200">
+                      {tracks.length} lanzamientos aprobados
+                    </strong>{" "}
+                    con métricas, enlaces y detalles de producción. El dossier y el
+                    rider técnico son por artista: entra a la ficha de un artista
+                    para descargarlos.
                   </p>
-                    <CatalogDownloadButton />
-                  </div>
+                  <CatalogDownloadButton artistName="PressPlay" />
+                </div>
               </SlideIn>
             </>
           )}

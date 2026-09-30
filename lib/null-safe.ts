@@ -34,6 +34,88 @@ export const formatDuration = (duration: string): string => {
   return `${min}:${sec.padStart(2, "0")}`;
 };
 
+/**
+ * CONTRATO P16 (RC.31) — parser de duraciones, exportado desde aquí para que
+ * ningún stream lo reimplemente.
+ *
+ * Por qué existe: el parser que estaba duplicado en
+ * `components/ReleaseTracklistSection.tsx:35-37` y `app/track/[id]/page.tsx:96-98`
+ * hacía `const [m, s] = value.split(":")` y devolvía `m * 60 + s`. Eso solo
+ * funciona con DOS segmentos. Con tres segmentos (`"1:02:03"`) el array es
+ * `[1, 2, 3]`, `m = 1` y `s = 2` → **62 segundos en vez de 3723**, y el guard
+ * `isNaN` que lo acompañaba NO saltaba porque `[1, 2, 3]` no contiene ningún
+ * NaN: el bug era silencioso y el resultado quedaba escrito en `duration`.
+ *
+ * No es hipotético: `secondsToTimestamp()` en `lib/youtube.ts:366-374` emite
+ * `H:MM:SS` a partir de una hora, y `app/releases/new/page.tsx:207` lo escribe
+ * tal cual en la columna `duration` de cada pista.
+ *
+ * Formatos aceptados: `"M:SS"`, `"MM:SS"`, `"H:MM:SS"`, `"HH:MM:SS"`.
+ * Valores sin sentido: `"—"`, `""`, `"—"`, `null`, `undefined`, texto no
+ * numérico → `null` (NO 0), para que el llamante distinga "vacío" de
+ * "duración cero".
+ */
+export function parseDurationToSeconds(
+  value: string | null | undefined
+): number | null {
+  if (value == null) return null;
+  if (typeof value !== "string") return null;
+
+  const raw = value.trim();
+  // El seed y varios formularios usan "—" como placeholder de "sin duración",
+  // no como un valor cero.
+  if (raw === "" || raw === "—" || raw === "-" || raw === "–") return null;
+  if (!/^\d{1,3}(:\d{1,2}){1,2}$/.test(raw)) return null;
+
+  const parts = raw.split(":").map((part) => Number(part));
+  if (parts.some((part) => !Number.isFinite(part) || part < 0)) return null;
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    // "3:75" no es una duración: 75 segundos no caben en un minuto.
+    if (seconds >= 60) return null;
+    return minutes * 60 + seconds;
+  }
+
+  const [hours, minutes, seconds] = parts;
+  if (minutes >= 60 || seconds >= 60) return null;
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+/**
+ * CONTRATO P16 (RC.31) — suma de duraciones de un tracklist.
+ *
+ * Devuelve `null` cuando NO hay nada sumable, para que el llamante pueda
+ * distinguir "no hay dato" de "0 segundos" (un álbum recién creado sin
+ * duraciones no debe renderizar "0:00" como si fuera real).
+ *
+ * La etiqueta sale en formato `M:SS` (minutos SIN relleno a la izquierda),
+ * igual que las hijas del seed (`"3:45"`, `"6:07"`). No se usa
+ * `formatDuration()` de este archivo porque solo rellena los segundos y
+ * dejaría `"42:46"` inconsistente al lado de `"6:07"`. Con más de una hora el
+ * total crece de forma natural: 3723 s → `"62:03"`.
+ */
+export function sumDurations(
+  values: Array<string | null | undefined>
+): { seconds: number; label: string } | null {
+  if (!Array.isArray(values) || values.length === 0) return null;
+
+  let total = 0;
+  let parsedCount = 0;
+  for (const value of values) {
+    const seconds = parseDurationToSeconds(value);
+    if (seconds == null) continue;
+    total += seconds;
+    parsedCount += 1;
+  }
+
+  if (parsedCount === 0) return null;
+
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return { seconds: total, label: `${minutes}:${String(secs).padStart(2, "0")}` };
+}
+
 export const formatNumber = (n: number): string =>
   new Intl.NumberFormat("es-VE").format(n);
 

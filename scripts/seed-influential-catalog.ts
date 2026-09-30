@@ -30,9 +30,10 @@ import {
   tursoExec,
 } from "../lib/db";
 import type { ArtistProfile, Track } from "@/types/music";
+import { sumDurations } from "@/lib/null-safe";
 import { randomUUID } from "crypto";
 
-interface SeedArtist {
+export interface SeedArtist {
   name: string;
   slug: string;
   biography: string;
@@ -41,7 +42,7 @@ interface SeedArtist {
   monthly_listeners: number;
 }
 
-interface SeedRelease {
+export interface SeedRelease {
   artistName: string;
   title: string;
   releaseType: "Album" | "EP" | "Single";
@@ -50,7 +51,7 @@ interface SeedRelease {
   tracks: SeedTrack[];
 }
 
-interface SeedTrack {
+export interface SeedTrack {
   title: string;
   duration: string;
   trackNumber: number;
@@ -62,7 +63,21 @@ interface SeedTrack {
   isrc?: string;
 }
 
-const SEED_ARTISTS: SeedArtist[] = [
+/**
+ * Fila de `tracks` tal y como sale de la base de datos, con lo mínimo que hace
+ * falta para localizar al padre de un release de este seed de forma
+ * determinista. `created_at` viene `NULL` en las filas ya sembradas, así que el
+ * orden estable termina resolviéndose por `id`.
+ */
+export interface SeedParentRow {
+  id: string;
+  artist_name: string;
+  title: string;
+  release_id?: string | null;
+  created_at?: string | null;
+}
+
+export const SEED_ARTISTS: SeedArtist[] = [
   {
     name: "Pink Floyd",
     slug: "pink-floyd",
@@ -105,7 +120,7 @@ const SEED_ARTISTS: SeedArtist[] = [
   },
 ];
 
-const SEED_RELEASES: SeedRelease[] = [
+export const SEED_RELEASES: SeedRelease[] = [
   // Pink Floyd - 2 álbumes
   {
     artistName: "Pink Floyd",
@@ -120,10 +135,10 @@ const SEED_RELEASES: SeedRelease[] = [
       { title: "Time", duration: "7:04", trackNumber: 4, discNumber: 1, startTime: 440, endTime: 864 },
       { title: "The Great Gig in the Sky", duration: "4:44", trackNumber: 5, discNumber: 1, startTime: 864, endTime: 1148 },
       { title: "Money", duration: "6:22", trackNumber: 6, discNumber: 1, startTime: 1148, endTime: 1530 },
-      { title: "Us and Them", duration: "7:49", trackNumber: 7, discNumber: 1, startTime: 1530, endTime: 2009 },
-      { title: "Any Colour You Like", duration: "3:24", trackNumber: 8, discNumber: 1, startTime: 2009, endTime: 2213 },
-      { title: "Brain Damage", duration: "3:50", trackNumber: 9, discNumber: 1, startTime: 2213, endTime: 2443 },
-      { title: "Eclipse", duration: "2:03", trackNumber: 10, discNumber: 1, startTime: 2443, endTime: 2566 },
+      { title: "Us and Them", duration: "7:49", trackNumber: 7, discNumber: 1, startTime: 1530, endTime: 1999 },
+      { title: "Any Colour You Like", duration: "3:24", trackNumber: 8, discNumber: 1, startTime: 1999, endTime: 2203 },
+      { title: "Brain Damage", duration: "3:50", trackNumber: 9, discNumber: 1, startTime: 2203, endTime: 2433 },
+      { title: "Eclipse", duration: "2:03", trackNumber: 10, discNumber: 1, startTime: 2433, endTime: 2556 },
     ],
   },
   {
@@ -194,14 +209,14 @@ const SEED_RELEASES: SeedRelease[] = [
       { title: "In Limbo", duration: "3:31", trackNumber: 7, discNumber: 1, startTime: 1779, endTime: 1990 },
       { title: "Idioteque", duration: "5:09", trackNumber: 8, discNumber: 1, startTime: 1990, endTime: 2299 },
       { title: "Morning Bell", duration: "4:38", trackNumber: 9, discNumber: 1, startTime: 2299, endTime: 2577 },
-      { title: "Motion Picture Soundtrack", duration: "7:01", trackNumber: 10, discNumber: 1, startTime: 2577, endTime: 3001 },
+      { title: "Motion Picture Soundtrack", duration: "7:01", trackNumber: 10, discNumber: 1, startTime: 2577, endTime: 2998 },
     ],
   },
-  // Björk - 1 EP
+  // Björk - 1 álbum
   {
     artistName: "Björk",
     title: "Vulnicura Strings",
-    releaseType: "EP",
+    releaseType: "Album",
     releaseDate: "2016-11-04",
     coverImage: "https://images.unsplash.com/photo-1521337581100-8ca9a73a5f79?w=600&q=80",
     tracks: [
@@ -215,13 +230,13 @@ const SEED_RELEASES: SeedRelease[] = [
   // David Bowie - 2 singles con lados B
   {
     artistName: "David Bowie",
-    title: "\"Heroes\"",
+    title: "Heroes",
     releaseType: "Single",
     releaseDate: "1977-09-23",
     coverImage: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80",
     tracks: [
       {
-        title: "\"Heroes\"",
+        title: "Heroes",
         duration: "6:07",
         trackNumber: 1,
         discNumber: 1,
@@ -250,7 +265,7 @@ const SEED_RELEASES: SeedRelease[] = [
     coverImage: "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=600&q=80",
     tracks: [
       {
-        title: "Ashe to Ashes",
+        title: "Ashes to Ashes",
         duration: "4:25",
         trackNumber: 1,
         discNumber: 1,
@@ -332,6 +347,74 @@ const SEED_RELEASES: SeedRelease[] = [
   },
 ];
 
+/**
+ * Consulta SOLO los padres (`release_id IS NULL`) con un orden estable.
+ *
+ * El `WHERE release_id IS NULL` no es una optimización: es la garantía de que
+ * una hija nunca puede salir de aquí, por muy unfortunate que sea el `SELECT`
+ * sin `ORDER BY` que usaba el cleanup antes (ver el comentario del bloque
+ * `--cleanup`). `ORDER BY created_at, id` convierte el resto en determinista:
+ * `created_at` está `NULL` en las 74 filas ya sembradas, así que el desempate
+ * real cae en `id`, pero las dos columnas juntas hacen el orden estable aunque
+ * `created_at` se rellene en el futuro.
+ */
+export const SEED_PARENT_SQL =
+  "SELECT id, artist_name, title, release_id, created_at FROM tracks " +
+  "WHERE release_id IS NULL ORDER BY created_at, id";
+
+async function querySeedParentRows(): Promise<SeedParentRow[]> {
+  if (isTursoEnabled()) {
+    const rows = await tursoExec(SEED_PARENT_SQL);
+    return rows as SeedParentRow[];
+  }
+  return getDbWrite()
+    .prepare(SEED_PARENT_SQL)
+    .all() as unknown as SeedParentRow[];
+}
+
+/**
+ * Devuelve el padre de un release del seed, o `null` si no existe.
+ *
+ * El segundo filtro (`release_id == null`) es redundante con el del SQL, y a
+ * propósito: `pickSeedParent` se exporta para que el test pueda ejercitarlo
+ * contra filas con la forma de producción, y la única garantía que importa es
+ * que con una lista donde solo hay hijas devolver `null` en vez de elegir una
+ * de ellas. Un `find` que no distingue padre de hija es lo que dejó al padre
+ * real de *Kid A* con sus 10 hijas huérfanas.
+ */
+export function pickSeedParent<T extends SeedParentRow>(
+  rows: T[],
+  artistName: string,
+  title: string
+): T | null {
+  const parents = rows
+    .filter(
+      (r) =>
+        r.artist_name === artistName &&
+        r.title === title &&
+        (r.release_id ?? null) === null
+    )
+    .sort(
+      (a, b) =>
+        (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id)
+    );
+  return parents[0] ?? null;
+}
+
+/**
+ * Duración del padre = suma de sus hijas, en `M:SS` (P15, RC.31).
+ *
+ * Antes iba `"00:00"` hardcodeado, y como el padre es la fila que se ve en la
+ * tarjeta del release, los 9 releases salían con duración cero en la web y en
+ * los 3 formatos de export. Se usa `sumDurations()` de `lib/null-safe.ts` —el
+ * contrato compartido de RC.31— en vez de un parser propio: el suyo ya trata
+ * `"H:MM:SS"`, `"—"` y `null`, y devuelve la etiqueta en `M:SS`, que es el
+ * formato de las hijas del seed.
+ */
+export function seedReleaseTotalDuration(sr: SeedRelease): string {
+  return sumDurations(sr.tracks.map((t) => t.duration))?.label ?? "0:00";
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
@@ -353,10 +436,12 @@ Options:
 Crea catálogo determinista multi-track:
 - Pink Floyd → 2 álbumes (The Dark Side of the Moon, The Wall, este de 2 discos)
 - Radiohead → 2 álbumes (OK Computer, Kid A)
-- Björk → 1 EP (Vulnicura Strings)
+- Björk → 1 álbum (Vulnicura Strings, versiones con cuerdas; de las 12 pistas del
+  disco original este archivo siembra 5)
 - David Bowie y Kraftwerk → 4 singles con lados B (is_double_single, sides_b)
 
 Total: 5 artistas, 9 releases, 65 pistas hijas (+ 9 filas padre = 74 en la web).
+La duración de cada padre es la suma de sus hijas, no "00:00".
 
 Nombres y slugs SIN sufijo, a propósito: son artistas reales, para que un artista
 que se registra vea los tipos de lanzamiento con los que puede trabajar. Para
@@ -372,9 +457,9 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
   // --cleanup: borra exactamente lo que creó este script.
   // Necesario desde que los nombres ya NO llevan el sufijo "-seed": no se
   // puede identificar el seed por convención de nombre, así que se borra por
-  // la clave estable del catálogo de este mismo archivo (artist_name + title),
-  // que es la misma que usa el upsert. Un artista solo se borra si se queda
-  // sin tracks: así no se lleva por delante nada que no sea suyo.
+  // la clave estable del catálogo de este mismo archivo (artist_name + title
+  // del PADRE), que es la misma que usa el upsert. Un artista solo se borra si
+  // se queda sin tracks: así no se lleva por delante nada que no sea suyo.
   // ------------------------------------------------------------------
   if (cleanup) {
     console.log("Alcance del borrado (clave estable: artist_name + title del catálogo de este script):");
@@ -388,15 +473,24 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
       return;
     }
 
-    // Las hijas NO tienen el titulo del release, asi que buscar por
-    // (artist_name, title) solo encuentra al padre y deja 63 huerfanas por el
-    // camino. Se borra por la ESTRUCTURA: se localiza el padre por la clave
-    // estable y se eliminan todas las filas con su release_id.
+    // Las hijas NO tienen el titulo del release, asi que el borrado se hace por
+    // la ESTRUCTURA: se localiza el padre y se eliminan todas las filas con su
+    // release_id. La localizacion tiene que ser DETERMINISTA, y por debajo hay
+    // una trampa: en *Kid A* la hija 2 se llama exactamente "Kid A", igual que
+    // el padre, y en *Heroes* la hija 1 se llama "Heroes". Buscar con
+    // `(artist_name, title)` sobre un `SELECT *` SIN ORDENAR puede devolver esa
+    // hija, borrarla con sus (cero) hijas y dejar al padre real con sus 10/1
+    // hijas huerfanas. El barrido de huerfanas de mas abajo NO lo salva: el
+    // padre sigue teniendo hijas, asi que no parece huerfano.
+    // Verificado en produccion: `rel-4e26ff30` tiene una hija llamada "Kid A".
+    // Por eso el filtro incluye `release_id IS NULL`: solo un padre puede
+    // cumplirlo, y ninguna hija puede salir nunca de la consulta.
     let delTracks = 0;
     let delReleases = 0;
+    const parentRows = await querySeedParentRows();
+    const all = await getAllTracks();
     for (const sr of SEED_RELEASES) {
-      const all = await getAllTracks();
-      const parent = all.find((t) => t.artist_name === sr.artistName && t.title === sr.title);
+      const parent = pickSeedParent(parentRows, sr.artistName, sr.title);
       if (!parent) {
         console.log(`  ⏭️  No existe: ${sr.artistName} — ${sr.title}`);
         continue;
@@ -546,7 +640,9 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
           artist_name: artist.name,
           release_type: sr.releaseType,
           release_date: sr.releaseDate,
-          duration: "00:00", // El padre no tiene duración propia
+          // El padre no lleva duración propia, pero SÍ lleva la de su tracklist:
+          // ver `seedReleaseTotalDuration()`.
+          duration: seedReleaseTotalDuration(sr),
           cover_image: sr.coverImage,
           audio_preview_url: "",
           spotify_url: null,
@@ -647,7 +743,17 @@ Upsert por clave estable: artist_name + title + release_id (para tracks) o artis
   }
 }
 
-main().catch((err) => {
-  console.error("❌ Error:", err);
-  process.exit(1);
-});
+// `SEED_RELEASES` y los helpers se exportan para que
+// `tests/unit/seed-integrity.test.ts` pueda comprobar los datos del catálogo sin
+// tocar la base de datos. Eso obliga a que este archivo NO siembre solo al
+// importarse: se ejecuta únicamente cuando es el entrypoint.
+const invokedDirectly = (process.argv[1] ?? "").replace(/\\/g, "/").endsWith(
+  "seed-influential-catalog.ts"
+);
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error("❌ Error:", err);
+    process.exit(1);
+  });
+}

@@ -22,7 +22,8 @@ vi.mock("@/lib/subscriber-notifications", () => ({
 import { GET as dashboardGET } from "@/app/api/dashboard/route";
 import { GET as artistsGET } from "@/app/api/artists/route";
 import { GET as releasesGET, POST as releasesPOST, PUT as releasesPUT } from "@/app/api/releases/route";
-import { POST as showsPOST, PUT as showsPUT } from "@/app/api/shows/route";
+import { GET as tracksGET } from "@/app/api/tracks/[id]/route";
+import { POST as showsPOST, PUT as showsPUT, GET as showsGET } from "@/app/api/shows/route";
 import { POST as subscriptionsPOST } from "@/app/api/subscriptions/route";
 import { POST as likesPOST } from "@/app/api/likes/route";
 import { POST as uploadPOST } from "@/app/api/upload/image/route";
@@ -53,6 +54,18 @@ const OWNED_TRACK_ID = `sweep-track-owned-${SUFFIX}`;
 const RELEASE_TRACK_ID = `sweep-track-release-${SUFFIX}`;
 const OWNED_ARTIST_NAME = `Artista Sweep ${SUFFIX}`;
 const OTHER_ARTIST_NAME = `Artista Sweep Otro ${SUFFIX}`;
+
+// P4 (S0): filas propias del caso "GET público por id". El hueco que había es
+// invisible a la suite porque `?id=X&user_id=Y` (que sí está filtrado) era lo
+// único que se ejercitaba. Estas cuatro filas cubren el camino sin `user_id`.
+const PUBLIC_DRAFT_ID = `sweep-track-public-draft-${SUFFIX}`;
+const PUBLIC_REJECTED_ID = `sweep-track-public-rejected-${SUFFIX}`;
+const APPROVED_PARENT_ID = `sweep-track-parent-${SUFFIX}`;
+const APPROVED_CHILD_ID = `sweep-track-child-${SUFFIX}`;
+const ADMIN_NOTES = `motivo interno de admin ${SUFFIX}`;
+
+// P12b (S0): un show sin aprobar y otro aprobado, para /api/shows.
+let SHOW_APPROVED_ID = `sweep-show-approved-${SUFFIX}`;
 
 let ownerToken = "";
 let adminToken = "";
@@ -86,12 +99,12 @@ function uploadRequest(token: string, ip: string, file: File): NextRequest {
   });
 }
 
-function insertTrack(id: string, artistName: string, status: string) {
+function insertTrack(id: string, artistName: string, status: string, extra?: { adminNotes?: string | null; releaseId?: string | null }) {
   const db = getDbWrite();
   db.prepare(
-    `INSERT INTO tracks (id, title, artist_name, release_type, release_date, status, created_at)
-     VALUES (?, ?, ?, 'Single', '2026-01-01', ?, datetime('now'))`
-  ).run(id, `Track ${id}`, artistName, status);
+    `INSERT INTO tracks (id, title, artist_name, release_type, release_date, status, admin_notes, release_id, created_at)
+     VALUES (?, ?, ?, 'Single', '2026-01-01', ?, ?, ?, datetime('now'))`
+  ).run(id, `Track ${id}`, artistName, status, extra?.adminNotes ?? null, extra?.releaseId ?? null);
 }
 
 beforeAll(async () => {
@@ -110,10 +123,11 @@ beforeAll(async () => {
   });
 
   const db = getDbWrite();
-  db.prepare("DELETE FROM tracks WHERE id IN (?, ?, ?, ?, ?)").run(
-    DRAFT_TRACK_ID, APPROVED_TRACK_ID, OWNED_TRACK_ID, OTHER_TRACK_ID, RELEASE_TRACK_ID
+  db.prepare("DELETE FROM tracks WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    DRAFT_TRACK_ID, APPROVED_TRACK_ID, OWNED_TRACK_ID, OTHER_TRACK_ID, RELEASE_TRACK_ID,
+    PUBLIC_DRAFT_ID, PUBLIC_REJECTED_ID, APPROVED_PARENT_ID, APPROVED_CHILD_ID
   );
-  db.prepare("DELETE FROM shows WHERE id = ?").run(showId);
+  db.prepare("DELETE FROM shows WHERE id IN (?, ?)").run(showId, SHOW_APPROVED_ID);
   db.prepare("DELETE FROM artists WHERE name IN (?, ?)").run(OWNED_ARTIST_NAME, OTHER_ARTIST_NAME);
   await deleteUser(OWNER_USER_ID);
 
@@ -142,6 +156,16 @@ beforeAll(async () => {
   insertTrack(OWNED_TRACK_ID, OWNED_ARTIST_NAME, "approved");
   insertTrack(RELEASE_TRACK_ID, OWNED_ARTIST_NAME, "pending");
 
+  // P4: borrador y rechazado con `admin_notes` escrito, que es exactamente lo
+  // que el `SELECT *` desnudo del camino público filtraba.
+  insertTrack(PUBLIC_DRAFT_ID, OWNED_ARTIST_NAME, "draft", { adminNotes: ADMIN_NOTES });
+  insertTrack(PUBLIC_REJECTED_ID, OWNED_ARTIST_NAME, "rejected", { adminNotes: ADMIN_NOTES });
+  // Álbum aprobado cuya hija quedó en `draft`: `POST /api/releases:168` inserta
+  // las hijas siempre como `draft`. Si el lector público no contempla al padre
+  // aprobado, el álbum se publica vacío y sus pistas dan 404.
+  insertTrack(APPROVED_PARENT_ID, OWNED_ARTIST_NAME, "approved");
+  insertTrack(APPROVED_CHILD_ID, OWNED_ARTIST_NAME, "draft", { releaseId: APPROVED_PARENT_ID });
+
   const ownedArtist = await createArtist({ name: OWNED_ARTIST_NAME, userId: OWNER_USER_ID });
   artistId = ownedArtist.id;
   ownedArtistId = ownedArtist.id;
@@ -152,15 +176,24 @@ beforeAll(async () => {
     status: "proximamente",
   });
   showId = show.id;
+  const approvedShow = await createShow({
+    artist_id: artistId,
+    venue_name: `Sala Sweep Aprobada ${SUFFIX}`,
+    date: "2026-12-15",
+    status: "proximamente",
+    approved: true,
+  });
+  SHOW_APPROVED_ID = approvedShow.id;
 });
 
 afterAll(async () => {
   if (isTursoConfigured()) return;
   const db = getDbWrite();
-  db.prepare("DELETE FROM tracks WHERE id IN (?, ?, ?, ?, ?)").run(
-    DRAFT_TRACK_ID, APPROVED_TRACK_ID, OWNED_TRACK_ID, OTHER_TRACK_ID, RELEASE_TRACK_ID
+  db.prepare("DELETE FROM tracks WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    DRAFT_TRACK_ID, APPROVED_TRACK_ID, OWNED_TRACK_ID, OTHER_TRACK_ID, RELEASE_TRACK_ID,
+    PUBLIC_DRAFT_ID, PUBLIC_REJECTED_ID, APPROVED_PARENT_ID, APPROVED_CHILD_ID
   );
-  db.prepare("DELETE FROM shows WHERE id = ?").run(showId);
+  db.prepare("DELETE FROM shows WHERE id IN (?, ?)").run(showId, SHOW_APPROVED_ID);
   db.prepare("DELETE FROM artists WHERE name IN (?, ?)").run(OWNED_ARTIST_NAME, OTHER_ARTIST_NAME);
   await deleteUser(OWNER_USER_ID);
 });
@@ -370,6 +403,225 @@ describe("S4 — GET /api/releases?user_id= filtra por el artista del usuario", 
     );
     expect(cross.status).toBe(200);
     expect(await cross.json()).toBeNull();
+  });
+});
+
+/**
+ * P4 (S0) — `GET /api/releases?id=X` SIN `user_id` es público y antes hacía
+ * `SELECT * FROM tracks WHERE id = ?` a secas: devolvía la fila CRUDA, sin
+ * pasar por `parseTrack`, y sin filtro de estado.
+ *
+ * Estos casos son los que faltaban. Los que ya existían (`S4`) usaban
+ * `?id=X&user_id=Y`, que SÍ está filtrado, así que el hueco era invisible a la
+ * suite: una comprobación que solo mira el camino protegido no puede detectar
+ * que el otro está abierto.
+ */
+describe("S0/P4 — GET /api/releases?id= sin user_id no filtra estado ni admin_notes", () => {
+  it("un borrador NO es legible por id público (devuelve null)", async () => {
+    if (isTursoConfigured()) return;
+    const res = await releasesGET(
+      jsonRequest(`${BASE}/api/releases?id=${PUBLIC_DRAFT_ID}`, { ip: "10.6.0.1" })
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBeNull();
+  });
+
+  it("un rechazo NO es legible por id público (devuelve null)", async () => {
+    if (isTursoConfigured()) return;
+    const res = await releasesGET(
+      jsonRequest(`${BASE}/api/releases?id=${PUBLIC_REJECTED_ID}`, { ip: "10.6.0.2" })
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBeNull();
+  });
+
+  it("admin_notes no aparece en la respuesta pública de un release aprobado", async () => {
+    if (isTursoConfigured()) return;
+    const db = getDbWrite();
+    db.prepare("UPDATE tracks SET admin_notes = ? WHERE id = ?").run(ADMIN_NOTES, APPROVED_TRACK_ID);
+
+    const res = await releasesGET(
+      jsonRequest(`${BASE}/api/releases?id=${APPROVED_TRACK_ID}`, { ip: "10.6.0.3" })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.id).toBe(APPROVED_TRACK_ID);
+    // El fallo original: la columna existe en `tracks` (verificado con PRAGMA
+    // table_info) y `SELECT *` la arrastraba porque `parseTrack` no la expone.
+    expect(Object.prototype.hasOwnProperty.call(json, "admin_notes")).toBe(false);
+    expect(JSON.stringify(json)).not.toContain(ADMIN_NOTES);
+
+    db.prepare("UPDATE tracks SET admin_notes = NULL WHERE id = ?").run(APPROVED_TRACK_ID);
+  });
+
+  it("el dueño autenticado sí recupera su borrador por id, con admin_notes (le corresponde)", async () => {
+    if (isTursoConfigured()) return;
+    const res = await releasesGET(
+      jsonRequest(`${BASE}/api/releases?id=${PUBLIC_DRAFT_ID}`, { token: ownerToken, ip: "10.6.0.4" })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.id).toBe(PUBLIC_DRAFT_ID);
+    expect(json.status).toBe("draft");
+    // El formulario de edición lee `admin_notes` para mostrar el motivo del
+    // rechazo: el dueño lo necesita, un anónimo no.
+    expect(json.admin_notes).toBe(ADMIN_NOTES);
+  });
+
+  it("el admin sí recupera cualquier estado por id, incluido el borrador", async () => {
+    if (isTursoConfigured()) return;
+    const res = await releasesGET(
+      jsonRequest(`${BASE}/api/releases?id=${PUBLIC_DRAFT_ID}`, { token: adminToken, ip: "10.6.0.5" })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.id).toBe(PUBLIC_DRAFT_ID);
+    expect(json.status).toBe("draft");
+  });
+
+  it("un artist que NO es el dueño no lee el borrador ajeno por id", async () => {
+    if (isTursoConfigured()) return;
+    const strangerToken = await createSessionToken({
+      userId: `sweep-stranger-artist-${SUFFIX}`,
+      email: `sweep-stranger-artist-${SUFFIX}@example.com`,
+      role: "artist",
+    });
+    const res = await releasesGET(
+      jsonRequest(`${BASE}/api/releases?id=${PUBLIC_DRAFT_ID}`, {
+        token: strangerToken,
+        ip: "10.6.0.6",
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBeNull();
+  });
+
+  it("una hija en draft de un release padre SÍ aprobado es pública (si no, el álbum sale vacío)", async () => {
+    if (isTursoConfigured()) return;
+    // `POST /api/releases:168` inserta las hijas siempre con `status = 'draft'`.
+    const res = await releasesGET(
+      jsonRequest(`${BASE}/api/releases?id=${APPROVED_CHILD_ID}`, { ip: "10.6.0.7" })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.id).toBe(APPROVED_CHILD_ID);
+    expect(json.release_id).toBe(APPROVED_PARENT_ID);
+  });
+});
+
+/**
+ * P4 (S0) — mismo agujero en `GET /api/tracks/:id`, que tampoco está en el
+ * `matcher` de `middleware.ts`.
+ */
+describe("S0/P4 — GET /api/tracks/:id no filtra estado ni admin_notes", () => {
+  it("un borrador devuelve 404 para un anónimo", async () => {
+    if (isTursoConfigured()) return;
+    const res = await tracksGET(
+      jsonRequest(`${BASE}/api/tracks/${PUBLIC_DRAFT_ID}`, { ip: "10.7.0.1" }),
+      { params: Promise.resolve({ id: PUBLIC_DRAFT_ID }) }
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("un aprobado sale parseado y sin admin_notes", async () => {
+    if (isTursoConfigured()) return;
+    const db = getDbWrite();
+    db.prepare("UPDATE tracks SET admin_notes = ? WHERE id = ?").run(ADMIN_NOTES, APPROVED_TRACK_ID);
+
+    const res = await tracksGET(
+      jsonRequest(`${BASE}/api/tracks/${APPROVED_TRACK_ID}`, { ip: "10.7.0.2" }),
+      { params: Promise.resolve({ id: APPROVED_TRACK_ID }) }
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.id).toBe(APPROVED_TRACK_ID);
+    expect(Object.prototype.hasOwnProperty.call(json, "admin_notes")).toBe(false);
+
+    db.prepare("UPDATE tracks SET admin_notes = NULL WHERE id = ?").run(APPROVED_TRACK_ID);
+  });
+
+  it("el dueño autenticado sí lee su borrador (el PATCH de lyrics lo necesita)", async () => {
+    if (isTursoConfigured()) return;
+    const res = await tracksGET(
+      jsonRequest(`${BASE}/api/tracks/${PUBLIC_DRAFT_ID}`, { token: ownerToken, ip: "10.7.0.3" }),
+      { params: Promise.resolve({ id: PUBLIC_DRAFT_ID }) }
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).id).toBe(PUBLIC_DRAFT_ID);
+  });
+
+  it("un artist ajeno recibe 404, no el borrador de otro", async () => {
+    if (isTursoConfigured()) return;
+    const strangerToken = await createSessionToken({
+      userId: `sweep-stranger-tracks-${SUFFIX}`,
+      email: `sweep-stranger-tracks-${SUFFIX}@example.com`,
+      role: "artist",
+    });
+    const res = await tracksGET(
+      jsonRequest(`${BASE}/api/tracks/${PUBLIC_DRAFT_ID}`, { token: strangerToken, ip: "10.7.0.4" }),
+      { params: Promise.resolve({ id: PUBLIC_DRAFT_ID }) }
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+/**
+ * P12b (S0) — `getAllShows()` era `SELECT * FROM shows ORDER BY date ASC`, sin
+ * `approved = 1` ni `deleted_at IS NULL`, y `/shows` no está en el `matcher` de
+ * `middleware.ts`, luego la página es pública. Como `POST /api/shows` crea con
+ * `approved = 0` para cualquier artista, un show recién enviado se publicaba
+ * solo.
+ */
+describe("S0/P12b — /api/shows no expone shows sin aprobar a un anónimo", () => {
+  it("el listado público excluye el show sin aprobar e incluye el aprobado", async () => {
+    if (isTursoConfigured()) return;
+    const res = await showsGET(jsonRequest(`${BASE}/api/shows`, { ip: "10.8.0.1" }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const ids = (json.shows as { id: string }[]).map((s) => s.id);
+    expect(ids).not.toContain(showId);
+    expect(ids).toContain(SHOW_APPROVED_ID);
+    expect(
+      (json.shows as { approved: boolean }[]).every((s) => s.approved === true)
+    ).toBe(true);
+  });
+
+  it("el listado por artist_id tampoco incluye los no aprobados", async () => {
+    if (isTursoConfigured()) return;
+    const res = await showsGET(
+      jsonRequest(`${BASE}/api/shows?artist_id=${artistId}`, { ip: "10.8.0.2" })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const ids = (json.shows as { id: string }[]).map((s) => s.id);
+    expect(ids).not.toContain(showId);
+    expect(ids).toContain(SHOW_APPROVED_ID);
+  });
+
+  it("por id, un show sin aprobar da 404 a un anónimo", async () => {
+    if (isTursoConfigured()) return;
+    const res = await showsGET(
+      jsonRequest(`${BASE}/api/shows?id=${showId}`, { ip: "10.8.0.3" })
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("el dueño autenticado sí ve su propio show sin aprobar", async () => {
+    if (isTursoConfigured()) return;
+    const res = await showsGET(
+      jsonRequest(`${BASE}/api/shows?id=${showId}`, { token: ownerToken, ip: "10.8.0.4" })
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).id).toBe(showId);
+  });
+
+  it("el admin conserva el alcance completo para poder aprobar", async () => {
+    if (isTursoConfigured()) return;
+    const res = await showsGET(jsonRequest(`${BASE}/api/shows`, { token: adminToken, ip: "10.8.0.5" }));
+    expect(res.status).toBe(200);
+    const ids = ((await res.json()).shows as { id: string }[]).map((s) => s.id);
+    expect(ids).toContain(showId);
+    expect(ids).toContain(SHOW_APPROVED_ID);
   });
 });
 

@@ -1,18 +1,101 @@
 "use client";
 
-import { useAudioPlayer } from "@/context/AudioPlayerContext";
+import { useMemo } from "react";
+import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
+import { getPlayableAudioSource } from "@/lib/audio-priority";
 import { safeString } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
 
 interface ReleaseTrackListProps {
   tracks: Track[];
+  /**
+   * Lista completa del lanzamiento para la COLA. Por defecto es `tracks`, pero
+   * quien pliega la lista a 6 filas tiene que pasar la entera: la cola es de
+   * audio, no de lo que cabe en pantalla.
+   */
+  queueTracks?: Track[];
   releaseTitle: string;
   releaseCoverImage?: string;
   releaseYoutubeVideoId?: string;
 }
 
-export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, releaseYoutubeVideoId }: ReleaseTrackListProps) {
+/**
+ * P2 — la cola de un lanzamiento, en una sola fuente de verdad.
+ *
+ * Vive AQUÍ y no en quien la pide porque la necesitan dos consumidores del
+ * mismo grupo — las filas de esta lista y el botón "Escuchar N pistas" de la
+ * `EPKCard` de arriba — y dos copias de esta lógica acabarían divergiendo: la
+ * tarjeta diría "4 pistas" y la lista pondría 3 en cola.
+ *
+ * ## Por qué esto no es un `map` con `|| ""`
+ *
+ * La versión anterior hacía `const audioUrl = track.audio_preview_url || ""` y
+ * llamaba a `playTrack({ audioUrl: "" })` **sin guarda**. Dos fallos en una
+ * línea:
+ *
+ * 1. `|| ""` no filtra el placeholder. `lib/db.ts` pasa la columna por
+ *    `safeString`, que convierte `""` en el string **truthy** `"—"`, así que
+ *    `audioUrl` llegaba al reproductor como `"—"` y `play()` fallaba con
+ *    "Error al iniciar reproducción — archivo no disponible".
+ * 2. `playTrack` no es una cola: una pista y ya. Pulsar la 3 de un disco
+ *    sonaba 8 segundos y se acababa, sin avanzar a la 4.
+ *
+ * ## Precedencia de la fuente
+ *
+ * La misma de `AudioPlayer` (`lib/audio-priority.ts`): el preview propio de
+ * la pista y, si no hay, el vídeo del **lanzamiento** — una pista de un disco
+ * en vivo no trae preview propio, pero el disco sí tiene vídeo, y eso es un
+ * recurso real, no un parche. Spotify y Apple Music quedan fuera a propósito:
+ * no son fuentes reproducibles.
+ *
+ * Las pistas sin ninguna de las dos se **quedan fuera** de la cola en vez de
+ * entrar mudas, para que el contador "2/8" del reproductor global diga la
+ * verdad sobre lo que hay en cola.
+ */
+export function buildReleaseQueue(
+  tracks: Track[],
+  releaseCoverImage?: string,
+  releaseYoutubeVideoId?: string
+): ActiveTrack[] {
+  const items: ActiveTrack[] = [];
+  const fallbackVideoId =
+    releaseYoutubeVideoId && releaseYoutubeVideoId.trim() !== "" ? releaseYoutubeVideoId : undefined;
+
+  for (const track of tracks) {
+    const own = getPlayableAudioSource({
+      audio_preview_url: track.audio_preview_url,
+      youtube_video_id: track.youtube_video_id,
+    });
+
+    const audioUrl = own?.type === "preview" ? own.url : "";
+    const youtubeVideoId = own?.type === "youtube" && own.videoId ? own.videoId : fallbackVideoId;
+
+    if (audioUrl === "" && !youtubeVideoId) continue;
+
+    items.push({
+      id: track.id,
+      title: safeString(track.title, "Track"),
+      artist: safeString(track.artist_name, "Artista EPK"),
+      audioUrl,
+      coverImage: releaseCoverImage || track.cover_image,
+      isYouTube: audioUrl === "",
+      youtubeVideoId,
+      startTimestamp: track.start_time || 0,
+      endTimestamp: track.end_time || 0,
+    });
+  }
+  return items;
+}
+
+export function ReleaseTrackList({
+  tracks,
+  queueTracks,
+  releaseTitle,
+  releaseCoverImage,
+  releaseYoutubeVideoId,
+}: ReleaseTrackListProps) {
   const globalPlayer = useAudioPlayer();
+  const allTracks = queueTracks ?? tracks;
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -20,23 +103,25 @@ export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, rele
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const queue = useMemo<ActiveTrack[]>(
+    () => buildReleaseQueue(allTracks, releaseCoverImage, releaseYoutubeVideoId),
+    [allTracks, releaseCoverImage, releaseYoutubeVideoId]
+  );
+
+  /**
+   * ¿Esta fila concreta tiene algo que sonar? (no "está en la cola": suena) */
+  const isRowPlayable = (track: Track) => queue.some((item) => item.id === track.id);
+
   const handlePlayTrack = (track: Track) => {
     if (!globalPlayer) return;
+    if (queue.length === 0) return;
 
-    const isYouTubeOnly = !!releaseYoutubeVideoId;
-    const audioUrl = track.audio_preview_url || "";
+    // El índice se busca por `id` y no por posición: la cola se salta las
+    // pistas mudas, así que el número de fila NO es el número de la cola.
+    const at = queue.findIndex((item) => item.id === track.id);
+    if (at === -1) return;
 
-    globalPlayer.playTrack({
-      id: track.id,
-      title: safeString(track.title, "Track"),
-      artist: safeString(track.artist_name, "Artista EPK"),
-      audioUrl,
-      coverImage: releaseCoverImage || track.cover_image,
-      isYouTube: isYouTubeOnly,
-      youtubeVideoId: releaseYoutubeVideoId || undefined,
-      startTimestamp: track.start_time || 0,
-      endTimestamp: track.end_time || 0,
-    });
+    globalPlayer.playQueue(queue, at);
   };
 
   if (tracks.length === 0) {
@@ -74,6 +159,7 @@ export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, rele
         const isPlaying = isCurrentTrack && globalPlayer?.isPlaying;
         const isLoading = isCurrentTrack && globalPlayer?.isLoading;
         const isError = isCurrentTrack && globalPlayer?.error;
+        const playable = isRowPlayable(track);
         const trackNumber =
           track.track_number != null && Number.isFinite(track.track_number)
             ? track.track_number
@@ -96,15 +182,25 @@ export function ReleaseTrackList({ tracks, releaseTitle, releaseCoverImage, rele
             {/* Play button */}
             <button
               onClick={() => handlePlayTrack(track)}
-              disabled={isLoading}
+              disabled={isLoading || !playable}
+              title={
+                playable
+                  ? undefined
+                  : "Esta pista no tiene audio propio y el lanzamiento no tiene vídeo: no hay nada que reproducir"
+              }
               className={`p-2 rounded-full transition-colors ${
                 isPlaying
                   ? "bg-primary-500 text-white"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-600"
-              } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+              } ${isLoading || !playable ? "opacity-50 cursor-not-allowed" : ""}`}
               aria-label={isPlaying ? "Pausar" : "Reproducir"}
             >
-              {isLoading ? (
+              {!playable ? (
+                /* Sin fuente: el icono tachado, no un play que no hace nada. */
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 011.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              ) : isLoading ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
