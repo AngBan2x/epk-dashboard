@@ -60,3 +60,7 @@ tests/screenshots/
 
 # playwright storage-state temp files
 prod-*.json
+
+# TTF de Noto Serif: se descargan y se incrustan en lib/pdf/fonts.generated.ts
+# con scripts/build-pdf-font-embed.ts. No se versionan.
+lib/pdf/fonts/*.ttf
