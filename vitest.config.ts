@@ -8,6 +8,16 @@ delete process.env.TURSO_DATABASE_URL;
 delete process.env.TURSO_AUTH_TOKEN;
 
 export default defineConfig({
+  // RC.33: los `.tsx` se compilan con el runtime JSX **automático**, como hace
+  // Next. Sin esto, esbuild usa el clásico y los componentes lancan
+  // `ReferenceError: React is not defined` al renderizar en un test.
+  //
+  // Es aditivo: hasta ahora ningún test renderizaba un componente, así que no
+  // cambia el comportamiento de los que ya existían. NO tocar los dos `delete`
+  // de arriba — son lo que impide que los tests escriban en Turso.
+  esbuild: {
+    jsx: "automatic",
+  },
   test: {
     environment: "node",
     include: ["tests/unit/**/*.test.ts"],

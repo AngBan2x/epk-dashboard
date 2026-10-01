@@ -95,26 +95,17 @@ export function ReleaseActions({ releaseId, artistName, status }: ReleaseActions
   if (!canEdit) {
     // Visitante o suscriptor: navegación útil, no controles de administración.
     //
-    // NOTA PARA D2 (owner de `app/dashboard/page.tsx` y `components/Header.tsx`):
-    // el enlace "Enviar música" que aparece para cualquier usuario
-    // autenticado es la entrada AL PORTAL P16 desde aquí porque son los únicos
-    // dos archivos que no son míos. El sitio natural es el dashboard del
-    // suscriptor o la nav del Header, junto a "Dashboard". Si lo añades allí,
-    // este bloque se puede quedar solo con la navegación pública.
+    // RC.33: aquí estaba también un botón "Enviar música" que enlazaba a
+    // `/submissions`, y se quitó. No tenía relación con el release que se está
+    // mirando —era el portal del usuario metido en la ficha de otra cosa— y
+    // además era la cuarta vía al mismo destino: el portal sigue siendo
+    // alcanzable desde su propia página y desde el CTA "¿Ya tienes música?"
+    // de la vista de suscriptor del dashboard.
+    //
+    // Si alguna vez hace falta volver a ofrecerlo, el sitio natural es la nav
+    // del Header o el dashboard del suscriptor, no esta ficha.
     return (
       <div className="flex flex-wrap gap-3">
-        {user && (
-          <Link
-            href="/submissions"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-            Enviar música
-          </Link>
-        )}
-
         <Link
           href="/artists"
           className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
