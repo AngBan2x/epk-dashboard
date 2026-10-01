@@ -572,6 +572,12 @@ function parseArtist(row: Record<string, unknown>): ArtistProfile {
     is_active: Number(row.is_active) !== 0,
     deleted_at: (row.deleted_at as string) ?? null,
     created_at: String(row.created_at),
+    // Canal de YouTube verificado del propio artista. Lo consume
+    // scripts/fetch-official-videos.ts via playlistItems.list, porque `search`
+    // devuelve candidatos no verificables y search.list está topado a 100/día.
+    // Opcional a propósito: hacerlo obligatorio rompe aquí y en el seed, que
+    // construyen ArtistProfile a mano sin este campo.
+    youtube_channel_id: (row.youtube_channel_id as string) ?? null,
   };
 }
 
@@ -1957,9 +1963,13 @@ export async function deleteShow(id: string): Promise<boolean> {
 // ─── Tracks CRUD ────────────────────────────────────────────────────────────
 
 export async function getAllTracks(): Promise<Track[]> {
+  // ORDER BY obligatorio: GET /api/tracks pagina encima de este resultado
+  // (`?page`/`?limit`). Sin orden, SQLite y Turso no garantizan nada y la
+  // página 2 puede repetir o saltar filas. `created_at DESC` además pone lo más
+  // reciente primero, que es lo que espera quien administer.
   if (isTursoEnabled()) {
     try {
-      const rows = await tursoExec("SELECT * FROM tracks");
+      const rows = await tursoExec("SELECT * FROM tracks ORDER BY created_at DESC, id DESC");
       return rows.map((r) => parseTrack(r as Record<string, unknown>));
     } catch (error) {
       console.error("Turso getAllTracks failed — production MUST use Turso:", error);
@@ -1967,7 +1977,7 @@ export async function getAllTracks(): Promise<Track[]> {
     }
   }
   const db = getLocalDb();
-  const rows = db.prepare("SELECT * FROM tracks").all() as Record<string, unknown>[];
+  const rows = db.prepare("SELECT * FROM tracks ORDER BY created_at DESC, id DESC").all() as Record<string, unknown>[];
   return rows.map(parseTrack);
 }
 

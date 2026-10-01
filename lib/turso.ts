@@ -147,9 +147,19 @@ export async function ensureTursoSchema(): Promise<boolean> {
       is_active INTEGER DEFAULT 1,
       deleted_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
+      youtube_channel_id TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
+  // Migrate: add columns if missing (safe for existing tables)
+  //
+  // RC.32 · agente H — `youtube_channel_id`.
+  //
+  // Solo se rellena después de que `scripts/fetch-official-videos.ts` verifique
+  // ESTRUCTURALMENTE que un canal es el oficial del artista (nombre exacto +
+  // enlace en su descripción al dominio oficial declarado). Por eso es
+  // nullable: un canal sin verificar es "desconocido", no "no existe".
+  try { await client.execute(`ALTER TABLE artists ADD COLUMN youtube_channel_id TEXT`); } catch {}
 
   // 3. users (P2.2)
   await client.execute(`
@@ -397,6 +407,50 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
 
 // ─── Sync: Artists ──────────────────────────────────────────────────────────
 
+/**
+ * Lee los `youtube_channel_id` ya verificados para poder **preservarlos**.
+ *
+ * RC.32 · agente H. `syncArtistsToTurso` es un `INSERT OR REPLACE`, y eso
+ * significa *borrar la fila e insertar otra*: cualquier columna que no esté en
+ * la lista del `INSERT` vuelve a su `DEFAULT`, es decir a `NULL`. Añadir la
+ * columna nueva al `INSERT` y dejar que valga `artist.youtube_channel_id ?? null`
+ * haría que **cada sync borrase el id de canal de todos los artistas**, porque
+ * `parseArtist` (`lib/db.ts`, fichero de otro agente) todavía no lo expone —y
+ * aunque lo expusiera, el `?? null` de un `ArtistProfile` construido a mano
+ * seguiría borrándolo.
+ *
+ * Así que se lee antes y se devuelve el valor: el sync sigue siendo idéntico en
+ * todo lo demás, y perder un canal que costó 5 unidades de cuota y una
+ * verificación estructural no depende de que otro fichero esté al día.
+ */
+async function readVerifiedYouTubeChannelIds(
+  client: Client,
+  artistIds: readonly string[],
+): Promise<Map<string, string>> {
+  const preserved = new Map<string, string>();
+  const ids = artistIds.filter((id) => typeof id === 'string' && id.trim() !== '');
+  if (ids.length === 0) return preserved;
+
+  try {
+    const result = await client.execute({
+      sql: `SELECT id, youtube_channel_id FROM artists WHERE id IN (${ids
+        .map(() => '?')
+        .join(', ')})`,
+      args: [...ids] as InValue[],
+    });
+    for (const row of result.rows) {
+      const id = String(row.id ?? '');
+      const channelId = typeof row.youtube_channel_id === 'string' ? row.youtube_channel_id.trim() : '';
+      if (id && channelId) preserved.set(id, channelId);
+    }
+  } catch {
+    // Si `youtube_channel_id` aún no existe en la tabla, `syncArtistsToTurso`
+    // fallaría igualmente en el INSERT. No se enmascara: se deja pasar y el
+    // error sale con su mensaje.
+  }
+  return preserved;
+}
+
 export async function syncArtistsToTurso(artists: ArtistProfile[]): Promise<SyncResult> {
   const client = getTurso();
   if (!client) {
@@ -407,14 +461,20 @@ export async function syncArtistsToTurso(artists: ArtistProfile[]): Promise<Sync
   let synced = 0;
   let failed = 0;
 
+  const preservedChannelIds = await readVerifiedYouTubeChannelIds(
+    client,
+    artists.map((a) => a.id),
+  );
+
   for (const artist of artists) {
     try {
       await client.execute({
         sql: `INSERT OR REPLACE INTO artists
               (id, name, user_id, biography, press_text, press_highlights,
                genre, location, monthly_listeners, social_links, profile_image,
-               banner_image, slug, is_active, deleted_at, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               banner_image, slug, is_active, deleted_at, created_at,
+               youtube_channel_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           artist.id,
           artist.name,
@@ -432,6 +492,11 @@ export async function syncArtistsToTurso(artists: ArtistProfile[]): Promise<Sync
           artist.is_active ? 1 : 0,
           artist.deleted_at ?? null,
           artist.created_at,
+          // Prioridad: lo verificado que trae el propio artista; si no, lo que
+          // ya estaba. Ver la nota de `readVerifiedYouTubeChannelIds`.
+          (typeof artist.youtube_channel_id === 'string' && artist.youtube_channel_id.trim()) ||
+            preservedChannelIds.get(artist.id) ||
+            null,
         ],
       });
       synced++;
@@ -442,6 +507,27 @@ export async function syncArtistsToTurso(artists: ArtistProfile[]): Promise<Sync
   }
 
   return { synced, failed, errors };
+}
+
+/**
+ * Escribe el `youtube_channel_id` de UN artista, en una sola columna.
+ *
+ * Existe separada de `syncArtistsToTurso` a propósito: la verificación del canal
+ * es un dato que se gana una vez (5 unidades de cuota, una comprobación
+ * estructural) y no se debe volver a perder en cada sincronización del catálogo.
+ */
+export async function setArtistYouTubeChannelId(
+  artistId: string,
+  channelId: string | null,
+): Promise<boolean> {
+  const client = getTurso();
+  if (!client) return false;
+  const value = typeof channelId === 'string' && channelId.trim() !== '' ? channelId.trim() : null;
+  await client.execute({
+    sql: "UPDATE artists SET youtube_channel_id = ? WHERE id = ?",
+    args: [value, artistId] as InValue[],
+  });
+  return true;
 }
 
 // ─── Sync: Users ────────────────────────────────────────────────────────────

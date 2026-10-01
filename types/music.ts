@@ -307,6 +307,25 @@ export interface ArtistProfile {
   is_active: boolean;
   deleted_at: string | null;
   created_at: string;
+  /**
+   * RC.32 · agente H — id del canal de YouTube **verificado estructuralmente**.
+   *
+   * Solo se rellena si el canal pasó nombre exacto + enlace en su descripción
+   * al dominio oficial del artista (`lib/youtube.ts:verifyOfficialChannel`, que
+   * es pura y está cubierta por `tests/unit/official-videos.test.ts`). `null`
+   * significa "no verificado", que **no** es lo mismo que "no tiene canal".
+   *
+   * ⚠️ **Opcional a propósito, y es deuda con una sola línea.** `parseArtist`
+   *   (`lib/db.ts:557`) no expone el campo, así que se persiste pero no se lee;
+   *   hacerlo obligatorio rompe la compilación en dos ficheros que no son del
+   *   agente H (`lib/db.ts` y `scripts/seed-influential-catalog.ts`). Mientras
+   *   siga así, el id sobrevive porque `syncArtistsToTurso` lo preserva a
+   *   propósito (`lib/turso.ts`, que lo lee antes del `INSERT OR REPLACE`).
+   *
+   *   **Para el orquestador:** añadir `youtube_channel_id: (row.youtube_channel_id as string) ?? null`
+   *   a `parseArtist`, y entonces este campo puede pasar a obligatorio.
+   */
+  youtube_channel_id?: string | null;
 }
 
 export interface SocialLink {
