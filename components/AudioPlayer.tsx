@@ -3,7 +3,13 @@
 import { useRef, useState, useContext, useEffect } from "react";
 import { safeString } from "@/lib/null-safe";
 import { AudioPlayerContext, type ActiveTrack } from "@/context/AudioPlayerContext";
-import { getAudioSources, hasPlayableSource, isUsableAudioUrl } from "@/lib/audio-priority";
+import {
+  getAudioSources,
+  hasPlayableSource,
+  isUsableAudioUrl,
+  resolvePlaybackTimeline,
+  type AudioSourceType,
+} from "@/lib/audio-priority";
 
 interface AudioPlayerProps {
   src: string | undefined;
@@ -57,6 +63,31 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
    * padre, quien quiera el vídeo monta la cola en modo YouTube.
    */
   const isYouTubeMode = !sources.some((s) => s.type === "preview") && sources.some((s) => s.type === "youtube");
+
+  /**
+   * Línea de tiempo de esta pista, en la capa de datos y no en el reproductor.
+   *
+   * `loadTrack` vuelve a calcular lo mismo (es la segunda línea de defensa), pero
+   * hacerlo aquí evita que un `ActiveTrack` con capítulos de vídeo llegue a la
+   * cola: la cola es lo que arrastra hacia atrás los tracks de un lanzamiento
+   * entero, así que un solo item contaminado contamina la fila de "3/12".
+   *
+   * `mediaDuration` se deja sin pasar porque aquí todavía no se ha cargado nada:
+   * para un preview da `end = 0` ("no hay ventana"), que es lo correcto.
+   */
+  const timeline = resolvePlaybackTimeline({
+    sourceType: (isYouTubeMode ? "youtube" : "preview") as AudioSourceType,
+    declaredStart: track?.start_time ?? 0,
+    declaredEnd: track?.end_time ?? 0,
+  });
+
+  /**
+   * Aviso de segmento (tarea 6 del usuario: "rechazar o desplazar" un segmento
+   * de más de 30 s). El rechazo real ocurre en `validateChapterSegment`, que
+   * devuelve `usable: false` y deja la pista sonando entera; aquí solo se
+   * cuenta, para que quede escrito por qué.
+   */
+  const segmentWarning = timeline.warning;
 
   // Determine if this track is the current global track — prefer id comparison to avoid
   // YouTube-only tracks colliding on shared audioUrl "—"
@@ -137,8 +168,10 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
         coverImage,
         isYouTube: isYouTubeMode,
         youtubeVideoId: track?.youtube_video_id || undefined,
-        startTimestamp: track?.start_time || 0,
-        endTimestamp: track?.end_time || 0,
+        // Ventana ya saneada: `end_time` del catálogo describe capítulos de un
+        // vídeo y se descarta aquí si el medio es un preview.
+        startTimestamp: timeline.start,
+        endTimestamp: timeline.end,
       };
 
       if (queue && queue.length > 0) {
@@ -184,6 +217,12 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
         ? "Reproduciendo..."
         : "Reproducir";
 
+  /**
+   * Aviso de segmento, cuando los `start_time`/`end_time` del catálogo no son
+   * utilizables. No es un error de reproducción: el segmento se ha descartado y
+   * la pista suena entera, así que se cuenta al lado del estado en vez de
+   * mezclarse con `error` (que tiene su propio "Reintentar").
+   */
   return (
     <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
       <div className="flex items-center gap-3">
@@ -220,6 +259,11 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
               {statusText}
               {canPlay && primarySource && ` • ${primarySource.label}`}
             </p>
+            {segmentWarning && (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                {segmentWarning}
+              </p>
+            )}
           </div>
         </div>
 

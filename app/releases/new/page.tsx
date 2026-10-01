@@ -33,12 +33,29 @@ export default function NewReleasePage() {
     title: "",
     artist_name: "",
     release_date: "",
-    genre: "",
     cover_image: "",
     description: "",
     spotify_url: "",
     apple_music_url: "",
     youtube_url: "",
+  });
+
+  /**
+   * RC.32 Tarea 5 — el género NO va en `form`.
+   *
+   * Antes este formulario escribía `tracks.genre`, que es una COLUMNA MUERTA:
+   * `parseTrack` no la expone, así que no salía por ninguna lectura, y
+   * `app/releases/[id]/page.tsx` no la menciona. El input se rellenaba, se
+   * guardaba y nadie lo leía nunca. La fuente real es
+   * `production_details.genre` (ver `lib/production-fields.ts`), que es lo que
+   * se renderiza y lo que se exporta a PDF y CSV.
+   *
+   * Aquí solo se guarda el subconjunto que este formulario ofrece; el resto de
+   * la ficha se completa en la pantalla de edición.
+   */
+  const [productionDetails, setProductionDetails] = useState({
+    genre: "",
+    sub_genre: "",
   });
 
   // Auto-extract YouTube video ID and generate thumbnail
@@ -114,9 +131,13 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
       title: prev.title || track.trackName,
       artist_name: prev.artist_name || track.artistName,
       cover_image: prev.cover_image || track.artworkUrl600 || "",
-      genre: prev.genre || track.primaryGenreName || "",
       release_date: prev.release_date || (track.releaseDate ? track.releaseDate.substring(0, 10) : ""),
       apple_music_url: prev.apple_music_url || `https://music.apple.com/us/album/${track.trackId}`,
+    }));
+    // RC.32 Tarea 5: el género de iTunes aterriza en `production_details`.
+    setProductionDetails(prev => ({
+      ...prev,
+      genre: prev.genre || track.primaryGenreName || "",
     }));
     // Auto-fill duration
     if (track.trackTimeMillis) {
@@ -237,7 +258,9 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          artist_id: user?.id,
+          // RC.32: el género viaja en `production_details`. `tracks.genre` es
+          // columna muerta y el POST ya no la escribe.
+          production_details: JSON.stringify(productionDetails),
           tracks: tracks.filter((t) => t.title),
           external_links: {
             spotify: form.spotify_url,
@@ -342,11 +365,13 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
               )}
             </div>
 
-            {/* Release Date & Genre */}
+            {/* Release Date & Genre — RC.32: el género va a `production_details`
+                (columna viva), no a `tracks.genre` (columna muerta). */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha de Lanzamiento *</label>
+                <label htmlFor="new-release-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha de Lanzamiento *</label>
                 <input
+                  id="new-release-date"
                   type="date"
                   required
                   value={form.release_date}
@@ -355,11 +380,12 @@ const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Género</label>
+                <label htmlFor="new-genre" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Género</label>
                 <input
+                  id="new-genre"
                   type="text"
-                  value={form.genre}
-                  onChange={(e) => setForm({ ...form, genre: e.target.value })}
+                  value={productionDetails.genre}
+                  onChange={(e) => setProductionDetails({ ...productionDetails, genre: e.target.value })}
                   className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                   placeholder="Rock, Pop, etc."
                 />

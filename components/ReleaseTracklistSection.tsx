@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { safeString, sumDurations } from "@/lib/null-safe";
+import { tracklistDurationLabel } from "@/lib/audio-priority";
 import type { Track } from "@/types/music";
 
 interface ReleaseTracklistSectionProps {
@@ -89,11 +90,25 @@ export function ReleaseTracklistSection({ release, tracks }: ReleaseTracklistSec
                       >
                         {safeString(track.title)}
                       </span>
-                      {safeString(track.duration, "—") !== "—" && (
-                        <span className="shrink-0 font-mono text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                          {track.duration}
-                        </span>
-                      )}
+                      {/* RC.32, tarea 5: esta vista ya imprimía `track.duration` sin mirar los
+                          timestamps — la que hacía bien. Se unifica con
+                          `tracklistDurationLabel` para que las dos vistas no
+                          diverjan otra vez.
+                          Se pasa **sin** `start_time`/`end_time` a propósito:
+                          aquí el rango de capítulo no es ni siquiera un recurso,
+                          porque una lista de pistas de un lanzamiento no tiene
+                          vídeo al que atribuirle capítulos.
+                          De paso se cuela el placeholder `"-"` del seed, que el
+                          `safeString(...) !== "—"` anterior sí pintaba. */}
+                      {(() => {
+                        const label = tracklistDurationLabel({ duration: track.duration });
+                        if (!label.text) return null;
+                        return (
+                          <span className="shrink-0 font-mono text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                            {label.text}
+                          </span>
+                        );
+                      })()}
                     </Link>
                   </li>
                 );

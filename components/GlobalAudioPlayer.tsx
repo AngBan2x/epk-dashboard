@@ -4,6 +4,15 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useAudioPlayer } from "@/context/AudioPlayerContext";
 import { imageOptimizationProps } from "@/lib/image-config";
+import {
+  SKIP_NEXT_GLYPH,
+  SKIP_PREV_GLYPH,
+  formatClock,
+  resolvePlaybackTimeline,
+  timelineProgress,
+  timelineScrubValue,
+  timelineSeekTarget,
+} from "@/lib/audio-priority";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 
@@ -14,7 +23,7 @@ const AudioVisualizer = dynamic(() => import("@/components/AudioVisualizer").the
 export function GlobalAudioPlayer() {
   const {
     activeTrack, isPlaying, isLoading, error, duration, currentTime, volume,
-    isVisualizerOpen, isYouTubeMode, queuePosition, hasNext, hasPrev,
+    isVisualizerOpen, isYouTubeMode, timelineWarning, queuePosition, hasNext, hasPrev,
     togglePlay, next, prev, clearTrack, seek, setVolume, toggleVisualizer, audioRef,
   } = useAudioPlayer();
   const [showVolume, setShowVolume] = useState(false);
@@ -64,12 +73,28 @@ export function GlobalAudioPlayer() {
 
   if (!activeTrack) return null;
 
-  const formatTime = (s: number) => {
-    if (!Number.isFinite(s)) return "0:00";
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
+  /**
+   * Una sola línea de tiempo para la barra, el scrubber y las dos etiquetas.
+   *
+   * Antes cada zona calculaba su propia ventana a partir de
+   * `activeTrack.startTimestamp/endTimestamp` con `duration` como suplente, y por
+   * eso la etiqueta izquierda (`formatTime(currentTime)`, del elemento `<audio>`)
+   * y la derecha (`formatTime(end || duration)`, de metadatos de capítulo) salían
+   * de **fuentes distintas**: un preview de iTunes con `end_time = 501` pintaba
+   * `0:08` a la izquierda y `8:21` a la derecha.
+   *
+   * `resolvePlaybackTimeline` decide por **medio que suena**: si no es YouTube,
+   * los capítulos no aplican. Y `mediaDuration` es la duración real
+   * (`loadedmetadata` / `yt.getDuration()`), no el `end_time` inventado.
+   */
+  const timeline = resolvePlaybackTimeline({
+    sourceType: isYouTubeMode ? "youtube" : "preview",
+    declaredStart: activeTrack.startTimestamp,
+    declaredEnd: activeTrack.endTimestamp,
+    mediaDuration: duration,
+  });
+
+  const progress = timelineProgress(timeline, currentTime);
 
   return (
     <AnimatePresence>
@@ -99,26 +124,24 @@ export function GlobalAudioPlayer() {
             </div>
           )}
 
-          {/* P3.27: Progress bar — segment-aware for timestamped tracks */}
+          {/* Barra de progreso. `progress` viene recortado a [0, 100] y nunca es
+              negativo: la versión anterior hacía `((currentTime - start) /
+              segmentDuration) * 100`, que con `start=265, end=501, currentTime=8`
+              daba -108% → recortado a 0, y la barra se quedaba en 0 durante los
+              30 s enteros del preview. */}
           {(() => {
-            const start = activeTrack.startTimestamp || 0;
-            const end = activeTrack.endTimestamp || duration;
-            const segmentDuration = Math.max(end - start, 0);
-            const segmentProgress = segmentDuration > 0
-              ? Math.max(0, Math.min(100, ((currentTime - start) / segmentDuration) * 100))
-              : duration > 0 ? (currentTime / duration) * 100 : 0;
             return isExpanded ? (
               <div className="mt-4 bg-slate-200 dark:bg-slate-700 h-1">
                 <motion.div
                   className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
-                  style={{ width: `${segmentProgress}%` }}
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             ) : (
               <div className="mt-2 bg-slate-200 dark:bg-slate-700 h-1">
                 <motion.div
                   className="h-full bg-gradient-to-r from-primary-500 to-violet-500"
-                  style={{ width: `${segmentProgress}%` }}
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             );
@@ -175,7 +198,10 @@ export function GlobalAudioPlayer() {
                     className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-slate-500 dark:disabled:hover:text-slate-400 transition-colors flex-shrink-0"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+                      {/* RC.32: este botón llevaba el glifo *forward* (`>>`). El
+                          handler y el `aria-label` ya eran correctos; lo cruzado
+                          era la ruta. `SKIP_PREV_GLYPH` apunta a la izquierda. */}
+                      <path strokeLinecap="round" strokeLinejoin="round" d={SKIP_PREV_GLYPH} />
                     </svg>
                   </button>
 
@@ -196,7 +222,8 @@ export function GlobalAudioPlayer() {
                     className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-slate-500 dark:disabled:hover:text-slate-400 transition-colors flex-shrink-0"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12.75 4.5l-7.5 7.5 7.5 7.5m6-15l-7.5 7.5 7.5 7.5" />
+                      {/* RC.32: este botón llevaba el glifo *backward* (`<<`). */}
+                      <path strokeLinecap="round" strokeLinejoin="round" d={SKIP_NEXT_GLYPH} />
                     </svg>
                   </button>
 
@@ -220,33 +247,44 @@ export function GlobalAudioPlayer() {
                   </button>
 
                   <div className="flex items-center gap-2 flex-1 justify-center max-w-xl">
-                    {(() => {
-                      const start = activeTrack.startTimestamp || 0;
-                      const end = activeTrack.endTimestamp || duration;
-                      const segmentDuration = Math.max(end - start, 0);
-                      return (
-                        <>
-                          <span className="text-xs text-slate-500 dark:text-slate-400 w-10 text-right font-mono">{formatTime(currentTime)}</span>
-                          <div className="flex-1 relative group">
-                            <input
-                              type="range"
-                              min={start}
-                              max={end || duration || 0}
-                              step={0.1}
-                              value={Math.max(start, Math.min(end || duration, currentTime))}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                const clamped = Math.max(start, Math.min(end || duration, val));
-                                seek(clamped);
-                              }}
-                              className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-primary-500 group-hover:h-2 transition-all"
-                            />
-                          </div>
-                          <span className="text-xs text-slate-500 dark:text-slate-400 w-10 font-mono">{formatTime(end || duration)}</span>
-                        </>
-                      );
-                    })()}
+                    <span className="text-xs text-slate-500 dark:text-slate-400 w-10 text-right font-mono">{formatClock(currentTime)}</span>
+                    <div className="flex-1 relative group">
+                      <input
+                        type="range"
+                        min={timeline.start}
+                        max={timeline.end}
+                        step={0.1}
+                        value={timelineScrubValue(timeline, currentTime)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          seek(timelineSeekTarget(timeline, val));
+                        }}
+                        aria-label="Posición de reproducción"
+                        aria-valuetext={`${formatClock(currentTime)} de ${formatClock(timeline.end)}`}
+                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-primary-500 group-hover:h-2 transition-all"
+                      />
+                    </div>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 w-10 font-mono">{formatClock(timeline.end)}</span>
                   </div>
+
+                  {/* Aviso de línea de tiempo: los capítulos del vídeo no aplican a
+                      este medio, o el segmento declarado no era utilizable. No es
+                      un error de reproducción, así que no se mezcla con `error`
+                      (que lleva su propio "Reintentar").
+                      El texto viene del contexto, no de `timeline.warning`: al
+                      pintar, `activeTrack` ya viene limpio de timestamps y
+                      `timeline.warning` sería siempre `""`. */}
+                  {timelineWarning && (
+                    <div
+                      className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-lg"
+                      role="status"
+                    >
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>{timelineWarning}</span>
+                    </div>
+                  )}
 
                   {/* P3.34: Error indicator */}
                   {error && (

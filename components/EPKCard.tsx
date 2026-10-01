@@ -140,6 +140,17 @@ export function EPKCard({
    */
   const playableRows = queue?.filter(isQueueItemPlayable) ?? [];
   const hasQueue = isReleaseParent && playableRows.length > 0;
+  /**
+   * "Multipista" describe al LANZAMIENTO, no a la fila.
+   *
+   * La condición era solo `track.release_id`, que es "esta fila es hija de
+   * otra": exactamente lo contrario de lo que la tarjeta representa cuando
+   * trae hijas. Con el agrupado del endpoint, `/dashboard` pinta la cabecera
+   * (cuyo `release_id` es NULL) y así el badge no salía nunca en ninguna de
+   * las dos rejillas que quedan. Con las dos ramas, el álbum lo lleva —que es
+   * lo que significa— y una fila hija suelta también, que sigue siendo cierto.
+   */
+  const isMultiTrack = isReleaseParent || !!track.release_id;
 
   useEffect(() => {
     // Fetch initial like count and user's liked state
@@ -279,14 +290,14 @@ export function EPKCard({
           portada. El único control sobre la portada es el botón de like
           (`z-10`).
         */}
-        {(isNewRelease || track.release_id) && (
+        {(isNewRelease || isMultiTrack) && (
           <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[70%] flex-col items-start gap-1">
             {isNewRelease && (
               <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg animate-pulse">
                 ✨ Nuevo
               </span>
             )}
-            {track.release_id && (
+            {isMultiTrack && (
               <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
                 🎵 Multipista
               </span>
@@ -414,6 +425,24 @@ export function EPKCard({
                   Escuchar {playableRows.length}{" "}
                   {playableRows.length === 1 ? "pista" : "pistas"}
                 </button>
+              )}
+              {/*
+                Hay hijas pero ninguna entra en la cola. En producción son
+                2 de los 9 álbumes ("Heroes", "Vulnicura Strings"): sin esta
+                frase el bloque queda con un botón tachado y ninguna acción, que
+                se lee como tarjeta rota en vez de como "a este disco todavía
+                no le han puesto audio". La condición mira `playableRows` y no
+                `hasQueue` a propósito: `hasQueue` también es false cuando no
+                hay contexto de audio, y entonces la frase sería mentira.
+
+                Sin número a propósito: "Ninguna de sus pistas tiene" es
+                gramatical con 1 y con N, y un contador aquí solo repetiría el
+                que ya lleva la etiqueta de "Multipista".
+              */}
+              {playableRows.length === 0 && (
+                <p className="text-xs leading-snug text-slate-400 dark:text-slate-500">
+                  Ninguna de sus pistas tiene audio disponible
+                </p>
               )}
             </div>
           </div>

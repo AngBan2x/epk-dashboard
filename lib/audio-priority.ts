@@ -380,3 +380,506 @@ export function queuePositionLabel(state: QueueState | null): string {
   if (!state || state.items.length === 0) return '';
   return `${state.index + 1}/${state.items.length}`;
 }
+
+// ---------------------------------------------------------------------------
+// Dos espacios de coordenadas que compartían dos columnas  (RC.32 · agente B)
+// ---------------------------------------------------------------------------
+//
+// `tracks.start_time` / `tracks.end_time` describen **un offset dentro de un
+// vídeo**: son los capítulos del álbum. `tracks.audio_preview_url` describe **un
+// fichero de audio independiente de 30 s**. Durante años las dos cosas viajaron
+// por las mismas columnas y el reproductor no las distinguía, así que una pista
+// con preview de iTunes sonar 30 s y llevar `end_time = 501` (la duración total
+// del release) encima.
+//
+// Verificado en Turso: 63 pistas reproducibles, **55 con `end_time > 30`** y 49
+// con `start_time > 0`. Esos valores no son transcripciones de capítulos:
+// `tests/unit/seed-integrity.test.ts:18-21` dice que el seed "lee el catálogo del
+// propio archivo, no la base de datos", o sea que son **duración acumulada**
+// inventada. Y **ninguna** de las 65 hijas tiene `youtube_video_id`: los
+// timestamps apuntan a un vídeo que no existe.
+//
+// La regla que sale de ahí es una sola y no se negocia:
+//
+//   **Los timestamps de capítulo SOLO aplican a un vídeo. Si el medio que suena
+//   es un fichero independiente (un preview), no aplican: se descartan de la
+//   pista activa, no se "dejan ganar" a la etiqueta.**
+//
+// Descartarlos de verdad y no solo dejar que `duration` gane importa porque el
+// scrubber también los leía: con `min=265, max=501` y `currentTime=8`, el valor
+// del `input[type=range]` era 265 mientras la etiqueta decía 0:08, y arrastrar
+// hacía `seek()` → `audio.currentTime = 265` en un fichero de 30 s → `ended` →
+// **salto de pista**.
+
+/** Tope de un segmento. El preview de iTunes/Spotify dura 30 s. */
+export const PREVIEW_MAX_SEGMENT_SECONDS = 30;
+
+export type ChapterSegmentIssueCode = 'NON_FINITE' | 'NEGATIVE' | 'INVERTED' | 'TOO_LONG';
+
+export interface ChapterSegmentIssue {
+  code: ChapterSegmentIssueCode;
+  /** Qué está mal, en una frase. Va directo a la UI. */
+  message: string;
+  /**
+   * Qué hay que hacer con los timestamps cuando aparece este problema.
+   * Siempre `"drop"`: ningún dato dudoso llega al reproductor, porque el
+   * síntoma de un timestamp inventado (perder la pista) es peor que el de un
+   * timestamp ausente (suena del principio a fin).
+   */
+  action: 'drop';
+}
+
+export interface ChapterSegment {
+  /** `true` si se declaró algo (start o end distinto de `null`/no finito/0). */
+  declared: boolean;
+  /** `true` si el segmento se puede usar tal cual, o si no declaró nada. */
+  usable: boolean;
+  /** Inicio saneado (>= 0). 0 si no hay segmento. */
+  start: number;
+  /**
+   * Fin saneado. `0` significa **"hasta el final del medio"**, no "sin fin":
+   * es lo que corresponde a un capítulo con `start_time` y `end_time` a null.
+   */
+  end: number;
+  /** Longitud del segmento en segundos; `0` si el final es abierto o no hay segmento. */
+  length: number;
+  issues: ChapterSegmentIssue[];
+  /** Aviso agregado para la UI. `""` si no hay nada que avisar. */
+  warning: string;
+}
+
+function finiteOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * CONTRATO PÚBLICO (RC.32, tarea 6 del usuario) — el validador de segmentos.
+ *
+ * ## Qué valida
+ *
+ * 1. `start` y `end` finitos y `>= 0` (los timestamps del seed son inventados,
+ *    pero la columna es editable desde el formulario de release).
+ * 2. `end > start` cuando **los dos** son distintos de 0.
+ * 3. `end - start <= maxSeconds` (30 s por defecto).
+ *
+ * ## Por qué devuelve un objeto y no un `boolean`
+ *
+ * Porque la UI necesita **distinguir** "no declaraste nada" (normal, no hay nada
+ * que avisar) de "declaraste algo que no vale" (hay que avisar). Un
+ * `zod.boolean()` en el servidor no distingue eso, y esta función es la que el
+ * agente A replica en el schema.
+ *
+ * ## Receta equivalente en Zod (`app/api/releases/route.ts`, propiedad de otro
+ * ## agente — no se edita aquí, solo se publica el contrato)
+ *
+ * ```ts
+ * const chapterSegment = z.object({
+ *   start_time: z.number().min(0, 'start_time no puede ser negativo').optional(),
+ *   end_time:   z.number().min(0, 'end_time no puede ser negativo').optional(),
+ * }).superRefine((v, ctx) => {
+ *   const { start_time: s, end_time: e } = v;
+ *   const start = s ?? 0;
+ *   const end = e ?? 0;
+ *   if (end > 0 && start > 0 && end <= start) {
+ *     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['end_time'],
+ *       message: 'end_time debe ser mayor que start_time' });
+ *   }
+ *   if (end > start && end - start > PREVIEW_MAX_SEGMENT_SECONDS) {
+ *     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['end_time'],
+ *       message: `el segmento no puede pasar de ${PREVIEW_MAX_SEGMENT_SECONDS} s` });
+ *   }
+ * });
+ * ```
+ *
+ * Nótese que el `end > start` **solo** se exige cuando ambos son > 0: un
+ * capítulo con `start_time = 265` y `end_time` a null es un capítulo abierto
+ * ("hasta el final del vídeo") y es legítimo.
+ *
+ * @param maxSegmentSeconds Techo del segmento. `Number.POSITIVE_INFINITY`
+ *   desactiva el tope de 30 s (para las vistas que solo quieren saber si el
+ *   rango es utilizable, no si cabe en un preview).
+ */
+export function validateChapterSegment(
+  startTime?: number | null,
+  endTime?: number | null,
+  maxSegmentSeconds: number = PREVIEW_MAX_SEGMENT_SECONDS,
+): ChapterSegment {
+  const rawStart = finiteOrNull(startTime);
+  const rawEnd = finiteOrNull(endTime);
+  const issues: ChapterSegmentIssue[] = [];
+
+  const declared =
+    (rawStart !== null && rawStart !== 0) || (rawEnd !== null && rawEnd !== 0);
+
+  if (startTime !== null && startTime !== undefined && rawStart === null) {
+    issues.push({ code: 'NON_FINITE', message: 'start_time no es un número', action: 'drop' });
+  }
+  if (endTime !== null && endTime !== undefined && rawEnd === null) {
+    issues.push({ code: 'NON_FINITE', message: 'end_time no es un número', action: 'drop' });
+  }
+  if ((rawStart !== null && rawStart < 0) || (rawEnd !== null && rawEnd < 0)) {
+    issues.push({ code: 'NEGATIVE', message: 'Los tiempos del segmento no pueden ser negativos', action: 'drop' });
+  }
+
+  const start = rawStart !== null && rawStart > 0 ? rawStart : 0;
+  const end = rawEnd !== null && rawEnd > 0 ? rawEnd : 0;
+
+  // Final invertido: `end <= start` con ambos declarados. Este es el bug
+  // latente que, con `start=265` y `end=0` sustituido por el default de 30,
+  // hacía que el poll de YouTube viera `ytTime >= 30` en el primer tick y
+  // saltase de pista al instante.
+  if (start > 0 && end > 0 && end <= start) {
+    issues.push({
+      code: 'INVERTED',
+      message: 'end_time debe ser mayor que start_time',
+      action: 'drop',
+    });
+  }
+
+  const length = end > start ? end - start : 0;
+  if (length > 0 && Number.isFinite(maxSegmentSeconds) && length > maxSegmentSeconds) {
+    issues.push({
+      code: 'TOO_LONG',
+      message: `El segmento dura ${Math.round(length)} s y el máximo son ${maxSegmentSeconds} s`,
+      action: 'drop',
+    });
+  }
+
+  const usable = issues.length === 0;
+
+  return {
+    declared,
+    usable,
+    start,
+    end,
+    length,
+    issues,
+    warning: issues.length === 0 ? '' : issues.map((i) => i.message).join(' · '),
+  };
+}
+
+/**
+ * Texto del aviso cuando se descartan los timestamps por ser de otro medio.
+ * No lleva el valor concreto a propósito: el `end_time = 501` del catálogo es
+ * un dato inventado, y reproducirlo en un aviso lo haría parecer creíble.
+ */
+export const CHAPTER_OFFSETS_DROPPED_WARNING =
+  'Los capítulos del vídeo no describen este preview de audio, así que el reproductor los ha descartado.';
+
+export interface PlaybackTimelineInput {
+  /**
+   * `preview` = fichero de audio independiente. `youtube` = vídeo con capítulos.
+   * Cualquier otro valor (`spotify`, `apple_music`, `null`) se trata como
+   * `preview`: son link-outs, nunca suenan.
+   */
+  sourceType: AudioSourceType | null | undefined;
+  declaredStart?: number | null;
+  declaredEnd?: number | null;
+  /**
+   * Duración **real del medio que suena** (`loadedmetadata` del `<audio>` o
+   * `yt.getDuration()`). `0` / `null` = todavía no se sabe. Al cargar una pista
+   * se pasa `0` a propósito: la duración que hay en el estado es la de la pista
+   * anterior.
+   */
+  mediaDuration?: number | null;
+  /** Techo del segmento. Por defecto 30 s. */
+  maxSegmentSeconds?: number;
+  /**
+   * Cuánto reproducir un vídeo cuando no se declaró ningún segmento. Antes de
+   * existir `mediaDuration` esto estaba cableado a 30 en el contexto; se mantiene
+   * como *fallback*, no como regla.
+   */
+  youTubeFallbackSeconds?: number;
+}
+
+export interface PlaybackTimeline {
+  /** Límite inferior del scrubber, en segundos del medio. */
+  start: number;
+  /** Límite superior del scrubber, en segundos del medio. `0` = aún desconocido. */
+  end: number;
+  /** `end - start`, siempre `>= 0`. */
+  span: number;
+  /** `true` si los timestamps declarados se aplicaron de verdad. */
+  applied: boolean;
+  /**
+   * `true` si la línea de tiempo es `[0, mediaDuration]`, es decir un fichero
+   * independiente donde los capítulos no aplican.
+   */
+  usesMediaDuration: boolean;
+  /** Aviso para la UI. `""` si no hay nada que avisar. */
+  warning: string;
+}
+
+/**
+ * ÚNICA fuente de verdad de la línea de tiempo de reproducción.
+ *
+ * Todo lo que muestra o manipula el reproductor (`GlobalAudioPlayer`, `seek`,
+ * `loadTrack`, el aviso de segmento) sale de aquí, para que no vuelva a existir
+ * el desajuste de "la etiqueta izquierda viene del elemento `<audio>` y la
+ * derecha de metadatos de capítulo".
+ *
+ * Con `sourceType: 'preview'` los timestamps declarados **se ignoran siempre**
+ * y salen warnings; no hay rama donde "gane" la duración porque no compiten.
+ */
+export function resolvePlaybackTimeline(input: PlaybackTimelineInput): PlaybackTimeline {
+  const {
+    sourceType,
+    declaredStart,
+    declaredEnd,
+    mediaDuration,
+    maxSegmentSeconds,
+    youTubeFallbackSeconds,
+  } = input;
+
+  const mediaDur = finiteOrNull(mediaDuration) ?? 0;
+  const media = mediaDur > 0 ? mediaDur : 0;
+  const fallback =
+    finiteOrNull(youTubeFallbackSeconds) ?? PREVIEW_MAX_SEGMENT_SECONDS;
+
+  if (sourceType !== 'youtube') {
+    const declared = validateChapterSegment(declaredStart, declaredEnd, maxSegmentSeconds ?? PREVIEW_MAX_SEGMENT_SECONDS);
+    return {
+      start: 0,
+      end: media,
+      span: media,
+      applied: false,
+      usesMediaDuration: true,
+      warning: declared.declared ? CHAPTER_OFFSETS_DROPPED_WARNING : '',
+    };
+  }
+
+  const segment = validateChapterSegment(declaredStart, declaredEnd, maxSegmentSeconds);
+  let start = segment.usable ? segment.start : 0;
+  let end = segment.usable ? segment.end : 0;
+
+  if (end === 0) {
+    // Final abierto, o segmento descartado: manda el medio.
+    end = media || fallback;
+  } else if (media > 0 && end > media) {
+    // Un capítulo que pasa del vídeo se recorta al vídeo (no al revés: al revés
+    // el poll nunca vería el fin y la pista no avanzaría sola).
+    end = media;
+  }
+
+  if (end <= start) {
+    // Ventana degenerada (p. ej. `start = 265` con un vídeo de 0 s todavía sin
+    // `loadedmetadata`): se cae al medio completo en vez de dejar un rango vacío.
+    start = 0;
+    end = media || fallback;
+  }
+
+  return {
+    start,
+    end,
+    span: Math.max(end - start, 0),
+    // `applied` = "los timestamps **declarados** entraron en la línea de tiempo".
+    // No basta con `usable`: `validateChapterSegment(0, 0)` es usable (no hay
+    // nada que objetar) pero no ha aplicado ningún timestamp.
+    applied: segment.usable && segment.declared,
+    usesMediaDuration: false,
+    warning: segment.warning,
+  };
+}
+
+/** `M:SS`. Reemplaza tres copias divergentes del mismo `formatTime`. */
+export function formatClock(seconds: number): string {
+  if (!Number.isFinite(seconds)) return '0:00';
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Progreso 0..100 del segmento. Nunca negativo, nunca `NaN`, nunca `>100`.
+ *
+ * Con el bug anterior, `start=265, end=501, currentTime=8` daba
+ * `(8-265)/236 = -108%`, recortado a `0`: la barra se quedaba en 0 durante los
+ * 30 s enteros del preview.
+ */
+export function timelineProgress(timeline: PlaybackTimeline, currentTime: number): number {
+  const base = timeline.span > 0 ? timeline.span : Math.max(timeline.end, 0);
+  if (base <= 0 || !Number.isFinite(currentTime)) return 0;
+  const pct = ((currentTime - timeline.start) / base) * 100;
+  if (!Number.isFinite(pct)) return 0;
+  return Math.max(0, Math.min(100, pct));
+}
+
+/** Valor del `<input type="range">`: siempre dentro de `[start, end]`. */
+export function timelineScrubValue(timeline: PlaybackTimeline, currentTime: number): number {
+  if (!Number.isFinite(currentTime)) return timeline.start;
+  const max = Math.max(timeline.end, 0);
+  return Math.max(timeline.start, Math.min(max, currentTime));
+}
+
+/**
+ * Destino de un `seek()`, ya recortado a `[start, end]`.
+ *
+ * Es la función que evita perder la pista: con `start=265` sobre un fichero de
+ * 30 s devolvía `265`, el `<audio>` buscaba más allá de su final y disparaba
+ * `ended` → salto de pista.
+ */
+export function timelineSeekTarget(timeline: PlaybackTimeline, requested: number): number {
+  if (!Number.isFinite(requested)) return timeline.start;
+  const floor = Math.max(timeline.start, 0);
+  if (timeline.end <= 0) return Math.max(floor, requested);
+  return Math.max(floor, Math.min(timeline.end, requested));
+}
+
+// ---------------------------------------------------------------------------
+// Glifos de salto  (RC.32 · tarea 4)
+// ---------------------------------------------------------------------------
+//
+// Los `aria-label` y los handlers eran correctos; lo que estaba cruzado eran las
+// rutas SVG: el botón "Pista anterior" tenía el glifo *forward* (dos triángulos
+// a la derecha) y el de "Pista siguiente" el *backward*. Se ve solo con el
+// nombre accesible al lado del icono, y un lector de pantalla no lo detecta:
+// por eso el sentido se deduce de la geometría y se testea, en vez de fiarse de
+// "la ruta correcta" sin comprobarla.
+
+/** Heroicons *backward* (`<<`). Para "Pista anterior". */
+export const SKIP_PREV_GLYPH = 'M12.75 4.5l-7.5 7.5 7.5 7.5m6-15l-7.5 7.5 7.5 7.5';
+
+/** Heroicons *forward* (`>>`). Para "Pista siguiente". */
+export const SKIP_NEXT_GLYPH = 'M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5';
+
+/**
+ * Sentido de un glifo de salto deducido de su geometría, no de su nombre.
+ *
+ * Los glifos de salto de Heroicons mini son **dos triángulos** (forward/backward)
+ * y cada triángulo es un `l` con `dx != 0`: el signo de `dx` es la dirección del
+ * vértice. Un `dx > 0` es un triángulo apuntando a la derecha.
+ *
+ * El mínimo de **dos** deltas no es decorativo: es lo que separa un glifo de
+ * salto de una cruz de cerrar (`M6 18L18 6M6 6l12 12`), que tiene un solo `l` y
+ * que devolvería `"forward"` sin más. Con dos o más, todos del mismo signo, el
+ * sentido está determinado; con signos mezclados no hay sentido único y se
+ * devuelve `null`.
+ *
+ * @returns `"forward"`, `"backward"`, o `null` si el sentido no se puede deducir.
+ */
+export function skipGlyphDirection(pathData: string): 'forward' | 'backward' | null {
+  const deltas = Array.from(pathData.matchAll(/l\s*(-?[\d.]+)\s+(-?[\d.]+)/g))
+    .map((m) => Number(m[1]))
+    .filter((dx) => dx !== 0 && Number.isFinite(dx));
+  if (deltas.length < 2) return null;
+  if (deltas.every((dx) => dx > 0)) return 'forward';
+  if (deltas.every((dx) => dx < 0)) return 'backward';
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Qué se imprime en la columna de la derecha del tracklist  (RC.32 · tarea 5)
+// ---------------------------------------------------------------------------
+
+/** `M:SS` o `H:MM:SS`. Rechaza el placeholder `"—"` y cualquier basura. */
+const DURATION_LIKE = /^\d{1,2}:\d{2}(:\d{2})?$/;
+
+export interface TracklistDurationLabel {
+  /** Lo que se pinta. `""` si no hay nada que pintar. */
+  text: string;
+  /** `true` si `text` es un rango de capítulo, no la duración real de la pista. */
+  isChapterRange: boolean;
+  /** `true` si hay timestamps pero no forman un rango utilizable (hay que avisar). */
+  invalidChapterRange: boolean;
+  /** Aviso para el `title`. `""` si no hay nada que avisar. */
+  warning: string;
+}
+
+/**
+ * La columna derecha del tracklist muestra **la duración de la pista**.
+ *
+ * Antes ganaba la rama de timestamps:
+ *
+ * ```
+ * {track.start_time || track.end_time ? `${formatTime(start)} — ${formatTime(end)}`
+ *                                     : track.duration ? track.duration : null}
+ * ```
+ *
+ * o sea, las 55 pistas con `end_time > 30` enseñaban un rango de capítulo y la
+ * duración real — la rama de `track.duration` — era **inalcanzable** para ellas.
+ *
+ * ## Por qué la asimetría es la señal
+ *
+ * `components/ReleaseTracklistSection.tsx` (otra vista, misma función, mismo
+ * catálogo) ya imprimía `track.duration` sin mirar los timestamps. Dos
+ * componentes haciendo lo contrario no es un descuido: una de las dos está
+ * haciendo bien lo que el usuario pidió.
+ *
+ * ## Lo que NO se borra
+ *
+ * `start_time` es el **fallback de ordenación** del catálogo
+ * (`lib/db.ts:2269` y el SQL de `getArtistCatalog` en `:2351` hacen
+ * `ORDER BY COALESCE(disc_number,1), COALESCE(track_number,999), start_time`).
+ * Aquí solo se desprioriza para **mostrar**: si no hay duración real, el rango
+ * se conserva como último recurso y se marca como lo que es.
+ */
+export function tracklistDurationLabel(track: {
+  duration?: string | null;
+  start_time?: number | null;
+  end_time?: number | null;
+}): TracklistDurationLabel {
+  const raw = typeof track.duration === 'string' ? track.duration.trim() : '';
+  if (DURATION_LIKE.test(raw)) {
+    return { text: raw, isChapterRange: false, invalidChapterRange: false, warning: '' };
+  }
+
+  const segment = validateChapterSegment(track.start_time, track.end_time, Number.POSITIVE_INFINITY);
+  if (segment.declared && segment.usable) {
+    return {
+      text: `${formatClock(segment.start)} — ${formatClock(segment.end)}`,
+      isChapterRange: true,
+      invalidChapterRange: false,
+      warning: 'Rango dentro de un vídeo, no duración de la pista: esta columna mostraría la duración real si la tuvieras.',
+    };
+  }
+  if (segment.declared && !segment.usable) {
+    return { text: '', isChapterRange: false, invalidChapterRange: true, warning: segment.warning };
+  }
+  return { text: '', isChapterRange: false, invalidChapterRange: false, warning: '' };
+}
+
+// ---------------------------------------------------------------------------
+// Radio de impacto del `crossOrigin` condicional — MEDIDO, NO RESUELTO
+// ---------------------------------------------------------------------------
+//
+// `CORS_VERIFIED_AUDIO_HOSTS` tiene **un solo host**: `audio-ssl.itunes.apple.com`.
+// `shouldUseCrossOrigin` devuelve `false` para cualquier otro tercero, así que el
+// `<audio>` se reproduce **sin** atributo `crossOrigin`.
+//
+// El problema no es el atributo, es lo que hace el visualizador al abrirse:
+// `lib/web-audio.ts:71-73` hace
+//
+//   const source = ctx.createMediaElementSource(audioElement);
+//   source.connect(analyser);
+//   analyser.connect(ctx.destination);
+//
+// `createMediaElementSource` **reemplaza la salida nativa** del elemento. Con
+// `crossOrigin = null` el medio se carga sin CORS y, según el navegador, el
+// `MediaElementAudioSourceNode` entrega **silencio**: el audio sigue reproduciéndose
+// en la cadena nativa, pero ya no pasa por el grafo — así que el `AnalyserNode`
+// dibuja barras sintéticas sobre un elemento que ya no suena por ahí.
+//
+// Con el audio **sí** pasa por el grafo (`analyser.connect(ctx.destination)`), así
+// que se oye; sin atributo, se oye *y* las barras son falsas, o directamente no
+// se oye. Ese es el radio exacto: **cualquier preview cuya URL no sea del CDN de
+// iTunes** — o sea, todo lo que traiga el script de Deezer (agente G) o un
+// `/uploads/…` servido por Vercel desde otro dominio.
+//
+// ## Por qué el comentario de más arriba dice lo contrario
+//
+// `audio-priority.ts` (sección de CORS) razona: "Perder barras es visible y
+// degradable; perder el audio no", y de ahí sale omitir el atributo. Ese razonamiento
+// era correcto **mientras el visualizador solo leyera** del `AnalyserNode`. Desde
+// que `lib/web-audio.ts` hace `analyser.connect(ctx.destination)`, la cadena pasa a
+// ser **de ida y vuelta**, y la degradación ya no es "degradable": con el atributo
+// puesto y sin `ACAO` falla `play()` (error visible, audio ausente); sin atributo y
+// con el visualizador abierto, el audio puede desaparecer sin ningún error.
+//
+// **NO se arregla aquí**: `lib/web-audio.ts` y `components/AudioVisualizer.tsx` son
+// del agente D. Lo que sí hace esta capa es no empeorar el radio: `crossOrigin`
+// se sigue fijando **solo** para hosts medidos, y `createAudioVisualizer` es quien
+// tiene que decidir si engancha el grafo o se mantiene en lectura. Anotado para la
+// ola de D.

@@ -7,12 +7,103 @@ let sharedAudioCtx: AudioContext | null = null;
 
 const sourceCache = new WeakMap<HTMLAudioElement, AudioVisualizerNode>();
 
-export const DEFAULT_FFT_SIZE = 1024;
+// ---------------------------------------------------------------------------
+// Constantes del analizador y de la escala de niveles
+// ---------------------------------------------------------------------------
+//
+// La escala de niveles se define **en dB**, nunca sobre el byte. El byte que
+// devuelve `getByteFrequencyData()` es una codificación lineal de una ventana de
+// dB elegida por `minDecibels`/`maxDecibels`, así que trabajar sobre él es
+// trabajar sobre un logaritmo disfrazado de lineal. RC.32 lo hacía y por eso el
+// extremo grave saturaba (ver `computeBandLevels`).
+
+/**
+ * fftSize del analizador.
+ *
+ * 1024 daba 43-47 Hz por bin, y con 48 bandas logarítmicas de 30 Hz a 18 kHz
+ * eso obliga a que muchas bandascecitan el mismo bin. 4096 deja la resolución
+ * en 10.8-11.7 Hz por bin: con `MIN_BAND_BINS = 2` ninguna banda queda con un
+ * solo bin y ninguna se solapa con su vecina.
+ */
+export const DEFAULT_FFT_SIZE = 4096;
+
+/** Ventana de frequencies cubierta por las bandas. */
 export const MIN_HZ = 30;
 export const MAX_HZ = 18000;
-export const DEFAULT_BAND_GAIN = 1.35;
+
+/**
+ * Extremos de la ventana del analizador.
+ *
+ * `maxDecibels = -10` (el valor anterior) creaba una zona muerta de 19 dB en la
+ * parte alta: cualquier bin por encima de -10 dBFS leía 255, y un preview
+ * masterizado pone los graves ahí. Subirlo a 0 dBFS devuelve la zona muerta
+ * entera al rango musical, porque casi ningún *bin* individual de un master llega
+ * a 0 dBFS (el ceiling es del bus, no de una banda del FFT).
+ */
+export const ANALYSER_MIN_DB = -90;
+export const ANALYSER_MAX_DB = 0;
+
+/**
+ * Piso de ruido: por debajo de esto la barra vale 0.
+ *
+ * Sin él, el extremo bajo de la ventana produce barras de altura no nula para
+ * silencio digital (un byte 0 son -90 dBFS y aun así la curva perceptual lo
+ * levantaba). Es el mismo defecto que la saturación, pero en el otro extremo.
+ */
+export const SPECTRUM_FLOOR_DB = -72;
+
+/** Rango dinámico realmente pintado, del piso de ruido al ceiling. */
+export const LEVEL_SPAN_DB = ANALYSER_MAX_DB - SPECTRUM_FLOOR_DB;
+
+/**
+ * Margen en dB aplicado antes de normalizar.
+ *
+ * Antes era `gain = 1.35`, un multiplicador sobre el byte: `byte * 1.35 >= 255`
+ * a partir del byte 189, o sea **-29.4 dBFS**. Todo lo más fuerte que eso
+ * clavaba a 1.0. En dB el margen es una traslación y el recorte ocurre en 0
+ * dBFS, no a mitad de rango.
+ */
+export const DEFAULT_BAND_BOOST_DB = 3;
+
+/**
+ * Gamma perceptual sobre la posición normalizada.
+ *
+ * <1 expande los niveles bajos para que se vean sin robar rango a los altos.
+ * Aplicado en el dominio de la posición, no sobre el byte.
+ */
 export const DEFAULT_BAND_CURVE = 0.62;
+
+/**
+ * Inclinación espectral en dB por octava, referredia a `DEFAULT_TILT_REFERENCE_HZ`.
+ *
+ * Es un **tilt**, no una ganancia por frecuencia: una recta en log(f), la misma
+ * forma que un pink-noise o un A-weighting. Sin ella la caída natural del
+ * espectro (~-4.5 dB/octava) se come el rango y las cuatro últimas bandas quedan
+ * indistinguibles entre sí.
+ *
+ * 1.6 es deliberadamente menos que el -3 dB/octava de un rosa real: compensa la
+ * mayor parte de la caída sin aplanar el espectro, que debe seguir leyéndose
+ * como descendente.
+ */
+export const DEFAULT_TILT_DB_PER_OCTAVE = 1.6;
+
+/** Frecuencia a la que el tilt vale 0 dB. */
+export const DEFAULT_TILT_REFERENCE_HZ = 1000;
+
+/** Suavizado temporal del analizador (0 = nada, ~1 = congelado). */
+export const ANALYSER_SMOOTHING = 0.7;
+
+/** Retención del pico por banda entre frames. */
 export const PEAK_DECAY = 0.94;
+
+/**
+ * Bins mínimos por banda.
+ *
+ * Con fftSize 1024 y 48 bandas logarítmicas, 23 de las 48 bandas caían en un
+ * único bin. Dos bandas que leen el mismo bin no son dos bandas: son una, y el
+ * tercio izquierdo de la pantalla queda gobernado por unos pocos números.
+ */
+export const MIN_BAND_BINS = 2;
 
 export async function getAudioContext(): Promise<AudioContext | null> {
   if (typeof window === "undefined") return null;
@@ -35,6 +126,67 @@ export async function getAudioContext(): Promise<AudioContext | null> {
   }
 
   return sharedAudioCtx;
+}
+
+/**
+ * Convierte el byte de `getByteFrequencyData()` a dBFS.
+ *
+ * Exacto e inverso de `dbToFrequencyByte()`: el byte es una codificación lineal
+ * de la ventana `[ANALYSER_MIN_DB, ANALYSER_MAX_DB]`, no una cantidad lineal de
+ * energía.
+ */
+export function frequencyByteToDb(value: number): number {
+  const clamped = Math.max(0, Math.min(255, value));
+  return ANALYSER_MIN_DB + (clamped / 255) * (ANALYSER_MAX_DB - ANALYSER_MIN_DB);
+}
+
+/** Inverso de `frequencyByteToDb()`. */
+export function dbToFrequencyByte(db: number): number {
+  if (!Number.isFinite(db)) return 0;
+  const span = ANALYSER_MAX_DB - ANALYSER_MIN_DB;
+  return Math.max(0, Math.min(255, Math.round(((db - ANALYSER_MIN_DB) / span) * 255)));
+}
+
+/** Forma mínima de `HTMLAudioElement` que necesita la comprobación de CORS. */
+export interface AnalyserSafeElementProbe {
+  crossOrigin: string | null;
+  currentSrc?: string | null;
+  src?: string;
+}
+
+/**
+ * ¿La salida de este elemento puede pasar por un `MediaElementAudioSourceNode`
+ * sin quedarse en silencio?
+ *
+ * `createMediaElementSource()` **reemplaza** la salida nativa del elemento: a
+ * partir de ahí el audio solo se oye si pasa por el grafo. Con medio
+ * cross-origin sin `Access-Control-Allow-Origin` el grafo entrega silencio, así
+ * que reproducir una pista no verificada suena bien hasta que se abre el
+ * visualizador, y entonces se corta.
+ *
+ * La autoridad es el atributo `crossOrigin` del propio elemento, no la URL: es
+ * lo que el navegador mira para decidir si taña el medio. Consultar la lista de
+ * hosts aquí duplicaría `shouldUseCrossOrigin()` de `lib/audio-priority.ts` y
+ * podría quedarse desfasada; el elemento ya tiene la respuesta.
+ *
+ * Puro: sin DOM, sin `window`, testeable.
+ */
+export function isAnalyserSafeElement(
+  element: AnalyserSafeElementProbe,
+  selfOrigin: string
+): boolean {
+  if (element.crossOrigin) return true;
+
+  const src = element.currentSrc || element.src || "";
+  if (src === "") return true;
+  if (/^(blob:|data:)/i.test(src)) return true;
+
+  if (!selfOrigin) return false;
+  try {
+    return new URL(src, selfOrigin).origin === new URL(selfOrigin).origin;
+  } catch {
+    return false;
+  }
 }
 
 export interface AudioVisualizerNode {
@@ -61,12 +213,23 @@ export async function createAudioVisualizer(
   const ctx = await getAudioContext();
   if (!ctx) return null;
 
+  // Antes de tocar el grafo: si el elemento va a salir silencioso por CORS, es
+  // preferible no tener visualizador a matar el audio.
+  const selfOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  if (!isAnalyserSafeElement(audioElement, selfOrigin)) {
+    console.warn(
+      "[WebAudio] AnalyserNode no enlazado: el medio es cross-origin sin CORS y " +
+        "createMediaElementSource() silenciaría la salida. Se reproduce sin espectro."
+    );
+    return null;
+  }
+
   try {
     const analyser = ctx.createAnalyser();
     analyser.fftSize = fftSize;
-    analyser.smoothingTimeConstant = 0.78;
-    analyser.minDecibels = -85;
-    analyser.maxDecibels = -10;
+    analyser.smoothingTimeConstant = ANALYSER_SMOOTHING;
+    analyser.minDecibels = ANALYSER_MIN_DB;
+    analyser.maxDecibels = ANALYSER_MAX_DB;
 
     const source = ctx.createMediaElementSource(audioElement);
     source.connect(analyser);
@@ -102,6 +265,13 @@ export interface FrequencyBand {
  * Reparte las bandas logarítmicamente entre minHz y maxHz (30 Hz – 18 kHz por
  * defecto) y las ancla a los bins reales del FFT según sampleRate/Nyquist.
  * Puras: sin DOM, sin window, determinista.
+ *
+ * Los bordes se calculan una vez en bin-space y se fuerzan a crecer de forma
+ * **estrictamente** monotona, con un ancho mínimo de `MIN_BAND_BINS`. La versión
+ * anterior redondeaba cada borde por separado y luego los recortaba contra
+ * `lastBin`, así que dos bandas consecutivas podían recibir el mismo bin: con
+ * 48 bandas sobre fftSize 1024 eran 7 duplicados exactos y las 13 primeras barras
+ * dependían de 8 números.
  */
 export function computeBandFrequencies(
   sampleRate: number,
@@ -126,18 +296,33 @@ export function computeBandFrequencies(
   const lastBin = Math.min(binCount - 1, Math.max(firstBin, Math.round(hi / binHz)));
   if (lastBin <= firstBin) return [];
 
-  const bands: FrequencyBand[] = [];
+  const span = lastBin - firstBin + 1;
+  if (span < bandCount) return [];
+
+  // Si el espectro no da para el ancho mínimo, se degrada al mínimo entero que
+  // quepa; si no cabe ni un bin por banda, no hay reparto que hacer.
+  const minBins = Math.max(1, Math.min(MIN_BAND_BINS, Math.floor(span / bandCount)));
+
   const logFirst = Math.log(firstBin + 1);
   const logLast = Math.log(lastBin + 1);
 
-  for (let i = 0; i < bandCount; i++) {
-    const progress = i / bandCount;
-    const nextProgress = (i + 1) / bandCount;
-    const edgeA = Math.round(Math.exp(logFirst + progress * (logLast - logFirst)) - 1);
-    const edgeB = Math.round(Math.exp(logFirst + nextProgress * (logLast - logFirst)) - 1);
+  // edges[i] es el primer bin de la banda i; hay bandCount + 1 bordes y la banda
+  // i ocupa [edges[i], edges[i + 1] - 1].
+  const edges: number[] = new Array<number>(bandCount + 1);
+  edges[0] = firstBin;
+  edges[bandCount] = lastBin + 1;
 
-    const startBin = Math.min(lastBin, Math.max(firstBin, edgeA));
-    const endBin = Math.min(lastBin, Math.max(startBin, edgeB - 1));
+  for (let i = 1; i < bandCount; i++) {
+    const raw = Math.exp(logFirst + (i / bandCount) * (logLast - logFirst)) - 1;
+    const lowest = edges[i - 1] + minBins;
+    const highest = lastBin + 1 - (bandCount - i) * minBins;
+    edges[i] = Math.min(highest, Math.max(lowest, Math.ceil(raw)));
+  }
+
+  const bands: FrequencyBand[] = [];
+  for (let i = 0; i < bandCount; i++) {
+    const startBin = edges[i];
+    const endBin = edges[i + 1] - 1;
 
     const startHz = Math.round(startBin * binHz * 100) / 100;
     const endHz = Math.min(maxHz, Math.round((endBin + 1) * binHz * 100) / 100);
@@ -159,62 +344,93 @@ export interface BandLevel {
   peak: number;
 }
 
+export interface BandLevelOptions {
+  /** Margen en dB antes de normalizar. */
+  boostDb?: number;
+  /** Gamma perceptual sobre la posición normalizada. */
+  curve?: number;
+  /** Inclinación espectral en dB por octava. 0 desactiva el tilt. */
+  tiltDbPerOctave?: number;
+  /** Frecuencia de referencia del tilt. */
+  tiltReferenceHz?: number;
+  previousPeaks?: number[];
+  peakDecay?: number;
+}
+
 /**
- * Convierte datos de frecuencia en niveles 0..1 por banda con ganancia y curva
- * perceptual, y aplica peak-hold usando los picos previos que le pase el caller
- * (la función sigue siendo pura). Tolera arrays más cortos de lo esperado.
+ * Convierte datos de frecuencia en niveles 0..1 por banda, aplicando margen,
+ * inclinación espectral, gamma perceptual y peak-hold sobre los picos que le
+ * pase el caller. Tolera arrays más cortos de lo esperado.
+ *
+ * Toda la matemática ocurre en dBFS:
+ *
+ *   byte -> dB (lineal sobre una ventana de dB, no sobre energía)
+ *        -> gate por `SPECTRUM_FLOOR_DB`
+ *        -> + boost + tilt
+ *        -> normalizado sobre `LEVEL_SPAN_DB` y recortado **aquí**
+ *        -> ^ curve
+ *
+ * El recorte va **después** de sumar el margen, no antes. Antes iba antes, y como
+ * el margen era un multiplicador sobre el byte (`byte * 1.35`), todo lo más
+ * fuerte que -29.4 dBFS salía exactamente 1.0: 19 dB de ventana muerta donde
+ * la altura de la barra no transmitía nada. Los graves de un preview masterizado
+ * caen de sobra ahí, que es exactamente el síntoma reportado.
+ *
+ * Agregación por **máximo**, no por media: el ancho de banda va de `MIN_BAND_BINS`
+ * a unas 180 bins y promediar todos diluye un pico estrecho en la banda ancha
+ * justo donde se ve el ataque.
  */
 export function computeBandLevels(
   freqData: Uint8Array,
   bands: FrequencyBand[],
-  options?: { gain?: number; curve?: number; previousPeaks?: number[]; peakDecay?: number }
+  options?: BandLevelOptions
 ): BandLevel[] {
-  const gain = options?.gain ?? DEFAULT_BAND_GAIN;
+  const boostDb = options?.boostDb ?? DEFAULT_BAND_BOOST_DB;
   const curve = options?.curve ?? DEFAULT_BAND_CURVE;
+  const tiltDbPerOctave = options?.tiltDbPerOctave ?? DEFAULT_TILT_DB_PER_OCTAVE;
+  const tiltReferenceHz = options?.tiltReferenceHz ?? DEFAULT_TILT_REFERENCE_HZ;
   const previousPeaks = options?.previousPeaks ?? [];
   const peakDecay = options?.peakDecay ?? PEAK_DECAY;
+
+  const decayOnly = () =>
+    bands.map((_, index) => {
+      const previous = previousPeaks[index] ?? 0;
+      return { level: 0, peak: Math.max(0, Math.min(1, previous * peakDecay)) };
+    });
+
   const available = Math.max(
     0,
     Math.min(freqData.length, bands.length > 0 ? bands[bands.length - 1].endBin + 1 : 0)
   );
-  if (available === 0) {
-    return bands.map((_, index) => {
-      const previous = previousPeaks[index] ?? 0;
-      return { level: 0, peak: Math.max(0, Math.min(1, previous * peakDecay)) };
-    });
-  }
+  if (available === 0) return decayOnly();
 
   return bands.map((band, index) => {
     const start = Math.max(0, Math.min(available - 1, band.startBin));
     const end = Math.max(start, Math.min(available - 1, band.endBin));
 
-    let sum = 0;
-    let count = 0;
+    let loudestDb = Number.NEGATIVE_INFINITY;
     for (let bin = start; bin <= end; bin++) {
       const value = freqData[bin];
       if (value === undefined) break;
-      sum += value;
-      count++;
+      const db = frequencyByteToDb(value);
+      if (db > loudestDb) loudestDb = db;
     }
 
-    const average = count > 0 ? sum / count : 0;
-    const normalized = Math.max(0, Math.min(1, average / 255));
-    const boosted = Math.max(0, Math.min(1, Math.pow(normalized * gain, curve)));
+    if (!Number.isFinite(loudestDb) || loudestDb <= SPECTRUM_FLOOR_DB) {
+      const previous = previousPeaks[index] ?? 0;
+      return { level: 0, peak: Math.max(0, Math.min(1, previous * peakDecay)) };
+    }
+
+    const tiltDb =
+      tiltDbPerOctave * Math.log2(Math.max(band.centerHz, 1) / Math.max(tiltReferenceHz, 1));
+
+    const position = (loudestDb + boostDb + tiltDb - SPECTRUM_FLOOR_DB) / LEVEL_SPAN_DB;
+    const normalized = Math.max(0, Math.min(1, position));
+    const level = Math.pow(normalized, curve);
 
     const previous = previousPeaks[index] ?? 0;
-    const peak = Math.max(boosted, previous * peakDecay);
+    const peak = Math.max(level, previous * peakDecay);
 
-    return { level: boosted, peak: Math.max(0, Math.min(1, peak)) };
+    return { level: Math.max(0, Math.min(1, level)), peak: Math.max(0, Math.min(1, peak)) };
   });
-}
-
-export function generateSyntheticFrequencies(count: number, intensity = 0.9): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < count; i++) {
-    const t = Date.now() / 1000;
-    const wave =
-      Math.sin(t * 1.7 + i * 0.35) * 0.5 + Math.sin(t * 0.9 + i * 0.12) * 0.35 + 0.5;
-    out.push(Math.max(0, Math.min(1, wave)) * 255 * intensity);
-  }
-  return out;
 }
