@@ -6306,3 +6306,276 @@ anchos contra producción, en las dos ramas.
 - Resend: falta `FROM_EMAIL` y hay cuota agotada.
 - `syncLocalToTurso` omite `track_number` y otras columnas.
 
+
+---
+
+## RC.32: contrato de edicion, audio, aprobaciones y catalogo real
+
+**Fecha:** 2026-10-01
+**Modelo:** `opencode/space-bunny-free` (orquestacion), subagentes por ownership disjunto
+**Modo:** Build + auditoria
+
+El encargo no era una lista de features: era "revisar esto y arreglar lo que
+este roto". Eso cambio el resultado. De los siete problemas de la lista, cuatro
+resultaron ser bugs de datos o de contrato, no features ausentes.
+
+### Como se decidio querometer
+
+El plan externo de MiMo proponia 12 tareas. Se auditaron una a una contra el
+codigo y **cinco no tenian soporte en el repo**:
+
+| Propuesta | Veredicto |
+|-----------|-----------|
+| B-8 quitar "Enviar musica" y enlazar al catalogo | **Adoptada**. Era un no-op: el dashboard se obtenia de la API, no de los props del server component |
+| B-5 labels de boton dinamicos por estado | **Adoptada**, pero el boton de nuevo release no cambia: la ruta es la misma |
+| B-EXTRA-1 quitar `extractYouTubeId` | **Adoptada**. Estaba *declarado dos veces*; la segunda definicion ganaba y ESLint no lo senalaba |
+| T-12 aviso de segmento > 30 s | **Adoptada**, con matiz: los offsets de capitulo no son duracion de preview |
+| B-4 buscar `user_id = NULL` | **Descartada**. Era una busqueda, no un bug. La mayoria son artistas que nunca se registraron |
+| T-6 `POST /api/releases` abierto a subscriber | **Descartada**. El portal `/submissions` ya cubre ese caso sin quitar moderacion |
+| T-11 MCP de YouTube | **Descartada**. Es un servidor de terceros que devuelve el canalbuscador como si fuera el oficial. No se anade |
+| T-8 playbook de subagentes | **Adoptada como el metodo de este trabajo**, no como fichero |
+
+### El fallo de test que era un bug de produccion
+
+`tracks-public-shape.test.ts` empezo a fallar con la Ola 3: 3 filas esperadas,
+31 devueltas. No era flakiness —fallaba tambien en aislado.
+
+La causa no estaba en el test. `getAllTracks()` era `SELECT * FROM tracks`
+**sin `ORDER BY`**, y encima pagina (`?page`/`?limit`, 50 por defecto). SQLite
+no garantiza orden sin `ORDER BY`, asi que la pagina 2 podia repetir filas de la
+1 o saltarlas, y una fila recien creada caia fuera del corte.
+
+Anadido `ORDER BY created_at DESC, id DESC` en las dos ramas. En produccion
+verificado: pagina 1 repetida es identica, cero solape entre paginas, y el
+orden es de mas reciente a mas antiguo.
+
+Lo que hacia el fallo visible era el estado de la SQLite local: 565 artistas,
+207 usuarios y 55 filas `sweep-track-*` acumulados de pruebas. Cuanto mas
+crece el fichero, mas lejos cae la fila nueva del primer corte, y el test pasa
+por casualidad. Turso estaba limpio (83/12/8). **Un fixture contaminado produce
+tests que mienten.**
+
+### Que se rompio al arreglar la edicion de releases
+
+Cinco bugs, y uno de ellos solo aparecio al arreglar el anterior:
+
+1. El editor reenviaba `status` en el body. Un no-admin podia auto-aprobarse
+   poniendolo a `approved`, y el backend lo aceptaba. Ahora el estado de
+   decision **se ignora siempre** en la rama no-admin.
+2. El GET exigia sesion antes que rol, y el rol antes que propiedad. Tres
+   redirects por un owner legitimo: 403. Ahora el brazo privilegiado comprueba
+   sesion + rol/propiedad y **solo despues** cae al publico.
+3. El `PUT` reescribia la fila con los defaults del formulario. `admin_notes` no
+   estaba en el cuerpo, asi que cada guardado borraba el motivo de rechazo.
+4. **Las hijas no se persistian al anadir una nueva al editar.** El formulario
+   las anadia a un array en memoria y el backend, que resolvia el mismo
+   `release_id` para todas, no conocia las nuevas. Se perdian en silencio.
+5. Al arreglar 4 con una reconciliacion transaccional, aparecio 6: `duration` del
+   padre se quedaba en el valor guardado en BD mientras las hijas cambiaban, asi
+   que la ficha tecnica mostraba duraciones que no cuadraban con el tracklist.
+
+`admin_notes` ahora no se toca: vive en la BD, no en el formulario. Publicarlo
+por GET habria sido el arreglo comodo y el equivocado.
+
+### Audio: dos espacios de coordenadas
+
+`start_time` y `end_time` significan cosas distintas segun el estado de la
+pista. En un **preview** son milisegundos dentro del preview. En un capitulo de
+album son offsets dentro del **video**. El reproductor arrastraba los dos a un
+solo par, con lo que un preview de 30 s heredaba el final de capitulo del album:
+el scrubber saltaba de pista a mitad y el `max` era incorrecto.
+
+- `resolvePlaybackTimeline()` normaliza cada caso. El fallback es buscar
+  `start_time` por `album_id` en la tabla de capitulos.
+- La duracion de un padre es la suma de las hijas, con `sumDurations()`. Los
+  `duration` en BD son texto (`"M:SS"`, `"H:MM:SS"`), y el parser tenia un
+  `destruir solo [m, s]` que hacia que `"1:02:03"` sumara 62 s.
+- El visualizador se niega a engancharse a un medio no CORS-safe.
+  `createMediaElementSource` **sustituye** la salida nativa del `<audio>`: sin
+  CORS se pierde el audio, no solo las barras. Perder barras es degradable.
+- La banda de graves se duplicaba por la transformada de la senal; se corrigio
+  la deduplicacion y se paso de media a maximo por banda.
+
+### YouTube: 0 de 5 canales, y ese era el resultado
+
+Regla del usuario: solo canal oficial verificado. La verificacion exige que la
+descripcion del canal enlace al sitio oficial del artista, con el nombre
+coincidente.
+
+Los 5 handles existen y los 5 nombres coinciden. **Ninguna descripcion enlaza al
+sitio oficial**: Radiohead viene vacia (0 caracteres), Bjork dice solo "This is
+the official Bjork channel on YouTube", y Pink Floyd, David Bowie y Kraftwerk
+traen prosa sin un dominio. Motivo `sin-dominio-oficial` en los 5. Se
+escribieron **0 videos y 0 canales**, que es lo correcto: la regla existe para
+eso, y llenarla habria reproducido exactamente el problema que se queria evitar.
+
+Anadido `part=status` a la ruta. Sin el no hay forma de leer `embeddable` ni
+`privacyStatus`, y el proyecto embede en un iframe 1x1 con `opacity:0`. Las
+Developer Policies exigen comprobar Made For Kids en cada video embebido y no
+habia ni una coincidencia de ese flag en el repo. Verificado en produccion:
+`madeForKids: False`, `embeddable: True`.
+
+La evidencia que `channels.list` no da **no se inventa con `search`**: esta
+topado a 100 llamadas/dia y sus candidatos no son verificables.
+
+### Un borrado de canal verificado que estaba a punto de existir
+
+`artists.youtube_channel_id` se anadio a `CREATE TABLE`, al `ALTER` de
+migraciones y a `syncArtistsToTurso`. Ahi `INSERT OR REPLACE` borra la fila y
+reinserta, asi que anadir la columna al `INSERT` con `?? null` habria hecho que
+**cada sync borrase el canal verificado de todos los artistas**. Preservada de
+forma explicita.
+
+### Aprobaciones: la cascada y el fallo que se escondia
+
+- Aprobar un release **cascadea a sus hijas** en la misma transaccion. Sin eso,
+  un padre aprobado dejaba hijas en `draft` y el contador del dashboard no
+  cuadraba con las tarjetas.
+- `getArtistCatalog` reconocia hijas de padres aprobados, asi que el catalogo
+  del artista ya no sale vacio con releases multipista.
+- **5 filas de timestamps de album se corrigieron en Turso.** Tenian minutos
+  de desviacion sembrados. `fix-seed-data.ts` corrige el origen y
+  `turso-check.ts` verifica que no vuelvan: `db_seed_timeline_desalineada: 0` y
+  `db_seed_padres_duracion_vs_recorrido: 0`.
+- El fallo de promocion ya no se tragaba: antes un error de red en
+  `artist-promotion.ts` devolvia 200 y el usuario se quedaba en `subscriber`
+  sin saber por que. Ahora se reporta y hay reintento.
+
+### `artist-promotion.ts`: la deuda que el propio AGENTS.md senalaba
+
+`lib/artist-promotion.ts:139` usaba `getDbWrite()`, el patron que la regla de
+AGENTS.md prohibia. Corregido al criterio de una sola fuente de verdad:
+`getTursoClientSync() !== null`, y handle local solo en la rama sin cliente.
+Ademas, la llamada a `createProfile` no existia, con un default que hacia que el
+metodo lanzara siempre. Verificado en Turso: los 7 artistas tienen perfil y el
+admin no, que es lo correcto.
+
+La promocion **via show** sigue siendo estructuralmente imposible:
+`userHasApprovedContent` exige un perfil de artista previo, asi que un
+suscriptor que solo envia shows nunca se promueve. Es una asimetria de diseno,
+no un bug, y queda documentada.
+
+### `/api/sync` deshabilitado en vez de arreglado a medias
+
+Era un `INSERT OR REPLACE` que omitia 7 columnas, incluida `admin_notes`, y su
+mapeo **no includia `status`**. Ejecutarlo revertia el catalogo aprobado entero
+a `draft`. Se deshabilito con `410` antes de la autenticacion.
+
+Un 410 en un endpoint de sync **rompe la portabilidad local a Turso**, que es el
+motivo por el que existe. Queda como pendiente construir el sustituto seguro;
+prefers eso a un endpoint que看起来 arreglado y borre el trabajo del admin.
+
+### `lib/turso.ts`: el diagnostico que costaba tres despliegues
+
+Dos funciones llamadas `isTursoConfigured` discrepaban: la de `lib/turso.ts`
+leia un snapshot de `process.env` capturado **al importar**, y la de `lib/db.ts`
+leia el env **en tiempo de llamada**. Con el env cargando tarde —lo normal en un
+bundle de Vercel— la primera decia "hay Turso" y la segunda devolvia `null`, se
+lanzaba y la ruta respondia 500. Convertidas las dos en getters y eliminada la
+colision de nombres.
+
+### Catalogo: 9 caratulas de Unsplash fuera
+
+9 filas tenian la foto generica. Menudo al ser revisadas a ojo: eran
+*Holger Bonse* con un hombre, *Greatest Hits* con un hombre mayor, *Brothers in
+Arms* con un hombre mayor. Ese es el fallo de usar Unsplash como relleno: genera
+retratos creibles de bandas que no tienen nada que ver.
+
+Aplicadas 9 caratulas reales de **Cover Art Archive** para los 3 releases y 6
+hijas, con revision visual antes de escribir. `seed_portadas_unsplash: 0`.
+
+**Deezer se descarto a proposito.** `cdnt-preview.dzcdn.net` devuelve
+`Access-Control-Allow-Origin: *`, asi que no hace falta proxy, pero la URL va
+firmada por Akamai y **caduca a los 900 s**: persistirla es escribir una URL
+muerta. Se comprobo empíricamente que una guardada y consultada a la hora ya
+devolvia 403. 0 previews de Deezer escritos.
+
+### La suite necesita `--no-file-parallelism`
+
+`npx vitest run` en paralelo muere con `ERR_IPC_CHANNEL_CLOSED` y una asertacion
+nativa `node::RemoveEnvironmentCleanupHook` `(env) != nullptr`. **No es un test
+rojo: los 800 pasan.** Aislado a `tests/unit/official-videos.test.ts`, que carga
+un modulo nativo (`better-sqlite3` via `@/libsql/client`) a traves de un route
+handler; el hook de limpieza nativo se ejecuta con el isolate ya destruido.
+
+Verificado por exclusion: sin ese unico fichero, 768/768 en paralelo y cero
+crash. Bajar concurrencia a 2 workers **no** lo evita. Secuencial: 800/800 en
+~42 s. Documentado en AGENTS.md con el hallazgo, porque el comando de gates del
+repo tiene que seguir siendo el que de verdad verifica.
+
+### Diagostico de MiMo: no era `opencode.db`
+
+El bucle de Compactacion (99% -> 1% -> 99%...) se atribuyo a la base de datos de
+opencode. Es falso: `.opencode/` **no** esta en `.gitignore` a proposito, porque
+contiene los skills y subagentes. Con base vacia, el bucle se reproduce igual.
+
+La causa real es el **`small_model` de mimo (200K) alimentando un `big_model` de
+1M**: el router recalcula el porcentaje sobre el modelo grande con un contexto
+que en realidad lo produjo el pequeño. Al 99% de 1M solo faltan 20 000 tokens,
+as que un `tail_turns` pequeno produce un resumen enorme que vuelve a disparar
+la Compactacion. `compaction.auto=false` es **global y peligroso**, asi que no
+se toco; la solucion fue acotar los prompts, reiniciar subagentes y usar
+`space-bunny-free` para el codigo.
+
+### README: cinco afirmaciones que eran falsas
+
+- "110 tests" -> **800 en 47 ficheros**
+- "10 tablas" incluyendo `releases` y `subscribers` -> las reales. **No hay tabla
+  `releases`**: un release es una fila de `tracks` con `release_id IS NULL`
+- "submissions" -> la cola vive en `track_submissions`, que no estaba en la lista
+- "5 rutas protegidas (dashboard, profile, account, releases/new, admin)" -> 8
+  en el matcher, con `requireRole`, y **`/dashboard` no esta** (se protege por
+  rama propia)
+- "Access Control 5/5 rutas -> 307 redirect" -> ahora hay comprobacion de rol
+
+Anadidas las secciones que faltaban: cuentas suspendidas, los tres roles y la
+promocion, multimedia y cola, descargas de prensa, modelo multi-pista y la regla
+dual-mode. Corregida la sintaxis POSIX de `NODE_OPTIONS` (este repo es
+PowerShell) y el historial de releases, que se detenia en rc.12.
+
+### La credencial
+
+`README.md:167` versionaba `test-artist@example.invalid / <CONTRASENA_ROTADA>`. Sustituida por
+instrucciones. **Borrarla no basta: el secreto sigue en 24 commits del
+historial** (verificado con `git log -S`), asi que hace falta rotar la
+contrasena en la app *y* rehacer el historial con `git filter-repo`.
+
+### Gates
+
+`tsc` limpio · lint sin avisos · **800/800 en 47 ficheros** (secuencial) · Turso
+`tracks:83 artists:12 users:8 shows:2 qa_*:0 huerfanos:0 unsplash:0
+timeline_desalineada:0`.
+
+Produccion: `/api/sync` 410 · `/api/tracks` 200 con paginacion determinista y sin
+solape · `/api/youtube` 200 con `madeForKids` y `embeddable` · catalogo de
+`OK Computer` montando cola de 12 pistas · scrubber 0-30 · glifos prev/next
+correctos.
+
+Commits: `ff5baea` (Ola 1), `8a45edd` (Ola 2), `4109794` (Ola 3 + README).
+
+## Pendientes que siguen abiertos
+
+- **0 de 5 canales oficiales verificados.** Ninguna descripcion enlaza al sitio
+  oficial del artista. Hacen falta 5 descripciones reales de los canales, o la
+  lista de sitios oficiales de los 5 artistas, y entonces la evidencia existe.
+- **8 pistas sin audio y 3 releases sin caratula real.** Los motivos concretos
+  estan en `scripts/fetch-official-videos.ts` y en el informe de Covers. Dicen
+  "el single no esta en iTunes" y "Deezer no lo tiene", que son hechos
+  verificados, no pereza: falta otra fuente o upload propio.
+- **`/api/sync` deshabilitado (410).** La portabilidad local a Turso sigue sin
+  sustituto. El que existia era destructivo.
+- **Promocion via show imposible** por diseno: `userHasApprovedContent` exige un
+  perfil de artista previo. Requiere una decision de producto.
+- **`POST /api/export` PDF**: la fuente esta incrustada y la build de Vercel pasa,
+  pero falta verificar que el texto del PDF sea legible y no solo que el endpoint
+  devuelva 200.
+- **Catalogo global en la vista de invitado del dashboard.** Sin `artist_id` no
+  hay forma de acotarlo, asi que el copy lo declara en vez de prometer un
+  catalogo de artista.
+- **`vitest` en paralelo no es viable** con un route handler que carga modulo
+  nativo en el worker. Es deuda de infraestructura de test.
+- **Vercel MCP sin scope**: `opencode mcp list` dice `connected` y las tools
+  devuelven cero proyectos. La OAuth se autorizo sin seleccionar equipo.
+- `WEBHOOK_SECRET`: lo define el usuario. Resend: falta `FROM_EMAIL` y hay cuota
+  agotada.
+- `scripts/rc29-artist-shots.ts:277-284` roto desde antes de RC.31.
