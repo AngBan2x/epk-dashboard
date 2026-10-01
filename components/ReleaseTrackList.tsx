@@ -2,7 +2,12 @@
 
 import { useMemo } from "react";
 import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
-import { getPlayableAudioSource } from "@/lib/audio-priority";
+import {
+  getPlayableAudioSource,
+  resolvePlaybackTimeline,
+  tracklistDurationLabel,
+  type AudioSourceType,
+} from "@/lib/audio-priority";
 import { safeString } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
 
@@ -51,6 +56,19 @@ interface ReleaseTrackListProps {
  * Las pistas sin ninguna de las dos se **quedan fuera** de la cola en vez de
  * entrar mudas, para que el contador "2/8" del reproductor global diga la
  * verdad sobre lo que hay en cola.
+ *
+ * ## Los timestamps no viajan a la cola sin limpiar
+ *
+ * `track.start_time`/`track.end_time` son offsets de un **vídeo**, y el catálogo
+ * los tiene poblados con duración acumulada inventada (55 de 63 pistas
+ * reproducibles tienen `end_time > 30`, y ninguna de las 65 hijas tiene
+ * `youtube_video_id`: apuntan a un vídeo que no existe). Meterlos tal cual
+ * hacía que un preview de iTunes de 30 s viajara con `end = 501`, lo que
+ * producía la etiqueta `8:21`, un scrubber con `min=265` y —al arrastrarlo— un
+ * `seek()` fuera de rango que **saltaba de pista**.
+ *
+ * Aquí se resuelven con `resolvePlaybackTimeline`, que es también lo que usa
+ * `loadTrack`: el medio decide, y si es un preview los capítulos no aplican.
  */
 export function buildReleaseQueue(
   tracks: Track[],
@@ -72,6 +90,12 @@ export function buildReleaseQueue(
 
     if (audioUrl === "" && !youtubeVideoId) continue;
 
+    const timeline = resolvePlaybackTimeline({
+      sourceType: (audioUrl === "" ? "youtube" : "preview") as AudioSourceType,
+      declaredStart: track.start_time ?? 0,
+      declaredEnd: track.end_time ?? 0,
+    });
+
     items.push({
       id: track.id,
       title: safeString(track.title, "Track"),
@@ -80,8 +104,8 @@ export function buildReleaseQueue(
       coverImage: releaseCoverImage || track.cover_image,
       isYouTube: audioUrl === "",
       youtubeVideoId,
-      startTimestamp: track.start_time || 0,
-      endTimestamp: track.end_time || 0,
+      startTimestamp: timeline.start,
+      endTimestamp: timeline.end,
     });
   }
   return items;
@@ -96,12 +120,6 @@ export function ReleaseTrackList({
 }: ReleaseTrackListProps) {
   const globalPlayer = useAudioPlayer();
   const allTracks = queueTracks ?? tracks;
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
 
   const queue = useMemo<ActiveTrack[]>(
     () => buildReleaseQueue(allTracks, releaseCoverImage, releaseYoutubeVideoId),
@@ -239,17 +257,35 @@ export function ReleaseTrackList({
               </p>
             </div>
 
-            {/* Duration / Timestamp */}
+            {/* Duración de la pista (RC.32, tarea 5).
+                Antes ganaba la rama de timestamps:
+                  {track.start_time || track.end_time
+                    ? `${formatTime(start)} — ${formatTime(end)}`
+                    : track.duration ? track.duration : null}
+                así que las 55 pistas con `end_time > 30` pintaban un rango de
+                capítulo y la rama de `track.duration` — la duración real — era
+                inalcanzable para ellas.
+                `start_time` NO se borra: es el fallback de ordenación del catálogo
+                (`lib/db.ts`, `ORDER BY COALESCE(track_number,999), start_time`).
+                Aquí solo se desprioriza para mostrar, y si no hay duración real
+                el rango se conserva como último recurso y se marca como lo que es. */}
             <div className="text-right">
-              {track.start_time || track.end_time ? (
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                  {formatTime(track.start_time || 0)} — {formatTime(track.end_time || 0)}
-                </span>
-              ) : track.duration ? (
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                  {track.duration}
-                </span>
-              ) : null}
+              {(() => {
+                const label = tracklistDurationLabel(track);
+                if (!label.text) return null;
+                return (
+                  <span
+                    className={`text-xs font-mono ${
+                      label.isChapterRange
+                        ? "text-slate-400 dark:text-slate-500"
+                        : "text-slate-500 dark:text-slate-400"
+                    }`}
+                    title={label.warning || track.duration || undefined}
+                  >
+                    {label.text}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Error indicator */}

@@ -2091,12 +2091,65 @@ export async function getApprovedTracks(): Promise<Track[]> {
 }
 
 /**
+ * RC.32 — LA regla de igualdad de nombres de artista. Una sola para todo el
+ * codebase, y por eso vive aquí y no duplicada en cada ruta.
+ *
+ * ── Por qué existe ─────────────────────────────────────────────────────────
+ * `tracks` NO tiene FK a `artists`: se relaciona **por nombre** (ver el
+ * comentario de `deleteArtist`). Eso convierte cada comparación de nombres en
+ * una comparación de IDENTIDAD de fila, y por eso no puede ser "casi igual".
+ *
+ * Antes de RC.32 había dos reglas distintas para el mismo invariante en la
+ * misma ruta:
+ *   - `POST /api/releases` comparaba el `artist_name` del **payload** con
+ *     `===` contra el nombre de la fila de `artists`.
+ *   - `PUT /api/releases` comparaba el `artist_name` de la **DB**.
+ * Un espacio trailing tecleado ("Angel Bandres ") pasaba el POST y escribía la
+ * fila con ESE nombre: una fila que ya no casa con ninguna fila de `artists`, y
+ * por lo tanto fuera de la cascada de `deleteArtist` y de toda verificación de
+ * propiedad posterior. El PUT, en cambio, no fallaba. Un tecleo y una pérdida
+ * silenciosa de Track.
+ *
+ * Normalizar (trim + case-insensitive) cierra las dos puertas. OJO: esto solo
+ * cambia la COMPARACIÓN. Lo que se ESCRIBE sigue siendo el valor canónico de
+ * la fila de `artists` — nunca el del payload — porque comparar normalizado y
+ * luego persistir el texto tecleado seguiría creando la fila huérfana. Ver
+ * `resolveOwnedArtistName` en `app/api/releases/route.ts`, que es quien
+ * guarantee esa segunda mitad.
+ *
+ * Devuelve `false` para vacíos: "" == "" no es propiedad de nadie.
+ */
+/**
+ * Estados de un release. Los tres "de decisión" (`approved`, `rejected`,
+ * `revision`) solo los puede escribir un admin —ver `resolveSubmitStatus`.
+ */
+export const DECISION_STATUSES: readonly string[] = ["approved", "rejected", "revision"];
+export const RELEASE_STATUSES: readonly string[] = ["draft", "pending", ...DECISION_STATUSES];
+
+export function sameArtistName(
+  a: string | null | undefined,
+  b: string | null | undefined
+): boolean {
+  const norm = (v: string | null | undefined): string =>
+    typeof v === "string" ? v.trim().toLowerCase() : "";
+  const na = norm(a);
+  const nb = norm(b);
+  return na !== "" && na === nb;
+}
+
+/**
  * Resuelve si un usuario es el dueño verificado de las filas de `tracks` con
  * ese `artist_name`.
  *
  * `tracks` NO tiene FK a `artists`: se relaciona por nombre (ver el comentario
  * de `deleteArtist`). Por eso el ownership se valida contra
  * `artists.user_id`, igual que hacen `PUT`/`DELETE /api/releases`.
+ *
+ * RC.32: el nombre se recorta antes de buscar. Una fila con un espacio
+ * trailing ya escrita en producción sigue huérfana (el `name = ?` de
+ * `getArtistByName` es exacto a propósito: es la misma clave que usa la
+ * cascada de `deleteArtist`), pero el input del cliente ya no puede crear una
+ * nueva.
  *
  * Devuelve `false` si no hay artista con ese nombre (un track orphaned nunca
  * es editable por nadie salvo por un admin).
@@ -2105,9 +2158,68 @@ export async function isArtistOwnerOfTrackName(
   artistName: string,
   userId: string
 ): Promise<boolean> {
-  if (!artistName || !userId) return false;
-  const artist = await getArtistByName(artistName);
+  const name = typeof artistName === "string" ? artistName.trim() : "";
+  if (!name || !userId) return false;
+  const artist = await getArtistByName(name);
   return artist?.user_id != null && artist.user_id === userId;
+}
+
+/**
+ * RC.32 — LA regla de transición de estado de `app/api/releases`.
+ *
+ * ## Por qué vive aquí y no en la ruta
+ * Un `route.ts` del App Router solo puede exportar verbos HTTP: cualquier otro
+ * export rompe el constraint `{ [x: string]: never }` de los tipos generados de
+ * Next (`tsc` lo falla con TS2344). Así que la regla vive con el resto de los
+ * invariantes de esta capa —junto a `sameArtistName`, que es el otro— y la ruta
+ * la importa.
+ *
+ * ## Qué rompía
+ * `PUT /api/releases` respondía 403 cuando `status` venía en el body, el rol no
+ * era admin y el estado era de decisión. El formulario de edición reenviaba el
+ * estado **vigente** (lo cargaba al state y lo mandaba de vuelta), así que con
+ * las 83 filas de producción en `approved` —las puso
+ * `scripts/fix-release-status.ts:53`— ningún artista podía guardar ningún
+ * release. Nunca. El mensaje largo de la captura era este gate; el corto
+ * ("No autorizado"), el de propiedad.
+ *
+ * ## Qué hace ahora
+ *   - Admin: decide cualquier estado, como siempre.
+ *   - Autor: la ÚNICA transición que puede pedir es `pending` ("entrar en la cola
+ *     de revisión"). Todo lo demás conserva el estado vigente.
+ *   - Un `status` inyectado a mano por un no-admin se IGNORA, no se rechaza: si
+ *     se rechazara, cualquier otro cliente que reprodujera el patrón del
+ *     formulario reintroduciría la misma trampa con otro código de error.
+ *   - Un estado que no existe en la lista sigue siendo un 400 (`null`).
+ *
+ * ## Por qué no se afloja el gate
+ * Ignorar no es permitir. Lo que sale de aquí (`nextStatus`) es lo único que
+ * llega a la sentencia SQL; el `status` del body no se escribe nunca. La puerta
+ * se cierra por omisión, no por excepción.
+ *
+ * ## La decisión de producto detrás
+ * `approved → pending` ES alcanzable para el autor (es el botón "Enviar para
+ * revisión" de un release ya publicado, con confirmación). Lo que NO es
+ * alcanzable es decidir sobre uno mismo: nadie se aprueba ni se rechaza a sí
+ * mismo.
+ */
+export function resolveSubmitStatus(input: {
+  role: string;
+  requested?: unknown;
+  previous: string;
+}): { nextStatus: string; ignored: boolean } | null {
+  const { role, requested, previous } = input;
+  const asked = typeof requested === "string" ? requested : undefined;
+
+  if (asked !== undefined && !RELEASE_STATUSES.includes(asked)) return null;
+
+  if (role === "admin") {
+    return { nextStatus: asked ?? previous, ignored: false };
+  }
+  if (asked === "pending") {
+    return { nextStatus: "pending", ignored: false };
+  }
+  return { nextStatus: previous, ignored: asked !== undefined };
 }
 
 export async function getTrackCount(): Promise<number> {

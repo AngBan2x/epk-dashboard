@@ -11,7 +11,10 @@ import {
   prevQueueIndex,
   queuePositionLabel,
   reindexQueue,
+  resolvePlaybackTimeline,
   shouldUseCrossOrigin,
+  timelineSeekTarget,
+  type AudioSourceType,
   type QueueState,
   type QueueTrack,
 } from "@/lib/audio-priority";
@@ -28,8 +31,27 @@ export interface ActiveTrack extends QueueTrack {
   coverImage?: string;
   isYouTube?: boolean;
   youtubeVideoId?: string;
-  // P3 Batch 2: capítulos sobre un MISMO vídeo (segmentar un vídeo).
-  // OJO: esto NO es la cola de pistas.
+  /**
+   * P3 Batch 2: capítulos sobre un MISMO vídeo (segmentar un vídeo).
+   * OJO: esto NO es la cola de pistas.
+   *
+   * ## Son un espacio de coordenadas DISTINTO al del medio que suena
+   *
+   * `startTimestamp`/`endTimestamp` son offsets dentro de un **vídeo de YouTube**.
+   * Cuando la fuente es un **fichero independiente** (`source.type === 'preview'`,
+   * el preview de iTunes/Deezer de 30 s) estos campos describen otro medio y no
+   * aplican: `loadTrack` los **borra** en lugar de dejarlos "perder" contra la
+   * duración.
+   *
+   * No basta con que `duration` gane en la etiqueta. El scrubber también los
+   * leía, y con `start = 265, end = 501` sobre un fichero de 30 s el valor del
+   * `input[type=range]` era 265 mientras la etiqueta decía 0:08; arrastrar
+   * llamaba a `seek()`, que recortaba a `[265, 501]` → `audio.currentTime = 265`
+   * en un fichero de 30 s → `ended` → **salto de pista**.
+   *
+   * Ver `resolvePlaybackTimeline` en `lib/audio-priority.ts` (fuente única de la
+   * regla) y `validateChapterSegment` (validador publicado para el schema Zod).
+   */
   startTimestamp?: number;
   endTimestamp?: number;
 }
@@ -44,6 +66,19 @@ export interface AudioPlayerContextType {
   volume: number;
   isVisualizerOpen: boolean;
   isYouTubeMode: boolean;
+  /**
+   * Aviso de línea de tiempo de la pista en curso, `""` si no hay ninguno.
+   *
+   * Vive aquí y no en `activeTrack.endTimestamp` porque `loadTrack` **ya limpió**
+   * los timestamps del `ActiveTrack`: al pintar, el reproductor vuelve a derivar
+   * la línea de tiempo de esos valores saneados, y una ventana descartada ya no
+   * se distingue de "no había ventana". El aviso se captura en el momento de
+   * cargar, con los valores declarados, que es cuando existe la información.
+   *
+   * Ejemplos: los capítulos del vídeo no aplican a un preview de audio, o el
+   * segmento declarado pasa de 30 s.
+   */
+  timelineWarning: string;
   /** Pistas de la cola montada con `playQueue`. */
   queue: QueueTrack[];
   /** Índice de la pista en curso, o -1 si no hay cola. */
@@ -81,6 +116,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const [error, setError] = useState<string | null>(null);
   const [isVisualizerOpen, setIsVisualizerOpen] = useState(false);
   const [isYouTubeMode, setIsYouTubeMode] = useState(false);
+  const [timelineWarning, setTimelineWarning] = useState("");
   const [queueState, setQueueState] = useState<QueueState | null>(null);
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -96,6 +132,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const activeTrackRef = useRef<ActiveTrack | null>(null);
   const isPlayingRef = useRef(false);
   const volumeRef = useRef(0.85);
+  /**
+   * Espejo de `duration` para `seek()`, que se declara con `[]` y no puede leer
+   * el estado. Sin esto recortaría contra la duración de la pista anterior.
+   */
+  const durationRef = useRef(0);
   const queueRef = useRef<QueueState | null>(null);
   /** Sube en cada carga: los callbacks de una pista ya descartada se ignoran. */
   const loadTokenRef = useRef(0);
@@ -119,6 +160,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   }, []);
 
   volumeRef.current = volume;
+  durationRef.current = duration;
 
   const stopYouTubeSync = useCallback(() => {
     if (youtubeSyncRef.current) {
@@ -188,16 +230,39 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setError(null);
     setIsLoading(false);
 
-    // Default 30s preview for YouTube tracks without explicit timestamps
-    const effectiveEnd = isYT && (!track.endTimestamp || track.endTimestamp === 0)
-      ? 30
-      : (track.endTimestamp || 0);
+    /**
+     * Línea de tiempo de ESTA pista, y solo de esta.
+     *
+     * `mediaDuration` se pasa a `0` a propósito: la `duration` del estado es la
+     * de la pista anterior hasta que llegue `loadedmetadata`. Para YouTube eso
+     * deja el fallback de 30 s (el comportamiento previo) y para un preview da
+     * `end = 0` — que es exactamente "no hay ventana de capítulo", porque los
+     * timestamps declarados se descartan.
+     *
+     * Lo que sale de aquí se escribe en el `ActiveTrack` (limpieza de raíz) y en
+     * los espejos que leen `seek()` y el poll de YouTube. Antes se hacía
+     *
+     *   const effectiveEnd = isYT && (!track.endTimestamp || track.endTimestamp === 0)
+     *     ? 30 : (track.endTimestamp || 0);
+     *
+     * que para un preview de iTunes con `end_time = 501` daba `effectiveEnd = 501`
+     * y propagaba el dato inventado a la etiqueta, al scrubber y al `seek()`.
+     */
+    const timeline = resolvePlaybackTimeline({
+      sourceType: (isYT ? "youtube" : "preview") as AudioSourceType,
+      declaredStart: track.startTimestamp,
+      declaredEnd: track.endTimestamp,
+      mediaDuration: 0,
+    });
 
-    setActiveTrack({ ...track, endTimestamp: effectiveEnd });
+    setActiveTrack({ ...track, startTimestamp: timeline.start, endTimestamp: timeline.end });
+    // Se captura aquí, con los valores **declarados**, porque a partir de este
+    // punto el `ActiveTrack` ya no los tiene (es el punto de la limpieza).
+    setTimelineWarning(timeline.warning);
     setIsYouTubeMode(isYT);
     isYouTubeModeRef.current = isYT;
-    startTimestampRef.current = track.startTimestamp || 0;
-    endTimestampRef.current = effectiveEnd;
+    startTimestampRef.current = timeline.start;
+    endTimestampRef.current = timeline.end;
 
     if (isYT) {
       // Pause HTML5 audio if playing and reset src to prevent conflicts
@@ -227,8 +292,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
             updatePlaying(true);
             startYouTubeSync();
           };
-          if (track.startTimestamp && track.startTimestamp > 0) {
-            yt.seek(track.startTimestamp);
+          // `timeline.start`, no `track.startTimestamp`: si el segmento se
+          // descartó por invertido o demasiado largo, arrancar en el capítulo
+          // inválido era parte del salto instantáneo de pista.
+          if (timeline.start > 0) {
+            yt.seek(timeline.start);
             setTimeout(doPlay, 300);
           } else {
             // Minimum 500ms so "Cargando..." is visible
@@ -260,8 +328,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
           updatePlaying(false);
         },
       }, {
-        start: track.startTimestamp || undefined,
-        end: effectiveEnd > 0 ? effectiveEnd : undefined,
+        start: timeline.start > 0 ? timeline.start : undefined,
+        end: timeline.end > 0 ? timeline.end : undefined,
       });
       return;
     }
@@ -441,8 +509,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     updatePlaying(false);
     setCurrentTime(0);
     setDuration(0);
+    durationRef.current = 0;
     setIsVisualizerOpen(false);
     setIsYouTubeMode(false);
+    setTimelineWarning("");
     isYouTubeModeRef.current = false;
     startTimestampRef.current = 0;
     endTimestampRef.current = 0;
@@ -452,15 +522,32 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const seek = useCallback((time: number) => {
     if (!Number.isFinite(time)) return;
 
-    // P3.27: Clamp to [startTimestamp, endTimestamp] for timestamped tracks
-    const start = startTimestampRef.current;
-    const end = endTimestampRef.current;
-    let clamped = time;
-    if (end > 0) {
-      clamped = Math.max(start, Math.min(end, time));
-    } else if (start > 0) {
-      clamped = Math.max(start, time);
-    }
+    /**
+     * Se recorta con la **misma** línea de tiempo que pinta el scrubber, no con
+     * los espejos sueltos.
+     *
+     * Antes:
+     *
+     *   const start = startTimestampRef.current;   // 265
+     *   const end = endTimestampRef.current;       // 501
+     *   if (end > 0) clamped = Math.max(start, Math.min(end, time));
+     *
+     * Es decir, `clamped = 265` siempre, sobre un fichero de 30 s. El `<audio>`
+     * buscaba más allá de su final, disparaba `ended` y `handleEnded` saltaba de
+     * pista. Ahora `startTimestampRef`/`endTimestampRef` contienen la ventana ya
+     * saneada (0/0 para un preview), así que `timelineSeekTarget` recorta a
+     * `[0, duración real]` y el salto no puede ocurrir.
+     *
+     * `durationRef` existe porque `seek` se declara con `[]`: sin espejo leería
+     * la duración de la pista anterior.
+     */
+    const timeline = resolvePlaybackTimeline({
+      sourceType: (isYouTubeModeRef.current ? "youtube" : "preview") as AudioSourceType,
+      declaredStart: startTimestampRef.current,
+      declaredEnd: endTimestampRef.current,
+      mediaDuration: durationRef.current,
+    });
+    const clamped = timelineSeekTarget(timeline, time);
 
     if (isYouTubeModeRef.current) {
       const yt = getYouTubePlayer();
@@ -573,6 +660,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         volume,
         isVisualizerOpen,
         isYouTubeMode,
+        timelineWarning,
         queue: queueState?.items ?? EMPTY_QUEUE,
         queueIndex: queueState?.index ?? -1,
         queuePosition: queuePositionLabel(queueState),

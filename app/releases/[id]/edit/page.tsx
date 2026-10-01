@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { extractYouTubeId, getYouTubeThumbnail, fetchYouTubeVideo } from "@/lib/youtube";
+import { capitalizeReleaseType } from "@/lib/null-safe";
 import {
   PRODUCTION_FIELDS,
   PRODUCTION_INPUT_CLASS,
@@ -27,6 +28,44 @@ interface TrackInput {
   track_number: number | null;
 }
 
+/**
+ * RC.32 — texto del botón de guardado y qué estado produce cada uno.
+ *
+ * Antes prometía guardar un borrador y NO lo guardaba: conservaba el estado
+ * vigente. Y la línea de ayuda que hay debajo se lo decía al usuario en la
+ * cara mientras el botón prometía otra cosa. Los dos textos describían
+ * operaciones distintas.
+ *
+ * `submitState` es lo que se manda, y es SIEMPRE una Intención —nunca el estado
+ * que devuelve el servidor—:
+ *
+ *   - `save`         → el servidor conserva el estado vigente (ver
+ *                      `app/api/releases/route.ts`, Tarea 1).
+ *   - `request`      → `pending`: entrar en la cola de revisión.
+ *
+ * Para un `rejected` la acción principal ES pedir revisión, así que el botón
+ * principal ya la dispara y el secundario se oculta. Para un `approved`, la
+ * secundaria existe y lo devuelve a la cola: es el camino que pedía el usuario
+ * ("vuelva a entrar en la cola") y por eso lleva confirmación.
+ */
+function primarySaveLabel(status: ReleaseStatus): string {
+  switch (status) {
+    case "pending":
+      return "Guardar actualización";
+    case "approved":
+      return "Actualizar publicación";
+    case "rejected":
+      return "Guardar y solicitar revisión";
+    default:
+      return "Guardar cambios";
+  }
+}
+
+/** Botón secundario de "Enviar para revisión": visible si aporta algo. */
+function canRequestReview(status: ReleaseStatus): boolean {
+  return status === "draft" || status === "approved";
+}
+
 export default function EditReleasePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -37,19 +76,26 @@ export default function EditReleasePage() {
   const [releaseData, setReleaseData] = useState<any>(null);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
 
+  /**
+   * RC.32 — `status` sale del estado del formulario. Antes vivía en `form` y se
+   * reenviaba en el payload, que es la causa literal del 403 que impedía
+   * guardar los 83 releases aprobados. Ahora el formulario no tiene un campo
+   * `status` que reenviar: `currentStatus` es de SOLO LECTURA (pinta la etiqueta
+   * y elige el texto del botón) y nunca entra en el body.
+   */
+  const [currentStatus, setCurrentStatus] = useState<ReleaseStatus>("draft");
+
   const [form, setForm] = useState({
     type: "single" as ReleaseType,
     title: "",
     artist_name: "",
     release_date: "",
-    genre: "",
     cover_image: "",
     description: "",
     duration: "",
     spotify_url: "",
     apple_music_url: "",
     youtube_url: "",
-    status: "draft" as ReleaseStatus,
   });
 
   const [tracks, setTracks] = useState<TrackInput[]>([{ title: "", duration: "", isrc: "", start_time: 0, end_time: 0, track_number: null }]);
@@ -89,15 +135,16 @@ export default function EditReleasePage() {
             title: data.title || "",
             artist_name: data.artist_name || "",
             release_date: data.release_date || "",
-            genre: data.genre || "",
             cover_image: data.cover_image || "",
             description: data.description || "",
             duration: data.duration || "",
             spotify_url: el.spotify || "",
             apple_music_url: el.apple_music || "",
             youtube_url: el.youtube || "",
-            status: data.status || "draft",
           });
+          // RC.32: el estado va a su propio state de solo lectura. No se manda
+          // de vuelta en el payload (ver Tarea 1).
+          setCurrentStatus(data.status || "draft");
           setLyrics(data.lyrics || "");
           setProductionDetails({
             daw: pd.daw || "",
@@ -112,10 +159,16 @@ export default function EditReleasePage() {
             recording_date: pd.recording_date || "",
             production_credits: pd.production_credits || "",
           });
-          if (data.tracks) {
+          // Las hijas llegan en `data.tracks` solo en el brazo privilegiado del
+          // GET (dueño o admin). Antes esto nunca se cumplía —ni `parseTrack`
+          // ni un `SELECT *` inventan una columna `tracks`— así que el tracklist
+          // de un álbum se editaba sobre UNA fila vacía y, al guardar, se
+          // perdía. Si el GET no trae hijas, se deja la fila vacía inicial:
+          // el payload se armará sin `tracks` y el backend no tocará nada.
+          if (Array.isArray(data.tracks) && data.tracks.length > 0) {
             setTracks(data.tracks.map((t: any) => ({
-              title: t.title,
-              duration: t.duration,
+              title: t.title ?? "",
+              duration: t.duration ?? "",
               isrc: t.isrc || "",
               start_time: t.start_time ?? 0,
               end_time: t.end_time ?? 0,
@@ -163,11 +216,11 @@ export default function EditReleasePage() {
     return null;
   }
 
-  // Auto-extract YouTube video ID and generate thumbnail + fetch metadata
-  const extractYouTubeId = (url: string): string | null => {
-    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-    return match ? match[1] : null;
-  };
+  // RC.32 Tarea 7: aquí vivía un `extractYouTubeId` local que SOMBREADABA el
+  // import de `@/lib/youtube` con un cuerpo byte a byte idéntico. No estaba
+  // muerto —se usaba tres veces más abajo—, pero sí era una segunda copia de
+  // un extractor que otro stream mantiene, y el import de la línea 7 quedaba
+  // sin uso real. Se borra la copia; el import pasa a ser el que manda.
 
   const handleYouTubeUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
@@ -207,11 +260,16 @@ export default function EditReleasePage() {
     setForm(prev => ({
       ...prev,
       title: prev.title || track.trackName,
-      artist_name: prev.artist_name || track.artistName,
       cover_image: prev.cover_image || track.artworkUrl600 || "",
-      genre: prev.genre || track.primaryGenreName || "",
       release_date: prev.release_date || (track.releaseDate ? track.releaseDate.substring(0, 10) : ""),
       apple_music_url: prev.apple_music_url || `https://music.apple.com/us/album/${track.trackId}`,
+    }));
+    // RC.32 Tarea 5: el género de iTunes va a `production_details.genre`, que
+    // es la fuente que se renderiza y se exporta. Antes iba a `tracks.genre`,
+    // que `parseTrack` no expone: se escribía y nadie lo leía nunca.
+    setProductionDetails(prev => ({
+      ...prev,
+      genre: prev.genre || track.primaryGenreName || "",
     }));
     // Auto-fill duration
     if (track.trackTimeMillis) {
@@ -269,43 +327,92 @@ export default function EditReleasePage() {
     setTracks(newTracks);
   };
 
-  const handleSubmit = async (e: React.FormEvent, submitForReview = false) => {
+  /**
+   * RC.32 — el cuerpo del PUT, campo por campo.
+   *
+   * Ya no es `{ ...form }`: el spread era el problema, porque `form` llevaba
+   * `status` dentro y la clave viajaba dos veces en el JSON (una por el spread y
+   * otra por la propiedad explícita). Aquí no hay spread y no hay `status` de
+   * origen en ninguna parte: lo que sale es una INTENCIÓN (`save` o `request`)
+   * y el servidor decide el estado.
+   *
+   * `tracks` solo se manda si hay ALGO que mandar. El backend rechaza con 400
+   * un array vacío sobre un release que ya tiene hijas, precisamente para que
+   * un cliente que no las cargó no las borre; omittingir la clave es la forma
+   * explícita de decir "no las toques".
+   *
+   * `type` viaja como `release_type` (su columna): el selector de Single/EP/
+   * Álbum mandaba `type`, que no está en la allowlist del PUT, así que era otro
+   * control muerto. `capitalizeReleaseType` deja el valor en la forma que usa el
+   * resto del catálogo ("Single", "EP", "Album").
+   */
+  const buildPayload = (submitState: "save" | "request") => {
+    const videoId = extractYouTubeId(form.youtube_url);
+    const children = tracks.filter((t) => t.title.trim().length > 0);
+    return {
+      id: releaseId,
+      // Un rechazo se corrige y se reenvía: la acción principal de un `rejected`
+      // es pedir revisión, no "guardar sin hacer nada".
+      status: submitState === "request" || currentStatus === "rejected" ? "pending" : "draft",
+      title: form.title,
+      release_type: capitalizeReleaseType(form.type),
+      artist_name: form.artist_name,
+      release_date: form.release_date,
+      cover_image: form.cover_image,
+      description: form.description,
+      duration: form.duration,
+      lyrics: lyrics || null,
+      production_details: JSON.stringify(productionDetails),
+      external_links: {
+        spotify: form.spotify_url,
+        apple_music: form.apple_music_url,
+        youtube: form.youtube_url,
+        youtube_video_id: videoId,
+      },
+      ...(children.length > 0 ? { tracks: children } : {}),
+    };
+  };
+
+  const handleSubmit = async (e: React.FormEvent, submitState: "save" | "request" = "save") => {
     e.preventDefault();
+
+    // Pedir revisión sobre un release ya publicado lo saca del catálogo hasta
+    // que un admin lo vuelva a aprobar. Es lo que quiere el botón, pero no es
+    // un clic que deba pasar por encima.
+    if (submitState === "request" && currentStatus === "approved") {
+      const confirmed = window.confirm(
+        "Este release está publicado. Si lo envías para revisión, dejará de aparecer en el catálogo hasta que un administrador lo apruebe de nuevo. ¿Continuar?"
+      );
+      if (!confirmed) return;
+    }
+
     setLoading(true);
     setMessage(null);
-
-    const videoId = extractYouTubeId(form.youtube_url);
-    const status = submitForReview ? "pending" : form.status;
 
     try {
       const res = await fetch(`/api/releases?id=${releaseId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: releaseId,
-          ...form,
-          status,
-          artist_id: user?.id,
-          tracks: tracks.filter((t) => t.title),
-          lyrics: lyrics || null,
-          production_details: JSON.stringify(productionDetails),
-          external_links: {
-            spotify: form.spotify_url,
-            apple_music: form.apple_music_url,
-            youtube: form.youtube_url,
-            youtube_video_id: videoId,
-          },
-        }),
+        body: JSON.stringify(buildPayload(submitState)),
       });
 
       if (res.ok) {
-        const msg = submitForReview ? "Release enviado para revisión" : "Release actualizado exitosamente";
-        setMessage({ type: "success", text: msg });
+        const json = await res.json().catch(() => null);
+        const askedForReview = submitState === "request" || currentStatus === "rejected";
+        const msg = askedForReview ? "Release enviado para revisión" : "Release actualizado exitosamente";
+        // Si el servidor ignora el estado (no debería pasar con este
+        // formulario, pero el contrato lo garantiza), el aviso lo dice en
+        // lugar de dejar pensar al artista que su release se despublicó.
+        if (json?.statusIgnored) {
+          setMessage({ type: "error", text: "Se guardaron los cambios, pero el estado del release no se pudo cambiar." });
+        } else {
+          setMessage({ type: "success", text: msg });
+        }
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(() => router.push("/dashboard"), 1500);
       } else {
-        const error = await res.json();
-        setMessage({ type: "error", text: error.error || "Error al actualizar release" });
+        const error = await res.json().catch(() => null);
+        setMessage({ type: "error", text: error?.error || "Error al actualizar release" });
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch {
@@ -362,39 +469,38 @@ export default function EditReleasePage() {
               />
             </div>
 
-            {/* Artist Name */}
+            {/* Artist Name — RC.32: SOLO LECTURA */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre del Artista *</label>
+              <label htmlFor="artist-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Nombre del Artista *
+              </label>
               <input
+                id="artist-name"
                 type="text"
                 required
+                readOnly
                 value={form.artist_name}
-                onChange={(e) => setForm({ ...form, artist_name: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
-                placeholder="Nombre del artista"
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-not-allowed"
               />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Es el nombre de tu perfil de artista. Los releases se vinculan a él por nombre, así que
+                no se puede cambiar desde aquí: se cambia en tu perfil.
+              </p>
             </div>
 
-            {/* Release Date & Genre */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Release Date — RC.32 Tarea 5: el input de "Género" (`tracks.genre`,
+                columna MUERTA) desaparece de aquí. El género vive en la Ficha de
+                Producción, más abajo, y es el único sitio donde se escribe. */}
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha de Lanzamiento *</label>
+                <label htmlFor="release-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha de Lanzamiento *</label>
                 <input
+                  id="release-date"
                   type="date"
                   required
                   value={form.release_date}
                   onChange={(e) => setForm({ ...form, release_date: e.target.value })}
                   className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Género</label>
-                <input
-                  type="text"
-                  value={form.genre}
-                  onChange={(e) => setForm({ ...form, genre: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
-                  placeholder="Rock, Pop, etc."
                 />
               </div>
             </div>
@@ -596,24 +702,27 @@ export default function EditReleasePage() {
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado actual:</span>
                   <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${
-                    form.status === "draft" ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300" :
-                    form.status === "pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300" :
-                    form.status === "approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" :
+                    currentStatus === "draft" ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300" :
+                    currentStatus === "pending" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300" :
+                    currentStatus === "approved" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" :
                     "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                   }`}>
-                    {form.status === "draft" ? "📝 Borrador" :
-                     form.status === "pending" ? "⏳ Pendiente de revisión" :
-                     form.status === "approved" ? "✅ Aprobado" :
+                    {currentStatus === "draft" ? "📝 Borrador" :
+                     currentStatus === "pending" ? "⏳ Pendiente de revisión" :
+                     currentStatus === "approved" ? "✅ Aprobado" :
                      "❌ Rechazado"}
                   </span>
                 </div>
+                {/* El texto de abajo tiene que describir lo que hace el botón de
+                    al lado. Antes describían operaciones distintas: el botón
+                    prometía guardar un borrador y esta línea, lo contrario. */}
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {form.status === "draft" && "Guarda cambios sin enviar. Cuando estés listo, usa 'Enviar para Revisión'."}
-                  {form.status === "pending" && "En revisión. Los cambios se guardan directamente."}
-                  {form.status === "approved" && "Aprobado y visible públicamente."}
-                  {form.status === "rejected" && "Rechazado. Edita y reenvía para revisión."}
+                  {currentStatus === "draft" && "Guarda los cambios. Cuando estés listo, usa 'Enviar para revisión'."}
+                  {currentStatus === "pending" && "En revisión. Los cambios se guardan y el release sigue en la cola."}
+                  {currentStatus === "approved" && "Publicado. 'Actualizar publicación' guarda los cambios sin quitarlo del catálogo."}
+                  {currentStatus === "rejected" && "Rechazado. Corrige lo que quieras y guarda: se reenvía para revisión."}
                 </p>
-                {form.status === "rejected" && releaseData.admin_notes && (
+                {currentStatus === "rejected" && releaseData.admin_notes && (
                   <p className="mt-2 text-sm text-red-600 dark:text-red-400">
                     Motivo: {releaseData.admin_notes}
                   </p>
@@ -621,29 +730,32 @@ export default function EditReleasePage() {
               </div>
             )}
 
-            {/* Submit Buttons */}
-            <div className="flex gap-4 pt-4">
+            {/* Submit Buttons — RC.32 Tarea 6 */}
+            <div className="flex flex-wrap gap-4 pt-4">
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-[200px] px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Guardando..." : "Guardar como Borrador"}
+                {loading ? "Guardando..." : primarySaveLabel(currentStatus)}
               </button>
-              {(form.status === "draft" || form.status === "rejected") && (
+              {/* Para `rejected` la acción principal YA es pedir revisión
+                  (ver `buildPayload`), así que el secundario solo aparece cuando
+                  aporta algo: en `draft` y en `approved`. */}
+              {canRequestReview(currentStatus) && (
                 <button
                   type="button"
-                  onClick={(e) => handleSubmit(e, true)}
+                  onClick={(e) => handleSubmit(e, "request")}
                   disabled={loading}
-                  className="flex-1 px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 min-w-[200px] px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Enviando..." : "Enviar para revisión"}
+                  {loading ? "Enviando..." : currentStatus === "approved" ? "Enviar para revisión (retira del catálogo)" : "Enviar para revisión"}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => router.push("/dashboard")}
-                className="flex-1 px-6 py-3 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-medium hover:bg-slate-300 dark:hover:bg-slate-600"
+                className="flex-1 min-w-[200px] px-6 py-3 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-medium hover:bg-slate-300 dark:hover:bg-slate-600"
               >
                 Cancelar
               </button>

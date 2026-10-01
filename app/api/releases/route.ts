@@ -7,12 +7,17 @@ import {
   getLocalDbWrite,
   getTursoClientSync,
   isArtistOwnerOfTrackName,
+  sameArtistName,
+  resolveSubmitStatus,
+  RELEASE_STATUSES,
+  DECISION_STATUSES,
 } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { validateTrackNumber } from "@/lib/validations";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
 import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
+import { sumDurations } from "@/lib/null-safe";
 
 const CreateReleaseSchema = z.object({
   title: z.string().min(1, "title requerido"),
@@ -22,7 +27,11 @@ const CreateReleaseSchema = z.object({
   type: z.string().optional(),
   external_links: z.record(z.unknown()).optional(),
   tracks: z.array(z.object({ title: z.string(), duration: z.string().optional(), isrc: z.string().optional(), start_time: z.number().optional(), end_time: z.number().optional() })).optional(),
-  genre: z.string().optional(),
+  // RC.32: `tracks.genre` es columna muerta (ver `lib/production-fields.ts`).
+  // El género viaja en `production_details`, que es la fuente que se renderiza
+  // y la que se exporta a PDF/CSV. Aceptarlo aquí sin escribirlo habría sido
+  // otra promesa rota del formulario.
+  production_details: z.union([z.record(z.unknown()), z.string()]).optional(),
   description: z.string().optional(),
   duration: z.string().optional(),
   status: z.enum(["draft", "pending"]).optional(),
@@ -80,9 +89,293 @@ async function dbRun(sql: string, params?: unknown[]): Promise<void> {
   stmt.run(...(params ?? []));
 }
 
+type Stmt = { sql: string; params?: unknown[] };
+
+/**
+ * RC.32 — escritura de varias filas como UNA unidad.
+ *
+ * Hace falta por las hijas de un álbum (`tracks.release_id`): antes el PUT no
+ * las escribía en absoluto, y ahora las escribe junto al padre y recalcula su
+ * `duration`. Si el padre se actualizara y la lista de hijas se escribiera en
+ * llamadas sueltas, un fallo a mitad dejaría el `duration` del padre
+ * desincronizado del tracklist: la misma clase de pérdida silenciosa que
+ * estamos cerrando, pero cambiada por otra.
+ *
+ * `client.batch()` de @libsql/client es una transacción: o entran todas las
+ * sentencias o ninguna. En el brazo local se usa `db.transaction()`, que es lo
+ * mismo para `better-sqlite3`. La decisión de backend sale de
+ * `getTursoClientSync()`, la única fuente (ver cabecera del archivo).
+ */
+async function dbBatch(statements: Stmt[]): Promise<void> {
+  if (statements.length === 0) return;
+  const client = getTursoClientSync();
+  if (client) {
+    await client.batch(
+      statements.map((s) => ({ sql: s.sql, args: (s.params ?? []) as InValue[] })),
+      "write"
+    );
+    return;
+  }
+  const db = getLocalDbWrite();
+  const runAll = db.transaction((list: Stmt[]) => {
+    for (const s of list) {
+      const stmt = db.prepare(s.sql);
+      if (s.params && s.params.length > 0) stmt.run(...s.params);
+      else stmt.run();
+    }
+  });
+  runAll(statements);
+}
+
+interface ArtistRow {
+  id: string;
+  name: string;
+  user_id: string | null;
+}
+
+/**
+ * RC.32 — los perfiles de artista del usuario de la SESIÓN.
+ *
+ * Es la base del único invariante de propiedad de esta ruta: "el
+ * `artist_name` de la fila tiene que ser uno de los míos". POST y PUT usaban
+ * reglas distintas (payload vs. DB) y por eso un espacio trailing tecleado
+ * pasaba una y no la otra.
+ */
+async function getSessionArtistRows(userId: string): Promise<ArtistRow[]> {
+  const rows = await dbQuery("SELECT id, name, user_id FROM artists WHERE user_id = ?", [userId]);
+  return (rows as ArtistRow[])
+    .filter((r) => typeof r.name === "string" && r.name.trim().length > 0)
+    .map((r) => ({ id: String(r.id), name: String(r.name), user_id: r.user_id ?? null }));
+}
+
+/**
+ * RC.32 — dado un `artist_name` (del payload en POST, de la fila en PUT),
+ * devuelve el perfil de artista del usuario que lo reclama, o `null`.
+ *
+ * La comparación es `sameArtistName` (trim + case) — la regla compartida de
+ * `lib/db.ts`. Lo que se ESCRIBE, en cambio, es `row.name`: el valor canónico
+ * de la fila de `artists`. Comparar normalizado y luego persistir el texto
+ * tecleado seguiría creando la fila huérfana que esto arregla, porque `tracks`
+ * se relaciona con `artists` por nombre y no por FK.
+ */
+function resolveOwnedArtistName(myArtists: ArtistRow[], candidate: string): ArtistRow | null {
+  return myArtists.find((a) => sameArtistName(a.name, candidate)) ?? null;
+}
+
+// ── Hijas de un release (`tracks.release_id`) ─────────────────────────────────
+
+const CHILD_TITLE_MAX = 200;
+const CHILD_DURATION_MAX = 32;
+const CHILD_ISRC_MAX = 32;
+
+interface ChildInput {
+  title: string;
+  duration: string;
+  isrc: string;
+  start_time: number;
+  end_time: number;
+  track_number: number | null;
+}
+
+interface ReleaseRowForChildren {
+  artist_name: string;
+  release_type?: string | null;
+  release_date?: string | null;
+  cover_image?: string | null;
+  youtube_video_id?: string | null;
+}
+
+interface ChildPlan {
+  /** Mensaje de 400 si el payload de hijas no es utilizable. */
+  error?: string;
+  /** Hijas ya validadas (para el `sumDurations` del padre). */
+  children?: ChildInput[];
+  /** Sentencias de escritura, en orden, para la transacción del PUT. */
+  statements?: Stmt[];
+}
+
+/** `null` = valor inválido. Ausente/`null` = cadena vacía. */
+function readChildString(value: unknown, max: number): string | null {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > max ? null : trimmed;
+}
+
+/** `null` = valor inválido. Ausente = 0. */
+function readChildSeconds(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return 0;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+/**
+ * RC.32 Tarea 4 — plan de escritura de las hijas de un álbum.
+ *
+ * ── El fallo que cierra ────────────────────────────────────────────────────
+ * El formulario de edición siempre mandó `tracks`, y `tracks` NO estaba en
+ * `ALLOWED_COLUMNS`. La clave se filtraba en `safeKeys` y se perdía sin error:
+ * el artista escribía el título, la duración y el ISRC de cada pista del álbum
+ * y el guardado respondía 200 sin haber escrito nada. Una promesa rota, no un
+ * error visible.
+ *
+ * ── Reconciliación ──────────────────────────────────────────────────────────
+ * POSICIONAL, contra las hijas existentes ordenadas igual que las devuelve el
+ * GET privilegiado (`COALESCE(track_number, 9999), start_time, id`): la i-ésima
+ * entrada actualiza la i-ésima fila, las que sobran se insertan como `draft`
+ * (igual que el POST) y las hijas que quedan fuera del payload se borran.
+ * Cada `UPDATE`/`DELETE` lleva `AND release_id = ?` en el `WHERE`: un PUT
+ * nunca alcanza a una fila que no sea hija de ESTE release.
+ *
+ * ── Por qué un array vacío se rechaza en vez de interpretarse ───────────────
+ * Vacío significa dos cosas incompatibles: "no tengo hijas" y "el formulario
+ * no las cargó". Con el GET arreglado (Task 2) el formulario sí las carga, pero
+ * un bundle antiguo en caché —o cualquier cliente nuevo mal escrito— enviaría
+ * vacío y borraría el tracklist de un álbum aprobado de un golpe. Ante la duda
+ * se devuelve 400 con el motivo, y el contrato es explícito: **omitir `tracks`
+ * significa "no las toques"**.
+ */
+async function planChildren(
+  releaseId: string,
+  releaseRow: ReleaseRowForChildren,
+  raw: unknown
+): Promise<ChildPlan> {
+  if (raw === undefined) return {};
+
+  if (!Array.isArray(raw)) {
+    return { error: "tracks debe ser un array de pistas hijas" };
+  }
+
+  const existingRows = await dbQuery(
+    `SELECT id FROM tracks WHERE release_id = ?
+      ORDER BY COALESCE(track_number, 9999), start_time, id`,
+    [releaseId]
+  ) as { id: string }[];
+
+  if (raw.length === 0) {
+    if (existingRows.length > 0) {
+      return {
+        error:
+          `Este release ya tiene ${existingRows.length} pista(s) hija(s) y el payload ` +
+          "llega con la lista vacía, lo que las borraría. Envía la lista completa " +
+          "o omite el campo `tracks` para no tocarlas.",
+      };
+    }
+    return {};
+  }
+
+  const children: ChildInput[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const entry = raw[i];
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      return { error: `tracks[${i}] debe ser un objeto` };
+    }
+    const fields = entry as Record<string, unknown>;
+
+    const title = readChildString(fields.title, CHILD_TITLE_MAX);
+    if (title === null) {
+      return { error: `tracks[${i}].title debe ser un texto de hasta ${CHILD_TITLE_MAX} caracteres` };
+    }
+    if (title === "") {
+      return { error: `tracks[${i}].title no puede estar vacío` };
+    }
+
+    const duration = readChildString(fields.duration, CHILD_DURATION_MAX);
+    if (duration === null) {
+      return { error: `tracks[${i}].duration debe ser un texto de hasta ${CHILD_DURATION_MAX} caracteres` };
+    }
+
+    const isrc = readChildString(fields.isrc, CHILD_ISRC_MAX);
+    if (isrc === null) {
+      return { error: `tracks[${i}].isrc debe ser un texto de hasta ${CHILD_ISRC_MAX} caracteres` };
+    }
+
+    const startTime = readChildSeconds(fields.start_time);
+    if (startTime === null) {
+      return { error: `tracks[${i}].start_time debe ser un número >= 0` };
+    }
+
+    const endTime = readChildSeconds(fields.end_time);
+    if (endTime === null) {
+      return { error: `tracks[${i}].end_time debe ser un número >= 0` };
+    }
+
+    // `TrackNumberSchema` rechaza `undefined` (exige número), pero aquí
+    // "no enviado" es lo mismo que "sin numerar": `null`.
+    const rawNumber = fields.track_number === "" ? null : fields.track_number;
+    const trackNumber =
+      rawNumber === undefined || rawNumber === null ? null : validateTrackNumber(rawNumber);
+    if (trackNumber === undefined) {
+      return { error: `tracks[${i}].track_number debe ser un entero >= 0 o null` };
+    }
+
+    children.push({
+      title,
+      duration,
+      isrc,
+      start_time: startTime,
+      end_time: endTime,
+      track_number: trackNumber,
+    });
+  }
+
+  const statements: Stmt[] = [];
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (i < existingRows.length) {
+      statements.push({
+        sql:
+          `UPDATE tracks SET title = ?, duration = ?, isrc = ?, start_time = ?, end_time = ?, track_number = ?
+            WHERE id = ? AND release_id = ?`,
+        params: [
+          child.title,
+          child.duration,
+          child.isrc,
+          child.start_time,
+          child.end_time,
+          child.track_number,
+          existingRows[i].id,
+          releaseId,
+        ],
+      });
+    } else {
+      statements.push({
+        sql:
+          `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, duration,
+                  isrc, youtube_video_id, release_id, start_time, end_time, track_number, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', datetime('now'))`,
+        params: [
+          crypto.randomUUID(),
+          child.title,
+          releaseRow.artist_name,
+          releaseRow.release_type || "single",
+          releaseRow.release_date || "",
+          releaseRow.cover_image || "",
+          child.duration,
+          child.isrc,
+          releaseRow.youtube_video_id || null,
+          releaseId,
+          child.start_time,
+          child.end_time,
+          child.track_number,
+        ],
+      });
+    }
+  }
+  for (const removed of existingRows.slice(children.length)) {
+    statements.push({
+      sql: "DELETE FROM tracks WHERE id = ? AND release_id = ?",
+      params: [removed.id, releaseId],
+    });
+  }
+
+  return { children, statements };
+}
+
 async function getArtistNamesByUserId(userId: string): Promise<string[]> {
-  const rows = await dbQuery("SELECT name FROM artists WHERE user_id = ?", [userId]) as { name: string }[];
-  return rows.map((row) => row.name).filter((name) => typeof name === "string" && name.length > 0);
+  const rows = await getSessionArtistRows(userId);
+  return rows.map((row) => row.name);
 }
 
 export async function GET(req: NextRequest) {
@@ -109,8 +402,8 @@ export async function GET(req: NextRequest) {
         // de artista del usuario. Para el dueño o el admin sigue viendo todos
         // los estados; para el resto, solo `approved`. Se mantiene el `SELECT *`
         // porque aquí el llamante ya está autenticado y por rol o por
-        // propiedad, y el formulario de edición necesita `description`/`genre`,
-        // que no forman parte del tipo `Track`.
+        // propiedad, y el formulario de edición necesita `description` y
+        // `production_details`, que no forman parte del tipo `Track`.
         let query = "SELECT * FROM tracks WHERE id = ?";
         const params: string[] = [id];
         query += ` AND artist_name IN (${artistNames.map(() => "?").join(", ")})${visibilityClause}`;
@@ -119,36 +412,70 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(releases[0] || null);
       }
 
-      // Camino `?id=X` SIN `user_id`: este es público. Antes hacía
-      // `SELECT * FROM tracks WHERE id = ?` a secas, lo que devolvía la fila
-      // CRUDA: un `draft`/`pending`/`rejected` legible por cualquiera con el id
-      // y la columna `tracks.admin_notes` —el motivo interno de rechazo del
-      // admin— traveling en la respuesta porque `parseTrack` no la expone.
+      // Camino `?id=X` SIN `user_id`. Es la vía que usa el formulario de edición
+      // (`app/releases/[id]/edit/page.tsx:75`): sin `user_id`, sin cabeceras de
+      // sesión en el request inicial y con el id en la URL.
       //
-      // Ahora: primero el lector de alcance público (aprobado + parseado). Solo
-      // si no está aprobado se exige sesión, y entonces se comprueba rol de
-      // admin o propiedad real contra `artists.user_id` (no un `user_id` de
-      // query, que sería falsificable).
+      // ── RC.32: el ORDEN estaba al revés y por eso el formulario perdía datos ──
+      // Antes se servía primero el lector PÚBLICO (`getApprovedTrackById`, que
+      // pasa por `parseTrack`) y solo si no estaba aprobado se exigía sesión:
+      //
+      //   const approved = await getApprovedTrackById(id);
+      //   if (approved) return NextResponse.json(approved);   // ← return aquí
+      //
+      // Las 83 filas de producción están en `approved` (las puso
+      // `scripts/fix-release-status.ts:53`), así que ese `return` se llevaba
+      // SIEMPRE. La rama privilegiada de abajo —la que sí devuelve la fila
+      // cruda con `description`, `production_details` y `admin_notes`, y que el
+      // comentario llama "para el dueño y el admin"— era INALCANZABLE para
+      // cualquier release aprobado. El comentario describe un caso que la
+      // función no ejecutaba nunca.
+      //
+      // El efecto era peor que una respuesta pobre: el formulario cargaba
+      // `description: ""`, y en cuanto se arregló el 403 (que hasta entonces
+      // tapaba esto) el siguiente guardado vació la descripción de las 83
+      // filas. Arreglar el 403 sin esto habría convertido un 403 en pérdida
+      // de datos.
+      //
+      // Ahora: primero sesión + rol/propiedad sobre la fila CRUDA; solo si eso
+      // no se cumple, el lector público. Lo que NO cambia es QUIÉN ve qué:
+      // el público sigue recibiendo `parseTrack` (y por tanto nunca
+      // `admin_notes`), y un no-propietario autenticado también.
+      const session = await validateSession(req);
+
+      if (session) {
+        // `getTrackById` pasa por `parseTrack`, que NO expone `admin_notes`,
+        // `description` ni `genre`. Para el dueño y el admin eso es una pérdida
+        // real: el formulario de edición muestra el motivo del rechazo y edita
+        // la descripción. Por eso este camino devuelve la fila cruda, igual
+        // que el `?id&user_id` de arriba.
+        const privileged = await dbQuery("SELECT * FROM tracks WHERE id = ?", [id]) as Record<string, unknown>[];
+        const row = privileged[0];
+        if (row) {
+          const isAdmin = session.role === "admin";
+          const owns = await isArtistOwnerOfTrackName(String(row.artist_name ?? ""), session.userId);
+          if (isAdmin || owns) {
+            // El formulario de edición necesita además las HIJAS
+            // (`tracks.release_id = id`) para no guardarlas en blanco: no hay
+            // columna `tracks` y `parseTrack` no la inventa, así que
+            // `data.tracks` era SIEMPRE `undefined` y el tracklist de un
+            // álbum aparecía como una única fila vacía. Adjuntarlas solo en
+            // este brazo —dueño o admin— para que el público no reciba filas
+            // crudas de hijos que no ha pedido.
+            const children = await dbQuery(
+              `SELECT * FROM tracks WHERE release_id = ?
+                ORDER BY COALESCE(track_number, 9999), start_time, id`,
+              [id]
+            );
+            return NextResponse.json({ ...row, tracks: children });
+          }
+        }
+      }
+
+      // No privilegiado (o sin fila): solo la vía pública, que devuelve
+      // `parseTrack` — sin `admin_notes`, sin `description`, sin `genre`.
       const approved = await getApprovedTrackById(id);
       if (approved) return NextResponse.json(approved);
-
-      const session = await validateSession(req);
-      if (!session) return NextResponse.json(null);
-
-      // `getTrackById` pasa por `parseTrack`, que NO expone `admin_notes`,
-      // `description` ni `genre`. Para el dueño y el admin eso es una pérdida
-      // real: el formulario de edición muestra el motivo del rechazo y
-      // edita la descripción. Por eso el camino privilegiado devuelve la fila
-      // cruda, igual que el camino `?id&user_id` de arriba, y el público es el
-      // único que pasa por `parseTrack`.
-      const privileged = await dbQuery("SELECT * FROM tracks WHERE id = ?", [id]) as Record<string, unknown>[];
-      const row = privileged[0];
-      if (!row) return NextResponse.json(null);
-
-      if (session.role === "admin") return NextResponse.json(row);
-
-      const owns = await isArtistOwnerOfTrackName(String(row.artist_name ?? ""), session.userId);
-      if (owns) return NextResponse.json(row);
 
       return NextResponse.json(null);
     }
@@ -192,23 +519,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    if (session.role === "artist") {
-      const owner = await dbQuery("SELECT name FROM artists WHERE user_id = ?", [session.userId]) as { name: string }[];
-      if (!owner.length || owner[0].name !== parsed.data.artist_name) {
-        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-      }
+    // RC.32 — una sola regla de propiedad, la misma que usa el PUT.
+    //
+    // Antes: `POST` comparaba el `artist_name` del PAYLOAD con `===` contra la
+    // fila de `artists`, y el PUT comparaba el de la DB. Dos reglas para el
+    // mismo invariante, y por lo tanto un tecleo con consecuencias distintas en
+    // cada una: un espacio trailing pasaba el POST y escribía la fila con ese
+    // nombre. Como `tracks` se relaciona con `artists` POR NOMBRE y no por FK,
+    // esa fila quedaba fuera de la cascada de `deleteArtist` y de toda
+    // verificación de propiedad posterior — huérfana, en silencio.
+    //
+    // `resolveOwnedArtistName` compara normalizado (trim + case) y devuelve la
+    // fila canónica. Lo que se INSERTa es `owned.name`, nunca el texto del
+    // payload: comparar normalizado y luego persistir el tecleo seguiría
+    // creando la huérfana.
+    const myArtists = await getSessionArtistRows(session.userId);
+    const owned = resolveOwnedArtistName(myArtists, parsed.data.artist_name);
+    if (session.role === "artist" && !owned) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
+    const artistName = owned ? owned.name : parsed.data.artist_name;
 
     const id = crypto.randomUUID();
     const {
       title,
-      artist_name,
       release_date,
       cover_image,
       type,
       external_links,
       tracks,
-      genre,
+      production_details,
       description,
       duration,
       status,
@@ -218,10 +558,20 @@ export async function POST(req: NextRequest) {
 
     const initialStatus = status || "draft";
 
+    // RC.32: `genre` fuera del INSERT (columna muerta, ver
+    // `lib/production-fields.ts`) y `production_details` dentro, que es donde
+    // el género vive de verdad y lo que se renderiza y se exporta.
+    const productionDetailsJson =
+      production_details === undefined
+        ? null
+        : typeof production_details === "string"
+          ? production_details
+          : JSON.stringify(production_details);
+
     await dbRun(
-      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, genre, description, duration, youtube_video_id, external_links, status, created_at)
+      `INSERT INTO tracks (id, title, artist_name, release_type, release_date, cover_image, description, duration, youtube_video_id, external_links, production_details, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [id, title, artist_name || "", type || "single", release_date || "", cover_image || "", genre || "", description || "", duration || "", youtubeVideoId || "", JSON.stringify(external_links || {}), initialStatus]
+      [id, title, artistName || "", type || "single", release_date || "", cover_image || "", description || "", duration || "", youtubeVideoId || "", JSON.stringify(external_links || {}), productionDetailsJson, initialStatus]
     );
 
     // Insert tracks if provided
@@ -235,7 +585,7 @@ export async function POST(req: NextRequest) {
             [
               trackId,
               track.title,
-              artist_name || "",
+              artistName || "",
               type || "single",
               release_date || "",
               cover_image || "",
@@ -271,22 +621,54 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, status, ...updates } = body;
+    // `tracks` sale del resto a propósito: las hijas NO son una columna y no
+    // pueden viajar por la allowlist de columnas sueltas (ver más abajo).
+    const { id, status, tracks: rawChildTracks, ...updates } = body;
 
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const existing = await dbQuery("SELECT id, title, artist_name, status FROM tracks WHERE id = ?", [id]) as { id: string; title: string; artist_name: string; status?: string | null }[];
+    const existing = await dbQuery(
+      `SELECT id, title, artist_name, status, release_type, release_date,
+              cover_image, youtube_video_id
+         FROM tracks WHERE id = ?`,
+      [id]
+    ) as {
+      id: string;
+      title: string;
+      artist_name: string;
+      status?: string | null;
+      release_type?: string | null;
+      release_date?: string | null;
+      cover_image?: string | null;
+      youtube_video_id?: string | null;
+    }[];
     if (!existing.length) {
       return NextResponse.json({ error: "Release no encontrado" }, { status: 404 });
     }
-    const artistRow = await dbQuery("SELECT id, user_id FROM artists WHERE name = ?", [existing[0].artist_name]) as { id: string; user_id: string | null }[];
-    const ownsTrack = artistRow.length > 0 && artistRow[0].user_id === session.userId;
+    const releaseRow = existing[0];
+
+    // ── RC.32 Tarea 3: la MISMA regla de propiedad que el POST ────────────────
+    // `resolveOwnedArtistName` sobre los perfiles del usuario de la sesión. Con
+    // esto PUT y POST comparten invariante: no hay dos reglas que un tecleo
+    // pueda distinguir.
+    const myArtists = await getSessionArtistRows(session.userId);
+    const ownsTrack = resolveOwnedArtistName(myArtists, releaseRow.artist_name) !== null;
     if (!ownsTrack && session.role !== "admin") {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
-    const previousStatus = existing[0].status ?? "draft";
+
+    // El artista dueño del release se resuelve por el NOMBRE de la fila, no por
+    // el `user_id` de la sesión: las notificaciones de una decisión del ADMIN
+    // tienen que llegar a quien sea que lo posea.
+    const releaseArtistRows = await dbQuery(
+      "SELECT id, name, user_id FROM artists WHERE name = ?",
+      [releaseRow.artist_name]
+    ) as ArtistRow[];
+    const releaseArtist = releaseArtistRows[0] ?? null;
+
+    const previousStatus = releaseRow.status ?? "draft";
 
     // Handle youtube_video_id from external_links
     if (updates.external_links && updates.external_links.youtube_video_id) {
@@ -298,19 +680,34 @@ export async function PUT(req: NextRequest) {
       updates.external_links = JSON.stringify(updates.external_links);
     }
 
-    if (status !== undefined) {
-      if (["approved", "rejected", "revision"].includes(status)) {
-        if (session.role !== "admin") {
-          return NextResponse.json({ error: "No autorizado: solo un admin puede aprobar, rechazar o pedir revisión" }, { status: 403 });
-        }
-      } else if (!["draft", "pending"].includes(status)) {
-        return NextResponse.json({ error: "Estado inválido. Debe ser: draft, pending, approved, rejected, revision" }, { status: 400 });
-      }
+    // ── RC.32 Tarea 1: el estado lo decide el SERVIDOR ────────────────────────
+    // Toda la regla vive en `resolveSubmitStatus` (`lib/db.ts`), que es pura y
+    // está testeada como matriz. El comentario largo está allí; aquí solo se
+    // aplica.
+    const resolved = resolveSubmitStatus({
+      role: session.role,
+      requested: status,
+      previous: previousStatus,
+    });
+    if (!resolved) {
+      return NextResponse.json(
+        { error: `Estado inválido. Debe ser: ${RELEASE_STATUSES.join(", ")}` },
+        { status: 400 }
+      );
     }
+    const { nextStatus, ignored: statusIgnored } = resolved;
+    const isAdmin = session.role === "admin";
 
     const ALLOWED_COLUMNS = new Set([
-      "title", "artist_name", "release_date", "cover_image", "release_type",
-      "genre", "description", "duration", "youtube_video_id", "external_links",
+      // RC.32: `artist_name` FUERA. `tracks` se relaciona con `artists` por
+      // nombre y no por FK, así que permitir reescribirlo deja que el dueño
+      // mueva su release bajo otro artista —o lo deje huérfano— y con ello lo
+      // saque de la cascada de `deleteArtist`. El ownership se verificaba
+      // contra la fila existente, nunca contra el valor nuevo.
+      "title", "release_date", "cover_image", "release_type",
+      // RC.32: `genre` FUERA también — columna muerta (ver
+      // `lib/production-fields.ts`). El género va en `production_details`.
+      "description", "duration", "youtube_video_id", "external_links",
       "status", "spotify_url", "audio_preview_url", "itunes_track_id",
       "stems_urls", "video_embed_url", "gallery_images", "disc_number",
       "is_double_single", "sides_b", "isrc", "composers", "is_instrumental",
@@ -331,54 +728,87 @@ export async function PUT(req: NextRequest) {
       updates.track_number = trackNumber;
     }
 
+    // ── RC.32 Tarea 4: las hijas de un álbum ────────────────────────────────
+    // El formulario mandaba `tracks: tracks.filter(t => t.title)` y `tracks` NO
+    // estaba en la allowlist: título, duración e ISRC de cada hija se perdían
+    // sin error ni aviso.
+    const childPlan = await planChildren(id, releaseRow, rawChildTracks);
+    if (childPlan.error) {
+      return NextResponse.json({ error: childPlan.error }, { status: 400 });
+    }
+
     const safeKeys = Object.keys(updates).filter((k) => ALLOWED_COLUMNS.has(k));
-    if (safeKeys.length === 0 && status === undefined) {
+
+    // El `duration` del padre es la suma de las hijas (`sumDurations`,
+    // contrato RC.31 de `lib/null-safe.ts`), igual que ya hacía el POST con la
+    // hija única. Si NO hay nada sumable —todas las duraciones vacías— se deja
+    // el valor del payload: un álbum sin duraciones no debe renderizar "0:00"
+    // como si fuera real ni borrar un total escrito a mano.
+    if (childPlan.children && childPlan.children.length > 0) {
+      const total = sumDurations(childPlan.children.map((c) => c.duration));
+      if (total) {
+        updates.duration = total.label;
+        if (!safeKeys.includes("duration")) safeKeys.push("duration");
+      }
+    }
+
+    const setClauses = safeKeys.map((key) => `${key} = ?`);
+    const setValues = safeKeys.map((key) => updates[key]);
+    if (nextStatus !== previousStatus) {
+      setClauses.push("status = ?");
+      setValues.push(nextStatus);
+    }
+
+    if (setClauses.length === 0 && (childPlan.children?.length ?? 0) === 0) {
+      // No hay nada que escribir. Si el body traía un `status` —ignorado o
+      // repetido— la operación es válida y no hace nada: 200 con el estado
+      // vigente. El 400 es solo para un body sin NADA actualizable, que antes
+      // también lo era y se conserva.
+      if (statusIgnored || typeof status === "string") {
+        return NextResponse.json({
+          message: "Release actualizado",
+          status: nextStatus,
+          ...(statusIgnored ? { statusIgnored: true } : {}),
+        });
+      }
       return NextResponse.json({ error: "Sin campos válidos para actualizar" }, { status: 400 });
     }
 
-    const fields = safeKeys.map((key) => `${key} = ?`).join(", ");
-    const values = safeKeys.map((key) => updates[key]);
-
-    if (status !== undefined) {
-      if (fields) {
-        await dbRun(`UPDATE tracks SET ${fields}, status = ? WHERE id = ?`, [...values, status, id]);
-      } else {
-        await dbRun(`UPDATE tracks SET status = ? WHERE id = ?`, [status, id]);
-      }
-    } else if (fields) {
-      await dbRun(`UPDATE tracks SET ${fields} WHERE id = ?`, [...values, id]);
+    const statements: Stmt[] = [];
+    if (setClauses.length > 0) {
+      statements.push({
+        sql: `UPDATE tracks SET ${setClauses.join(", ")} WHERE id = ?`,
+        params: [...setValues, id],
+      });
     }
+    if (childPlan.statements) statements.push(...childPlan.statements);
 
-    const DECISION_STATUSES = ["approved", "rejected", "revision"];
-    if (
-      session.role === "admin" &&
-      status !== undefined &&
-      status !== previousStatus &&
-      DECISION_STATUSES.includes(status)
-    ) {
+    await dbBatch(statements);
+
+    if (isAdmin && nextStatus !== previousStatus && DECISION_STATUSES.includes(nextStatus)) {
       try {
-        const ownerUserId = artistRow[0]?.user_id ?? null;
-        const artistId = artistRow[0]?.id ?? null;
-        const artistName = existing[0].artist_name;
-        const trackTitle = existing[0].title;
+        const ownerUserId = releaseArtist?.user_id ?? null;
+        const artistId = releaseArtist?.id ?? null;
+        const artistName = releaseRow.artist_name;
+        const trackTitle = releaseRow.title;
 
         if (ownerUserId) {
           const type =
-            status === "approved"
+            nextStatus === "approved"
               ? "submission_approved"
-              : status === "rejected"
+              : nextStatus === "rejected"
                 ? "submission_rejected"
                 : "revision_requested";
           const title =
-            status === "approved"
+            nextStatus === "approved"
               ? "¡Tu release ha sido aprobado!"
-              : status === "rejected"
+              : nextStatus === "rejected"
                 ? "Tu release no fue aprobado"
                 : "Tu release necesita cambios";
           const message =
-            status === "approved"
+            nextStatus === "approved"
               ? `"${trackTitle}" ya está disponible en el catálogo.`
-              : status === "rejected"
+              : nextStatus === "rejected"
                 ? "Razón: no se especificó motivo."
                 : "Por favor revisa y actualiza la información.";
 
@@ -392,7 +822,7 @@ export async function PUT(req: NextRequest) {
           });
         }
 
-        if (status === "approved" && artistId) {
+        if (nextStatus === "approved" && artistId) {
           await notifyArtistSubscribers({
             artistId,
             kind: "release",
@@ -418,7 +848,12 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ message: "Release actualizado" });
+    return NextResponse.json({
+      message: "Release actualizado",
+      status: nextStatus,
+      ...(statusIgnored ? { statusIgnored: true } : {}),
+      ...(childPlan.children ? { tracksSaved: childPlan.children.length } : {}),
+    });
   } catch (error) {
     console.error("PUT releases error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

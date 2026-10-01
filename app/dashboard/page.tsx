@@ -16,9 +16,14 @@ import { CatalogDownloadButton } from "@/components/CatalogDownloadButton";
 import { PageTransition, SlideIn, PitchHeading } from "@/components/MotionWrappers";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ShowForm } from "@/components/ShowForm";
+// `buildReleaseQueue` es la MISMA función que usa `ReleaseTrackList` para sus
+// filas y que ya consume `ArtistTracksSection`: dos copias de esta lógica
+// divergirían y la tarjeta acabaría diciendo "4 pistas" con 3 en cola.
+import { buildReleaseQueue } from "@/components/ReleaseTrackList";
+import type { ActiveTrack } from "@/context/AudioPlayerContext";
 import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
 import { formatDateES, safeString } from "@/lib/null-safe";
 import { showStatusLabel } from "@/lib/show-status";
@@ -35,6 +40,20 @@ const DEFAULT_SORT = { sort: "date", order: "desc" } as const;
 
 interface DashboardData {
   tracks: Track[];
+  /**
+   * Pistas hijas de cada lanzamiento, indexadas por el id de la cabecera.
+   *
+   * Lo consume `GET /api/dashboard`, que agrupa en el endpoint y no en el
+   * cliente. Antes no existía: la ruta hacía `filter((t) => !t.release_id)` y
+   * tiraba cada hija, así que la `EPKCard` de un álbum no tenía con qué montar
+   * la cola y pintaba un `<AudioPlayer>` con el audio del padre — "No hay audio
+   * disponible" para *Vulnicura Strings* y *OK Computer*, y "1/1" en *Kid A* en
+   * vez de "1/10".
+   *
+   * Opcional a propósito: mientras la respuesta venga sin el (o con `null`),
+   * la tarjeta cae en el comportamiento de siempre para un single suelto.
+   */
+  childrenByRelease?: Record<string, Track[]> | null;
   artists: ArtistProfile[];
   artistProfile: ArtistProfile | null;
   artistShows: Show[];
@@ -116,6 +135,86 @@ export default function DashboardPage() {
   }, [user?.id]);
 
   const { tracks, artists, artistProfile, artistShows } = data;
+
+  /**
+   * Hijas por cabecera, ya sin entradas vacías.
+   *
+   * `useMemo` y no un `map` en el render: `playQueue` recibe el array entero en
+   * cada pulsación, y un array nuevo en cada render impediría asumir estabilidad
+   * aguas abajo. La clave es `childrenByRelease`, que solo cambia cuando llega
+   * una respuesta nueva del endpoint — reordenar la rejilla no la reconstruye.
+   */
+  const childrenByRelease = useMemo(() => {
+    const map: Record<string, Track[]> = {};
+    const source = data.childrenByRelease;
+    if (!source || typeof source !== "object") return map;
+    for (const releaseId of Object.keys(source)) {
+      const children = source[releaseId];
+      if (Array.isArray(children) && children.length > 0) map[releaseId] = children;
+    }
+    return map;
+  }, [data.childrenByRelease]);
+
+  /**
+   * Una cola por lanzamiento, con `buildReleaseQueue` — la MISMA función que
+   * usa `ReleaseTrackList` para sus filas y que consume `ArtistTracksSection`.
+   * Si esta copia dijera otra cosa, la tarjeta prometería "Escuchar 4 pistas" y
+   * el reproductor pondría 3.
+   *
+   * El orden de las hijas es el que el endpoint ya aplicó (el de
+   * `getArtistCatalog`), así que aquí no se reordena: la cola tiene que sonar en
+   * el orden del disco.
+   */
+  const queues = useMemo(() => {
+    const parents = new Map(tracks.map((t) => [t.id, t]));
+    const map: Record<string, ActiveTrack[]> = {};
+    for (const releaseId of Object.keys(childrenByRelease)) {
+      const parent = parents.get(releaseId);
+      const built = buildReleaseQueue(
+        childrenByRelease[releaseId],
+        parent?.cover_image || undefined,
+        parent?.youtube_video_id || undefined
+      );
+      if (built.length > 0) map[releaseId] = built;
+    }
+    return map;
+  }, [childrenByRelease, tracks]);
+
+  /**
+   * Las tres rejillas de esta página (admin, artista, invitado) montaban la
+   * `EPKCard` con las mismas props y por eso las tres se quedaban fuera del
+   * caso "lanzamiento padre" a la vez: `childrenTracks` y `queue` son
+   * opcionales en el contrato, así que compilaban mientras dejaban la cola sin
+   * construir. Aquí se calculan en un solo sitio y las tres los reciben.
+   *
+   * `detailHref` sigue la misma regla que `ArtistTracksSection`: un single
+   * suelto solo tiene `/track/{id}`, un álbum tiene su página `/releases/{id}`
+   * donde ya se listan las pistas. Mandar los padres a `/track/{id}` era
+   * inconsistente con la ficha del artista.
+   */
+  const cardProps = (track: Track) => {
+    const children = childrenByRelease[track.id];
+    return {
+      detailHref: children && children.length > 0 ? `/releases/${track.id}` : `/track/${track.id}`,
+      childrenTracks: children,
+      queue: queues[track.id],
+    };
+  };
+
+  /**
+   * Pistas que pinta esta rejilla: las cabeceras más sus hijas.
+   *
+   * Hace falta porque `tracks` son **solo las cabeceras** (una por
+   * lanzamiento), así que el "N tracks" del encabezado de invitado contaba
+   * lanzamientos y lo llamaba pistas: en producción, 18 donde hay 83 filas.
+   * El número de la cabecera y el del archivo descargado tienen que ser el
+   * mismo, o la tarjeta de descargas vuelve a mentir.
+   */
+  const visibleTrackCount = useMemo(() => {
+    let total = tracks.length;
+    for (const releaseId of Object.keys(childrenByRelease)) total += childrenByRelease[releaseId].length;
+    return total;
+  }, [childrenByRelease, tracks]);
 
   /**
    * Fase E — UN solo fetch con todos los ids para las 3 rejillas.
@@ -216,7 +315,7 @@ export default function DashboardPage() {
                         priority={i === 0}
                         onLoginPrompt={() => setShowLoginModal(true)}
                         youtubeStats={statsFor(track)}
-                        detailHref={`/track/${track.id}`}
+                        {...cardProps(track)}
                       />
                     </SlideIn>
                   ))}
@@ -401,28 +500,32 @@ export default function DashboardPage() {
                     color="hover:bg-blue-50 dark:hover:bg-blue-950"
                   />
                   {/*
-                    P2 (CTA) — "Enviar música" al portal de envíos.
+                    B-8 (decisión del usuario): "Enviar música" fuera de Acciones
+                    Rápidas, y en su lugar acceso al catálogo general.
 
-                    El enlace estaba metido dentro de `components/ReleaseActions.tsx`
-                    (fichero de otro agente) porque `/dashboard` es la entrada
-                    natural y ese no lo era. Aquí ya no hace falta: el portal de
-                    envíos (`/submissions`) es exactamente donde se ve lo que
-                    has enviado y en qué estado está, así que es una acción
-                    rápida más, del mismo peso que las otras tres.
+                    El enlace a `/submissions` no desaparece del dashboard: ya
+                    estaba en el CTA "¿Ya tienes música?" de la vista de
+                    suscriptor y en las tarjetas numeradas de arriba. Como
+                    atajo de aquí era la cuarta vez que se ofrecía lo mismo.
+                    Lo que faltaba era lo que el usuario pidió: el catálogo
+                    global no era alcanzable desde el dashboard de un artista, y
+                    su rejilla es solo SU catálogo.
 
-                    Solo para usuarios autenticados: el portal exige sesión
-                    (`GET /api/submissions` responde 401 sin cookie) y un
-                    anónimo que pulse estoicrobota en `/login`. La vista de
-                    invitado no monta este bloque.
+                    `/artists` es el índice público: por él se llega a la ficha
+                    de cualquier artista y desde ahí a su dossier, su rider y el
+                    catálogo completo. Es el único destino de esta página desde
+                    el que se ve PressPlay entero.
+
+                    Sin guarda de `user`: esta sección solo se monta con
+                    `artistProfile`, o sea con sesión. La vista de invitado no
+                    la incluye.
                   */}
-                  {user && (
-                    <QuickAction
-                      label="Enviar música"
-                      icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>}
-                      href="/submissions"
-                      color="hover:bg-violet-50 dark:hover:bg-violet-950"
-                    />
-                  )}
+                  <QuickAction
+                    label="Catálogo de artistas"
+                    icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 5.25h16.5M3.75 15h16.5M2.25 6.75A2.25 2.25 0 014.5 4.5h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V6.75z" /></svg>}
+                    href="/artists"
+                    color="hover:bg-violet-50 dark:hover:bg-violet-950"
+                  />
                 </div>
               </section>
 
@@ -524,7 +627,7 @@ export default function DashboardPage() {
                           priority={i === 0}
                           onLoginPrompt={() => setShowLoginModal(true)}
                           youtubeStats={statsFor(track)}
-                          detailHref={`/track/${track.id}`}
+                          {...cardProps(track)}
                         />
                         <a
                           href={`/releases/${track.id}/edit`}
@@ -710,7 +813,11 @@ export default function DashboardPage() {
                     PressPlay
                   </h1>
                   <p className="text-slate-600 dark:text-slate-400 text-base">
-                    Catálogo completo · <strong className="text-primary-600 dark:text-primary-400">{tracks.length} tracks</strong>
+                    Catálogo completo ·{" "}
+                    <strong className="text-primary-600 dark:text-primary-400">
+                      {tracks.length} {tracks.length === 1 ? "lanzamiento" : "lanzamientos"}
+                    </strong>{" "}
+                    · {visibleTrackCount} {visibleTrackCount === 1 ? "pista" : "pistas"}
                   </p>
                 </PitchHeading>
 
@@ -731,7 +838,7 @@ export default function DashboardPage() {
                         priority={i === 0}
                         onLoginPrompt={() => setShowLoginModal(true)}
                         youtubeStats={statsFor(track)}
-                        detailHref={`/track/${track.id}`}
+                        {...cardProps(track)}
                       />
                     </SlideIn>
                   ))}
@@ -763,11 +870,13 @@ export default function DashboardPage() {
                     que la descarga es legítimamente la GLOBAL. El problema era
                     el copy, que decía "el catálogo completo del EPK" sin decir
                     de quién, y el `CatalogDownloadButton` sin props que lo
-                    confirmaba. Ahora el texto dice las tres cosas que el
-                    backend hace de verdad:
+                    confirmaba. El texto dice lo que el backend hace de verdad:
 
                     - es el catálogo de los {n} lanzamientos APROBADOS de
-                      PressPlay (no hay un artist's id al que acotarlo);
+                      PressPlay (no hay un artist's id al que acotarlo), con
+                      {m} pistas: el archivo son filas de `tracks`, no de
+                      lanzamientos, así que decir solo "{n}" invitaba a contar 18
+                      filas en un archivo que trae 83;
                     - el dossier y el rider son por artista y salen
                       deshabilitados aquí, con su explicación, en vez de fallar
                       con un 400 (los necesita un usuario autenticado con
@@ -780,9 +889,10 @@ export default function DashboardPage() {
                     <strong className="font-semibold text-slate-800 dark:text-slate-200">
                       {tracks.length} lanzamientos aprobados
                     </strong>{" "}
-                    con métricas, enlaces y detalles de producción. El dossier y el
-                    rider técnico son por artista: entra a la ficha de un artista
-                    para descargarlos.
+                    ({visibleTrackCount}{" "}
+                    {visibleTrackCount === 1 ? "pista" : "pistas"}) con métricas, enlaces y
+                    detalles de producción. El dossier y el rider técnico son por artista: entra a
+                    la ficha de un artista para descargarlos.
                   </p>
                   <CatalogDownloadButton artistName="PressPlay" />
                 </div>
