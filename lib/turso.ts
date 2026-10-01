@@ -28,13 +28,38 @@ import type {
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 
-const TURSO_URL = process.env.TURSO_DATABASE_URL;
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
+// ─── Environment detection ───────────────────────────────────────────────────
+// ESTAS DOS CONSTANTES ESTABAN EN ÁMBITO DE MÓDULO Y ESO ERA UN BUG (RC.32, S1):
+//
+//   const TURSO_URL  = process.env.TURSO_DATABASE_URL;   // antes :31
+//   const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;   // antes :32
+//
+// En ámbito de módulo se evalúan UNA vez, al importar. Con el env llegando
+// después —que es lo normal en un bundle de Vercel, donde `process.env` se
+// inyecta al construir— `TURSO_URL` quedaba en `undefined` para siempre y
+// `getTursoClient()` devolvía `null` aunque las variables estuvieran puestas.
+//
+// El daño no era "Turso no funciona": era que los predicados derivados de este
+// snapshot discrepaban de los de `lib/db.ts` (que sí lee en tiempo de llamada).
+// Dos funciones chamadas igual, `isTursoConfigured`, con semántica distinta: una
+// preguntaba por el snapshot, la otra por el env real. Una ruta que usara la
+// primera para elegir rama y la segunda para ejecutar caía en 500.
+//
+// Los getters de abajo replican `lib/db.ts:59-64`. A partir de aquí TODO este
+// módulo lee el env en TIEMPO DE LLAMADA y las dos copias coinciden.
+export function getTursoUrl(): string | undefined {
+  return process.env.TURSO_DATABASE_URL;
+}
+export function getTursoToken(): string | undefined {
+  return process.env.TURSO_AUTH_TOKEN;
+}
 
 // Fresh client per request — singleton causes stale HTTP transport cache on Vercel
 export function getTursoClient(): Client | null {
-  if (!TURSO_URL || !TURSO_TOKEN) return null;
-  return createClient({ url: TURSO_URL, authToken: TURSO_TOKEN });
+  const url = getTursoUrl();
+  const token = getTursoToken();
+  if (!url || !token) return null;
+  return createClient({ url, authToken: token });
 }
 
 // Keep legacy alias
@@ -746,6 +771,32 @@ export async function getTursoTrackCount(): Promise<number> {
   return row?.count ?? 0;
 }
 
-export function isTursoConfigured(): boolean {
-  return getTurso() !== null;
-}
+// ─── Eliminado en RC.32: `isTursoConfigured()` ────────────────────────────────
+//
+// Este módulo exportaba una función con ESE MISMO NOMBRE y semántica distinta
+// de la de `lib/db.ts`:
+//
+//   aquí    → getTurso() !== null, sobre un snapshot del env capturado al
+//             importar el módulo (y por tanto congelado para siempre)
+//   db.ts   → isTursoEnabled(), que lee process.env en tiempo de llamada
+//
+// Se han eliminado en vez de renombrarse a propósito: un nombre menos que
+// colisiona. Cuando alguien importaba la equivocada, TypeScript no decía nada
+// —el import era válido en los dos sitios— y el fallo era un 500 en producción,
+// no un error de compilación.
+//
+// No la re-añadas aquí. Si la ruta necesita saber si hay cliente Turso, usa
+// `getTursoClient() !== null` de este mismo módulo, que ya es de tiempo de
+// llamada. Si necesita el predicado para una ruta que ramifica, usa
+// `getTursoClientSync() !== null` de `@/lib/db`, que es el criterio de las ocho
+// rutas ya migradas.
+//
+// NOTA sobre los 83 guards `if (isTursoConfigured()) return;` que hay en los
+// tests: importan la de `@/lib/db`, no esta, y bajo vitest NUNCA saltan, porque
+// `vitest.config.ts:7-8` hace `delete process.env.TURSO_DATABASE_URL` y
+// `delete process.env.TURSO_AUTH_TOKEN` antes de que se cargue ningún módulo.
+// Con el env ausente, `isTursoEnabled()` es falso y el guard no salta: el test
+// corre contra SQLite local. Lo que protege Turso en los tests son esas dos
+// líneas, no los guards. NO las borres de `vitest.config.ts` creyendo que los
+// guards cubren: si el env se restaura, cualquier import mal resuelto pasa de
+// latente a destructivo y `createUser()` escribe filas de QA en producción.

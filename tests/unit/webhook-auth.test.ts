@@ -72,15 +72,34 @@ describe("T1.1 endpoints administrativos protegidos", () => {
     delete process.env.WEBHOOK_SECRET;
   });
 
-  it("POST /api/sync rechaza anonimos y artistas", async () => {
+  /**
+   * RC.32 — `/api/sync` ya no es una ruta protegida: es un endpoint DESHABILITADO
+   * que devuelve 410 Gone antes de mirar la sesión. Antes este test afirmaba
+   * 401/403, y el cambio de contrato es deliberado, no un descuido:
+   *
+   * Con `requireAdmin` delante, un POST sin sesión salía por 401 y un POST de
+   * un artista por 403, así que la ruta quedaba "protegida" sin llegar a hacer
+   * nada — pero un admin sí la ejecutaba, y `syncLocalToTurso` reverteía el
+   * catálogo aprobado a `draft` y borraba `admin_notes`. El 410 elimina la rama
+   * entera: no hay rol desde el que el endpoint sea alcanzable.
+   *
+   * Se sigue comprobando que la sesión no influye en la respuesta, porque es
+   * justo lo contrario de lo que hacía antes.
+   * El diagnóstico completo vive en `app/api/sync/route.ts` y su guarda de
+   * regresión en `tests/unit/sync-endpoint-disabled.test.ts`.
+   */
+  it("POST /api/sync responde 410 Gone a cualquiera, con o sin sesion", async () => {
     const { POST } = await import("@/app/api/sync/route");
     const req = new NextRequest("http://localhost/api/sync", { method: "POST" });
 
     mockValidateRequest.mockResolvedValue(null);
-    expect((await POST(req)).status).toBe(401);
+    expect((await POST(req)).status).toBe(410);
 
     mockValidateRequest.mockResolvedValue({ userId: "u1", role: "artist", iat: 1 });
-    expect((await POST(req)).status).toBe(403);
+    expect((await POST(req)).status).toBe(410);
+
+    mockValidateRequest.mockResolvedValue({ userId: "a1", role: "admin", iat: 1 });
+    expect((await POST(req)).status).toBe(410);
   });
 
   it("DELETE /api/shows/cleanup rechaza anonimos", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { safeString, capitalizeReleaseType, getCoverImage } from "@/lib/null-safe";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { safeString, capitalizeReleaseType, getCoverImage, sumDurations } from "@/lib/null-safe";
 import { imageOptimizationProps } from "@/lib/image-config";
 import type { Track, ArtistProfile, Show, ShowStatus, ReleaseStatus } from "@/types/music";
 import Image from "next/image";
@@ -24,6 +24,12 @@ interface AdminTrack {
   spotify_url: string | null;
   youtube_video_id: string | null;
   lyrics: string | null;
+  /**
+   * RC.32 Tarea 4 — lo expone `parseTrack` (`tracks.release_id`), y es lo que
+   * permite saber qué filas son las hijas de un padre para recalcular su
+   * duración. `undefined` = fila suelta o servidor antiguo.
+   */
+  release_id?: string | null;
 }
 
 interface Release {
@@ -130,6 +136,12 @@ export default function AdminPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>("tracks");
   const [tracks, setTracks] = useState<AdminTrack[]>([]);
+  /**
+   * RC.32 Tarea 4 — `total` del catálogo, para saber si la página que llegó trae
+   * TODAS las filas. Con una página recortada, la suma de las hijas de un padre
+   * sería una suma parcial y mentiría.
+   */
+  const [tracksTotal, setTracksTotal] = useState(0);
   const [releases, setReleases] = useState<Release[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -220,12 +232,52 @@ export default function AdminPage() {
     }
   }, [message]);
 
+  /**
+   * RC.32 Tarea 4 — la duración que ve el admin.
+   *
+   * Un release (álbum/EP) y un single suelto son la misma fila de `tracks`, y solo
+   * se distinguen por tener hijas (`tracks.release_id = id`). La `duration` del
+   * padre la escribe quien lo creó —`POST /api/releases` con un solo track la
+   * copia, `fix-seed-data` la suma— y no se recalcula cuando las hijas cambian,
+   * así que el panel se contradecía con el resto de la app: `EPKCard`,
+   * `/releases/[id]` y las exportaciones usan `sumDurations` sobre las hijas.
+   *
+   * Aquí se calcula igual. Dos guardas, y las dos son necesarias:
+   *   1. `tracks.length !== tracksTotal` → la página no trae el catálogo entero, y
+   *      una suma parcial sería PEOR que el valor declarado.
+   *   2. `sumDurations` devuelve `null` cuando no hay nada parseable → se cae al
+   *      valor declarado en vez de renderizar `0:00`.
+   */
+  const trackDurations = useMemo(() => {
+    const map = new Map<string, string>();
+    if (tracks.length === 0 || tracks.length !== tracksTotal) return map;
+    const childrenByParent = new Map<string, AdminTrack[]>();
+    for (const track of tracks) {
+      if (!track.release_id) continue;
+      const bucket = childrenByParent.get(track.release_id);
+      if (bucket) bucket.push(track);
+      else childrenByParent.set(track.release_id, [track]);
+    }
+    for (const [parentId, children] of childrenByParent) {
+      const total = sumDurations(children.map((c) => c.duration));
+      if (total) map.set(parentId, total.label);
+    }
+    return map;
+  }, [tracks, tracksTotal]);
+
   const fetchTracks = async () => {
     try {
-      const res = await fetch("/api/tracks");
+      // `limit=100` (el máximo de la ruta) y no el 50 por defecto: la duración
+      // de un padre se recalcula sumando sus hijas, y con la página recortada un
+      // álbum aparece con la suma de las primeras 50 filas del catálogo, que no
+      // son necesariamente las suyas. `tracksTotal` deja constancia de si la
+      // página trajo el catálogo entero; si no lo trajo, se enseña el valor
+      // declarado en vez de una suma parcial.
+      const res = await fetch("/api/tracks?limit=100");
       if (res.ok) {
         const data = await res.json();
         setTracks(data.tracks || []);
+        setTracksTotal(Number(data.total ?? 0));
       }
     } catch {
       setMessage({ type: "error", text: "No se pudieron cargar los tracks. Endpoint API no disponible." });
@@ -826,7 +878,7 @@ export default function AdminPage() {
                         </td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{capitalizeReleaseType(track.release_type)}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{track.release_date}</td>
-                        <td className="p-3 text-slate-600 dark:text-slate-400">{track.duration}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{trackDurations.get(track.id) ?? track.duration}</td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button

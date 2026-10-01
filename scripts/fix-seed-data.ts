@@ -28,12 +28,32 @@
  *     hijas, en `M:SS` con `sumDurations()` de `lib/null-safe.ts` —el contrato
  *     compartido de RC.31— para que una etiqueta de dos dígitos no quede
  *     inconsistente al lado de las hijas (`"6:07"`, no `"06:07"`).
+ *  5. (RC.32 Tarea 3) La deriva de `start_time` / `end_time` de las hijas, que
+ *     en RC.31 quedó documentada como "no se toca" y era la incoherencia viva
+ *     más visible del catálogo. Ver abajo.
+ *
+ * ── 5. La deriva de la línea de tiempo (RC.32) ──────────────────────────────
+ * En `The Dark Side of the Moon`, `Us and Them` empezaba en 1530 y acababa en
+ * 2009 cuando 1530 + 469 (7:49) = 1999: los 10 s de desfase arrastraban el
+ * `start_time` y el `end_time` de las tres pistas siguientes, y `Eclipse
+ * acababa en 2566` en vez de 2556. En `Kid A`, `Motion Picture Soundtrack`
+ * acababa en 3001 cuando 2577 + 421 (7:01) = 2998.
+ *
+ * La causa está corregida en el ORIGEN (`scripts/seed-influential-catalog.ts` ya
+ * declara 1999/2203/2433/2556 y 2998), pero las filas ya sembradas conservan los
+ * valores viejos: el upsert del seed es create-or-skip, así que volver a correrlo
+ * no las toca. Por eso el arreglo va aquí.
+ *
+ * El efecto no era cosmético. El `duration` del padre `rel-9b286f4a` es la suma
+ * de las duraciones de sus hijas (2556 s = "42:36"), pero el RECORRIDO de sus
+ * `end_time` llegaba a 2566: padre e hijas se contradecían en la misma tabla, y
+ * cualquier consumidor que usara los `end_time` (saltos de vídeo) se salía 10 s.
+ * Al corregir la línea de tiempo, la contradicción se cierra sola.
+ *
+ * Se emparejan por `(disc_number, track_number)`, NO por título: en *Kid A* la
+ * hija 2 se llama exactamente "Kid A" y en *Heroes* la hija 1 se llama "Heroes".
  *
  * Lo que NO toca, a propósito:
- *  - `start_time` / `end_time`. La deriva de 10 s en *The Dark Side of the Moon*
- *    y de 3 s en *Kid A* está corregida en el origen del seed, pero aquí solo
- *    cambiarían los offsets de salto de vídeo de 2 filas de cada álbum y no
- *    se han pedido. Se reporta al final.
  *  - `release_date` de *Vulnicura Strings*, que dice 2016-11-04 cuando el
  *    álbum es de 2015.
  *
@@ -73,6 +93,24 @@ interface Row {
   release_type: string;
   duration: string;
 }
+
+/**
+ * Una hija del catálogo semilla. `start_time` / `end_time` son SEGUNDOS
+ * enteros, no `"M:SS"` como `duration`: es como los escribe el seed
+ * (`st.startTime` / `st.endTime`) y como los leen los saltos de vídeo.
+ */
+interface TimelineRow {
+  id: string;
+  title: string;
+  disc_number: number | null;
+  track_number: number | null;
+  start_time: number;
+  end_time: number;
+}
+
+/** Clave de emparejamiento hija↔seed. El título NO sirve: hay daughters homónimas. */
+const timelineKey = (disc: number | null, track: number | null): string =>
+  `${disc ?? 1}|${track ?? ""}`;
 
 interface Fix {
   label: string;
@@ -261,6 +299,75 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
+  // 5. (RC.32) La línea de tiempo de las hijas, contra el ORIGEN del seed.
+  //
+  //    Se recorre padre por padre porque es el único modo de saber a qué
+  //    release pertenece cada hija: `SEED_RELEASES` es la lista de releases, y
+  //    las hijas se localizan por `disc_number`/`track_number` DENTRO de él.
+  // ------------------------------------------------------------------
+  const timelineRows: string[] = [];
+  let missingFromDb = 0;
+
+  for (const parent of parents) {
+    const sr = SEED_RELEASES.find(
+      (r) => r.artistName === parent.artist_name && r.title === parent.title
+    );
+    if (!sr) {
+      // El padre está en la base de datos pero no en el catálogo del seed: no
+      // hay con qué comparar su línea de tiempo, y no se inventa.
+      continue;
+    }
+
+    const children = (await readRows(
+      `SELECT id, title, disc_number, track_number, start_time, end_time
+         FROM tracks WHERE release_id = ?`,
+      [parent.id]
+    )) as unknown as TimelineRow[];
+
+    const byKey = new Map<string, TimelineRow>();
+    for (const child of children) {
+      byKey.set(timelineKey(child.disc_number, child.track_number), child);
+    }
+
+    for (const st of sr.tracks) {
+      const child = byKey.get(timelineKey(st.discNumber, st.trackNumber));
+      if (!child) {
+        missingFromDb += 1;
+        continue;
+      }
+      const curStart = Number(child.start_time ?? 0);
+      const curEnd = Number(child.end_time ?? 0);
+      if (curStart === st.startTime && curEnd === st.endTime) continue;
+
+      const label = `timeline ${parent.artist_name} — ${parent.title} #${st.trackNumber} "${st.title}": ` +
+        `start ${curStart}->${st.startTime}, end ${curEnd}->${st.endTime}`;
+      timelineRows.push(label);
+      fixes.push({
+        label,
+        // El `WHERE` lleva los valores VIEJOS: re-aplicar el script no cuenta
+        // como arreglo y el dry-run puede volver a correr las veces que quiera.
+        sql: `UPDATE tracks SET start_time = ?, end_time = ?
+               WHERE id = ? AND start_time = ? AND end_time = ?`,
+        args: [st.startTime, st.endTime, child.id, curStart, curEnd],
+        expected: 1,
+        countSql: `SELECT COUNT(*) c FROM tracks
+                    WHERE id = ? AND start_time = ? AND end_time = ?`,
+        countArgs: [child.id, curStart, curEnd],
+      });
+    }
+  }
+
+  if (timelineRows.length > 0) {
+    console.log(`\nDeriva de línea de tiempo a corregir: ${timelineRows.length} hija(s)`);
+  }
+  if (missingFromDb > 0) {
+    console.log(
+      `⚠️  ${missingFromDb} pista(s) del catálogo no están en la base de datos: ` +
+        `su línea de tiempo no se puede comparar y se dejan como están.`
+    );
+  }
+
+  // ------------------------------------------------------------------
   // Dry-run: contar filas afectadas de verdad, sin escribir.
   // ------------------------------------------------------------------
   console.log(`\n${"=".repeat(72)}`);
@@ -284,8 +391,7 @@ async function main() {
   if (!apply) {
     console.log("\n🔍 DRY-RUN. No se escribió nada. Añade --apply para ejecutarlo.");
     console.log(
-      "Lo que NO se toca aquí: la deriva de start_time/end_time (10 s en The Dark Side of the Moon," +
-        "\n3 s en Kid A) y la release_date de Vulnicura Strings (2016-11-04 cuando el álbum es de 2015)."
+      "Lo que NO se toca aquí: la release_date de Vulnicura Strings (2016-11-04 cuando el álbum es de 2015)."
     );
     return;
   }

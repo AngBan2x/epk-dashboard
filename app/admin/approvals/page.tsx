@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { capitalizeReleaseType, getCoverImage } from '@/lib/null-safe';
+import { capitalizeReleaseType, getCoverImage, sumDurations } from '@/lib/null-safe';
 import { Badge, CountBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -113,6 +113,20 @@ export default function ApprovalsPage() {
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [revisionTarget, setRevisionTarget] = useState<Submission | null>(null);
   const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
+  /**
+   * RC.32 Tarea 5 — el envío cuya promoción falló y se puede reintentar.
+   *
+   * Antes el `try/catch` de la promoción se comía el error y la respuesta 200
+   * solo decía `promoted: false`, que también es lo que sale cuando el usuario
+   * YA era artista. El admin veía un éxito y el usuario no se promovía. Ahora el
+   * backend manda `promotion: { error, retryable }` y aquí se muestra, con el
+   * envío al que pertenece y un botón para reintentarlo.
+   */
+  const [promotionFailure, setPromotionFailure] = useState<{
+    id: string;
+    message: string;
+    retryable: boolean;
+  } | null>(null);
   const [page, setPage] = useState(1);
   const [artistlessCount, setArtistlessCount] = useState(0);
   const modalTitleRef = useRef<HTMLHeadingElement>(null);
@@ -197,7 +211,9 @@ export default function ApprovalsPage() {
     }
   }, [showRevisionModal]);
 
-  const handleAction = async (id: string, action: 'approve' | 'reject' | 'revision', reason?: string) => {
+  type ActionKind = 'approve' | 'reject' | 'revision' | 'retry_promotion';
+
+  const handleAction = async (id: string, action: ActionKind, reason?: string) => {
     try {
       setActionLoading(id);
       const res = await fetch(`/api/admin/approvals/${id}`, {
@@ -207,19 +223,56 @@ export default function ApprovalsPage() {
       });
       if (res.ok) {
         const result = await res.json();
-        fetchApprovals();
-        setSelected(null);
-        setShowRejectModal(false);
-        setShowRevisionModal(false);
-        setRejectReason('');
-        setRevisionReason('');
-        if (result.promoted) {
+        // Un reintento no abre ni cierra modales: solo informa.
+        const isRetry = action === 'retry_promotion';
+        if (!isRetry) {
+          fetchApprovals();
+          setSelected(null);
+          setShowRejectModal(false);
+          setShowRevisionModal(false);
+          setRejectReason('');
+          setRevisionReason('');
+        }
+
+        // `promotion` es el dato nuevo: si se intentó y no promovió, el motivo
+        // viaja en la respuesta y se enseña. Antes esto no se distinguía de un
+        // "ya era artista".
+        const promotion = result.promotion as
+          | { promoted?: boolean; attempted?: boolean; error?: string | null; retryable?: boolean }
+          | undefined;
+
+        if (action === 'approve' && promotion?.attempted && !promotion.promoted) {
+          setPromotionFailure({
+            id,
+            message:
+              promotion.error ||
+              'El envío se aprobó, pero el autor no se promovió a artista.',
+            retryable: promotion.retryable !== false,
+          });
+          setPromotionMessage(null);
+        } else if (result.promoted) {
+          setPromotionFailure(null);
           setPromotionMessage('¡El usuario ha sido promovido a Artista!');
           setTimeout(() => setPromotionMessage(null), 5000);
+        } else if (isRetry) {
+          setPromotionFailure(null);
+          setPromotionMessage('La promoción se completó correctamente.');
+          setTimeout(() => setPromotionMessage(null), 5000);
+        } else {
+          setPromotionFailure(null);
         }
       } else {
-        const error = await res.json();
+        const error = await res.json().catch(() => null);
         console.error('Action failed:', error);
+        // El reintento sobre un envío que ya no está aprobado es un 409: se
+        // informa sin tocar nada.
+        if (action === 'retry_promotion') {
+          setPromotionFailure({
+            id,
+            message: error?.error ?? 'No se pudo reintentar la promoción.',
+            retryable: false,
+          });
+        }
       }
     } catch (error) {
       console.error('Action failed:', error);
@@ -272,6 +325,30 @@ export default function ApprovalsPage() {
     } catch {
       return {};
     }
+  };
+
+  /**
+   * RC.32 Tarea 4 — la duración que ve el admin al revisar un envío.
+   *
+   * `track_data.duration` es lo que el remitente escribió para el envío, y en un
+   * álbum eso es `""` o el total viejo: el admin acababa comparando un `00:00`
+   * contra lo que el resto de la app ya enseña como la suma de las pistas. Se
+   * calcula con `sumDurations` (contrato de `lib/null-safe.ts`), el mismo helper
+   * que usan `EPKCard` y `/releases/[id]`.
+   *
+   * Si el envío no trae `tracks`, o sus duraciones no son parseables, se cae al
+   * valor declarado en vez de inventar un `0:00`.
+   */
+  const submissionDuration = (data: { duration?: unknown; tracks?: unknown }): string => {
+    const children = Array.isArray(data.tracks) ? data.tracks : [];
+    if (children.length > 0) {
+      const durations = children
+        .filter((t): t is { duration?: unknown } => typeof t === 'object' && t !== null)
+        .map((t) => (typeof t.duration === 'string' ? t.duration : null));
+      const total = sumDurations(durations);
+      if (total) return total.label;
+    }
+    return typeof data.duration === 'string' && data.duration.length > 0 ? data.duration : '—';
   };
 
   const formatDate = (dateStr: string) => {
@@ -334,9 +411,43 @@ export default function ApprovalsPage() {
             role="alert"
             className="mb-6 rounded-lg border border-emerald-300 bg-emerald-100 p-4 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 animate-slide-in"
           >
-            ✅ {promotionMessage}
+            ? {promotionMessage}
           </div>
         )}
+
+        {/*
+          RC.32 Tarea 5 — el fallo de promoción, a la vista. `role="alert"` para
+          que un lector de pantalla lo anuncie sin tener que buscarlo: el
+          `console.error` del backend no le llega a nadie.
+        */}
+        {promotionFailure && (
+          <div
+            role="alert"
+            className="mb-6 rounded-lg border border-amber-300 bg-amber-100 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200 animate-slide-in"
+          >
+            <p className="font-medium">
+              El envío se aprobó, pero el autor no se promovió a artista.
+            </p>
+            <p className="mt-1 text-xs opacity-90">{promotionFailure.message}</p>
+            <p className="mt-1 text-xs opacity-90">
+              La aprobación es válida y el contenido ya está publicado. Solo falta
+              el cambio de rol.
+            </p>
+            {promotionFailure.retryable && (
+              <button
+                type="button"
+                onClick={() => handleAction(promotionFailure.id, 'retry_promotion')}
+                disabled={actionLoading === promotionFailure.id}
+                className={`mt-3 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-50 disabled:opacity-50 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800 ${FOCUS_RING}`}
+              >
+                {actionLoading === promotionFailure.id
+                  ? 'Reintentando...'
+                  : 'Reintentar promoción'}
+              </button>
+            )}
+          </div>
+        )}
+
 
         {/* Stats — son a la vez cifras y filtros, así que van en `aria-pressed`. */}
         {stats && (
@@ -574,7 +685,7 @@ export default function ApprovalsPage() {
                     <DetailRow term="Artista">{data.artist_name}</DetailRow>
                     <DetailRow term="Tipo">{capitalizeReleaseType(data.release_type)}</DetailRow>
                     <DetailRow term="Fecha">{data.release_date}</DetailRow>
-                    <DetailRow term="Duración">{data.duration}</DetailRow>
+                    <DetailRow term="Duración">{submissionDuration(data)}</DetailRow>
                     {revision > 0 && <DetailRow term="Revisión">#{revision}</DetailRow>}
                     {cover && (
                       <DetailRow term="Portada">

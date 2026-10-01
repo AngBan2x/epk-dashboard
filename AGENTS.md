@@ -72,6 +72,7 @@ tests/             # Vitest + Playwright
 - **Scripts de datos**: `scripts/seed-influential-catalog.ts` (P5.2, **NO aplicado en prod**), `scripts/backfill-artist-owners.ts` (6 de 7 artistas siguen con `user_id` NULL) y `scripts/qa-cleanup.ts`. Los tres con dry-run por defecto y `--apply` para escribir.
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
+- ⚠️ **`vitest.config.ts:7-8` (los dos `delete process.env.TURSO_*`) es lo que protege Turso en los tests. NO los borres.** Parecen higiene de test y no lo son: bajo vitest el env está ausente, así que `isTursoEnabled()` es falso y los **83 guards `if (isTursoConfigured()) return;` nunca saltan** — están muertos. Si se restaura el env, cualquier import mal resuelto pasa de latente a destructivo: `createUser()` (que sí usa el predicado de tiempo de llamada) escribiría filas de QA en producción, y el fallo sería **verde**. Si alguna vez hay que tocar ese fichero, verifica los conteos con `scripts/turso-check.ts` antes y después.
 - **REGLA (corregida en RC.31)**: usar funciones de `lib/db.ts` en vez de SQL suelto en API routes. Y cuando una ruta necesite SQL propio, la decisión de backend se toma con **UNA sola fuente de verdad**: ramificar sobre `getTursoClientSync() !== null`, que devuelve `null` si y solo si `isTursoEnabled()` es falso y lee `process.env` en **tiempo de llamada**. El handle local (`getLocalDb()` para leer, `getLocalDbWrite()` para escribir) se abre **solo en el brazo sin cliente**, nunca antes.
   - **Por qué cambió**: la regla anterior ("nunca `getDbWrite()` en una ruta API") era inejecutable. Sin Turso no hay handle de escritura, así que prohibirlos a todos dejaba las rutas de escritura sin forma de degradar. Lo que estaba mal no era el handle, era **la forma de decidir quién lo abre**.
   - **El patrón roto que sustituye** (GAP-B): ramificar con `isTursoConfigured()` de `@/lib/db` (lee `process.env` al llamar) y ejecutar con `getTursoClient()` de `@/lib/turso` (lee el env al **importar**, `lib/turso.ts:31-32`). Con el env cargando tarde —el caso normal en un bundle de Vercel— la primera decía "turso" y la segunda `null`, se lanzaba y la ruta respondía **500**. Ya no queda ninguna ruta con este patrón.
@@ -219,27 +220,48 @@ Con `reserved: 20000` la compactación salta al **90% del modelo de 200K** (mimo
 | `web-design-guidelines` | Vercel | Revisión UI/accessibility |
 | `improve-codebase-architecture` | Matt Pocock | Mejorar arquitectura |
 
-## MCP Servers (17)
+## MCP Servers (7)
 
-### Habilitados (8)
+> **RC.32 — la configuración se limpió.** Antes había 17 entradas y 2 de ellas
+> estaban rotas o no servían. Ver «Qué se quitó y por qué» más abajo.
+
+### Habilitados (7)
 | Server | Tipo | Utilidad |
 |--------|------|----------|
 | filesystem | Local | Operaciones de archivos |
-| playwright | Local | Automatización navegador — **necesita Chrome real**: busca `chrome.exe` en `%LOCALAPPDATA%\Google\Chrome\Application\`, que aquí no está. Con `npx playwright install chrome` funciona. Mientras tanto, usar `chromium.launch()` del paquete de Playwright, que sí está instalado. Para **renderizar** un PDF hace falta `headless: false` (en headless descarga el PDF en vez de pintarlo) |
+| playwright | Local | Automatización navegador — **necesita Chrome real**: busca `chrome.exe` en `%LOCALAPPDATA%\Google\Chrome\Application/`, que aquí no está. Con `npx playwright install chrome` funciona. Mientras tanto, usar `chromium.launch()` del paquete de Playwright, que sí está instalado. Para **renderizar** un PDF hace falta `headless: false` (en headless descarga el PDF en vez de pintarlo) |
 | context7 | Remoto | Docs de frameworks |
 | gh_grep | Remoto | Buscar código en GitHub |
 | git | Local | Operaciones git |
-| fetch | Local | Fetch de contenido web |
 | **vercel** | Remoto (OAuth) | **Deploys y logs de Vercel.** Ver nota 1 |
 | **turso** | Remoto (OAuth) | **SQL directo y estado de la DB.** Ver nota 2 |
 
-Autenticación: `opencode mcp auth vercel` / `opencode mcp auth turso` (OAuth en el navegador, sin copiar tokens). Nota: la sesión actual no los tiene autenticados; hay que reiniciar opencode para que aparezcan.
+**Para fetching de contenido web no hace falta un servidor MCP**: está la tool
+built-in `webfetch` (y `websearch`). No reañadas un MCP `fetch` para eso.
+
+Autenticación: `opencode mcp auth vercel` / `opencode mcp auth turso` (OAuth en el navegador, sin copiar tokens).
+
+> **PASO MANUAL DEL USUARIO — `vercel` aparece conectado pero con el scope vacío.**
+> `opencode mcp list` dice `✓ vercel connected` y, aun así, **todas las tools
+> devuelven cero proyectos y cero teams**. Eso **no es un problema de
+> configuración**: la OAuth se autorizó sin seleccionar equipo, así que el token
+> es válido y no tiene sobre qué actuar. Ninguna clave ni variable lo arregla, y
+> **no hay `VERCEL_TOKEN` en `.env.local`** como plan B (comprobado).
+>
+> Pasos exactos:
+> 1. Vercel → **Account Settings → Integrations** → revoca la conexión de
+>    Vercel MCP.
+> 2. `opencode mcp auth vercel`
+> 3. **En el navegador, seleccionar el equipo.** Este paso es el que falta siempre
+>    y el que no se puede saltar: si no se elige equipo, el token vuelve a salir
+>    sin scope y `mcp list` volverá a decir `connected` mintiendo.
+> 4. Reiniciar opencode y comprobar que las tools devuelven proyectos.
 
 > **Nota 1 — por qué Vercel.** El 500 del PDF costó **tres despliegues** porque no había forma de ver el log. La causa estaba en una línea que el build sí imprimía:
 > `The framework produced an invalid deployment package for a Serverless Function. Typically this means that the framework produces files in symlinked directories.`
 > Con `vercel inspect --logs` eso se lee en segundos. Antes hubo que pedirle al usuario que pegara los logs a mano, dos veces.
 >
-> **Nota 2 — por qué Turso.** `getTursoClient()` devuelve `null` mientras `isTursoConfigured()` devuelve `true`, y `tursoExec` avisa «Turso no configurado» en un script que acaba de escribir 65 filas sin problema. Tener SQL directo y el estado de la réplica quita esa indirección, y `scripts/turso-check.ts` sigue siendo la fuente de verdad de la réplica local.
+> **Nota 2 — por qué Turso.** Dos funciones chamadas `isTursoConfigured` discrepaban: la de `lib/turso.ts` leía un snapshot del `process.env` capturado **al importar el módulo** y la de `lib/db.ts` leía el env **en tiempo de llamada**, así que la primera decía «hay Turso» mientras la segunda decía que no, y la ruta respondía 500. RC.32 lo arregló convirtiendo las dos `const` de `lib/turso.ts` en getters y **eliminando** el alias de `lib/turso.ts` en vez de renombrarlo: un nombre menos que colisiona. Tener además SQL directo quita la indirección, y `scripts/turso-check.ts` sigue siendo la fuente de verdad de la réplica local.
 
 ### Lo que los MCP **no** reemplazan (leído de la Ola 3)
 Estos cuatro hallazgos resuelieron los fallos más caros de la tanda y **ninguno** vino de un servidor:
@@ -251,18 +273,34 @@ Estos cuatro hallazgos resuelieron los fallos más caros de la tanda y **ninguno
 | Extraer texto de PDF con el CMap `ToUnicode` (`tests/helpers/pdf-text.ts`) | Un PDF con la maquetación rota es un PDF **válido**: solo se ve leyendo su contenido |
 | **Comprobar que un test falla al revertir el arreglo** | Disciplina, no herramienta. Un check que siempre pasa no protege de nada, y por eso el 500 del PDF costó tres deploys |
 
-### Deshabilitados (9)
-| Server | Tipo | Utilidad |
-|--------|------|----------|
-| sqlite | Local | **off** — `mcp-server-sqlite` irrecuperable vía npx en Windows (caché corrupto `ajv` sin package.json + EPERM en cleanup + build nativo lento). Usar custom tool `database-query` |
-| github | Local | GitHub API — **off, se usa `gh` CLI** (consume demasiado contexto) |
-| sentry | Remoto | Error tracking |
-| memory | Local | Memoria persistente |
-| sequential-thinking | Local | Resolución problemas |
-| plur | Remoto | Memoria persistente |
-| novu | Remoto | Notificaciones |
-| strac-dlp | Local | Detección PII |
-| ctxfile | Local | Context snapshots |
+### Qué se quitó y por qué (RC.32)
+
+Las 9 entradas `enabled: false` **se han borrado de `opencode.json`**. No costaban
+nada en ejecución —un servidor con `enabled: false` nunca se lanza—, pero dejaban
+una lista en la que reaktivar uno era un clic. Se guardan aquí las tres razones
+por las que no conviene volver:
+
+| Server | Por qué no vuelve |
+|---|---|
+| **sqlite** | **Irrecuperable vía npx en Windows**: caché corrupto de `ajv` sin `package.json`, `EPERM` en el cleanup y build nativo lentísimo. Para consultar la DB está el custom tool **`database-query`**, y para el estado real de Turso, **`scripts/turso-check.ts`**. No lo reintroduzcas. |
+| github | Se usa el CLI `gh` (además `git` MCP ya cubre lo local). El MCP de GitHub consumía demasiado contexto. |
+| sentry · memory · sequential-thinking · plur · novu · strac-dlp · ctxfile | Nunca se usaron en este proyecto. Si alguna vez hacen falta, se añaden de nuevo con su bloque completo. |
+
+**`fetch` se eliminó porque estaba roto, no porque sobrara.** Parecía sano
+(`enabled: true`) y por eso era el caro: se lanzaba en cada arranque, resolvía
+por `npx -y`, y ahí se caía. El diagnóstico:
+
+```
+npx -y @smokei/mcp-fetch
+npm error code E404
+npm error 404 Not Found - GET https://registry.npmjs.org/@smokei%2fmcp-fetch
+```
+
+El paquete **no existe en npm**. Y no es un problema de versión: no hay
+sustituto directo. `mcp-server-fetch` resuelve a `0.0.1-security`, que es el
+marcador de npm para un paquete retirado (no es un servidor funcional), y
+`@modelcontextprotocol/server-fetch` da 404. Lo que lo cubría es la tool
+built-in `webfetch`.
 
 ## Custom Tools (6)
 

@@ -395,6 +395,20 @@ describe("P4 — /releases/:id/edit exige rol de artista o admin, no solo sesió
  * portal. Se deja escrito porque descubrirlo por el camino difícil —un admin
  * que pregunta por qué un show aprobado no promovió a nadie— es más caro que
  * leerlo aquí.
+ *
+ * ── RC.32: este test NO se reescribió, y esa es la decisión ────────────────
+ * `lib/artist-promotion.ts` sí cambió en RC.32 (Tarea 4), pero no esta función:
+ * `userHasApprovedContent` sigue exigiendo perfil de artista antes de mirar los
+ * shows, así que la decisión que este test documenta sigue vigente y sus
+ * aserciones siguen siendo ciertas. Un test de caracterización existe para
+ * registrar una decisión; si la decisión no cambia, el test no cambia.
+ *
+ * Lo que sí se arregló alrededor —el default muerto de `createProfile`, que
+ * hacía que la promoción fallara en silencio, y la rama de backend de
+ * `updateUserRole`— tiene ahora tests de comportamiento de verdad en
+ * `tests/unit/artist-promotion-behaviour.test.ts`. Aquí sigue siendo
+ * deliberadamente un test de fuente: el único test de este repo que depende de
+ * estos nombres de función.
  */
 describe("P16 — la promoción vía show es estructuralmente imposible", () => {
   it("userHasApprovedContent exige perfil de artista para la rama de shows", () => {
