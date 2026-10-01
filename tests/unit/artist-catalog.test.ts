@@ -234,14 +234,43 @@ describe("C2 — getArtistCatalog", () => {
     const groups = await getArtistCatalog("c2d");
     const flatIds = groups.flatMap((g) => [g.release.id, ...g.tracks.map((t) => t.id)]);
 
+    // El padre pendiente no aparece: `release_id IS NULL` solo entra por
+    // `status = 'approved'`, y no hay segundo brazo que lo salve.
     expect(flatIds).not.toContain("c2-pending-parent");
-    expect(flatIds).not.toContain("c2-pending-child");
-    // El padre pendiente arrastra a su hija: el release entero queda fuera.
+    // Y el release entero queda fuera: su hija está aprobada, pero su padre no,
+    // así que el EXISTS mirando hacia arriba la deja fuera con él.
     expect(flatIds).not.toContain("c2-orphan-child");
 
+    // ── RC.32 Tarea 2: lo que cambió ────────────────────────────────────────
+    // `c2-pending-child` SÍ aparece, y antes no. Su padre (`c2-ok-parent`) está
+    // aprobado, y el criterio de visibilidad es "aprobada O hija de un padre
+    // aprobado" — el mismo de `getApprovedTrackById`. Con el filtro anterior
+    // (`t.status = 'approved'` a secas) un álbum creado por la app se publicaba
+    // con el padre visible y cero pistas dentro, porque las hijas nacen en
+    // `draft`. Esta aserción codificaba ese bug.
+    //
+    // Lo que SIGUE sin aparecer es una hija de un padre que no está aprobado, y
+    // una fila suelta sin aprobar: eso es lo que evita que se publicó un draft.
     const approved = groups.find((g) => g.release.id === "c2-ok-parent");
     expect(approved).toBeDefined();
-    expect(approved!.tracks.map((t) => t.id)).toEqual(["c2-ok-child"]);
+    expect(approved!.tracks.map((t) => t.id)).toEqual([
+      "c2-ok-child",
+      "c2-pending-child",
+    ]);
+  });
+
+  it("(d-bis) una hija no aprobada de un padre que NO está aprobado tampoco sale", async () => {
+    // El segundo brazo mira hacia ARRIBA (`p.status = 'approved'`), nunca hacia
+    // abajo: un `pending` no puede arrastrar a su hija al catálogo.
+    if (isTursoConfigured()) return;
+    const groups = await getArtistCatalog("c2d");
+    const flatIds = groups.flatMap((g) => [g.release.id, ...g.tracks.map((t) => t.id)]);
+    // `c2-orphan-child` está aprobada y su padre no: fuera.
+    expect(flatIds).not.toContain("c2-orphan-child");
+    // Ninguna hija de `c2-pending-parent` aparece, aprobado o no.
+    expect(
+      groups.some((g) => g.tracks.some((t) => t.id === "c2-orphan-child"))
+    ).toBe(false);
   });
 
   it("(e) los grupos salen ordenados por release_date descendente", async () => {

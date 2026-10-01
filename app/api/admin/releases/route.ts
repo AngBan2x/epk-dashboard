@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { InValue } from "@libsql/client";
 import {
+  buildChildStatusCascade,
   bustSelectCache,
   getLocalDb,
   getLocalDbWrite,
   getTursoClientSync,
+  isExecutableStatement,
+  type RawStatement,
 } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { notifyApprovalDecision } from "@/lib/approval-notifications";
@@ -47,14 +50,58 @@ async function dbQuery(sql: string, params?: unknown[]): Promise<unknown[]> {
   return params ? stmt.all(...params) : stmt.all();
 }
 
-async function dbRun(sql: string, params?: unknown[]): Promise<void> {
+/**
+ * RC.32 Tarea 1 — el estado del padre y el de sus hijas, como UNA unidad.
+ *
+ * `client.batch()` de @libsql/client es una transacción: entra todo o no entra
+ * nada. El brazo local usa `db.transaction()` de better-sqlite3, que es lo
+ * mismo. La decisión de backend sale de `getTursoClientSync()`, la única fuente
+ * (ver cabecera del archivo) — nunca de `isTursoConfigured()`.
+ *
+ * Por qué hace falta aquí y no bastaba un segundo `dbRun`: el `UPDATE` del
+ * padre y el de las hijas tienen que ser atómicos. Escritos por separado, un
+ * fallo entre los dos deja el release `approved` con las hijas en `draft`, que
+ * es justo el estado que hoy hace que un álbum se publique vacío.
+ */
+async function dbBatch(statements: RawStatement[]): Promise<void> {
+  const runnable = statements.filter(isExecutableStatement);
+  if (runnable.length === 0) return;
   const client = getTursoClientSync();
   if (client) {
-    await client.execute({ sql, args: (params ?? []) as InValue[] });
+    await client.batch(
+      runnable.map((s) => ({ sql: s.sql, args: s.params as InValue[] })),
+      "write"
+    );
     return;
   }
-  const stmt = getLocalDbWrite().prepare(sql);
-  stmt.run(...(params ?? []));
+  const db = getLocalDbWrite();
+  const runAll = db.transaction((list: RawStatement[]) => {
+    for (const s of list) db.prepare(s.sql).run(...s.params);
+  });
+  runAll(runnable);
+}
+
+/**
+ * RC.32 Tarea 1 — cuántas hijas quedan sin el estado del padre.
+ *
+ * No es decoración: es la verificación de que la transacción CASCADEÓ de
+ * verdad. Si un día alguien saca la sentencia del `batch()` y la ejecuta suelta,
+ * este número deja de ser 0 y la respuesta lo enseña en vez de fingir un
+ * éxito. Se cuenta DESPUÉS de escribir, no antes.
+ */
+async function countUnsyncedChildren(
+  parentId: string,
+  parentStatus: string
+): Promise<{ total: number; unsynced: number }> {
+  const rows = (await dbQuery(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN status = ? THEN 0 ELSE 1 END) AS unsynced
+       FROM tracks WHERE release_id = ?`,
+    [parentStatus, parentId]
+  )) as unknown as Array<{ total?: number; unsynced?: number }>;
+  const total = Number(rows[0]?.total ?? 0);
+  const unsynced = Number(rows[0]?.unsynced ?? 0);
+  return { total, unsynced: Number.isFinite(unsynced) ? unsynced : 0 };
 }
 
 // GET: List all releases with artist info (admin only)
@@ -143,10 +190,23 @@ export async function PUT(req: NextRequest) {
     const oldStatus = release.status || "draft";
 
     const now = new Date().toISOString();
-    await dbRun(
-      "UPDATE tracks SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?",
-      [status, admin_notes ?? null, now, id]
-    );
+    // RC.32 Tarea 1 — el padre y sus hijas en la MISMA transacción. Aprobar un
+    // álbum sin arrastrar `tracks.release_id` lo publicaba con cero pistas: las
+    // hijas nacen en `draft` (`POST /api/releases`) y todo lo público filtra por
+    // estado. La regla vive en `buildChildStatusCascade` (`lib/db.ts`); aquí solo
+    // se aplica y se verifica.
+    await dbBatch([
+      {
+        sql: "UPDATE tracks SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?",
+        params: [status, admin_notes ?? null, now, id],
+      },
+      buildChildStatusCascade(id, status, now),
+    ]);
+
+    // Verificación posterior, no promesa: si las hijas NO se sincronizaron, el
+    // número sale distinto de 0 y la respuesta lo dice en vez de reportar un
+    // éxito que no ocurrió.
+    const children = await countUnsyncedChildren(id, status);
 
     const notification = {
       artistNotified: false,
@@ -228,7 +288,18 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ message: "Estado actualizado", status, notification });
+    // `children.total` y `children.unsynced` son la prueba de que la
+    // cascada ocurrió. Con `unsynced > 0` el admin tiene que verlo, porque el
+    // album está `approved` con pistas en borrador y eso no se publica.
+    return NextResponse.json({
+      message: "Estado actualizado",
+      status,
+      children: { total: children.total, unsynced: children.unsynced },
+      ...(children.unsynced > 0
+        ? { warning: `${children.unsynced} pista(s) hija(s) no quedaron en "${status}"` }
+        : {}),
+      notification,
+    });
   } catch (error) {
     console.error("PUT admin releases error:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

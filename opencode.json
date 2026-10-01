@@ -22,20 +22,6 @@
       "enabled": true,
       "timeout": 60000
     },
-    "sqlite": {
-      "type": "local",
-      "command": ["npx", "-y", "mcp-server-sqlite"],
-      "cwd": ".",
-      "environment": { "SQLITE_DB_PATH": "data/music_catalog.db" },
-      "enabled": false,
-      "timeout": 60000
-    },
-    "github": {
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
-      "enabled": false,
-      "timeout": 60000
-    },
     "playwright": {
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp"],
@@ -57,48 +43,6 @@
       "command": ["uvx", "mcp-server-git", "--repository", "."],
       "enabled": true,
       "timeout": 60000
-    },
-    "fetch": {
-      "type": "local",
-      "command": ["npx", "-y", "@smokei/mcp-fetch"],
-      "enabled": true,
-      "timeout": 60000
-    },
-    "sentry": {
-      "type": "remote",
-      "url": "https://mcp.sentry.dev/mcp",
-      "oauth": {},
-      "enabled": false
-    },
-    "memory": {
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
-      "enabled": false
-    },
-    "sequential-thinking": {
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-sequentialthinking"],
-      "enabled": false
-    },
-    "plur": {
-      "type": "remote",
-      "url": "https://mcp.plur.so/mcp",
-      "enabled": false
-    },
-    "novu": {
-      "type": "remote",
-      "url": "https://mcp.novu.co/mcp",
-      "enabled": false
-    },
-    "strac-dlp": {
-      "type": "local",
-      "command": ["npx", "-y", "strac-mcp-dlp"],
-      "enabled": false
-    },
-    "ctxfile": {
-      "type": "local",
-      "command": ["npx", "-y", "ctxfile-mcp"],
-      "enabled": false
     }
   },
   "permission": {

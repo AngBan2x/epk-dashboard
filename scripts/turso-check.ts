@@ -1,6 +1,6 @@
 import { createClient } from "@libsql/client";
 import fs from "node:fs";
-import { sumDurations } from "@/lib/null-safe";
+import { parseDurationToSeconds, sumDurations } from "@/lib/null-safe";
 
 function loadEnv() {
   const text = fs.readFileSync(".env.local", "utf8");
@@ -129,7 +129,8 @@ async function main() {
   // `sumDurations()` es el helper del contrato de RC.31.
   try {
     const { rows } = await client.execute({
-      sql: `SELECT id, title, artist_name, release_id, duration
+      sql: `SELECT id, title, artist_name, release_id, duration,
+                   disc_number, track_number, start_time, end_time
               FROM tracks WHERE artist_name IN (${inList})`,
       args: SEED_ARTISTS,
     });
@@ -155,12 +156,118 @@ async function main() {
     }
     console.log(`seed_padres_con_duracion_correcta: ${parents.length - mismatches.length}/${parents.length}`);
     for (const m of mismatches) console.log(`  ⚠️  ${m}`);
+
+    // ------------------------------------------------------------------
+    // RC.32 Tarea 3 — checks que LEEN LA BASE DE DATOS. El prefijo `db_` no es
+    // decorativo: las consultas de arriba y las de `tests/unit/seed-integrity.test.ts`
+    // leen el catálogo del propio FICHERO del seed, y por eso no detectaron nada
+    // cuando el seed ya estaba corregido y las filas de Turso seguían con los
+    // valores viejos. Estos dos leen lo que hay escrito.
+    //
+    // 1. `db_seed_timeline_desalineada`: `start_time`/`end_time` son SEGUNDOS
+    //    enteros, y tienen que encadenar sin huecos ni solapamientos dentro de
+    //    cada disco, con `end_time = start_time + duration`. La deriva viva era
+    //    de +10 s en The Dark Side of the Moon (desde "Us and Them") y de +3 s en
+    //    el final de Kid A.
+    // 2. `db_seed_padres_duracion_vs_recorrido`: la duración declarada del padre
+    //    (suma de las duraciones de sus hijas) contra el `end_time` de su última
+    //    pista. Son dos cosas distintas y se contradecían: el padre decía
+    //    "42:36" (2556 s) y el recorrido llegaba a 2566 s.
+    // ------------------------------------------------------------------
+    const timeline = rows as unknown as Array<{
+      id: string;
+      title: string;
+      artist_name: string;
+      release_id: string | null;
+      duration: string;
+      disc_number: number | null;
+      track_number: number | null;
+      start_time: number;
+      end_time: number;
+    }>;
+    const seedChildren = timeline.filter((t) => t.release_id !== null);
+    const desalineadas: string[] = [];
+    const recorridoMismatches: string[] = [];
+    const recorridoOmitidos: string[] = [];
+
+    for (const parent of parents) {
+      const children = seedChildren.filter((t) => t.release_id === parent.id);
+
+      // Por disco, porque The Wall reinicia en 0 el segundo.
+      const byDisc = new Map<number, typeof children>();
+      for (const child of children) {
+        const disc = Number(child.disc_number ?? 1);
+        const bucket = byDisc.get(disc) ?? [];
+        bucket.push(child);
+        byDisc.set(disc, bucket);
+      }
+      const byDiscEnd = new Map<number, number>();
+      for (const [disc, list] of byDisc) {
+        const ordered = [...list].sort(
+          (a, b) => (a.track_number ?? 9999) - (b.track_number ?? 9999) || a.start_time - b.start_time
+        );
+        let previousEnd = 0;
+        for (const child of ordered) {
+          const seconds = parseDurationToSeconds(child.duration);
+          const expectedEnd = child.start_time + (seconds ?? 0);
+          if (seconds == null) {
+            desalineadas.push(
+              `${parent.artist_name} — ${parent.title} d${disc} "${child.title}": duración "${child.duration}" no parseable`
+            );
+          } else if (expectedEnd !== child.end_time) {
+            desalineadas.push(
+              `${parent.artist_name} — ${parent.title} d${disc} "${child.title}": ${child.start_time} + ${seconds} = ${expectedEnd}, end_time es ${child.end_time}`
+            );
+          }
+          if (child.start_time !== previousEnd) {
+            desalineadas.push(
+              `${parent.artist_name} — ${parent.title} d${disc} "${child.title}": hueco/solape de ${
+                child.start_time - previousEnd
+              } s con la anterior`
+            );
+          }
+          previousEnd = child.end_time;
+        }
+        byDiscEnd.set(disc, previousEnd);
+      }
+
+      // El padre contra el RECORRIDO, solo donde el recorrido SIGNIFICA algo: un
+      // release de un solo disco, que va de 0 a su `end_time` final. En The Wall
+      // (2 discos que reinician en 0) el recorrido de un disco son 1941 s y el
+      // padre dice 61:06 = 3666 s, que es la SUMA de los dos discos, no un
+      // recorrido: ahí la comparación no aplica y no se reporta como fallo.
+      if (byDisc.size === 1) {
+        const onlyDisc = [...byDisc.keys()][0];
+        const recorrido = byDiscEnd.get(onlyDisc) ?? 0;
+        const declared = parseDurationToSeconds(parent.duration);
+        if (declared == null) {
+          recorridoMismatches.push(
+            `${parent.artist_name} — ${parent.title}: duración padre "${parent.duration}" no parseable`
+          );
+        } else if (recorrido > 0 && recorrido !== declared) {
+          recorridoMismatches.push(
+            `${parent.artist_name} — ${parent.title}: padre "${parent.duration}" (${declared} s) vs recorrido ${recorrido} s`
+          );
+        }
+      } else {
+        recorridoOmitidos.push(
+          `${parent.artist_name} — ${parent.title}: ${byDisc.size} discos (el padre es la suma de los discos, no un recorrido)`
+        );
+      }
+    }
+
+    console.log(`db_seed_timeline_desalineada: ${desalineadas.length}`);
+    for (const d of desalineadas) console.log(`  ⚠️  ${d}`);
+    console.log(`db_seed_padres_duracion_vs_recorrido: ${recorridoMismatches.length}`);
+    for (const m of recorridoMismatches) console.log(`  ⚠️  ${m}`);
+    for (const o of recorridoOmitidos) console.log(`  –  ${o}`);
   } catch (e) {
     console.log(`seed_padres_con_duracion_correcta: ERROR ${(e as Error).message.slice(0, 120)}`);
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+

@@ -2222,6 +2222,83 @@ export function resolveSubmitStatus(input: {
   return { nextStatus: previous, ignored: asked !== undefined };
 }
 
+/**
+ * RC.32 Tarea 1 — UNA sentencia parametrizada, compartida por las dos rutas que
+ * escriben un release y sus hijas en la MISMA transacción.
+ *
+ * Vive aquí porque un `route.ts` del App Router solo puede exportar verbos HTTP,
+ * igual que `resolveSubmitStatus` justo arriba: la lógica de negocio que las dos
+ * rutas necesitan va en `lib/db.ts`, y las rutas solo la aplican.
+ */
+export interface RawStatement {
+  sql: string;
+  params: unknown[];
+}
+
+/**
+ * RC.32 Tarea 1 — la aprobación de un release tiene que arrastrar a sus hijas.
+ *
+ * ## El fallo que cierra
+ * `POST /api/releases` inserta las hijas SIEMPRE con `status = 'draft'`
+ * (`app/api/releases/route.ts:583`, literal `'draft'` en el VALUES), y las dos
+ * rutas que aprueban escribían el estado del PADRE con `WHERE id = ?`, sin
+ * tocar jamás `tracks.release_id`. Consecuencia medida, no teórica: un release
+ * con pistas creado por la app y aprobado después se publica como **un álbum con
+ * cero pistas**, porque todo lo público filtra por estado —
+ * `getArtistCatalog` (`t.status = 'approved'`) y `getApprovedTrackById` (que por
+ * eso ya lleva el segundo brazo de `EXISTS`). El padre se ve, las pistas no.
+ *
+ * ## Por qué "las hijas siguen al padre" y no una regla por estado
+ * En este modelo un álbum se revisa como una unidad: las decisiones del admin
+ * se toman sobre el padre (`app/api/admin/releases` y `POST
+ * /api/admin/approvals`). Una hija con estado propio no se revisa en ningún
+ * sitio, así que un estado distinto del padre solo puede significar "publicada
+ * sin que nadie la mirara" (el bug de origen) o "el padre se aprobó y esta se
+ * quedó atrás". En los dos casos, seguir al padre es la única lectura
+ * coherente.
+ *
+ * ## Por qué una sola sentencia y no una por hija
+ * `UPDATE tracks SET status = ? WHERE release_id = ?` toca exactamente las
+ * hijas de ESE release. Sin N+1 y, sobre todo, sin que la lista de hijas pueda
+ * haber cambiado entre el SELECT y el UPDATE.
+ *
+ * ## La transacción es lo que hace que esto sea seguro
+ * La ruta mete esta sentencia en el MISMO `dbBatch()` que el `UPDATE` del
+ * padre. Sin eso, un fallo al escribir las hijas dejaría el padre `approved` con
+ * las hijas en `draft`: exactamente el estado roto que este arreglo cierra, y
+ * peor, porque parecería ya arreglado.
+ */
+export function buildChildStatusCascade(
+  parentId: string,
+  parentStatus: string,
+  updatedAt?: string
+): RawStatement {
+  if (!RELEASE_STATUSES.includes(parentStatus)) {
+    // Un estado que no existe en el vocabulario no se propaga: escribirlo sería
+    // inventar filas con un valor que ninguna ruta puede leer después.
+    return { sql: "", params: [] };
+  }
+  const sets = ["status = ?"];
+  const params: unknown[] = [parentStatus];
+  if (updatedAt) {
+    sets.push("updated_at = ?");
+    params.push(updatedAt);
+  }
+  params.push(parentId);
+  return {
+    sql: `UPDATE tracks SET ${sets.join(", ")} WHERE release_id = ?`,
+    params,
+  };
+}
+
+/**
+ * `true` si `buildChildStatusCascade` produce una sentencia ejecutable.
+ * Evita que una ruta haga `batch([...sentencias, ''])` y Turso la rechace.
+ */
+export function isExecutableStatement(stmt: RawStatement | undefined | null): stmt is RawStatement {
+  return Boolean(stmt && stmt.sql.trim().length > 0);
+}
+
 export async function getTrackCount(): Promise<number> {
   if (isTursoEnabled()) {
     const row = await tursoExecSingle("SELECT COUNT(*) as count FROM tracks");
@@ -2450,13 +2527,49 @@ export interface ArtistCatalogGroup {
 // de `getTracksByReleaseId`: en SQLite los NULL suben solos en un ORDER BY
 // ASC, así que sin COALESCE una pista sin numerar saltaría a la cabecera de
 // su disco. `release_date DESC` va primero porque es el orden de los grupos.
+//
+// ── RC.32 Tarea 2: el MISMO criterio de visibilidad que `getApprovedTrackById` ──
+// Antes el `WHERE` era `t.status = 'approved'` a secas, y `has_children` exigía
+// además `c.status = 'approved'`. Ese filtro era el segundo brazo del mismo bug
+// que ya se arregló en `getApprovedTrackById`: las hijas de un álbum nacen en
+// `draft` (`POST /api/releases`) y sin el brazo del `EXISTS` el álbum aprobado
+// salía **vacío de contenido** — el padre en la lista, ninguna pista dentro, y
+// con ella los enlaces de `ArtistTracksSection` a `/releases/<id de la hija>`.
+//
+// OJO con el alcance: `getArtistCatalog` alimenta la ficha pública del artista,
+// el agrupado por release, `/api/artist-catalog` y las EXPORTACIONES
+// (CSV/JSON/PDF). Ampliar el criterio no publica nada nuevo: el segundo brazo
+// solo alcanza a filas cuyo padre ya está `approved`, y un padre aprobado es
+// público por definición. Lo que cambia es que el álbum ya no aparece vacío.
+//
+// El ORDER BY no se toca: el agrupado y el orden de pistas (`disc_number`,
+// `track_number`, `start_time` con los mismos centinelas) son el contrato que
+// consumen las exportaciones.
+const ARTIST_CATALOG_VISIBLE_SQL = `
+        t.status = 'approved'
+        OR (
+          t.release_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM tracks p
+             WHERE p.id = t.release_id AND p.status = 'approved'
+          )
+        )
+`;
+
 const ARTIST_CATALOG_SQL = `
   SELECT t.*,
          EXISTS (SELECT 1 FROM tracks c
-                  WHERE c.release_id = t.id AND c.status = 'approved') AS has_children
+                  WHERE c.release_id = t.id
+                    AND (
+                      c.status = 'approved'
+                      OR EXISTS (
+                        SELECT 1 FROM tracks p2
+                         WHERE p2.id = c.release_id AND p2.status = 'approved'
+                      )
+                    )) AS has_children
     FROM tracks t
    WHERE t.artist_name = (SELECT name FROM artists WHERE id = ?)
-     AND t.status = 'approved'
+     AND (${ARTIST_CATALOG_VISIBLE_SQL})
    ORDER BY t.release_date DESC,
             COALESCE(t.disc_number, 1) ASC,
             COALESCE(t.track_number, 999) ASC,

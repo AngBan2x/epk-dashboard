@@ -3,14 +3,17 @@ import type { InValue } from "@libsql/client";
 import { z } from "zod";
 import {
   bustSelectCache,
+  buildChildStatusCascade,
   getApprovedTrackById,
   getLocalDbWrite,
   getTursoClientSync,
   isArtistOwnerOfTrackName,
+  isExecutableStatement,
   sameArtistName,
   resolveSubmitStatus,
   RELEASE_STATUSES,
   DECISION_STATUSES,
+  type RawStatement,
 } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 import { validateTrackNumber } from "@/lib/validations";
@@ -89,7 +92,7 @@ async function dbRun(sql: string, params?: unknown[]): Promise<void> {
   stmt.run(...(params ?? []));
 }
 
-type Stmt = { sql: string; params?: unknown[] };
+type Stmt = RawStatement;
 
 /**
  * RC.32 — escritura de varias filas como UNA unidad.
@@ -107,24 +110,44 @@ type Stmt = { sql: string; params?: unknown[] };
  * `getTursoClientSync()`, la única fuente (ver cabecera del archivo).
  */
 async function dbBatch(statements: Stmt[]): Promise<void> {
-  if (statements.length === 0) return;
+  const runnable = statements.filter(isExecutableStatement);
+  if (runnable.length === 0) return;
   const client = getTursoClientSync();
   if (client) {
     await client.batch(
-      statements.map((s) => ({ sql: s.sql, args: (s.params ?? []) as InValue[] })),
+      runnable.map((s) => ({ sql: s.sql, args: s.params as InValue[] })),
       "write"
     );
     return;
   }
   const db = getLocalDbWrite();
   const runAll = db.transaction((list: Stmt[]) => {
-    for (const s of list) {
-      const stmt = db.prepare(s.sql);
-      if (s.params && s.params.length > 0) stmt.run(...s.params);
-      else stmt.run();
-    }
+    for (const s of list) db.prepare(s.sql).run(...s.params);
   });
-  runAll(statements);
+  runAll(runnable);
+}
+
+/**
+ * RC.32 Tarea 1 — cuántas hijas quedaron sin el estado del padre.
+ *
+ * Es la verificación de que la cascada ocurrió de verdad: se cuenta DESPUÉS de
+ * escribir, y con `unsynced > 0` la respuesta lleva el aviso. Si alguien saca
+ * la sentencia del `dbBatch()` y la ejecuta suelta, este número deja de ser 0 y
+ * la API deja de fingir que la publicación ocurrió.
+ */
+async function countUnsyncedChildren(
+  parentId: string,
+  parentStatus: string
+): Promise<{ total: number; unsynced: number }> {
+  const rows = (await dbQuery(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN status = ? THEN 0 ELSE 1 END) AS unsynced
+       FROM tracks WHERE release_id = ?`,
+    [parentStatus, parentId]
+  )) as unknown as Array<{ total?: number; unsynced?: number }>;
+  const total = Number(rows[0]?.total ?? 0);
+  const unsynced = Number(rows[0]?.unsynced ?? 0);
+  return { total, unsynced: Number.isFinite(unsynced) ? unsynced : 0 };
 }
 
 interface ArtistRow {
@@ -783,7 +806,31 @@ export async function PUT(req: NextRequest) {
     }
     if (childPlan.statements) statements.push(...childPlan.statements);
 
+    // RC.32 Tarea 1 — el estado del padre arrastra al de sus hijas, en la
+    // MISMA transacción que el `UPDATE` de arriba.
+    //
+    // Sin esto, aprobar por esta ruta un álbum creado por la app lo publicaba
+    // con cero pistas: `POST /api/releases` inserta las hijas con `'draft'`
+    // hardcodeado en el VALUES, y todo lo público filtra por estado
+    // (`getArtistCatalog`, `getApprovedTracks`, `getApprovedTrackById`).
+    //
+    // Entra en la transacción y no en un `dbRun` suelto: dos escrituras
+    // separadas dejan el padre `approved` con las hijas en `draft` si la
+    // segunda falla, que es el estado roto que esto arregla.
+    //
+    // Solo cuando el estado cambia: si `nextStatus === previousStatus` el
+    // `UPDATE` del padre ni siquiera lleva `status`, y en ese caso lo que
+    // corresponde es devolver lo que hay, no reescribir el árbol de estados.
+    if (nextStatus !== previousStatus) {
+      statements.push(buildChildStatusCascade(id, nextStatus));
+    }
+
     await dbBatch(statements);
+
+    // Verificación posterior, no promesa: si las hijas no quedaron sincronizadas
+    // el número lo dice y la respuesta lleva el aviso, en vez de confirmar una
+    // publicación que no ocurrió.
+    const childrenState = await countUnsyncedChildren(id, nextStatus);
 
     if (isAdmin && nextStatus !== previousStatus && DECISION_STATUSES.includes(nextStatus)) {
       try {
@@ -853,6 +900,10 @@ export async function PUT(req: NextRequest) {
       status: nextStatus,
       ...(statusIgnored ? { statusIgnored: true } : {}),
       ...(childPlan.children ? { tracksSaved: childPlan.children.length } : {}),
+      children: { total: childrenState.total, unsynced: childrenState.unsynced },
+      ...(childrenState.unsynced > 0
+        ? { warning: `${childrenState.unsynced} pista(s) hija(s) no quedaron en "${nextStatus}"` }
+        : {}),
     });
   } catch (error) {
     console.error("PUT releases error:", error);
