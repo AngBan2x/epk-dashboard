@@ -480,6 +480,14 @@ export default function DashboardPage() {
                   title="Acciones Rápidas"
                   subtitle="Atajos para gestionar tu EPK"
                 />
+                {/*
+                  Tres acciones, y `md:grid-cols-3` es justo lo que llena la
+                  rejilla en una sola fila. RC.32 metió aquí un cuarto atajo
+                  ("Catálogo de artistas") para sustituir a "Enviar música" y
+                  RC.33 lo quitó: `/artists` ya está en la nav del header, así
+                  que era un duplicado. No subir las columnas a 4 —dejarían
+                  tres celdas estiradas en una fila de cuatro.
+                */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <QuickAction
                     label="Nuevo Release"
@@ -498,33 +506,6 @@ export default function DashboardPage() {
                     icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>}
                     href="/profile"
                     color="hover:bg-blue-50 dark:hover:bg-blue-950"
-                  />
-                  {/*
-                    B-8 (decisión del usuario): "Enviar música" fuera de Acciones
-                    Rápidas, y en su lugar acceso al catálogo general.
-
-                    El enlace a `/submissions` no desaparece del dashboard: ya
-                    estaba en el CTA "¿Ya tienes música?" de la vista de
-                    suscriptor y en las tarjetas numeradas de arriba. Como
-                    atajo de aquí era la cuarta vez que se ofrecía lo mismo.
-                    Lo que faltaba era lo que el usuario pidió: el catálogo
-                    global no era alcanzable desde el dashboard de un artista, y
-                    su rejilla es solo SU catálogo.
-
-                    `/artists` es el índice público: por él se llega a la ficha
-                    de cualquier artista y desde ahí a su dossier, su rider y el
-                    catálogo completo. Es el único destino de esta página desde
-                    el que se ve PressPlay entero.
-
-                    Sin guarda de `user`: esta sección solo se monta con
-                    `artistProfile`, o sea con sesión. La vista de invitado no
-                    la incluye.
-                  */}
-                  <QuickAction
-                    label="Catálogo de artistas"
-                    icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 5.25h16.5M3.75 15h16.5M2.25 6.75A2.25 2.25 0 014.5 4.5h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V6.75z" /></svg>}
-                    href="/artists"
-                    color="hover:bg-violet-50 dark:hover:bg-violet-950"
                   />
                 </div>
               </section>
@@ -807,7 +788,19 @@ export default function DashboardPage() {
           ) : (
             /* ===== GUEST VIEW ===== */
             <>
-              <section className="mb-8">
+              {/*
+                RC.33 (P4): este `mb-8` (32px) era el ÚNICO margen entre la
+                línea "Catálogo completo · N lanzamientos · M pistas" y el
+                "Ordenar por" de abajo, y se leía como un corte de sección
+                donde no lo hay: los dos bloques son la misma cosa —el encabezado
+                del catálogo. Bajado a `mb-3` (12px), que es lo que separa un
+                párrafo de un grupo de control; la separación con la rejilla de
+                tarjetas la sigue dando el `mb-4` de su propio contenedor.
+
+                Solo la vista de invitado. Los `mb-8` de las otras dos sí
+                separan paneles distintos.
+              */}
+              <section className="mb-3">
                 <PitchHeading>
                   <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                     PressPlay

@@ -140,17 +140,6 @@ export function EPKCard({
    */
   const playableRows = queue?.filter(isQueueItemPlayable) ?? [];
   const hasQueue = isReleaseParent && playableRows.length > 0;
-  /**
-   * "Multipista" describe al LANZAMIENTO, no a la fila.
-   *
-   * La condición era solo `track.release_id`, que es "esta fila es hija de
-   * otra": exactamente lo contrario de lo que la tarjeta representa cuando
-   * trae hijas. Con el agrupado del endpoint, `/dashboard` pinta la cabecera
-   * (cuyo `release_id` es NULL) y así el badge no salía nunca en ninguna de
-   * las dos rejillas que quedan. Con las dos ramas, el álbum lo lleva —que es
-   * lo que significa— y una fila hija suelta también, que sigue siendo cierto.
-   */
-  const isMultiTrack = isReleaseParent || !!track.release_id;
 
   useEffect(() => {
     // Fetch initial like count and user's liked state
@@ -279,30 +268,23 @@ export function EPKCard({
           </span>
         </button>
         {/*
-          Badges: "Nuevo" y "Multipista" compartían `absolute top-3 left-3`, así
-          que se montaban ENCIMA el uno del otro y en un lanzamiento recién
-          publicado solo se leía uno de los dos. Ahora van en una columna: el
-          primero arriba, el segundo debajo, sin salirse de la portada (son
-          como 22px de alto cada uno y la portada en 4 columnas mide 294px).
+          Badge "Nuevo", y el único que queda sobre la portada. El de
+          "Multipista" se fue en RC.33 (ver `hasQueue`): repetía en texto lo que
+          el botón de cola ya dice —"Escuchar 12 pistas"—, no tenía etiqueta
+          accesible, y la condición que lo traía (`isReleaseParent ||
+          track.release_id`) metía en la misma etiqueta cosas distintas, que es
+          un lanzamiento con hijas y una fila hija suelta.
 
-          `pointer-events-none` por lo mismo que el placeholder: son
-          decorativos y, al ser una caja posicionada, tapaban el enlace de la
-          portada. El único control sobre la portada es el botón de like
-          (`z-10`).
+          Se simplificó el contenedor: al quedar un solo badge no hace falta la
+          columna ni el `max-w-[70%]`, así que el `<span>` positioning se hace
+          directamente. `pointer-events-none` porque es decorativo y, al ser una
+          caja posicionada, taparía el enlace de la portada; el único control
+          sobre la portada es el botón de like (`z-10`).
         */}
-        {(isNewRelease || isMultiTrack) && (
-          <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[70%] flex-col items-start gap-1">
-            {isNewRelease && (
-              <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg animate-pulse">
-                ✨ Nuevo
-              </span>
-            )}
-            {isMultiTrack && (
-              <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
-                🎵 Multipista
-              </span>
-            )}
-          </div>
+        {isNewRelease && (
+          <span className="pointer-events-none absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg animate-pulse">
+            ✨ Nuevo
+          </span>
         )}
       </div>
       <CardContent className="flex flex-col flex-grow p-4">
@@ -377,74 +359,71 @@ export function EPKCard({
         </div>
 
         {/*
-          P2 — fila padre de un lanzamiento: no hay audio propio, así que no se
-          monta un reproductor que no puede hacer nada. En su lugar, un estado
-          explícito:
+          P2 / RC.33 — fila padre de un lanzamiento: **un solo control**, y es
+          el que funciona.
 
-          1. Botón DESHABILITADO con etiqueta honesta ("el lanzamiento no tiene
-             audio propio"). Se mantiene el ritmo visual de la tarjeta y el
-             control no promete nada.
-          2. La acción real: "Escuchar N pistas" monta la COLA completa en el
-             contexto, que es lo que el usuario decidió (cola con avance
-             automático). El estado de la cola no vive aquí: vive en
-             `useAudioPlayer()`, y esta tarjeta solo llama a `playQueue`.
+          Antes este bloque pintaba DOS controles contradictorios: un botón
+          `disabled` con un círculo tachado y el texto "Este lanzamiento no
+          tiene audio propio", y justo debajo un botón que sí reproducía las
+          12 pistas. Era ruido autoinfligido —decía "no hay audio" sobre una
+          tarjeta que sí lo tenía, y lo decía con el control más inutilizable
+          que existe, el tachado— y además era mentira: el lanzamiento sí
+          suena, desde sus hijas.
 
-          Antes el padre montaba `<AudioPlayer>` con su `audio_preview_url`, que
-          `lib/db.ts` deja como el string truthy `"—"`: `hasPlayableSource` lo
-          daba por no reproducible y el botón quedaba inerte (y si el padre
-          traía `youtube_video_id`, el botón se activaba con un vídeo que no
-          era la pista).
+          Ahora:
+          - Si hay cola reproducible, el control es un play circular real, con
+            el mismo lenguaje visual que el de `AudioPlayer` (40px, `rounded-full`,
+            `bg-primary-600`, triángulo `M8 5v14l11-7z`). El texto "Escuchar N
+            pistas" pasa a ser la etiqueta legible al lado, no un enlace
+            disfrazado.
+          - Si hay hijas pero ninguna es reproducible, no se pinta NINGÚN
+            control: solo la frase honesta. Un botón apagado ahí sería ruido
+            igual de vacío.
+
+          El estado de la cola no vive aquí: vive en `useAudioPlayer()`, y esta
+          tarjeta solo llama a `playQueue` con el array que le pasó quien tiene
+          las hijas.
         */}
         {isReleaseParent ? (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              title="El lanzamiento no tiene audio propio: se reproduce desde sus pistas"
-              aria-label={`${title} no tiene audio propio`}
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 011.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
-            </button>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs leading-snug text-slate-500 dark:text-slate-400">
-                Este lanzamiento no tiene audio propio
-              </p>
-              {hasQueue && audio && (
+            {hasQueue && audio && (
+              <>
                 <button
                   type="button"
                   onClick={() => audio.playQueue(queue as ActiveTrack[], 0)}
-                  className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  aria-label={`Reproducir ${playableRows.length} ${playableRows.length === 1 ? "pista" : "pistas"} de ${title}`}
+                  className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-800"
                 >
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M8 5v14l11-7z" />
                   </svg>
+                </button>
+                <p className="min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
                   Escuchar {playableRows.length}{" "}
                   {playableRows.length === 1 ? "pista" : "pistas"}
-                </button>
-              )}
-              {/*
-                Hay hijas pero ninguna entra en la cola. En producción son
-                2 de los 9 álbumes ("Heroes", "Vulnicura Strings"): sin esta
-                frase el bloque queda con un botón tachado y ninguna acción, que
-                se lee como tarjeta rota en vez de como "a este disco todavía
-                no le han puesto audio". La condición mira `playableRows` y no
-                `hasQueue` a propósito: `hasQueue` también es false cuando no
-                hay contexto de audio, y entonces la frase sería mentira.
-
-                Sin número a propósito: "Ninguna de sus pistas tiene" es
-                gramatical con 1 y con N, y un contador aquí solo repetiría el
-                que ya lleva la etiqueta de "Multipista".
-              */}
-              {playableRows.length === 0 && (
-                <p className="text-xs leading-snug text-slate-400 dark:text-slate-500">
-                  Ninguna de sus pistas tiene audio disponible
                 </p>
-              )}
-            </div>
+              </>
+            )}
+            {/*
+              Hay hijas pero ninguna entra en la cola. En producción son
+              2 de los 9 álbumes ("Heroes", "Vulnicura Strings"): sin esta
+              frase el bloque se queda vacío y se lee como tarjeta rota en vez
+              de como "a este disco todavía no le han puesto audio".
+
+              La condición mira `playableRows` y no `hasQueue` a propósito:
+              `hasQueue` también es false cuando no hay contexto de audio, y
+              entonces la frase sería mentira. Con las dos condiciones
+              independientes, los dos casos no pueden solaparse: si hay botón no
+              hay frase, y si hay frase no hay botón.
+
+              Sin número a propósito: "Ninguna de sus pistas tiene" es
+              gramatical con 1 y con N.
+            */}
+            {playableRows.length === 0 && (
+              <p className="text-xs leading-snug text-slate-400 dark:text-slate-500">
+                Ninguna de sus pistas tiene audio disponible
+              </p>
+            )}
           </div>
         ) : (
           <AudioPlayer

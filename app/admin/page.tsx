@@ -162,6 +162,8 @@ export default function AdminPage() {
     genre: "",
     location: "",
     monthly_listeners: 0,
+    profile_image: "",
+    banner_image: "",
   });
   const [loading, setLoading] = useState(true);
   const [editingTrack, setEditingTrack] = useState<AdminTrack | null>(null);
@@ -1217,6 +1219,8 @@ onClick={() => {
                             genre: artist.genre || "",
                             location: artist.location || "",
                             monthly_listeners: artist.monthly_listeners,
+                            profile_image: artist.profile_image || "",
+                            banner_image: artist.banner_image || "",
                           });
                         }}
                       className="px-3 py-1 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition"
@@ -1269,6 +1273,11 @@ onSubmit={async (e) => {
                         genre: artistForm.genre || null,
                         location: artistForm.location || null,
                         monthly_listeners: artistForm.monthly_listeners,
+                        // Vacio -> null explicito: "" se guardaria como cadena y
+                        // `artists.profile_image` debe volver a NULL para que la
+                        // pagina del artista caiga en la portada por defecto.
+                        profile_image: artistForm.profile_image || null,
+                        banner_image: artistForm.banner_image || null,
                       }),
                     });
                     if (res.ok) {
@@ -1331,6 +1340,32 @@ onSubmit={async (e) => {
                       onChange={(e) =>
                         setArtistForm({ ...artistForm, location: e.target.value })
                       }
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="artist-profile-image" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">URL Foto de Perfil</label>
+                    <input
+                      id="artist-profile-image"
+                      type="url"
+                      value={artistForm.profile_image}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, profile_image: e.target.value })
+                      }
+                      placeholder="https://... — vacio para quitarla"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="artist-banner-image" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">URL Banner</label>
+                    <input
+                      id="artist-banner-image"
+                      type="url"
+                      value={artistForm.banner_image}
+                      onChange={(e) =>
+                        setArtistForm({ ...artistForm, banner_image: e.target.value })
+                      }
+                      placeholder="https://... — vacio para quitarla"
                       className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
@@ -1400,6 +1435,8 @@ onSubmit={async (e) => {
                           genre: "",
                           location: "",
                           monthly_listeners: 0,
+                          profile_image: "",
+                          banner_image: "",
                         });
                       }}
                       className="px-6 py-2 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
