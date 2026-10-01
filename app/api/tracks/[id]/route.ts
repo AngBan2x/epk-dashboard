@@ -75,6 +75,24 @@ export async function PATCH(
       return NextResponse.json({ error: "Track no encontrado" }, { status: 404 });
     }
 
+    // RC.33 Ola 0 — el hueco de autorización que este mismo fichero documentaba
+    // sin cerrar. El GET de arriba sí comprobaba ownership (línea 47) y el PATCH no:
+    // aceptaba a cualquier `artist` autenticado para reescribir `lyrics`,
+    // `production_details`, `gallery_images`, `start_time`/`end_time` y
+    // `track_number` de CUALQUIER pista por id. Con 12 artistas en el catálogo, eso
+    // es "puedo escribir la letra de Pink Floyd".
+    //
+    // El admin conserva el bypass, igual que en `PUT /api/releases:681` y en
+    // `DELETE /api/releases:934`. La prueba de propiedad va por
+    // `isArtistOwnerOfTrackName` porque `tracks` se relaciona con `artists` por
+    // nombre y no por FK: no hay otro sitio fiable donde mirar.
+    if (session.role === "artist") {
+      const owns = await isArtistOwnerOfTrackName(existing.artist_name, session.userId);
+      if (!owns) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+    }
+
     // Only allow specific fields to be patched
     const allowedFields = ["lyrics", "is_instrumental", "production_details", "start_time", "end_time", "gallery_images", "track_number"];
     const updates: Record<string, unknown> = {};
