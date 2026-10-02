@@ -1,4 +1,4 @@
-import { normalizeOfficialText, stripVideoDecorations } from "./youtube";
+import { normalizeOfficialText, stripTrailingTitleGroups, stripVideoDecorations } from "./youtube";
 import type { LastfmTopTrack } from "./lastfm";
 
 /**
@@ -53,15 +53,6 @@ export type LastfmPlaycountIndex = Record<string, number>;
 export type LastfmByArtistRecord = Record<string, LastfmPlaycountIndex>;
 
 /**
- * Grupo entre paréntesis o corchetes al FINAL del título.
- *
- * Se quita ANTES de normalizar porque `normalizeOfficialText` ya se come los
- * paréntesis y convertirlos en espacios los vuelve indistinguibles del resto
- * del texto.
- */
-const TRAILING_GROUP = /\s*(?:\([^()]*\)|\[[^[\]]*\])\s*$/;
-
-/**
  * ## Por qué hay que quitar el sufijo entre paréntesis
  *
  * Last.fm devuelve los títulos **sin** el calificador de edición que sí trae el
@@ -84,15 +75,14 @@ const TRAILING_GROUP = /\s*(?:\([^()]*\)|\[[^[\]]*\])\s*$/;
  * `"Fake Plastic Trees (Acoustic Version)"`, y `acoustic`/`version` no están en
  * esa lista a propósito porque allí cambian la obra. Se acepta el posible
  * false positive a cambio de que las pistas del catálogo tengan número.
+ *
+ * ## Dónde vive el recorte (RC.33 · Ola 4)
+ *
+ * `stripTrailingTitleGroups` **no** está aquí: es el de `lib/youtube.ts`, y este
+ * módulo lo importa. Antes eran dos copias del mismo regex, y la Ola 4 necesitaba
+ * exactamente este recorte para emparejar títulos de YouTube contra el catálogo.
+ * Copiarlo habría sido el fallo que el propio `lib/youtube.ts:8-15` documenta.
  */
-function stripTrailingGroups(raw: string): string {
-  let text = raw;
-  for (;;) {
-    const next = text.replace(TRAILING_GROUP, "");
-    if (next === text) return text.trim();
-    text = next;
-  }
-}
 
 /**
  * Clave con la que se indexa el `gettoptracks` de un artista y con la que se
@@ -107,7 +97,7 @@ function stripTrailingGroups(raw: string): string {
  */
 export function lastfmTitleKey(title: string | null | undefined): string {
   if (typeof title !== "string") return "";
-  return normalizeOfficialText(stripTrailingGroups(stripVideoDecorations(title)));
+  return normalizeOfficialText(stripTrailingTitleGroups(stripVideoDecorations(title)));
 }
 
 /**

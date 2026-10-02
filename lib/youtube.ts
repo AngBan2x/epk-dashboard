@@ -611,6 +611,12 @@ export interface YouTubeChannel {
   uploadsPlaylistId: string | null;
   subscriberCount: number;
   viewCount: number;
+  /**
+   * RC.33 · Ola 4. En un canal `- Topic` esto es **lo que separa un catálogo de
+   * un homónimo vacío**: un canal con `videoCount = 0` existe pero no tiene nada
+   * que ofrecer, y sin este campo no había forma de distinguirlo.
+   */
+  videoCount: number;
 }
 
 export type OfficialChannelRejectReason =
@@ -826,6 +832,46 @@ export function stripVideoDecorations(raw: string): string {
   return text.trim();
 }
 
+/**
+ * Grupo entre paréntesis o corchetes al FINAL del título.
+ *
+ * Se quita ANTES de normalizar porque `normalizeOfficialText` ya se come la
+ * puntuación y convertirlos en espacios los volvería indistinguibles del resto
+ * del texto.
+ */
+const TRAILING_GROUP = /\s*(?:\([^()]*\)|\[[^[\]]*\])\s*$/;
+
+/**
+ * ## Qué quita y por qué aquí y no en `VIDEO_DECORATION_WORDS`
+ *
+ * Un grupo final puede ser **metadato** (`"(Official Video)"`, `"[HD]"`) o el
+ * **nombre de otra grabación** (`"Fake Plastic Trees (Acoustic Version)"`,
+ * `"(2009 Remaster)"`, `"(Etape 1)"`). `VIDEO_DECORATION_WORDS` solo cubre el
+ * primer caso, y esa distinción es deliberada y está fijada por
+ * `tests/unit/official-videos.test.ts` ("NO quita marcas de grabación
+ * distinta").
+ *
+ * Aquí el criterio es **otro**: para *emparejar* contra una fila del catálogo,
+ * la fila puede traer el sufijo y el vídeo de YouTube no, o al revés. Por eso el
+ * recorte del grupo final es una decisión de **emparejamiento**, no de
+ * clasificación: se aplica después de `classifyVideoTitle`, que ya decidió qué
+ * es el vídeo, y **nunca** se escribe de vuelta en la base de datos.
+ *
+ * Canónico aquí, no en `lib/lastfm-playcounts.ts`: aquel módulo tenía su copia
+ * privada y el mismo recorte hacía falta en los dos sitios. Dos copias que
+ * divergen es el fallo que `lib/youtube.ts:8-15` ya documenta para
+ * `normalizeAudioText`; la de aquí es la que se importa y la otra se borró.
+ */
+export function stripTrailingTitleGroups(raw: string | null | undefined): string {
+  if (typeof raw !== 'string') return '';
+  let text = raw;
+  for (;;) {
+    const next = text.replace(TRAILING_GROUP, '');
+    if (next === text) return text.trim();
+    text = next;
+  }
+}
+
 export type OfficialTitleMatch = 'exacto' | 'parcial' | 'distinto';
 
 /**
@@ -840,6 +886,232 @@ export function matchOfficialVideoTitle(videoTitle: string, trackTitle: string):
   if (a === b) return 'exacto';
   if (a.includes(b) || b.includes(a)) return 'parcial';
   return 'distinto';
+}
+
+// ─── RC.33 · Ola 4 — CLASIFICAR «live», no recortarlo ────────────────────────
+//
+// `VIDEO_DECORATION_WORDS` recorta `official|video|audio|music|lyric|visualizer|
+// hd|hq` porque, con el canal ya verificado, esas palabras **no aportan nada**:
+// el canal ya es la prueba. `live` está en la situación contraria.
+//
+// Si `live` se recortara como el resto, `"Comfortably Numb (Live at Pompeii)"`
+// —50 minutos— se emparejaría con `"Comfortably Numb"` y su duración declarada
+// por la ficha pasaría a ser la del directo: una **mentira silenciosa**, porque
+// el resto del título cuadra y nada señala el error.
+//
+// Dos tratamientos opuestos, entonces:
+//
+//   official | video | audio | music | hd   ->  RECORTAR
+//   live | live at X | live performance     ->  CLASIFICAR (kind = 'live')
+//
+// Y `isDecorationSegment` **no** se reutiliza para el caso `live` por diseño:
+// exige que *todas* las palabras sean decoración y que sean ≤ 3, así que
+// `"live at glastonbury"` no entra — correcto, porque no queremos quitarlo, sino
+// marcarlo.
+
+/**
+ * Los tres valores de `tracks.video_kind`.
+ *
+ * - `videoclip`: el canal humano verificado del artista. Es el vídeo que la
+ *   ficha quiere mostrar.
+ * - `live`: una grabación en directo. Se muestra, pero **no** es la pista del
+ *   lanzamiento.
+ * - `topic_audio`: el canal `- Topic` autogenerado por YouTube. No hay
+ *   videoclip; es el audio del tema.
+ */
+export type VideoKind = 'videoclip' | 'live' | 'topic_audio';
+
+export interface VideoClassification {
+  /**
+   * `null` cuando **no se sabe el canal**: el título por sí solo no distingue un
+   * videoclip de un audio de `- Topic`, y adivinarlo sería inventar el dato. El
+   * que llama pasa `channelIsTopic`.
+   */
+  kind: VideoKind | null;
+  /**
+   * Título listo para comparar: decoración recortada y normalizado. En un `live`
+   * el marcador **se conserva a propósito** (`"song live at glastonbury"`), que
+   * es justo lo que impide que un directo se presente como el tema de estudio.
+   */
+  normalizedTitle: string;
+  /** El motivo, en texto. Es lo que se imprime en el informe del dry-run. */
+  reason: string;
+  /** `true` si el título lleva marcador de directo. */
+  isLive: boolean;
+}
+
+/** `\b` con palabra entera: `(Olive)` no es un marcador de directo. */
+const LIVE_WORD = /\blive\b/i;
+
+/** Grupo de parentesis o corchetes. Para saber si el marcador va con contexto. */
+const BRACKET_GROUP = /[([][^()[\]]*[)\]]/g;
+
+/**
+ * El único marcador de directo es la palabra `live`, por palabra entera.
+ *
+ * Se decide **por palabras clave**, no por posición: `(Live)` a secas y
+ * `(Live at Glastonbury)` son ambos `live`, y lo que los diferencia es si el
+ * grupo lleva contexto —que va al `reason`, no a la decisión—.
+ */
+function mentionsLive(raw: string): boolean {
+  return LIVE_WORD.test(raw);
+}
+
+/** `true` si algún grupo `(…)`/`[…]` contiene la palabra `live` y nada más. */
+function hasBareLiveMarker(raw: string): boolean {
+  for (const match of raw.matchAll(BRACKET_GROUP)) {
+    if (LIVE_WORD.test(match[0]) && normalizeOfficialText(match[0]) === 'live') return true;
+  }
+  return false;
+}
+
+/**
+ * Quita el marcador de directo, **solo para comparar**.
+ *
+ * Sirve para que un directo sea reconocible como la pista que se busca
+ * (`"Song (Live at Glastonbury)"` → `"Song"`), no para reescribir nada. Lo que
+ * se persiste es `video_kind`, no este título.
+ *
+ * Dos formas, y solo dos, porque son las que existen en los títulos:
+ *
+ *  1. Un grupo de paréntesis/corchetes que contiene `live`.
+ *  2. Un segmento final delimitado que contiene `live`: `"Song - Live at Wembley"`.
+ *
+ * `"Live and Let Die - Remastered"` **no** pierde nada: no hay grupo con `live`
+ * y el segmento final (`"Remastered"`) no la tiene, así que el texto queda
+ * entero. El fallback de `classifyVideoTitle` (que compara antes con la pista)
+ * es lo que blinda ese caso.
+ */
+export function stripLiveMarkers(raw: string | null | undefined): string {
+  if (typeof raw !== 'string') return '';
+  let text = raw.trim();
+  if (!text) return '';
+
+  text = text.replace(/[([][^()[\]]*\blive\b[^()[\]]*[)\]]/gi, ' ');
+
+  const tail = text.match(/^([\s\S]*?)\s*(?:[|–—:·/]|\s[-–—]\s)\s*([^|–—:/]*\blive\b[\s\S]*)$/i);
+  if (tail && tail[1]) text = tail[1];
+
+  return text
+    .replace(/[|–—:·/]+/g, ' ')
+    .replace(/\s*[-–—]+\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Clasifica un título de vídeo. **Pura**: sin red, sin `process.env`.
+ *
+ * `channelIsTopic` es el contexto que el título no da:
+ *
+ * ```ts
+ * classifyVideoTitle("Another Brick in the Wall (Official Video)", "Another Brick in the Wall")
+ *   → { kind: 'videoclip', isLive: false, normalizedTitle: 'another brick in the wall' }
+ * classifyVideoTitle("Comfortably Numb (Live at Pompeii)", "Comfortably Numb")
+ *   → { kind: 'live', isLive: true, normalizedTitle: 'comfortably numb live at pompeii' }
+ * classifyVideoTitle("Fake Plastic Trees", "Fake Plastic Trees", { channelIsTopic: true })
+ *   → { kind: 'topic_audio', isLive: false, normalizedTitle: 'fake plastic trees' }
+ * ```
+ *
+ * `trackTitle` protege contra el falso positivo obvio: si el título coincide
+ * **exacto** con la pista, la palabra `live` es parte del nombre de la obra
+ * (`"Live and Let Die"`) y no un marcador de directo. Sin ese corto, se
+ * clasificaría como `live` y además se descartaría por título, que es peor.
+ */
+export function classifyVideoTitle(
+  rawTitle: string,
+  trackTitle?: string | null,
+  options: { channelIsTopic?: boolean } = {},
+): VideoClassification {
+  const raw = typeof rawTitle === 'string' ? rawTitle.trim() : '';
+  if (!raw) {
+    return {
+      kind: null,
+      normalizedTitle: '',
+      reason: 'el vídeo no trae título: no hay nada que clasificar',
+      isLive: false,
+    };
+  }
+
+  const decorated = stripVideoDecorations(raw);
+  const normalizedFull = normalizeOfficialText(decorated);
+  const normalizedPlain = normalizeOfficialText(stripTrailingTitleGroups(decorated));
+  const wanted = normalizeOfficialText(trackTitle ?? null);
+
+  // ⚠️ La coincidencia exacta se mide contra `normalizedFull`, **no** contra
+  // `normalizedPlain`. Recortar el grupo final aquí destruiría el detector: el
+  // sufijo final de `"Song (Live at Glastonbury)"` es exactamente lo que dice que
+  // es un directo, y quitarlo lo convertiría en la grabación de estudio y en
+  // `videoclip`. El recorte del grupo final es para *emparejar* (lo hace
+  // `stripLiveMarkers` y luego `matchOfficialVideoTitle`), no para decidir qué
+  // es el vídeo.
+  const exactWithWanted = !!wanted && normalizedFull === wanted;
+  const saysLive = mentionsLive(raw);
+  const isLive = saysLive && !exactWithWanted;
+
+  let kind: VideoKind | null = null;
+  if (isLive) kind = 'live';
+  else if (options.channelIsTopic === true) kind = 'topic_audio';
+  else if (options.channelIsTopic === false) kind = 'videoclip';
+
+  const strippedDecoration = decorated !== raw;
+  const strippedTrailing = stripTrailingTitleGroups(decorated) !== decorated;
+
+  if (isLive) {
+    const bare = hasBareLiveMarker(raw);
+    const reason = bare
+      ? '«(Live)» a secas: no dice qué directo es, pero sigue siendo una grabación en directo. ' +
+        'Se CLASIFICA como live y el título NO se recorta — un directo no es el tema del lanzamiento.'
+      : 'el título lleva «Live» con contexto: es una grabación en directo. ' +
+        'Se CLASIFICA como live y el título NO se recorta.';
+    return { kind, normalizedTitle: normalizedFull, reason, isLive: true };
+  }
+
+  if (exactWithWanted && saysLive) {
+    return {
+      kind,
+      normalizedTitle: normalizedFull,
+      reason:
+        'la palabra «Live» forma parte del título de la obra, no es un marcador: ' +
+        'coincide exacto con la pista del catálogo y no se clasifica como directo.',
+      isLive: false,
+    };
+  }
+
+  const notes: string[] = [];
+  if (strippedDecoration) notes.push('metadato del canal recortado (no aporta: el canal ya está verificado)');
+  if (strippedTrailing) notes.push('sufijo de edición recorte solo para comparar');
+
+  if (kind === 'topic_audio') {
+    return {
+      kind,
+      normalizedTitle: normalizedPlain,
+      reason:
+        'canal «- Topic» autogenerado por YouTube: no hay videoclip, es el audio del tema' +
+        (notes.length > 0 ? `. ${notes.join('; ')}` : ''),
+      isLive: false,
+    };
+  }
+
+  if (kind === 'videoclip') {
+    return {
+      kind,
+      normalizedTitle: normalizedPlain,
+      reason:
+        'canal humano verificado: es el videoclip oficial' +
+        (notes.length > 0 ? `. ${notes.join('; ')}` : ''),
+      isLive: false,
+    };
+  }
+
+  return {
+    kind: null,
+    normalizedTitle: normalizedPlain,
+    reason:
+      'sin contexto de canal no se puede distinguir un videoclip de un audio de «- Topic»: ' +
+      'el título no lo dice y no se inventa.',
+    isLive: false,
+  };
 }
 
 // ─── Verificación HTTP del vídeo ───────────────────────────────────────────
@@ -993,7 +1265,31 @@ export function describeOfficialVideo(candidate: OfficialVideoCandidate): string
 export async function resolveOfficialVideo(
   wanted: WantedOfficialVideo,
   candidates: readonly OfficialVideoCandidate[],
-  options: { channelId: string | null; verify?: OfficialVideoVerifier },
+  options: {
+    channelId: string | null;
+    verify?: OfficialVideoVerifier;
+    /**
+     * RC.33 · Ola 4 — acepta un candidato `live` cuya única diferencia con la
+     * pista sea el marcador de directo.
+     *
+     * Sin esto `"Eclipse (Live from the Los Angeles Sports Arena, 1975)"` es
+     * `parcial` contra `"Eclipse"` y la resolución se contradice a sí misma: el
+     * enrutador (`routeOfficialVideos`) lo declara apto para showcase y esta
+     * función lo rechaza. El valor por defecto es `false`, que es el
+     * comportamiento de RC.32 y el que los tests fijan.
+     */
+    allowLiveRendition?: boolean;
+    /**
+     * RC.33 · Ola 4 — el vídeo que **eligió** la ruta, que va primero.
+     *
+     * Sin esto esta función vuelve a ordenar los candidatos por antigüedad y
+     * puede devolver **otro** vídeo del que la rutaBridó, que es peor que no
+     * devolver ninguno: el informe del dry-run y la fila escrita dirían cosas
+     * distintas. Si el preferido no pasa la comprobación HTTP, se prueba el
+     * siguiente de la lista, que es el orden de la ruta.
+     */
+    preferVideoId?: string | null;
+  },
 ): Promise<OfficialVideoResolution> {
   const rejected: RejectedOfficialVideo[] = [];
   const httpRejected: RejectedOfficialVideo[] = [];
@@ -1030,7 +1326,11 @@ export async function resolveOfficialVideo(
       continue;
     }
 
-    const title = matchOfficialVideoTitle(candidate.title, wanted.title);
+    // Un directo se compara sin su marcador SOLO cuando quien llama lo ha pedido.
+    const isLiveCandidate = options.allowLiveRendition === true && mentionsLive(candidate.title);
+    const comparable = isLiveCandidate ? stripLiveMarkers(candidate.title) : candidate.title;
+
+    const title = matchOfficialVideoTitle(comparable, wanted.title);
     if (title === 'parcial') {
       rejected.push({
         label,
@@ -1058,6 +1358,13 @@ export async function resolveOfficialVideo(
     if (at && bt && at !== bt) return at < bt ? -1 : 1;
     return 0;
   });
+
+  // El vídeo de la ruta va primero, sin quitar el orden de antigüedad del resto.
+  const preferred = (options.preferVideoId ?? '').trim();
+  if (preferred) {
+    const index = viable.findIndex((candidate) => candidate.videoId === preferred);
+    if (index > 0) viable.unshift(...viable.splice(index, 1));
+  }
 
   for (const candidate of viable) {
     const label = describeOfficialVideo(candidate);
@@ -1150,6 +1457,281 @@ export function selectOfficialVideoUpdates(
     updates.push(update);
   }
   return updates;
+}
+
+// ─── RC.33 · Ola 4 — el canal «- Topic» y las dos rutas ─────────────────────
+
+/** Los tres valores admitidos, para validar lo que venga de la base de datos. */
+export const VIDEO_KINDS: readonly VideoKind[] = ['videoclip', 'live', 'topic_audio'];
+
+/**
+ * Un `video_kind` desconocido o ausente **no rompe nada**: se trata como `null`,
+ * que es "no lo sabemos". Es la misma política que `madeForKids: null` en
+ * `YouTubeVideo`: la ausencia se propaga, no se rellena con un valor inventado.
+ */
+export function parseVideoKind(raw: unknown): VideoKind | null {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim().toLowerCase();
+  return (VIDEO_KINDS as readonly string[]).includes(value) ? (value as VideoKind) : null;
+}
+
+/**
+ * ¿El nombre del canal es `<artista> - Topic`?
+ *
+ * **Sin distinción de mayúsculas**, y no por comodidad: los tres canales
+ * verificados traen la caja que les dio YouTube, y son tres casos distintos —
+ * `"PINK FLOYD - Topic"` en mayúsculas, `"Radiohead - Topic"` en title case y
+ * `"Kraftwerk - Topic"`. Un `===` fallaría en dos de tres y el script
+ * descartaría el audio de un artista que sí lo tiene.
+ *
+ * Se comparan ambos lados con `normalizeOfficialText`, así que `"Björk"` y
+ * `"BJORK"` también casan, y una tribute con sufijo (`"Pink Floyd Tribute -
+ * Topic"`) no cuela: sobra texto en el medio.
+ */
+export function isTopicChannelTitle(channelTitle: string, artistName: string): boolean {
+  const title = normalizeOfficialText(channelTitle);
+  const artist = normalizeOfficialText(artistName);
+  if (!title || !artist) return false;
+  return title === `${artist} topic`;
+}
+
+/** La consulta de `search.list?type=channel` para encontrar el canal de un artista. */
+export function topicChannelQuery(artistName: string): string {
+  return `${(artistName || '').trim()} - Topic`;
+}
+
+/**
+ * Quita los vídeos repetidos por `videoId`, **conservando el primero**.
+ *
+ * `playlistItems.list` devuelve el mismo vídeo dos veces: se comprobó con
+ * `"You And Whose Army?"`, que aparecía repetido dentro de la misma playlist de
+ * subidas. Sin esto, el mismo vídeo entra dos veces como candidato y la decisión
+ * no sabe cuál de los dos es "el" candidato; con esto, la lista de candidatos
+ * tiene un vídeo por fila.
+ */
+export function dedupeVideoCandidates(
+  candidates: readonly OfficialVideoCandidate[],
+): OfficialVideoCandidate[] {
+  const seen = new Set<string>();
+  const unique: OfficialVideoCandidate[] = [];
+  for (const candidate of candidates) {
+    const id = typeof candidate?.videoId === 'string' ? candidate.videoId : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    unique.push(candidate);
+  }
+  return unique;
+}
+
+/**
+ * Qué ruta decide qué vídeo.
+ *
+ * - `showcase` — lo que la ficha **muestra**: los tres. Un directo es contenido
+ *   válido para una sección «En vivo».
+ * - `playback` — lo que el reproductor **usa**: `videoclip` y `topic_audio`.
+* El directo se queda fuera a propósito: un directo no es el tema del
+ *   lanzamiento, y colgarlo al play sería el mismo error de duración que
+ *   motivó clasificar `live` en vez de recortarlo.
+ */
+export type OfficialVideoRoute = 'showcase' | 'playback';
+
+/** El orden de preferencia de cada ruta. Es la decisión, en un sitio. */
+export const OFFICIAL_VIDEO_ROUTE_ORDER: Record<OfficialVideoRoute, readonly VideoKind[]> = {
+  showcase: ['videoclip', 'live', 'topic_audio'],
+  playback: ['videoclip', 'topic_audio'],
+};
+
+export interface OfficialVideoOption {
+  candidate: OfficialVideoCandidate;
+  classification: VideoClassification;
+  /** Con qué confianza encaja el título. `parcial` no entra en la ruta. */
+  titleMatch: OfficialTitleMatch;
+  /** Posición en el orden de la ruta. `0` es la primera. */
+  rank: number;
+}
+
+export interface SkippedOfficialVideo {
+  label: string;
+  kind: VideoKind | null;
+  reason: string;
+}
+
+export interface OfficialVideoRouting {
+  route: OfficialVideoRoute;
+  kind: VideoKind | null;
+  chosen: OfficialVideoCandidate | null;
+  chosenOption: OfficialVideoOption | null;
+  /** Los que sirven para esta ruta, ya ordenados. */
+  options: OfficialVideoOption[];
+  /** Los que se quedaron fuera, con el motivo. Para el informe del dry-run. */
+  skipped: SkippedOfficialVideo[];
+  /**
+   * Candidatos cuyo título coincide **algo** (`parcial`), no nada. Es el número
+   * que dice "de esta pista hay un vídeo parecido pero es otra grabación": lo
+   * que separa "el catálogo no tiene vídeo" de "tenía uno y era el equivocado",
+   * que con 1483 vídeos contra ~40 pistas es la diferencia entre revisar y no
+   * revisar.
+   */
+  nearMisses: number;
+  /** Vacío cuando sí hay elegido. */
+  reason: string;
+}
+
+/**
+ * La decisión pista → vídeo, por ruta. **Pura**: recibe candidatos ya traídos y
+ * devuelve cuál va en cada uso. No red, no SQL, no escritura.
+ *
+ * La UI de la Ola 4 solo tiene que leer esto: no tiene que reimplementar la
+ * preferencia ni el por qué de cada descarte.
+ *
+ * Para un candidato `live` la comparación de título va contra
+ * `stripLiveMarkers(candidate.title)`: `"Song (Live at Glastonbury)"` **sí** es
+ * una versión de `"Song"`, y sin eso un directo nunca podría ganar en la ruta de
+ * showcase. El recorte es solo para comparar; lo que se persiste es el
+ * `video_kind`, nunca el título recortado.
+ */
+export function routeOfficialVideos(
+  candidates: readonly OfficialVideoCandidate[],
+  trackTitle: string,
+  options: { channelIsTopic: boolean; route: OfficialVideoRoute },
+): OfficialVideoRouting {
+  const order = OFFICIAL_VIDEO_ROUTE_ORDER[options.route];
+  const base: OfficialVideoRouting = {
+    route: options.route,
+    kind: null,
+    chosen: null,
+    chosenOption: null,
+    options: [],
+    skipped: [],
+    nearMisses: 0,
+    reason: '',
+  };
+
+  const unique = dedupeVideoCandidates(candidates);
+  if (unique.length === 0) {
+    return { ...base, reason: 'no llegó ningún vídeo del canal' };
+  }
+
+  const optionsList: OfficialVideoOption[] = [];
+  const skipped: SkippedOfficialVideo[] = [];
+  let nearMisses = 0;
+
+  for (const candidate of unique) {
+    const label = describeOfficialVideo(candidate);
+    if (!/^[\w-]{11}$/.test(candidate.videoId)) {
+      skipped.push({
+        label,
+        kind: null,
+        reason: `"${candidate.videoId}" no tiene forma de id de YouTube`,
+      });
+      continue;
+    }
+
+    const classification = classifyVideoTitle(candidate.title, trackTitle, {
+      channelIsTopic: options.channelIsTopic,
+    });
+    const comparableTitle =
+      classification.isLive ? stripLiveMarkers(candidate.title) : candidate.title;
+    const titleMatch = matchOfficialVideoTitle(comparableTitle, trackTitle);
+
+    if (titleMatch !== 'exacto') {
+      if (titleMatch === 'parcial') nearMisses++;
+      skipped.push({
+        label,
+        kind: classification.kind,
+        reason:
+          titleMatch === 'parcial'
+            ? `«${candidate.title}» solo coincide parcialmente con «${trackTitle}»: es otra grabación`
+            : `«${candidate.title}» ≠ «${trackTitle}»`,
+      });
+      continue;
+    }
+
+    const rank = classification.kind === null ? -1 : order.indexOf(classification.kind);
+    if (rank < 0) {
+      skipped.push({
+        label,
+        kind: classification.kind,
+        reason:
+          `clasificado como ${classification.kind ?? "sin kind"}, que no está en la ruta ` +
+          `"${options.route}" (${order.join(' → ')})`,
+      });
+      continue;
+    }
+
+    optionsList.push({ candidate, classification, titleMatch, rank });
+  }
+
+  // Mismo criterio de desempate que `resolveOfficialVideo`: a igualdad de kind y
+  // de título, gana el más antiguo. Es el que más se parece a la grabación
+  // sembrada y no el remix que el canal subió hace tres años.
+  optionsList.sort((a, b) => {
+    if (a.rank !== b.rank) return a.rank - b.rank;
+    const at = a.candidate.publishedAt ?? '';
+    const bt = b.candidate.publishedAt ?? '';
+    if (at && bt && at !== bt) return at < bt ? -1 : 1;
+    return 0;
+  });
+
+  const chosenOption = optionsList[0] ?? null;
+  if (!chosenOption) {
+    return {
+      ...base,
+      skipped,
+      nearMisses,
+      reason:
+        skipped.length === 0
+          ? 'ningún vídeo encajó con el título exacto'
+          : `ningún vídeo encajó con el título exacto (${skipped.length} descartado(s))`,
+    };
+  }
+
+  return {
+    route: options.route,
+    kind: chosenOption.classification.kind,
+    chosen: chosenOption.candidate,
+    chosenOption,
+    options: optionsList,
+    skipped,
+    nearMisses,
+    reason: '',
+  };
+}
+
+/**
+ * Consumo **estimado** antes de gastar nada, para que el número salga impreso y
+ * no como sorpresa al final.
+ *
+ * `search.list` son 100 unidades de un bucket aparte (100 llamadas/día para
+ * todo el proyecto), así que va aparte en el desglose: por eso el script no las
+ * gasta por defecto y usa `lib/official-channels.ts`, que ya está verificado.
+ */
+export function estimateOfficialQuota(plan: {
+  artists: number;
+  playlistPages: number;
+  topicSearches: number;
+}): QuotaEstimate {
+  const channels = Math.max(0, plan.artists);
+  const pages = Math.max(0, plan.artists) * Math.max(0, plan.playlistPages);
+  const searches = Math.max(0, plan.topicSearches);
+  const playlistItems = pages;
+  return {
+    channels,
+    playlistItems,
+    searches,
+    total:
+      channels * YOUTUBE_QUOTA_COST.channels +
+      playlistItems * YOUTUBE_QUOTA_COST.playlistItems +
+      searches * YOUTUBE_QUOTA_COST.search,
+  };
+}
+
+export interface QuotaEstimate {
+  channels: number;
+  playlistItems: number;
+  searches: number;
+  /** Unidades totales de las 10 000 diarias. `search` incluida. */
+  total: number;
 }
 
 // ─── Política de embed (Made For Kids) ──────────────────────────────────────

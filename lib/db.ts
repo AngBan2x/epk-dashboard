@@ -45,6 +45,9 @@ import type {
   ReleaseStatus,
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
+// RC.33 · Ola 4. `parseVideoKind` es pura y no trae nada de la red: importarla
+// aquí no abre `lib/youtube.ts` al resto del módulo.
+import { parseVideoKind } from "@/lib/youtube";
 import {
   SEARCH_GROUP_LIMIT,
   hitMatches,
@@ -212,11 +215,14 @@ function initLocalTables(): void {
       release_id TEXT,
       start_time REAL DEFAULT 0,
       end_time REAL DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      video_kind TEXT
     )
   `);
   // M0: safe ALTER TABLE for pre-existing local DBs (idempotent via try/catch)
   try { db.exec(`ALTER TABLE tracks ADD COLUMN track_number INTEGER`); } catch {}
+  // RC.33 · Ola 4: `video_kind`. Nullable y sin DEFAULT; ver `lib/turso.ts`.
+  try { db.exec(`ALTER TABLE tracks ADD COLUMN video_kind TEXT`); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -717,6 +723,10 @@ function parseTrack(row: Record<string, unknown>): Track {
     release_id: (row.release_id as string) ?? null,
     start_time: row.start_time != null ? Number(row.start_time) : 0,
     end_time: row.end_time != null ? Number(row.end_time) : 0,
+    // RC.33 · Ola 4. `parseVideoKind` devuelve `null` para un valor que no es
+    // uno de los tres: la ausencia se propaga, no se rellena con un kind
+    // inventado que la UI pintaría como dato.
+    video_kind: parseVideoKind(row.video_kind),
   };
 }
 
@@ -2653,6 +2663,43 @@ export async function getArtistCatalog(artistId: string): Promise<ArtistCatalogG
   });
 }
 
+/**
+ * RC.33 · Ola 4 — qué `video_kind` se escribe, preservando el que ya había.
+ *
+ * Tres casos, y la diferencia entre los dos primeros es la que evita perder el
+ * trabajo de la verificación:
+ *
+ *   - El llamante trae un `VideoKind`: se escribe ese. Nadie discrepa.
+ *   - El llamante trae `null` **explícito**: se limpia. Es una orden.
+ *   - El llamante no trae el campo (`undefined`): se lee lo que hay y se
+ *     conserva. Un `?? null` a secas borraría la clasificación en cada
+ *     `createTrack` sobre un id existente, que es un camino real
+ *     (`POST /api/tracks` no comprueba que el id sea nuevo).
+ *
+ * Solo lee cuando hace falta (el segundo caso no lee nada), y el `SELECT` es
+ * tolerante a que la columna todavía no exista: si alguien corre un `createTrack`
+ * contra una base con el esquema viejo, la lectura falla y se escribe `null` en
+ * vez de romper la creación de la pista.
+ */
+async function resolveIncomingVideoKind(
+  id: string,
+  incoming: import("@/types/music").VideoKind | null | undefined,
+): Promise<import("@/types/music").VideoKind | null> {
+  if (incoming !== undefined) return incoming;
+  try {
+    if (isTursoEnabled()) {
+      const row = await tursoExecSingle("SELECT video_kind FROM tracks WHERE id = ?", [id]);
+      return parseVideoKind(row?.video_kind);
+    }
+    const row = getLocalDbWrite()
+      .prepare("SELECT video_kind FROM tracks WHERE id = ?")
+      .get(id) as Record<string, unknown> | undefined;
+    return parseVideoKind(row?.video_kind);
+  } catch {
+    return null;
+  }
+}
+
 export async function createTrack(data: {
   id: string;
   title: string;
@@ -2687,6 +2734,13 @@ export async function createTrack(data: {
   end_time?: number;
   // Release approval workflow
   status?: import("@/types/music").ReleaseStatus;
+  // RC.33 · Ola 4 — qué clase de vídeo es `youtube_video_id`.
+  //
+  // **Ausente ≠ null.** Ausente significa "el llamante no sabe", y entonces se
+  // preserva lo que ya había (ver `resolveIncomingVideoKind`). `null` explícito
+  // sí limpia la columna, que es lo que hace falta para "esta pista ya no tiene
+  // vídeo clasificado".
+  video_kind?: import("@/types/music").VideoKind | null;
 }): Promise<Track> {
   const track = {
     id: data.id,
@@ -2741,6 +2795,19 @@ export async function createTrack(data: {
     // `status = 'approved'`. Se escribe ahora; el default sigue siendo 'draft'
     // para no cambiar el comportamiento de las rutas que crean pendientes.
     status: data.status ?? "draft",
+    // RC.33 · Ola 4 — `video_kind` va en el INSERT, y además se preserva.
+    //
+    // `INSERT OR REPLACE` es DELETE + INSERT, así que **una columna que no esté
+    // en la lista vuelve a su DEFAULT**. Por eso el solo hecho de añadir la
+    // columna no basta: si el llamante no trae `video_kind` y se escribe `NULL`,
+    // cualquier `createTrack` sobre un id existente lo borra — y
+    // `POST /api/tracks` (`app/api/tracks/route.ts:142`) no comprueba que el id
+    // sea nuevo, así que ese camino existe de verdad.
+    //
+    // Se escribe tal cual, sin pasar por `parseVideoKind`: aquí la entrada la ha
+    // tipado el llamante, y un `kind` inválido tiene que ser un error de
+    // TypeScript y no un `null` silencioso en una fila recién escrita.
+    video_kind: await resolveIncomingVideoKind(data.id, data.video_kind),
   };
 
 if (isTursoEnabled()) {
@@ -2750,8 +2817,8 @@ if (isTursoEnabled()) {
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
         external_links, disc_number, track_number, is_double_single, sides_b, isrc, composers, is_instrumental,
-        release_id, start_time, end_time, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        release_id, start_time, end_time, status, video_kind
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         track.id, track.title, track.artist_name, track.release_type, track.release_date,
         track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -2772,6 +2839,7 @@ if (isTursoEnabled()) {
         track.start_time,
         track.end_time,
         track.status,
+        track.video_kind,
       ]
     );
   } else {
@@ -2782,8 +2850,8 @@ if (isTursoEnabled()) {
         audio_preview_url, spotify_url, youtube_video_id, itunes_track_id,
         metrics, production_details, lyrics, stems_urls, video_embed_url, gallery_images,
         external_links, disc_number, track_number, is_double_single, sides_b, isrc, composers, is_instrumental,
-        release_id, start_time, end_time, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        release_id, start_time, end_time, status, video_kind
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       track.id, track.title, track.artist_name, track.release_type, track.release_date,
       track.duration, track.cover_image, track.audio_preview_url, track.spotify_url,
@@ -2804,6 +2872,7 @@ if (isTursoEnabled()) {
       track.start_time,
       track.end_time,
       track.status,
+      track.video_kind,
     );
   }
 
@@ -2830,6 +2899,8 @@ export async function updateTrack(id: string, updates: Partial<{
   is_instrumental: boolean;
   // M0: track number within its disc (null clears it)
   track_number?: number | null;
+  // RC.33 · Ola 4: qué clase de vídeo es `youtube_video_id` (null limpia).
+  video_kind?: import("@/types/music").VideoKind | null;
   status: import("@/types/music").ReleaseStatus;
 }>): Promise<Track | null> {
   const existing = await getTrackById(id);

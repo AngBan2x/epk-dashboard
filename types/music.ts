@@ -48,6 +48,16 @@ export interface StemsUrls {
   other?: string;
 }
 
+/**
+ * RC.33 · Ola 4 — qué clase de vídeo hay en `tracks.youtube_video_id`.
+ *
+ * Importado de `lib/youtube.ts` en vez de re-declarado aquí: son tres cadenas
+ * y dos copias divergirían en silencio, que es justo lo que pasa con
+ * `VideoKind` si alguien añade un valor en un sitio y no en el otro.
+ */
+export type { VideoKind } from "@/lib/youtube";
+import type { VideoKind } from "@/lib/youtube";
+
 export interface Track {
   id: string;
   title: string;
@@ -101,6 +111,20 @@ export interface Track {
   release_id?: string | null;
   start_time?: number;
   end_time?: number;
+  /**
+   * RC.33 · Ola 4 — qué clase de vídeo es `youtube_video_id`.
+   *
+   * `null` (o ausente) significa **"no clasificado"**, y es distinto de
+   * `'videoclip'`. Un directo y el audio del canal `- Topic` son cosas
+   * distintas, pero no por gusto: un directo de 12 minutos no es el tema de
+   * estudio de 8:20, y sin esta columna la duración que la ficha declara sería
+   * una mentira silenciosa.
+   *
+   * No es obligatorio a propósito. `parseTrack` lo expone, pero los `INSERT OR
+   * REPLACE` que no lo escriben (los scripts de seed) lo dejarían a `NULL`, y
+   * volverlo obligatorio rompe la compilación en ficheros que son de otro agente.
+   */
+  video_kind?: VideoKind | null;
 }
 
 export interface ExternalLinks {
@@ -158,6 +182,8 @@ export interface RawTrackRow {
   isrc?: string | null;
   composers?: string | null;
   is_instrumental?: number | null;
+  /** RC.33 · Ola 4 — `'videoclip' | 'live' | 'topic_audio'`, o `NULL`. */
+  video_kind?: string | null;
 }
 
 export interface SyncResult {
