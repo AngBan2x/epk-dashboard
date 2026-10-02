@@ -194,6 +194,15 @@ async function main() {
   const planes: Plan[] = [];
 
   for (const [name, cur] of Object.entries(CURATED)) {
+// `--only=<artista>`: el mapa es curado a mano y no todas las entradas valen
+    // para todos los campos. Conviene comprobar el arte **y** la composición antes
+    // de escribir: una foto correcta de la persona equivocada es peor que
+    // ninguna, y una buena foto en el hueco equivocado también (un retrato
+    // apaisado con el sujeto en el tercio derecho, recortado en un círculo de
+    // 40px, sale casi negro).
+    if (flags.only.length > 0 && !flags.only.includes(name.toLowerCase())) {
+      continue;
+    }
     const row = byName.get(name);
     if (!row) {
       console.log(`  AVISO  ${name}: no existe en la tabla artists, se omite.`);
