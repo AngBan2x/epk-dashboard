@@ -28,7 +28,12 @@ import type { Track, ArtistProfile, Show, ShowStatus } from "@/types/music";
 import { formatDateES, safeString } from "@/lib/null-safe";
 import { showStatusLabel } from "@/lib/show-status";
 import { sortList } from "@/lib/search";
-import { collectVideoIds, type YouTubeStatsRecord } from "@/lib/youtube";
+import { collectVideoIds, normalizeOfficialText, type YouTubeStatsRecord } from "@/lib/youtube";
+import {
+  lastfmArtistKey,
+  lastfmPlaycountForRow,
+  type LastfmByArtistRecord,
+} from "@/lib/lastfm-playcounts";
 import { SortSelect, useListSort } from "@/components/SortSelect";
 
 const TRACK_ACCESSORS = {
@@ -37,6 +42,34 @@ const TRACK_ACCESSORS = {
 };
 
 const DEFAULT_SORT = { sort: "date", order: "desc" } as const;
+
+/**
+ * Artistas distintos que aparecen en el payload, ya en la clave que devuelve el
+ * endpoint (`lastfmArtistKey`, o sea `normalizeOfficialText` del nombre).
+ *
+ * Se recoge de las cabeceras **y** de sus hijas aunque hoy las hijas no se
+ * pinten como tarjeta: si mañana la rejilla las dibuja, el lote ya las cubre y
+ * no hay que acordarse de ampliarlo. `lastfmArtistKey("")` y
+ * `lastfmArtistKey("—")` dan `""` —el guion largo es puntuación, y `normalizeOfficialText`
+ * la cambia por un espacio— así que el filtro `if (!key)` también se come el
+ * `artist_name` vacío que deja `lib/db.ts`.
+ */
+function collectLastfmArtistKeys(
+  headers: Track[],
+  childrenByRelease: Record<string, Track[]>,
+): string[] {
+  const seen = new Set<string>();
+  const keys: string[] = [];
+  for (const list of [headers, ...Object.values(childrenByRelease)]) {
+    for (const track of list) {
+      const key = lastfmArtistKey(track.artist_name);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      keys.push(key);
+    }
+  }
+  return keys;
+}
 
 interface DashboardData {
   tracks: Track[];
@@ -121,6 +154,7 @@ export default function DashboardPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [sortState, setSortState] = useListSort(DEFAULT_SORT);
   const [youtubeStats, setYoutubeStats] = useState<YouTubeStatsRecord>({});
+  const [lastfmByArtist, setLastfmByArtist] = useState<LastfmByArtistRecord>({});
 
   useEffect(() => {
     const base = user?.id ? `/api/dashboard?user_id=${user.id}` : "/api/dashboard";
@@ -255,6 +289,77 @@ export default function DashboardPage() {
   const statsFor = (track: Track) =>
     track.youtube_video_id ? youtubeStats[track.youtube_video_id] ?? null : null;
 
+  /**
+   * RC.34 — UN solo fetch de Last.fm para las 3 rejillas, en el mismo patrón
+   * que el lote de YouTube de arriba.
+   *
+   * El parámetro son los **artistas distintos**, no las pistas: el endpoint
+   * llama a `artist.gettoptracks` una vez por artista y devuelve el índice de
+   * títulos de cada uno. Un catálogo de 83 pistas y 12 artistas son 12 llamadas
+   * upstream, no 83 —llamando por pista, un solo álbum de 65 hijas gastaría 65
+   * unidades de cuota para pintar 65 números.
+   *
+   * El lote solo se vuelve a pedir si cambia el **string** de artistas: con
+   * `[tracks]` se re-dispararía en cada reordenación (`SortSelect`) y en cada
+   * recarga de `/api/dashboard`, porque `setData` crea arrays nuevos.
+   */
+  const lastfmArtistsKey = useMemo(
+    () => collectLastfmArtistKeys(tracks, childrenByRelease).join(","),
+    [tracks, childrenByRelease],
+  );
+  useEffect(() => {
+    if (!lastfmArtistsKey) {
+      setLastfmByArtist({});
+      return;
+    }
+    let cancelled = false;
+    // Cualquier status que no sea 200 (400 por tope de artistas, 429 por cuota,
+    // 500) cae en el mismo sitio: `{}` → las tarjetas pintan "—".
+    fetch(`/api/lastfm?method=batch&artists=${encodeURIComponent(lastfmArtistsKey)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!cancelled) setLastfmByArtist(json?.tracksByArtist ?? {});
+      })
+      .catch(() => {
+        if (!cancelled) setLastfmByArtist({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lastfmArtistsKey]);
+
+  /**
+   * Scrobbles de Last.fm de una tarjeta concreta, o `null` si Last.fm no conoce
+   * esa pista (o no respondió). `lastfmPlaycountForRow` busca por artista
+   * normalizado y por título normalizado —el mismo par con el que el endpoint
+   * construyó el índice— y devuelve `null` cuando no hay entrada, que es lo que
+   * hace que `EPKCard` enseñe el "—" con su `title` explicativo en vez de un `0`.
+   */
+  const lastfmFor = (track: Track) =>
+    lastfmPlaycountForRow(lastfmByArtist, track.artist_name, track.title);
+
+  /**
+   * El mismo dato, indexado por `track.id`, para que `EPKCard` pueda agregar las
+   * hijas de un álbum. Sin esto, un álbum se ve como "—": el padre no tiene
+   * playcount propio, y son las hijas las que lo tienen.
+   *
+   * Solo se guardan las entradas **con** dato. Una clave ausente y una clave en
+   * `null` significan lo mismo para la tarjeta, y un objeto lleno de `null` es
+   * más difícil de leer al depurar.
+   */
+  const lastfmByTrackId = useMemo(() => {
+    const map: Record<string, number | null> = {};
+    const rows: Track[] = [
+      ...tracks,
+      ...Object.values(childrenByRelease).flat() as Track[],
+    ];
+    for (const row of rows) {
+      const value = lastfmPlaycountForRow(lastfmByArtist, row.artist_name, row.title);
+      if (value !== null) map[row.id] = value;
+    }
+    return map;
+  }, [lastfmByArtist, tracks, childrenByRelease]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -315,6 +420,8 @@ export default function DashboardPage() {
                         priority={i === 0}
                         onLoginPrompt={() => setShowLoginModal(true)}
                         youtubeStats={statsFor(track)}
+                        lastfmPlaycount={lastfmFor(track)}
+                lastfmByTrack={lastfmByTrackId}
                         {...cardProps(track)}
                       />
                     </SlideIn>
@@ -608,6 +715,8 @@ export default function DashboardPage() {
                           priority={i === 0}
                           onLoginPrompt={() => setShowLoginModal(true)}
                           youtubeStats={statsFor(track)}
+                          lastfmPlaycount={lastfmFor(track)}
+                lastfmByTrack={lastfmByTrackId}
                           {...cardProps(track)}
                         />
                         <a
@@ -831,6 +940,8 @@ export default function DashboardPage() {
                         priority={i === 0}
                         onLoginPrompt={() => setShowLoginModal(true)}
                         youtubeStats={statsFor(track)}
+                        lastfmPlaycount={lastfmFor(track)}
+                lastfmByTrack={lastfmByTrackId}
                         {...cardProps(track)}
                       />
                     </SlideIn>

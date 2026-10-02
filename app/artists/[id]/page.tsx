@@ -11,6 +11,12 @@ import type { Metadata } from "next";
 import type { Track } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
 import { collectVideoIds, getVideoStatsBatch, toStatsRecord } from "@/lib/youtube";
+import { fetchTopTracks } from "@/lib/lastfm";
+import {
+  LASTFM_TOP_TRACKS_LIMIT,
+  buildLastfmPlaycountIndex,
+  lastfmPlaycountFor,
+} from "@/lib/lastfm-playcounts";
 
 export const dynamic = "force-dynamic";
 
@@ -72,20 +78,59 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
   // Fase E: UN lote de YouTube para todos los tracks (antes, uno por tarjeta).
   // Se resuelve aquí, en el servidor, y baja como objeto plano: el `Map` no
   // sobrevive al límite Server → Client.
-  let youtubeStats: ReturnType<typeof toStatsRecord> = {};
-  const videoIds = collectVideoIds(tracks);
-  if (videoIds.length > 0) {
+  //
+  // RC.34: Last.fm entra por la misma puerta y con la misma decisión —
+  // **una llamada por artista, nunca por pista**. `track.getInfo` por fila
+  // serían 65 llamadas para un álbum de 65 hijas; `artist.gettoptracks` son
+  // 12 llamadas para las 83 filas del catálogo y ya trae las pistas más
+  // escuchadas. Aquí se resuelve el índice y se entrega `track.id -> number |
+  // null` para que el componente cliente no tenga que normalizar títulos.
+  const loadYoutubeStats = async (): Promise<ReturnType<typeof toStatsRecord>> => {
+    const videoIds = collectVideoIds(tracks);
+    if (videoIds.length === 0) return {};
     try {
       const batch = await getVideoStatsBatch(videoIds);
-      if (batch.ok) {
-        youtubeStats = toStatsRecord(batch.data);
-      } else {
-        console.error(`[artists/${params.id}] métricas de YouTube no disponibles: ${batch.reason}`);
-      }
+      if (batch.ok) return toStatsRecord(batch.data);
+      console.error(`[artists/${params.id}] métricas de YouTube no disponibles: ${batch.reason}`);
+      return {};
     } catch (e) {
       console.error(`[artists/${params.id}] fallo al pedir el lote de YouTube:`, e);
+      return {};
     }
-  }
+  };
+
+  const loadLastfmByTrack = async (): Promise<Record<string, number | null>> => {
+    try {
+      const res = await fetchTopTracks(artist.name, LASTFM_TOP_TRACKS_LIMIT);
+      if (!res.ok) {
+        console.error(`[artists/${params.id}] scrobbles de Last.fm no disponibles: ${res.reason}`);
+        return {};
+      }
+      const index = buildLastfmPlaycountIndex(res.data);
+      const byTrack: Record<string, number | null> = {};
+      for (const track of tracks) byTrack[track.id] = lastfmPlaycountFor(index, track.title);
+      return byTrack;
+    } catch (e) {
+      console.error(`[artists/${params.id}] fallo al pedir el lote de Last.fm:`, e);
+      return {};
+    }
+  };
+
+  /**
+   * Los dos lotes en paralelo, no en serie: cada uno tiene un timeout de 5 s
+   * hacia arriba, y sumarlos dejaría la página esperando hasta 10 s cuando
+   * cualquiera de los dos proveedores cuelgue. En paralelo, el peor caso es el
+   * timeout del más lento, y sin clave ninguno de los dos sale a la red (ambos
+   * devuelven `no_key` al instante) así que la página no se retrasa.
+   *
+   * El render no queda bloqueado "de más": la página ya esperaba a YouTube
+   * (`force-dynamic` + este mismo `await`), así que no se introduce un salto
+   * nuevo de blocking más allá del que ya existía.
+   */
+  const [youtubeStats, lastfmByTrack] = await Promise.all([
+    loadYoutubeStats(),
+    loadLastfmByTrack(),
+  ]);
 
   // `safeString` devuelve "—" (truthy) como fallback por defecto, asi que con
   // `|| undefined` el JSON-LD emitia "—" en vez de omitir el campo.
@@ -165,7 +210,11 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
           />
         </div>
 
-        <ArtistTracksSection groups={catalog} youtubeStats={youtubeStats} />
+        <ArtistTracksSection
+          groups={catalog}
+          youtubeStats={youtubeStats}
+          lastfmByTrack={lastfmByTrack}
+        />
       </main>
     </div>
   );
