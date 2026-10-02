@@ -10,6 +10,7 @@ import {
   getSubscriberCount,
 } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { withDynamicStatus } from "@/lib/show-dynamic-status";
 import type { ArtistProfile, Show, Track } from "@/types/music";
 
 export const dynamic = "force-dynamic";
@@ -138,6 +139,18 @@ export async function GET(req: NextRequest) {
     const session = await validateRequest(req);
     const isAdmin = session?.role === "admin";
 
+    /**
+     * RC.33 Ola 5 — instante de referencia ÚNICO para toda la respuesta.
+     *
+     * Esta ruta devolvía el `status` CRUDO de la columna mientras que
+     * `/api/shows` lo recalculaba por fecha. Como el dashboard del artista y el
+     * carrusel del catálogo se alimentan de AQUÍ y no de `/api/shows`, un show
+     * con `status = 'proximamente'` (el default del formulario) y una fecha ya
+     * pasada llegaba intacto al componente, que pintaba "Próximamente" con una
+     * fecha de meses atrás. Los dos estados ahora se derivan en el mismo sitio.
+     */
+    const reference = new Date();
+
     const [artistProfile, allTracks, allArtists] = await Promise.all([
       session?.userId ? getArtistByUserId(session.userId) : Promise.resolve(null),
       getAllTracks(),
@@ -209,8 +222,15 @@ export async function GET(req: NextRequest) {
       const visibleShows = isAdmin
         ? await getShowsByArtists(artists.map((a) => a.id))
         : await getApprovedShowsByArtists(artists.map((a) => a.id));
+      /**
+       * `ShowsBooking` pinta la etiqueta de estado de estos shows, así que el
+       * carrusel del catálogo necesita el MISMO estado recalculado que
+       * `artistShows`. Se calcula una vez sobre la lista completa y luego se
+       * reparte por artista.
+       */
+      const dynamicShows = withDynamicStatus(visibleShows, reference);
       for (const art of artists) {
-        showsByArtist[art.id] = visibleShows.filter((s) => s.artist_id === art.id);
+        showsByArtist[art.id] = dynamicShows.filter((s) => s.artist_id === art.id);
       }
     }
 
@@ -223,9 +243,22 @@ export async function GET(req: NextRequest) {
      */
     let artistShows: Show[] = [];
     if (artistProfile) {
-      artistShows = isAdmin
+      const ownShows = isAdmin
         ? showsByArtist[artistProfile.id] ?? []
         : await getShowsByArtist(artistProfile.id);
+      /**
+       * El artista sí ve los suyos sin aprobar, igual que sus tracks en las
+       * líneas de arriba: `POST /api/shows` los deja en `approved = 0`, así que
+       * con solo los aprobados nunca vería el show que acaba de enviar. Para el
+       * resto de artistas, `showsByArtist` no cambia: sigue siendo solo lo
+       * aprobado, que es lo que pinta `CatalogArtistsCarousel`.
+       *
+       * `ownShows` viene de los lectores de la DB con el `status` crudo, así que
+       * también pasa por `withDynamicStatus`. Sin esto, el show que el artista
+       * acaba de enviar era el ÚNICO que podía llegar al dashboard con la fecha
+       * ya pasada y el estado sin recalcular — o sea, el del bug reportado.
+       */
+      artistShows = withDynamicStatus(ownShows, reference);
       // Lo que YA está en el carrusel son solo los aprobados, así que de ahí
       // sale la deduplicación. Comparar contra `artistShows` en vez de contra
       // `showsByArtist` no añadiría nada: las dos listas contienen lo aprobado.

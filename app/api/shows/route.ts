@@ -5,6 +5,7 @@ import { validateRequest } from "@/lib/auth";
 import { sendNotificationEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
+import { createDynamicStatusResolver } from "@/lib/show-dynamic-status";
 import type { ShowStatus } from "@/types/music";
 import { randomUUID } from "crypto";
 
@@ -67,20 +68,19 @@ const UpdateShowSchema = z.object({
   notes: z.string().nullish(),
 });
 
-function computeDynamicStatus(show: { status: string; date: string | null }): string {
-  if (show.status === "cancelado" || show.status === "suspendido") return show.status;
-  if (!show.date) return show.status || "proximamente";
-  const now = new Date();
-  const showDate = new Date(show.date);
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  if (showDate >= todayStart && showDate < todayEnd) return "hoy";
-  if (showDate < todayStart) return "pasado";
-  return show.status || "proximamente";
-}
-
+/**
+ * RC.33 Ola 5 — la regla de "el estado se recalcula por fecha" ya no vive aquí:
+ * vive en `lib/show-dynamic-status.ts` y la aplica TAMBIÉN `/api/dashboard`. Esta
+ * ruta solo la invoca, con un instante de referencia único por petición.
+ */
 export async function GET(req: NextRequest) {
   try {
+    /**
+     * Instante de referencia único para toda la petición. Con `new Date()` por
+     * llamada, una respuesta que cruzara medianoche podía pintar el MISMO show
+     * como "hoy" en una fila y "pasado" en otra.
+     */
+    const resolveStatus = createDynamicStatusResolver();
     const { searchParams } = new URL(req.url);
     const artistId = searchParams.get("artist_id");
     const showId = searchParams.get("id");
@@ -103,17 +103,17 @@ export async function GET(req: NextRequest) {
         if (!show) {
           return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
         }
-        return NextResponse.json({ ...show, status: computeDynamicStatus(show) as ShowStatus });
+        return NextResponse.json({ ...show, status: resolveStatus(show) as ShowStatus });
       }
       // Aprobado y no borrado → anyone.
       const approved = await getApprovedShowById(showId);
       if (approved) {
-        return NextResponse.json({ ...approved, status: computeDynamicStatus(approved) as ShowStatus });
+        return NextResponse.json({ ...approved, status: resolveStatus(approved) as ShowStatus });
       }
       // Sin aprobar: solo su dueño.
       const owned = await getShowById(showId);
       if (owned && (await ownsShow(owned.artist_id))) {
-        return NextResponse.json({ ...owned, status: computeDynamicStatus(owned) as ShowStatus });
+        return NextResponse.json({ ...owned, status: resolveStatus(owned) as ShowStatus });
       }
       return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }
@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
       const shows = isAdmin
         ? await getShowsByArtist(artistId)
         : await getApprovedShowsByArtist(artistId);
-      return NextResponse.json({ shows: shows.map(s => ({ ...s, status: computeDynamicStatus(s) as ShowStatus })) });
+      return NextResponse.json({ shows: shows.map(s => ({ ...s, status: resolveStatus(s) as ShowStatus })) });
     }
 
     // S0/P12b: `/shows` NO está en el `matcher` de `middleware.ts`, así que la
@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
     // catálogo público, porque `POST /api/shows:144` lo crea con
     // `approved = 0` salvo que lo cree un admin con `approved: true`.
     const shows = isAdmin ? await getAllShows() : await getApprovedShows();
-    return NextResponse.json({ shows: shows.map(s => ({ ...s, status: computeDynamicStatus(s) as ShowStatus })) }, {
+    return NextResponse.json({ shows: shows.map(s => ({ ...s, status: resolveStatus(s) as ShowStatus })) }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",
