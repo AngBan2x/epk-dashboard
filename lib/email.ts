@@ -1,4 +1,9 @@
-import { resend, FROM_EMAIL } from "@/lib/resend";
+import {
+  getEmailTransport,
+  resolveSender,
+  type EmailResult,
+  type EmailTransport,
+} from "@/lib/email-transport";
 import { getEmailTemplate, type EmailTemplateData, type NotificationType } from "@/lib/email-templates";
 import { getUserById } from "@/lib/db";
 
@@ -56,6 +61,34 @@ function recordFailure(reason: string, context: string): SendEmailResult {
   return { sent: false, reason: safeReason };
 }
 
+/**
+ * Traduce el estado del transporte al resultado público de siempre.
+ *
+ * La diferencia que importa: `failed` y `not_attempted` comparten `sent: false`,
+ * pero no comparten contadores. `failed` significa que se intentó y no salió;
+ * `not_attempted` que no se va a intentar. Sin distinguirlos, un `FROM_EMAIL`
+ * ausente se contaría como fallo de envío y el log mentiría.
+ */
+function mapEmailResult(result: EmailResult, to: string): SendEmailResult {
+  if (result.status === "sent") {
+    const messageId = result.messageId ?? null;
+    stats.sent += 1;
+    stats.lastSentAt = new Date().toISOString();
+    stats.lastError = null;
+    stats.lastMessageId = messageId;
+    console.info(
+      `${LOG_PREFIX} enviado ✓ id=${messageId ?? "s/n"} to=${to} from=${getFromAddress()}`
+    );
+    return { sent: true, messageId: messageId ?? undefined };
+  }
+
+  if (result.status === "failed") {
+    return recordFailure(result.reason ?? "error_desconocido", `to=${to}`);
+  }
+
+  return recordSkip(result.reason ?? "no_enviado", `to=${to}`);
+}
+
 function sanitizeSubject(subject: string): string {
   return String(subject ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, 300);
 }
@@ -72,21 +105,31 @@ export function isEmailConfigured(): boolean {
 }
 
 export function getFromAddress(): string {
-  return FROM_EMAIL;
+  // Se resuelve en tiempo de llamada, no desde el `const` de módulo que tenía
+  // `@/lib/resend`: ese snapshot quedaba en `undefined` para siempre cuando el
+  // env llegaba tarde (el mismo bug que RC.32 corrigió en `lib/turso.ts`).
+  return resolveSender().from;
 }
 
 export function getEmailStats(): EmailStats {
   return { ...stats };
 }
 
-export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+/**
+ * Envía un correo. La API pública no ha cambiado: mismos parámetros, mismo
+ * retorno, y la llamada por defecto sigue yendo a Resend.
+ *
+ * El segundo parámetro es el punto de inyección (P3): un doble en memoria entra
+ * por ahí y el resto de la función —validación, contadores, logs— no cambia.
+ * Los ~8 call sites de producción no lo pasan y siguen compilando sin cambios.
+ */
+export async function sendEmail(
+  input: SendEmailInput,
+  transport: EmailTransport = getEmailTransport()
+): Promise<SendEmailResult> {
   const to = String(input.to ?? "").trim();
   if (!EMAIL_PATTERN.test(to)) {
     return recordSkip("destinatario_invalido", `to=${to || "(vacío)"}`);
-  }
-
-  if (!resend || !isEmailConfigured()) {
-    return recordSkip("RESEND_API_KEY no configurado", `to=${to}`);
   }
 
   const subject = sanitizeSubject(input.subject);
@@ -94,33 +137,18 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     return recordSkip("asunto_vacio", `to=${to}`);
   }
 
+  let result: EmailResult;
   try {
-    const response = await resend.emails.send({
-      from: FROM_EMAIL,
-      to,
-      subject,
-      html: input.html,
-      text: input.text,
-    });
-
-    if (response.error) {
-      return recordFailure(
-        `${response.error.name}: ${response.error.message}`,
-        `to=${to} from=${FROM_EMAIL}`
-      );
-    }
-
-    const messageId = response.data?.id ?? null;
-    stats.sent += 1;
-    stats.lastSentAt = new Date().toISOString();
-    stats.lastError = null;
-    stats.lastMessageId = messageId;
-    console.info(`${LOG_PREFIX} enviado ✓ id=${messageId ?? "s/n"} to=${to} from=${FROM_EMAIL}`);
-    return { sent: true, messageId: messageId ?? undefined };
+    result = await transport({ to, subject, html: input.html, text: input.text });
   } catch (error) {
+    // Red de seguridad: un transporte inyectado que lance no debe tumbar la ruta
+    // que llama a `sendEmail`. El camino de aprobaciones y el buzón de P4
+    // dependen de esto para que un problema de correo no sea un 500.
     const message = error instanceof Error ? error.message : String(error);
-    return recordFailure(message, `to=${to} from=${FROM_EMAIL}`);
+    return recordFailure(message, `to=${to}`);
   }
+
+  return mapEmailResult(result, to);
 }
 
 export async function sendNotificationEmail(input: {
