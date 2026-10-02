@@ -123,7 +123,23 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {shows.map((show) => {
-            const isPast = !!show.date && new Date(show.date) < new Date();
+            /*
+             * RC.33 Ola 5 — aquí ya no se decide si el show pasó.
+             *
+             * Este bloque tenía DOS decisiones independientes sin ninguna guarda
+             * que las conciliara: `showStatusLabel(show.status)`, que no miraba la
+             * fecha, y un `isPast` calculado en el cliente, que sí. Con el `status`
+             * sin recalcular —que era lo que pasaba en el dashboard, alimentado por
+             * `/api/dashboard`— la fila salía con "Próximamente" y, al lado,
+             * "Pasado · se elimina en 48h".
+             *
+             * Ahora el estado llega resuelto del servidor: `/api/shows` y
+             * `/api/dashboard` derivan los dos del mismo módulo,
+             * `lib/show-dynamic-status.ts`. Recalcular aquí además dejaría que el
+             * reloj del visitante decidiera —cambiar la fecha del sistema
+             * convertiría en "Pasado" un show de mañana—. Un show pasado se
+             * etiqueta "Pasado" y la fila sigue enseñando fecha, lugar y precio.
+             */
             return (
               <div
                 key={show.id}
@@ -138,9 +154,6 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${showStatusClass(show.status)}`}>
                         {showStatusLabel(show.status)}
                       </span>
-                      {isPast && (
-                        <Badge variant="amber">Pasado · se elimina en 48h</Badge>
-                      )}
                     </div>
                     <div className="text-sm text-slate-500 dark:text-slate-400">
                       <p className="flex items-center gap-1">
