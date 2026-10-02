@@ -694,6 +694,11 @@ export function deprecatedWikimediaHosts(url: string): string[] {
 export interface ScriptFlags {
   apply: boolean;
   dryRequested: boolean;
+  /**
+   * Artistas a los que se limita la corrida, en minusculas. Vacio = todos.
+   * `--only=<artista>` acepta lista separada por comas o espacios.
+   */
+  only: string[];
   /** Texto para el banner que va al principio de la salida. */
   label: string;
 }
@@ -710,5 +715,16 @@ export interface ScriptFlags {
 export function parseScriptFlags(argv: readonly string[]): ScriptFlags {
   const apply = argv.includes("--apply");
   const dryRequested = argv.includes("--dry") || argv.includes("--dry-run");
-  return { apply, dryRequested, label: apply ? "APLICANDO" : "DRY-RUN (sin escrituras)" };
+  // `--only="Pink Floyd,Radiohead"`.
+  //
+  // Se parte **solo por comas**, nunca por espacios: los nombres de artista
+  // llevan espacios ("Pink Floyd", "David Bowie", "The Weeknd"), y partir por
+  // espacios los rompe en tokens que no coinciden nunca con la clave. Un filtro
+  // que no puede seleccionar es peor que no tener filtro, porque parece funcionar.
+  const only = argv
+    .filter((a) => a.startsWith("--only="))
+    .flatMap((a) => a.slice("--only=".length).split(","))
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return { apply, dryRequested, only, label: apply ? "APLICANDO" : "DRY-RUN (sin escrituras)" };
 }
