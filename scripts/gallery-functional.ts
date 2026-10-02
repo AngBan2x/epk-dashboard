@@ -1,6 +1,7 @@
 import { chromium } from "@playwright/test";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
+import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./lib/credentials";
 
 // Functional: gallery CRUD persistence (PATCH/DELETE, no R2 needed) + R2 upload probes + profile upload.
 // Local dev only. Restores baseline at the end.
@@ -51,7 +52,7 @@ async function getGallery(cookie: string, trackId: string): Promise<any[]> {
 }
 
 async function main() {
-  const cookie = await loginCookie("angab06@gmail.com", "12345678");
+  const cookie = await loginCookie(ARTIST_EMAIL, ARTIST_PASSWORD);
   const H = { Cookie: cookie };
   const tracks = ((await (await fetch(`${BASE}/api/tracks`, { headers: H })).json()) as any).tracks ?? [];
   const mine = tracks.find((t: any) => /sad winter/i.test(`${t.title}`));

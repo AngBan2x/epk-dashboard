@@ -12,8 +12,18 @@ const { chromium } = require("@playwright/test");
 
 const BASE = process.env.BASE || "http://localhost:3000";
 const OUT = "tests/screenshots/rc29";
-const EMAIL = process.env.ADMIN_EMAIL || "admin@epk.local";
-const PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+// Este script corre con `node` (sin tsx), asi que no puede importar
+// scripts/lib/credentials.ts. Mismas variables, misma fuente de verdad.
+// El email tiene default porque no es un secreto; la contrasena no lo tiene.
+const EMAIL = process.env.TEST_ADMIN_EMAIL || "admin@epk.local";
+const PASSWORD = process.env.TEST_ADMIN_PASSWORD || "";
+if (!PASSWORD) {
+  console.error(
+    "Falta TEST_ADMIN_PASSWORD. Defina en .env.local (plantilla en .env.example) " +
+      "o en el secret store de CI. No hay contrasena por defecto."
+  );
+  process.exit(1);
+}
 
 const pass = [];
 const fail = [];

@@ -10,6 +10,17 @@ const { chromium } = require("@playwright/test");
 
 const BASE = process.env.BASE || "http://localhost:3100";
 const OUT = "tests/screenshots/rc29";
+// Este script corre con `node` (sin tsx), asi que no puede importar
+// scripts/lib/credentials.ts. Mismas variables, misma fuente de verdad.
+const ARTIST_EMAIL = process.env.TEST_ARTIST_EMAIL || "";
+const ARTIST_PASSWORD = process.env.TEST_ARTIST_PASSWORD || "";
+if (!ARTIST_EMAIL || !ARTIST_PASSWORD) {
+  console.error(
+    "Faltan TEST_ARTIST_EMAIL / TEST_ARTIST_PASSWORD. Definelas en .env.local " +
+      "(plantilla en .env.example) o en el secret store de CI. No hay contrasena por defecto."
+  );
+  process.exit(1);
+}
 const pass = [], fail = [];
 const log = (m) => console.log(m);
 const ok = (n, d) => { pass.push(n); log(`  PASS ${n}${d ? " — " + d : ""}`); };
@@ -158,7 +169,7 @@ async function login(page, email, pw) {
   // ---------- A3: toggle del menu de perfil ----------
   log("\n== A3: menu de perfil (toggle) ==");
   await page.setViewportSize({ width: 1440, height: 900 });
-  if (!(await login(page, "angab06@gmail.com", "12345678"))) { ko("login artista"); }
+  if (!(await login(page, ARTIST_EMAIL, ARTIST_PASSWORD))) { ko("login artista"); }
   else {
     ok("login artista");
     const avatar = page.locator('button[aria-haspopup="menu"]').first();

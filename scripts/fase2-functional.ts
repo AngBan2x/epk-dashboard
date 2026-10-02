@@ -1,4 +1,5 @@
 import { chromium } from "@playwright/test";
+import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./lib/credentials";
 
 // Functional test (local dev only): show expand + dossier->artists sync, with cleanup.
 const BASE = "http://localhost:3099";
@@ -19,7 +20,7 @@ async function loginAndCookie(email: string, pw: string) {
 }
 
 async function main() {
-  const cookie = await loginAndCookie("angab06@gmail.com", "12345678");
+  const cookie = await loginAndCookie(ARTIST_EMAIL, ARTIST_PASSWORD);
   const H = { "Content-Type": "application/json", Cookie: cookie };
   const ARTIST = "art-1788275587598";
 

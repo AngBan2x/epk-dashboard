@@ -1,5 +1,6 @@
 import { chromium } from "@playwright/test";
 import * as fs from "fs";
+import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./lib/credentials";
 
 // HEADED visual verification: gallery buttons appear after same-page login (bug 1),
 // no edit/delete on fallback images (bug 2). Screenshots to tests/screenshots/verify-fixes/.
@@ -33,8 +34,8 @@ async function main() {
   await page.waitForTimeout(1500);
   const email = page.locator('input[type="email"]');
   await email.waitFor({ timeout: 15000 });
-  await email.fill("angab06@gmail.com");
-  await page.locator('input[type="password"]').fill("12345678");
+  await email.fill(ARTIST_EMAIL);
+  await page.locator('input[type="password"]').fill(ARTIST_PASSWORD);
   const lp = page.waitForResponse((r) => r.url().includes("/api/auth/login"), { timeout: 60000 });
   await page.locator('button[type="submit"]').click();
   const loginOk = (await lp).status() === 200;

@@ -1,5 +1,6 @@
 import { chromium } from "@playwright/test";
 import * as fs from "fs";
+import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./lib/credentials";
 
 // Download test: both EPK export buttons trigger real file downloads (prod, artist).
 const BASE = "https://epk-dashboard.vercel.app";
@@ -15,8 +16,8 @@ async function main() {
   await page.goto(BASE + "/login", { waitUntil: "domcontentloaded", timeout: 45000 });
   const form = page.locator("form").first();
   await form.waitFor({ timeout: 20000 });
-  await form.locator('input[type="email"]').fill("angab06@gmail.com");
-  await form.locator('input[type="password"]').fill("12345678");
+  await form.locator('input[type="email"]').fill(ARTIST_EMAIL);
+  await form.locator('input[type="password"]').fill(ARTIST_PASSWORD);
   const lp = page.waitForResponse((r) => r.url().includes("/api/auth/login"), { timeout: 60000 });
   await form.locator('button[type="submit"]').click();
   if ((await lp).status() !== 200) { fail("login", "failed"); await browser.close(); process.exit(1); }
