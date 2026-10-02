@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./credentials";
 
 test.describe("N5: Artist Flow", () => {
   test("artist can login and access dashboard", async ({ page }) => {
@@ -6,8 +7,8 @@ test.describe("N5: Artist Flow", () => {
     await page.goto("/login", { waitUntil: "networkidle" });
 
     // Fill login form with test artist
-    await page.fill('input[type="email"]', "test-artist@example.invalid");
-    await page.fill('input[type="password"]', "12345678");
+    await page.fill('input[type="email"]', ARTIST_EMAIL);
+    await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
 
     // Wait for redirect to dashboard
@@ -28,8 +29,8 @@ test.describe("N5: Artist Flow", () => {
   test("artist can view their tracks", async ({ page }) => {
     // Login as artist
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "test-artist@example.invalid");
-    await page.fill('input[type="password"]', "12345678");
+    await page.fill('input[type="email"]', ARTIST_EMAIL);
+    await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -47,8 +48,8 @@ test.describe("N5: Artist Flow", () => {
   test("artist can view BioSection", async ({ page }) => {
     // Login as artist
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "test-artist@example.invalid");
-    await page.fill('input[type="password"]', "12345678");
+    await page.fill('input[type="email"]', ARTIST_EMAIL);
+    await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -67,8 +68,8 @@ test.describe("N5: Artist Flow", () => {
   test("artist can view Shows & Booking", async ({ page }) => {
     // Login as artist
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "test-artist@example.invalid");
-    await page.fill('input[type="password"]', "12345678");
+    await page.fill('input[type="email"]', ARTIST_EMAIL);
+    await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -89,8 +90,8 @@ test.describe("N5: Artist Flow", () => {
 
     // Login as artist
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "test-artist@example.invalid");
-    await page.fill('input[type="password"]', "12345678");
+    await page.fill('input[type="email"]', ARTIST_EMAIL);
+    await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -106,8 +107,8 @@ test.describe("N5: Artist Flow", () => {
 
     // Login as artist
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "test-artist@example.invalid");
-    await page.fill('input[type="password"]', "12345678");
+    await page.fill('input[type="email"]', ARTIST_EMAIL);
+    await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 

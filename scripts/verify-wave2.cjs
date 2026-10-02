@@ -10,6 +10,19 @@ const { chromium } = require("@playwright/test");
 
 const BASE = process.env.BASE || "http://localhost:3100";
 const OUT = "tests/screenshots/rc29";
+// Este script corre con `node` (sin tsx), asi que no puede importar
+// scripts/lib/credentials.ts. Mismas variables, misma fuente de verdad.
+// Ninguna contrasena tiene default: si falta, el script para aqui con un
+// mensaje util en vez de fallar con un 401 mas abajo.
+const ARTIST_EMAIL = process.env.TEST_ARTIST_EMAIL || "";
+const ARTIST_PASSWORD = process.env.TEST_ARTIST_PASSWORD || "";
+if (!ARTIST_EMAIL || !ARTIST_PASSWORD) {
+  console.error(
+    "Faltan TEST_ARTIST_EMAIL / TEST_ARTIST_PASSWORD. Definelas en .env.local " +
+      "(plantilla en .env.example) o en el secret store de CI. No hay contrasena por defecto."
+  );
+  process.exit(1);
+}
 const pass = [], fail = [];
 const log = (m) => console.log(m);
 const ok = (n, d) => { pass.push(n); log(`  PASS ${n}${d ? " — " + d : ""}`); };
@@ -72,7 +85,7 @@ async function login(page, email, pw) {
 
   // dashboard invitado: cuenta las rejillas
   for (const [label, url] of [["invitado", "/dashboard"], ["artista", "/dashboard"]]) {
-    if (label === "artista" && !(await login(page, "test-artist@example.invalid", "12345678"))) { ko("login artista"); continue; }
+    if (label === "artista" && !(await login(page, ARTIST_EMAIL, ARTIST_PASSWORD))) { ko("login artista"); continue; }
     ytCalls = []; lfmCalls = [];
     await page.goto(BASE + url, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(4000);
@@ -154,7 +167,7 @@ async function login(page, email, pw) {
   // TIENE perfil de artista. El admin no lo tiene, asi que hay que entrar con
   // la cuenta de artista.
   const adm = await ctx2.newPage();
-  if (await login(adm, "test-artist@example.invalid", "12345678")) {
+  if (await login(adm, ARTIST_EMAIL, ARTIST_PASSWORD)) {
     await adm.goto(BASE + "/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
     await adm.waitForTimeout(4500);
     const heights = await adm.evaluate(() => {

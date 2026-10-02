@@ -8,8 +8,18 @@ const { chromium } = require("@playwright/test");
 
 const BASE = process.env.BASE || "http://localhost:3100";
 const OUT = "tests/screenshots/rc29";
-const EMAIL = "test-artist@example.invalid";
-const PASSWORD = "12345678";
+// Este script corre con `node` (sin tsx), asi que no puede importar
+// scripts/lib/credentials.ts. Las variables son las mismas y la fuente de verdad
+// sigue siendo ese modulo: si cambias el nombre de una, cambias aqui tambien.
+const EMAIL = process.env.TEST_ARTIST_EMAIL || "";
+const PASSWORD = process.env.TEST_ARTIST_PASSWORD || "";
+if (!EMAIL || !PASSWORD) {
+  console.error(
+    "Faltan TEST_ARTIST_EMAIL / TEST_ARTIST_PASSWORD. Definelas en .env.local " +
+      "(plantilla en .env.example) o en el secret store de CI. No hay contrasena por defecto."
+  );
+  process.exit(1);
+}
 
 const pass = [], fail = [];
 const log = (m) => console.log(m);

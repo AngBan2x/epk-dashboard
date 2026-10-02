@@ -1,4 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
+import * as dotenv from "dotenv";
+
+// Playwright NO hereda la carga de `.env.local` que hace Next. Sin esto, los
+// `process.env.TEST_*` de `scripts/lib/credentials.ts` serian `undefined` en
+// todos los specs y las credenciales saldrian vacias. En CI las variables
+// llegan del secret store y esta llamada no encuentra fichero: es inocua.
+dotenv.config({ path: ".env.local" });
 
 export default defineConfig({
   testDir: "./tests/e2e",

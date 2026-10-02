@@ -1,10 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { ARTIST_EMAIL, ARTIST_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
-const ARTIST_EMAIL = "test-artist@example.invalid";
-const ARTIST_PASSWORD = "12345678";
-const ADMIN_EMAIL = "admin@epk.local";
-const ADMIN_PASSWORD = "CONTRASENA_ADMIN_ROTADA";
 
 const loginTimestamps: number[] = [];
 

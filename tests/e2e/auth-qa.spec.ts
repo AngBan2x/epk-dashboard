@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
 
 const BASE_URL = 'https://epk-dashboard.vercel.app';
 
@@ -21,8 +22,8 @@ test.describe('Auth QA — v3.10.3', () => {
     await context.clearCookies();
     
     await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', 'admin@epk.local');
-    await page.fill('input[type="password"]', 'CONTRASENA_ADMIN_ROTADA');
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     
     await page.waitForURL('**/dashboard', { timeout: 10000 });
@@ -37,7 +38,7 @@ test.describe('Auth QA — v3.10.3', () => {
     // Verify token via API
     const meResponse = await page.goto(`${BASE_URL}/api/auth/me`);
     const body = await meResponse!.json();
-    expect(body.email).toBe('admin@epk.local');
+    expect(body.email).toBe(ADMIN_EMAIL);
     
     console.log('✅ Login works, cookie set, /api/auth/me returns user');
   });
@@ -47,8 +48,8 @@ test.describe('Auth QA — v3.10.3', () => {
     await context.clearCookies();
     
     await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', 'admin@epk.local');
-    await page.fill('input[type="password"]', 'CONTRASENA_ADMIN_ROTADA');
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.check('input[type="checkbox"]');
     await page.click('button[type="submit"]');
     
@@ -62,7 +63,7 @@ test.describe('Auth QA — v3.10.3', () => {
     // Verify via API
     const meResponse = await page.goto(`${BASE_URL}/api/auth/me`);
     const body = await meResponse!.json();
-    expect(body.email).toBe('admin@epk.local');
+    expect(body.email).toBe(ADMIN_EMAIL);
     
     console.log('✅ Login with rememberMe works, session persists');
   });
@@ -75,7 +76,7 @@ test.describe('Auth QA — v3.10.3', () => {
     const expiredToken = await page.evaluate(() => {
       return btoa(JSON.stringify({
         userId: 'usr-001',
-        email: 'admin@epk.local',
+        email: ADMIN_EMAIL,
         role: 'admin',
         iat: Date.now() - 100000,
         exp: Date.now() - 1000,
@@ -104,7 +105,7 @@ test.describe('Auth QA — v3.10.3', () => {
     await context.clearCookies();
     
     const loginResponse = await page.request.post(`${BASE_URL}/api/auth/login`, {
-      data: { email: 'admin@epk.local', password: 'CONTRASENA_ADMIN_ROTADA', rememberMe: false },
+      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, rememberMe: false },
     });
     expect(loginResponse.ok()).toBeTruthy();
     
@@ -112,7 +113,7 @@ test.describe('Auth QA — v3.10.3', () => {
     expect(meResponse!.status()).toBe(200);
     
     const body = await meResponse!.json();
-    expect(body.email).toBe('admin@epk.local');
+    expect(body.email).toBe(ADMIN_EMAIL);
     expect(body.role).toBe('admin');
     expect(body.password_hash).toBeUndefined();
     
@@ -139,7 +140,7 @@ test.describe('Auth QA — v3.10.3', () => {
     await context.clearCookies();
     
     const loginResponse = await page.request.post(`${BASE_URL}/api/auth/login`, {
-      data: { email: 'admin@epk.local', password: 'CONTRASENA_ADMIN_ROTADA', rememberMe: true },
+      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, rememberMe: true },
     });
     expect(loginResponse.ok()).toBeTruthy();
     
@@ -173,7 +174,7 @@ test.describe('Auth QA — v3.10.3', () => {
     const expiredToken = await page.evaluate(() => {
       return btoa(JSON.stringify({
         userId: 'usr-001',
-        email: 'admin@epk.local',
+        email: ADMIN_EMAIL,
         role: 'admin',
         iat: Date.now() - 100000,
         exp: Date.now() - 1000,
@@ -202,7 +203,7 @@ test.describe('Auth QA — v3.10.3', () => {
     
     // Login
     const loginResponse = await page.request.post(`${BASE_URL}/api/auth/login`, {
-      data: { email: 'admin@epk.local', password: 'CONTRASENA_ADMIN_ROTADA', rememberMe: true },
+      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, rememberMe: true },
     });
     expect(loginResponse.ok()).toBeTruthy();
     
@@ -219,7 +220,7 @@ test.describe('Auth QA — v3.10.3', () => {
     // Verify still authenticated
     const meResponse = await page.goto(`${BASE_URL}/api/auth/me`);
     const body = await meResponse!.json();
-    expect(body.email).toBe('admin@epk.local');
+    expect(body.email).toBe(ADMIN_EMAIL);
     
     console.log('✅ Session survives page navigation');
   });

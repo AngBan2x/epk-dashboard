@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 import * as dotenv from "dotenv";
+import { ARTIST_EMAIL, ARTIST_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
-const ARTIST = ["test-artist@example.invalid", "12345678"] as const;
-const ADMIN = ["admin@epk.local", "CONTRASENA_ADMIN_ROTADA"] as const;
+const ARTIST = [ARTIST_EMAIL, ARTIST_PASSWORD] as const;
+const ADMIN = [ADMIN_EMAIL, ADMIN_PASSWORD] as const;
 const ARTIST_ID = "art-1788275587598";
 const PASSWORD = "TestPass123!";
 const loginStamps: number[] = [];

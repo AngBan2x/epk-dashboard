@@ -1,6 +1,7 @@
 /* Batch 2 visual verification — dashboard sections + admin artist edit form */
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "fs";
+import { ARTIST_EMAIL, ARTIST_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD } from "./lib/credentials";
 
 const BASE = "http://localhost:3099";
 const OUT = "tests/screenshots/batch2";
@@ -48,7 +49,7 @@ async function main() {
   const page = await ctx.newPage();
 
   try {
-    await login(page, "test-artist@example.invalid", "12345678");
+    await login(page, ARTIST_EMAIL, ARTIST_PASSWORD);
     await page.goto(`${BASE}/dashboard`, { waitUntil: "domcontentloaded", timeout: 45000 });
     await page.waitForSelector("h2", { timeout: 20000 });
     await page.waitForTimeout(1500);
@@ -96,8 +97,8 @@ async function main() {
     await adminPage.goto(`${BASE}/login`, { waitUntil: "networkidle", timeout: 60000 });
     const form = adminPage.locator("form").first();
     await form.waitFor({ timeout: 20000 });
-    await form.locator('input[type="email"]').fill("admin@epk.local");
-    await form.locator('input[type="password"]').fill("CONTRASENA_ADMIN_ROTADA");
+    await form.locator('input[type="email"]').fill(ADMIN_EMAIL);
+    await form.locator('input[type="password"]').fill(ADMIN_PASSWORD);
 
     const loginResPromise = adminPage.waitForResponse(
       (r) => r.url().includes("/api/auth/login"),

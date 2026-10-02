@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
 test.describe("N4: Admin Flow", () => {
   test("admin can login and access admin panel", async ({ page }) => {
@@ -6,8 +7,8 @@ test.describe("N4: Admin Flow", () => {
     await page.goto("/login", { waitUntil: "networkidle" });
 
     // Fill login form
-    await page.fill('input[type="email"]', "admin@epk.local");
-    await page.fill('input[type="password"]', "CONTRASENA_ADMIN_ROTADA");
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
 
     // Wait for redirect to dashboard
@@ -52,8 +53,8 @@ test.describe("N4: Admin Flow", () => {
   test("admin can view tracks tab", async ({ page }) => {
     // Login as admin
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "admin@epk.local");
-    await page.fill('input[type="password"]', "CONTRASENA_ADMIN_ROTADA");
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -79,8 +80,8 @@ test.describe("N4: Admin Flow", () => {
   test("admin can view artists tab", async ({ page }) => {
     // Login as admin
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "admin@epk.local");
-    await page.fill('input[type="password"]', "CONTRASENA_ADMIN_ROTADA");
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -101,8 +102,8 @@ test.describe("N4: Admin Flow", () => {
   test("admin can view shows tab", async ({ page }) => {
     // Login as admin
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "admin@epk.local");
-    await page.fill('input[type="password"]', "CONTRASENA_ADMIN_ROTADA");
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -123,8 +124,8 @@ test.describe("N4: Admin Flow", () => {
   test("admin can view notifications tab", async ({ page }) => {
     // Login as admin
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "admin@epk.local");
-    await page.fill('input[type="password"]', "CONTRASENA_ADMIN_ROTADA");
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
@@ -147,8 +148,8 @@ test.describe("N4: Admin Flow", () => {
 
     // Login as admin
     await page.goto("/login", { waitUntil: "networkidle" });
-    await page.fill('input[type="email"]', "admin@epk.local");
-    await page.fill('input[type="password"]', "CONTRASENA_ADMIN_ROTADA");
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 

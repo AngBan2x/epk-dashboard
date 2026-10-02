@@ -1,8 +1,9 @@
 import { chromium } from "@playwright/test";
 import fs from "node:fs";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./lib/credentials";
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
-const ADMIN = { email: "admin@epk.local", password: "CONTRASENA_ADMIN_ROTADA" };
+const ADMIN = { email: ADMIN_EMAIL, password: ADMIN_PASSWORD };
 const results: string[] = [];
 
 async function main() {

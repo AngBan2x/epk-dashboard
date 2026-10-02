@@ -1,5 +1,6 @@
 import { chromium, BrowserContext, Page } from "@playwright/test";
 import * as fs from "fs";
+import { ARTIST_EMAIL, ARTIST_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD } from "./lib/credentials";
 
 const BASE = "https://epk-dashboard.vercel.app";
 const OUT = "tests/screenshots/prod-exhaustive";
@@ -129,7 +130,7 @@ async function main() {
   {
     const lctx = await browser.newContext();
     console.log("ARTIST LOGIN...");
-    if (!(await login(lctx, "test-artist@example.invalid", "12345678"))) { fail("artist login", "login failed"); }
+    if (!(await login(lctx, ARTIST_EMAIL, ARTIST_PASSWORD))) { fail("artist login", "login failed"); }
     else {
       pass("artist login", "200");
       await lctx.storageState({ path: "prod-artist.json" });
@@ -153,7 +154,7 @@ async function main() {
     const lctx = await browser.newContext();
     console.log("ADMIN LOGIN...");
     await new Promise((r) => setTimeout(r, 65000)); // rate-limit cooldown
-    if (!(await login(lctx, "admin@epk.local", "CONTRASENA_ADMIN_ROTADA"))) { fail("admin login", "login failed"); }
+    if (!(await login(lctx, ADMIN_EMAIL, ADMIN_PASSWORD))) { fail("admin login", "login failed"); }
     else {
       pass("admin login", "200");
       await lctx.storageState({ path: "prod-admin.json" });

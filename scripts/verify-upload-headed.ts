@@ -1,5 +1,6 @@
 import { chromium } from "@playwright/test";
 import * as fs from "fs";
+import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./lib/credentials";
 const BASE = "https://epk-dashboard.vercel.app";
 const TRACK = "b55c7033-66a7-42f2-84ad-dd4c225f3307";
 const OUT = "tests/screenshots/verify-fixes";
@@ -25,8 +26,8 @@ async function main() {
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded", timeout: 45000 });
   const form = page.locator("form").first();
   await form.waitFor({ timeout: 20000 });
-  await form.locator('input[type="email"]').fill("test-artist@example.invalid");
-  await form.locator('input[type="password"]').fill("12345678");
+  await form.locator('input[type="email"]').fill(ARTIST_EMAIL);
+  await form.locator('input[type="password"]').fill(ARTIST_PASSWORD);
   const lp = page.waitForResponse((r) => r.url().includes("/api/auth/login"), { timeout: 60000 });
   await form.locator('button[type="submit"]').click();
   console.log("login:", (await lp).status());

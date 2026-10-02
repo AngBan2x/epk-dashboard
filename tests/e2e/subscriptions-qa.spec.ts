@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ARTIST_EMAIL, ARTIST_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
 const TEST_PASSWORD = "TestPass123!";
@@ -150,7 +151,7 @@ test.describe("P4.2: Suscripciones QA", () => {
 
   test("API: un artista no puede suscribirse a su propio perfil", async ({ browser }) => {
     const ctx = await browser.newContext();
-    await loginWithRetry(ctx.request, "test-artist@example.invalid", "12345678");
+    await loginWithRetry(ctx.request, ARTIST_EMAIL, ARTIST_PASSWORD);
     const attempt = await ctx.request.post(`${BASE_URL}/api/subscriptions`, { data: { artist_id: ARTIST } });
     expect(attempt.status()).toBe(400);
     expect((await attempt.json()).error).toBe("No puedes suscribirte a tu propio perfil");
@@ -291,7 +292,7 @@ test.describe("P4.2: Suscripciones QA", () => {
     createdEmails.splice(createdEmails.indexOf(email), 1);
 
     const adminCtx = await browser.newContext();
-    await loginWithRetry(adminCtx.request, "admin@epk.local", "CONTRASENA_ADMIN_ROTADA");
+    await loginWithRetry(adminCtx.request, ADMIN_EMAIL, ADMIN_PASSWORD);
     const check = await adminCtx.request.get(`${BASE_URL}/api/subscriptions?user_id=${userId}`);
     expect(check.status()).toBe(200);
     expect(await check.json()).toEqual([]);

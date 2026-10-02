@@ -8,6 +8,7 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { mkdir } from "fs/promises";
 import path from "path";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./lib/credentials";
 
 const BASE = process.argv[2] || "http://localhost:3200";
 const OUT = process.argv[3] || path.join(process.cwd(), "tests", "screenshots", "rc29");
@@ -137,7 +138,7 @@ async function dumpCardTooltips(page: Page, selector: string) {
 async function main() {
   await mkdir(OUT, { recursive: true });
   const browser = await chromium.launch();
-  const admin = { email: "admin@epk.local", pw: "CONTRASENA_ADMIN_ROTADA" };
+  const admin = { email: ADMIN_EMAIL, pw: ADMIN_PASSWORD };
 
   for (const theme of ["light", "dark"] as const) {
     console.log(`\n=== ${theme} ===`);

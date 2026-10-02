@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
-const ADMIN = ["admin@epk.local", "CONTRASENA_ADMIN_ROTADA"] as const;
+const ADMIN = [ADMIN_EMAIL, ADMIN_PASSWORD] as const;
 const PASSWORD = "TestPass123!";
 const loginStamps: number[] = [];
 const createdEmails: string[] = [];
