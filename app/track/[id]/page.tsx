@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper"
 import { LyricsSectionWrapper } from "@/components/LyricsSectionWrapper";
@@ -17,6 +17,7 @@ import LastfmMetrics from "@/components/LastfmMetrics";
 import { UnifiedMetrics } from "@/components/UnifiedMetrics";
 import { PageTransition, SlideIn } from "@/components/MotionWrappers";
 import { getTrackById, getAllTracks, getArtistByName, getTracksByReleaseId } from "@/lib/db";
+import { resolveTrackRoute } from "@/lib/releases";
 import { safeString, formatNumber, capitalizeReleaseType, getCoverImage, sumDurations } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
 
@@ -66,17 +67,50 @@ export async function generateMetadata({ params }: TrackDetailPageProps): Promis
 
 export default async function TrackDetailPage({ params }: TrackDetailPageProps) {
   const { id } = await params;
-  const track = await getTrackById(id);
-  if (!track) notFound();
+
+  /**
+   * P2 · Ola 10 — esta ruta deja de ser la ficha de una pista sin más.
+   *
+   * `tracks.release_id` es la columna que hace de una fila hija de un
+   * lanzamiento (el enunciado la llama `parent_id`, pero en el esquema se llama
+   * `release_id`: `lib/db.ts:218`, y `Track.release_id` es lo que expone
+   * `parseTrack`). Una fila con `release_id` puesta ya **no es una página**:
+   * su contenido se presenta en `/releases/[padre]`, que es la única página de
+   * ese contenido. Así que aquí se redirige, y no se replica.
+   *
+   * `resolveTrackRoute` decide los cuatro casos (ver `lib/releases.ts` para
+   * por qué se comprueba antes de redirigir y qué pasa con una hija sin padre).
+   * Los dos primeros son `never`: `notFound()` y `redirect()` lanzan. Por eso
+   * `route.track` queda estrechado sin `as Track` ni `!` — y sin ese
+   * estrechamiento habría que escribir un cast, que es exactamente lo que
+   * rompe el caso de "no existe", el único que importa.
+   */
+  const route = await resolveTrackRoute(id);
+  if (route.kind === "missing") notFound();
+  if (route.kind === "release") redirect(route.href);
+  const track = route.track;
+  /** Hija cuyo `release_id` apunta a una fila que ya no existe. */
+  const isOrphan = route.kind === "orphan";
 
   const [artist, allTracks, children] = await Promise.all([
     getArtistByName(track.artist_name),
     getAllTracks(),
     getTracksByReleaseId(id),
   ]);
-  const currentIndex = allTracks.findIndex(t => t.id === id);
-  const prevTrack = currentIndex > 0 ? allTracks[currentIndex - 1] : null;
-  const nextTrack = currentIndex < allTracks.length - 1 ? allTracks[currentIndex + 1] : null;
+
+  /**
+   * Anterior / siguiente: SOLO sobre filas que son un lanzamiento.
+   *
+   * `getAllTracks()` devuelve las cabeceras y todas las hijas en un mismo
+   * array, así que el índice avanzaba por dentro de un álbum. Desde P2 una hija
+   * redirige a la página de su padre, de modo que "siguiente" podía llevar a la
+   * página de la que se acaba de salir. Filtrar aquí quita las hijas del
+   * contador sin cambiar nada más del render.
+   */
+  const navigable = allTracks.filter((t) => !t.release_id);
+  const currentIndex = navigable.findIndex(t => t.id === id);
+  const prevTrack = currentIndex > 0 ? navigable[currentIndex - 1] : null;
+  const nextTrack = currentIndex >= 0 && currentIndex < navigable.length - 1 ? navigable[currentIndex + 1] : null;
 
   const streamCount = track.streams ?? track.metrics?.streams ?? 0;
 
@@ -105,6 +139,34 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
   return (
     <PageTransition>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-32">
+        {/*
+            Hija huérfana: `release_id` apunta a una fila que ya no existe.
+
+            `release_id` no es foreign key (`lib/db.ts:218`, `release_id TEXT`
+            pelado), así que esto es alcanzable: un script, un `DELETE`
+            directo o un padre borrado en una cascada que no corrió dejan la
+            hija apuntando al vacío. Redirigir a `/releases/<padre-inexistente>`
+            daría un 404 en una URL que no le dice nada a quien la ve; dar un
+            404 aquí tiraría una pista que **sí** existe y que además se puede
+            reproducir. Así que se muestra, con el aviso en la primera línea.
+
+            El aviso importa tanto como la decisión: sin él, el visitante
+            llegaría aquí desde un enlace viejo y concluiría que el catálogo
+            está roto, cuando lo que pasó es que se borró el disco.
+        */}
+        {isOrphan && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6">
+            <p
+              role="status"
+              className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              Esta pista formaba parte de un lanzamiento que ya no está en el
+              catálogo. Puedes reproducirla aquí, pero ya no hay ficha del disco
+              al que perteneció.
+            </p>
+          </div>
+        )}
+
         {/* Header / Breadcrumb */}
         <SlideIn index={0}>
           <nav className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-4" aria-label="Breadcrumb">

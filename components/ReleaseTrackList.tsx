@@ -206,12 +206,19 @@ export function ReleaseTrackList({
                   ? undefined
                   : "Esta pista no tiene audio propio y el lanzamiento no tiene vídeo: no hay nada que reproducir"
               }
-              className={`p-2 rounded-full transition-colors ${
+              className={`p-2.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
                 isPlaying
                   ? "bg-primary-500 text-white"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-600"
               } ${isLoading || !playable ? "opacity-50 cursor-not-allowed" : ""}`}
-              aria-label={isPlaying ? "Pausar" : "Reproducir"}
+              /* Sin el título, "Reproducir" repetido en cada fila no dice nada: un
+                 lector de pantalla anuncia once botones idénticos. Con el número
+                 y el título, el usuario sabe cuál va a pulsar. */
+              aria-label={
+                playable
+                  ? `${isPlaying ? "Pausar" : "Reproducir"} ${trackNumber}: ${track.title}`
+                  : `${track.title}: sin audio disponible`
+              }
             >
               {!playable ? (
                 /* Sin fuente: el icono tachado, no un play que no hace nada. */
