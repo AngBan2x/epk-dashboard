@@ -7,6 +7,17 @@ export interface CarouselNavigationProps {
   canNext: boolean;
   onPrev: () => void;
   onNext: () => void;
+  /**
+   * RC.33 Ola 7 — el nombre del elemento que se pagina. Antes estaba escrito a
+   * fuego como "Artista", lo que era verdad para el único consumidor que había
+   * (el de artistas) y un error para el de releases: un lector de pantalla
+   * anunciaba "Artista siguiente" sobre un carrusel de lanzamientos.
+   *
+   * Opcionales y con ese valor por defecto, así que el carrusel de artistas no
+   * pasa nada y sus botones dicen exactamente lo que decían.
+   */
+  prevLabel?: string;
+  nextLabel?: string;
 }
 
 const buttonClass =
@@ -17,6 +28,8 @@ export function CarouselNavigation({
   canNext,
   onPrev,
   onNext,
+  prevLabel = "Artista anterior",
+  nextLabel = "Artista siguiente",
 }: CarouselNavigationProps) {
   return (
     <div className="mt-4 flex items-center justify-end gap-2">
@@ -25,7 +38,7 @@ export function CarouselNavigation({
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         disabled={!canPrev}
-        aria-label="Artista anterior"
+        aria-label={prevLabel}
         onClick={onPrev}
         className={buttonClass}
       >
@@ -38,7 +51,7 @@ export function CarouselNavigation({
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         disabled={!canNext}
-        aria-label="Artista siguiente"
+        aria-label={nextLabel}
         onClick={onNext}
         className={buttonClass}
       >

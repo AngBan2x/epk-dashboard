@@ -7,6 +7,11 @@ import { BioSection } from "@/components/BioSection";
 // C6: `ArtistSocialLinks` se retiró del catálogo. Sus datos ya son públicos en
 // `/artists/[id]` y aquí solo se duplicaban.
 import { CatalogArtistsCarousel } from "@/components/dashboard/CatalogArtistsCarousel";
+// RC.33 Ola 7: el carrusel horizontal de releases que sustituye a la rejilla de
+// la vista de invitado. Comparte los 5 primitivos de `components/carousel/*` con
+// el de artistas; lo propio de este es el contenido (una `EPKCard` por slide) y
+// que son 4 por página en vez de 1.
+import { CatalogReleaseCarousel } from "@/components/dashboard/CatalogReleaseCarousel";
 import { ShowsBooking } from "@/components/ShowsBooking";
 import { LoginModal } from "@/components/LoginModal";
 import LastfmMetrics from "@/components/LastfmMetrics";
@@ -926,33 +931,54 @@ export default function DashboardPage() {
               </section>
 
               {/* All tracks */}
-              <section>
+              <section className="mb-8">
                 <div className="mb-4 flex justify-end">
                   <SortSelect value={sortState} onChange={setSortState} />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-                  {sortedTracks.map((track, i) => (
-                    <SlideIn key={track.id} index={i}>
-                      {/* P8: sin `<a>` envolviendo la tarjeta. Ver la nota del
-                          panel de admin, que tenía el mismo defecto. */}
-                      <EPKCard
-                        track={track}
-                        priority={i === 0}
-                        onLoginPrompt={() => setShowLoginModal(true)}
-                        youtubeStats={statsFor(track)}
-                        lastfmPlaycount={lastfmFor(track)}
-                lastfmByTrack={lastfmByTrackId}
-                        {...cardProps(track)}
-                      />
-                    </SlideIn>
-                  ))}
-                  {tracks.length === 0 && (
-                    <div className="col-span-full text-center py-12 text-slate-400">
-                      <p>No se encontraron tracks.</p>
-                    </div>
-                  )}
-                </div>
+                {/*
+                  RC.33 Ola 7 — esta rejilla la **sustituye** un carrusel
+                  horizontal de 4 releases por página.
+
+                  Y no es una decisión de maquetación, es una de producto, así
+                  que va por escrito. Tres motivos:
+
+                  1. El usuario pidió el carrusel y ya había dicho que la rejilla
+                     de 4 columnas le parecía mal. Dejar las dos cosas es
+                     mandar el motivo del aviso junto al arreglo, en la misma
+                     pantalla y con los mismos 18 lanzamientos.
+                  2. Dos presentaciones horizontales del mismo catálogo en una
+                     página es exactamente la "dos fuentes de verdad" que este
+                     repo lleva tres olas rechazando: está escrito en
+                     `lib/carousel.ts` y en `ArtistTracksSection.tsx:138-142`.
+                  3. Esta vista ya tiene un carrusel debajo, el de artistas. La
+                     página queda "cabecera → catálogo → artistas → descargas",
+                     y 18 tarjetas en rejilla rompían ese ritmo.
+
+                  Lo que NO se pierde con el cambio: las 18 tarjetas siguen
+                  montadas en el DOM, solo que fuera de la vista inicial. No hay
+                  pérdida de indexación ni de accesibilidad, y `SortSelect`
+                  sigue ordenando el mismo array.
+
+                  El `SortSelect` y el encabezado "Catálogo completo · N
+                  lanzamientos · M pistas" se quedan donde estaban, encima del
+                  carrusel: son la cabecera del catálogo, no del mecanismo que lo
+                  muestra.
+
+                  `cardProps`, `statsFor`, `lastfmFor` y `lastfmByTrackId` se
+                  **pasan** al carrusel en vez de reimplementarse ahí: las colas,
+                  el lote de YouTube y el playcount de Last.fm ya están resueltos
+                  en esta página y duplicarlos daría dos copias que divergen.
+                */}
+                <CatalogReleaseCarousel
+                  tracks={sortedTracks}
+                  getCardProps={cardProps}
+                  getYoutubeStats={statsFor}
+                  getLastfmPlaycount={lastfmFor}
+                  lastfmByTrack={lastfmByTrackId}
+                  onLoginPrompt={() => setShowLoginModal(true)}
+                />
               </section>
+
 
               {/* Carousel of all artists' Bio + Shows */}
               {artists.length > 0 && (
