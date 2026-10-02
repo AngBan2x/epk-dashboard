@@ -7,6 +7,7 @@ import {
 import { validateRequest } from "@/lib/auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { buildReleaseDurations, resolveCatalogDuration } from "@/lib/downloadable-assets";
+import { resolveAlbumMetrics, type MetricsSource } from "@/lib/metrics-source";
 import { safeArray, safeNumber, safeString } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
 
@@ -75,7 +76,17 @@ interface CatalogRelease {
   status: ReleaseStatus | "otro";
   cover_image: string | null;
   track_count: number;
-  streams: number;
+  /**
+   * RC.33 · Ola 3 — `null` cuando ninguna fuente tiene cifra para este release.
+   *
+   * Antes era `children.reduce(sum + safeNumber(child.metrics?.streams), ...)`:
+   * `safeNumber` devolvía `0` para lo que no venía, así que un álbum sin
+   * métricas salía con `streams: 0` y la UI no tenía forma de saber si ese
+   * cero era un dato o un hueco. `null` es el hueco.
+   */
+  streams: number | null;
+  /** De dónde sale `streams`. Permite que la UI no adivine. */
+  streams_source: MetricsSource;
   tracks: CatalogChild[];
 }
 
@@ -139,6 +150,20 @@ function groupByRelease(tracks: Track[]): CatalogRelease[] {
     const children = (childrenByRelease.get(safeString(head.id, "")) ?? []).sort(compareChildren);
     const computed = releaseDurations.get(safeString(head.id, ""));
     const duration = resolveCatalogDuration(head, releaseDurations);
+    /**
+     * RC.33 · Ola 3 — la agregación de las hijas vive en `lib/metrics-source.ts`
+     * y NO se duplica aquí: `EPKCard` llama a la misma función para el pie, así
+     * que el número de la API y el de la tarjeta no pueden divergir.
+     *
+     * Esta ruta no hace red, así que solo hay una fuente posible —el JSON
+     * curado—, y se le pasa como tal. `resolveAlbumMetrics` decide igual: suma
+     * las hijas que tengan dato en la fuente elegida e ignora las que no, en vez
+     * de sumar ceros de relleno como hacía `safeNumber`.
+     */
+    const resolved = resolveAlbumMetrics(
+      { curated: head.metrics },
+      children.map((child) => ({ curated: child.metrics }))
+    );
     return {
       id: safeString(head.id),
       title: safeString(head.title),
@@ -149,7 +174,8 @@ function groupByRelease(tracks: Track[]): CatalogRelease[] {
       status: normalizeStatus(head.status),
       cover_image: head.cover_image ?? null,
       track_count: children.length,
-      streams: children.reduce((sum, child) => sum + safeNumber(child.metrics?.streams), safeNumber(head.metrics?.streams)),
+      streams: resolved.value,
+      streams_source: resolved.source,
       tracks: children.map(toChild),
     };
   });

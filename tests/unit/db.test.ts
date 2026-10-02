@@ -77,10 +77,18 @@ describe("Database", () => {
   it("tracks have parsed metrics", async () => {
     const tracks = await getAllTracks();
     const first = tracks[0];
-    expect(first.metrics).toHaveProperty("streams");
-    expect(first.metrics).toHaveProperty("saves");
-    expect(first.metrics).toHaveProperty("top_countries");
-    expect(Array.isArray(first.metrics.top_countries)).toBe(true);
+    // RC.33 · Ola 3: `metrics` es `Metrics | null`, así que la forma correcta de
+    // comprobarlo es que sea `null` o un objeto completo — NO que tenga las
+    // propiedades, que era justamente lo que el fallback de ceros garantizaba
+    // siempre y por eso no probaba nada. La diferencia importa: la columna puede
+    // traer `NULL` y eso ya no se convierte en `{streams: 0, ...}`.
+    expect(
+      first.metrics === null ||
+        (typeof first.metrics.streams === "number" &&
+          typeof first.metrics.saves === "number" &&
+          typeof first.metrics.playlist_additions === "number" &&
+          Array.isArray(first.metrics.top_countries))
+    ).toBe(true);
   });
 
   it("tracks have parsed production_details", async () => {
@@ -95,48 +103,62 @@ describe("parseMetrics", () => {
   it("parses valid JSON string", () => {
     const jsonString = '{"streams": 1000, "saves": 50, "playlist_additions": 10, "top_countries": [{"country": "US", "pct": 40}]}';
     const result = parseMetrics(jsonString);
-    expect(result.streams).toBe(1000);
-    expect(result.saves).toBe(50);
-    expect(result.playlist_additions).toBe(10);
-    expect(result.top_countries).toEqual([{ country: "US", pct: 40 }]);
+    expect(result?.streams).toBe(1000);
+    expect(result?.saves).toBe(50);
+    expect(result?.playlist_additions).toBe(10);
+    expect(result?.top_countries).toEqual([{ country: "US", pct: 40 }]);
   });
 
   it("parses pre-parsed object (simulating Turso behavior)", () => {
     const obj = { streams: 2500, saves: 120, playlist_additions: 25, top_countries: [{ country: "MX", pct: 30 }, { country: "AR", pct: 25 }] };
     const result = parseMetrics(obj);
-    expect(result.streams).toBe(2500);
-    expect(result.saves).toBe(120);
-    expect(result.playlist_additions).toBe(25);
-    expect(result.top_countries).toEqual([{ country: "MX", pct: 30 }, { country: "AR", pct: 25 }]);
+    expect(result?.streams).toBe(2500);
+    expect(result?.saves).toBe(120);
+    expect(result?.playlist_additions).toBe(25);
+    expect(result?.top_countries).toEqual([{ country: "MX", pct: 30 }, { country: "AR", pct: 25 }]);
   });
 
-  it("returns fallback for null input", () => {
-    const result = parseMetrics(null);
-    expect(result).toEqual({ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] });
+  // RC.33 · Ola 3 — estas cuatro aserciones cambiaron de `{streams: 0, ...}` a
+  // `null`. Antes describían el bug: "no hay dato" se colapsaba a cero, y el
+  // pie de la tarjeta pintaba ese cero como si fuera una medición. `null` es la
+  // ausencia; un objeto con ceros dentro sigue siendo un dato y se respeta.
+  it("returns null for null input", () => {
+    expect(parseMetrics(null)).toBeNull();
   });
 
-  it("returns fallback for empty string", () => {
-    const result = parseMetrics("");
-    expect(result).toEqual({ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] });
+  it("returns null for empty string", () => {
+    expect(parseMetrics("")).toBeNull();
   });
 
-  it("returns fallback for invalid JSON string", () => {
-    const result = parseMetrics("invalid json {{{");
-    expect(result).toEqual({ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] });
+  it("returns null for invalid JSON string", () => {
+    expect(parseMetrics("invalid json {{{")).toBeNull();
   });
 
   it("handles partial metrics object with missing fields", () => {
+    // Un objeto válido con un campo: es dato, y los campos ausentes valen 0.
+    // No se reescribe a `null`, porque la columna sí traía métricas.
     const obj = { streams: 500 };
     const result = parseMetrics(obj);
-    expect(result.streams).toBe(500);
-    expect(result.saves).toBe(0);
-    expect(result.playlist_additions).toBe(0);
-    expect(result.top_countries).toEqual([]);
+    expect(result?.streams).toBe(500);
+    expect(result?.saves).toBe(0);
+    expect(result?.playlist_additions).toBe(0);
+    expect(result?.top_countries).toEqual([]);
+  });
+
+  it("keeps an explicit curated zero as a real datum", () => {
+    // La otra mitad del contrato: si alguien escribió `streams: 0`, ese 0 es un
+    // dato. Reescribirlo a `null` sería borrar una métrica a propósito, y el
+    // usuario pidió explícitamente que las inventadas no se borren.
+    const result = parseMetrics({ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] });
+    expect(result).toEqual({ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] });
+  });
+
+  it("returns null for a JSON array (not a metrics object)", () => {
+    expect(parseMetrics("[1,2,3]")).toBeNull();
   });
 
   it("handles non-object parsed result", () => {
-    const result = parseMetrics("not an object");
-    expect(result).toEqual({ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] });
+    expect(parseMetrics("not an object")).toBeNull();
   });
 });
 

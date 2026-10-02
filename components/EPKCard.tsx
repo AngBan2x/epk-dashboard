@@ -21,6 +21,12 @@ import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
 import { isQueueItemPlayable } from "@/lib/audio-priority";
 import { sumDurations } from "@/lib/null-safe";
 import type { YouTubeStatPair } from "@/lib/youtube";
+import {
+  metricsTooltip,
+  resolveAlbumMetrics,
+  resolveMetrics,
+  type MetricsCandidates,
+} from "@/lib/metrics-source";
 
 interface EPKCardProps {
   track: Track;
@@ -60,6 +66,22 @@ interface EPKCardProps {
   childrenTracks?: Track[];
   /** Cola completa del lanzamiento, ya en formato `ActiveTrack`. */
   queue?: ActiveTrack[];
+  /**
+   * RC.33 · Ola 3 — scrobbles de Last.fm de **esta** fila.
+   *
+   * Es `null` cuando Last.fm no respondió (sin clave, `not_found`, cuota,
+   * timeout) y un número cuando respondió, incluido `0`. Ese es el contrato de
+   * `resolveMetrics`, y por eso el tipo no es `number`: mandar `0` cuando la
+   * integración falló es exactamente el bug que se arregla aquí.
+   *
+   * ⚠️ **Límite conocido, reportado a propósito.** Esta tarjeta solo recibe el
+   *   playcount de la fila que representa. Las hijas de un álbum llegan sin
+   *   Last.fm, así que un álbum del que solo se conoce el Last.fm de las pistas
+   *   se enseña como "—". El fetch por Daughter está en quien monta la rejilla
+   *   (`ArtistTracksSection`), fuera del ownership de esta ola; cuando exista,
+   *   esta tarjeta y `resolveAlbumMetrics` ya lo agregan sin tocar nada más.
+   */
+  lastfmPlaycount?: number | null;
 }
 
 export function EPKCard({
@@ -72,6 +94,7 @@ export function EPKCard({
   detailHref,
   childrenTracks,
   queue,
+  lastfmPlaycount = null,
 }: EPKCardProps) {
   const { user } = useAuth();
   const audio = useAudioPlayer();
@@ -94,17 +117,50 @@ export function EPKCard({
   const [animating, setAnimating] = useState(false);
   const [loading, setLoading] = useState(false);
   const ytLikes = youtubeStats?.likeCount ?? 0;
-  const ytViews = youtubeStats?.viewCount ?? 0;
-  const streams = formatNumber((track.metrics?.streams ?? 0) + ytViews);
+  const ytViews = youtubeStats?.viewCount ?? null;
+  /**
+   * RC.33 · Ola 3 — el pie ya no suma fuentes ni inventa ceros.
+   *
+   * Antes: `formatNumber((track.metrics?.streams ?? 0) + ytViews)`. Eso hacía
+   * tres cosas malas a la vez: convertía "sin dato" en 0, mezclaba streams
+   * curados con vistas de YouTube (que no son la misma unidad), y cuando el
+   * track no tenía vídeo devolvía un 0 que la tarjeta pintaba con tipografía de
+   * medición real.
+   *
+   * Ahora decide `lib/metrics-source.ts`: una sola fuente, y `null` —no `0`—
+   * cuando ninguna habló. Un álbum se agrega **dentro de una sola fuente**; por
+   * eso las hijas aportan solo su JSON curado, que es lo único que esta tarjeta
+   * tiene de ellas.
+   */
+  const ownMetricsCandidates: MetricsCandidates = {
+    curated: track.metrics,
+    youtubeViewCount: ytViews,
+    lastfmPlaycount,
+  };
+  const metrics = childrenTracks?.length
+    ? resolveAlbumMetrics(
+        ownMetricsCandidates,
+        childrenTracks.map((child): MetricsCandidates => ({ curated: child.metrics }))
+      )
+    : resolveMetrics(ownMetricsCandidates);
+  const streams = metrics.value === null ? "—" : formatNumber(metrics.value);
+  /**
+   * `saves` solo existe en el JSON curado: ni YouTube ni Last.fm lo dan, así que
+   * no tiene cadena de fallback y se resuelve con la misma regla de ausencia.
+   * Se deja el `—` en vez de `?? 0` por el mismo motivo que en las streams.
+   */
+  const saves = track.metrics ? formatNumber(track.metrics.saves) : "—";
 
   // El track declara un video de YouTube pero el lote no trajo sus stats:
   // no inventamos el dato, lo decimos.
   const youtubeMissing = !!track.youtube_video_id && !youtubeStats;
-  const statsTooltip = youtubeMissing
-    ? "No se pudieron obtener las métricas de YouTube para este video"
-    : youtubeStats
-      ? `Incluye vistas y likes de YouTube (${formatNumber(youtubeStats.viewCount)} vistas)`
-      : "Streams registrados en PressPlay (este track no tiene video de YouTube)";
+  const statsTooltip = metricsTooltip(
+    metrics,
+    youtubeMissing ? "No se pudieron obtener las métricas de YouTube para este video" : null
+  );
+  const savesTooltip = track.metrics
+    ? "Guardados registrados en el catálogo de PressPlay"
+    : "Sin dato: el catálogo no tiene guardados para esta pista";
 
   // Badge "Nuevo Lanzamiento" — track released in the last 7 days (UTC days, TZ-safe)
   const isNewRelease = (() => {
@@ -436,16 +492,33 @@ export function EPKCard({
           />
         )}
 
-        {/* Stats footer: streams, saves, likes */}
+        {/*
+          Stats footer. RC.33 · Ola 3: `streams` y `saves` traen "—" cuando no
+          hay dato, no `0`.
+
+          El `title` no es decoración: es lo que distingue un guion de "no lo
+          sabemos" de un número que se perdió al renderizar. Los dos `span` de
+          cifras llevan `aria-label` con el texto del tooltip para que el lector
+          de pantalla no anuncie un "—" pelado, que es indistinguible de un 0
+          silencioso.
+        */}
         <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1" title={statsTooltip}>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A2 2 0 0010 9.87v4.263a2 2 0 001.555.832l3.197-2.132a2 2 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span
+              className="inline-flex items-center gap-1"
+              title={statsTooltip}
+              aria-label={statsTooltip}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A2 2 0 0010 9.87v4.263a2 2 0 001.555.832l3.197-2.132a2 2 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               {streams}
             </span>
-            <span className="inline-flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-              {formatNumber(track.metrics?.saves ?? 0)}
+            <span
+              className="inline-flex items-center gap-1"
+              title={savesTooltip}
+              aria-label={savesTooltip}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+              {saves}
             </span>
           </div>
           <div
