@@ -581,12 +581,38 @@ function parseArtist(row: Record<string, unknown>): ArtistProfile {
   };
 }
 
-export function parseMetrics(raw: string | Record<string, unknown> | null): Metrics {
-  const fallback: Metrics = { streams: 0, saves: 0, playlist_additions: 0, top_countries: [] };
-  if (!raw) return fallback;
+/**
+ * RC.33 · Ola 3 — `NULL`, `""` y JSON inválido significan **"no hay dato"**, y
+ * eso se devuelve como `null`, no como un paquete de ceros.
+ *
+ * El contrato es el inverso del anterior, y a propósito:
+ *
+ * - **Ausencia → `null`.** La columna no traía nada, o traía algo que no se
+ *   puede leer. No sabemos nada, y decirlo es lo único honesto. Antes se
+ *   devolvía `{ streams: 0, saves: 0, ... }`, que afirmaba que nadie había
+ *   escuchado la pista; el pie de `EPKCard` sumaba ese 0 y lo pintaba como si
+ *   fuera una medición. Era el bug reportado.
+ * - **Un objeto válido → sus números, ceros incluidos.** `{"streams": 0}` es un
+ *   dato escrito por alguien, y se respeta. Un objeto vacío `{}` da 0 en los
+ *   cuatro campos, también a propósito: si la columna contiene un JSON de
+ *   métricas, hay métricas, y todos los campos ausentes valen cero. Reescribir
+ *   eso a `null` sería inventar una segunda ausencia, y la ausencia ya la trae
+ *   la columna.
+ *
+ * `Track["metrics"]` es `Metrics | null` por esto (`types/music.ts`), y ningún
+ * consumidor debe reintroducir el `?? 0`: lo decide `resolveMetrics`
+ * (`lib/metrics-source.ts`).
+ */
+export function parseMetrics(
+  raw: string | Record<string, unknown> | null
+): Metrics | null {
+  if (!raw) return null;
 
   const parsed = typeof raw === 'string' ? safeParseJSON<Record<string, unknown> | null>(raw, null) : raw;
-  if (!parsed || typeof parsed !== 'object') return fallback;
+  if (!parsed || typeof parsed !== 'object') return null;
+  // Un array es `typeof "object"` pero no es un JSON de métricas: tratarlo como
+  // un objeto válido daría cuatro ceros, o sea un dato inventado.
+  if (Array.isArray(parsed)) return null;
 
   return {
     streams: safeNumber(parsed.streams),
@@ -2674,7 +2700,23 @@ export async function createTrack(data: {
     spotify_url: data.spotify_url || null,
     youtube_video_id: data.youtube_video_id || null,
     itunes_track_id: data.itunes_track_id || null,
-    metrics: { streams: 0, saves: 0, playlist_additions: 0, top_countries: [], ...data.metrics },
+    // RC.33 Ola 3 — sin métricas NO se escribe el esqueleto de ceros, se escribe
+    // `null`.
+    //
+    // Antes: `{ streams: 0, ..., ...data.metrics }`. Con el spread detrás, una
+    // pista creada **sin** métricas nacía con `metrics = {streams: 0, ...}` no
+    // nulo, `parseMetrics` lo leía como dato válido y la tarjeta pintaba `0` para
+    // siempre. Eso convertía "no lo sabemos" en un dato falso, que es el bug que
+    // reportó el usuario, y era la vía más probable por la que seguía viéndose
+    // en producción: el seed lo pone explícito, pero cualquier release nuevo
+    // creado por un artista pasaba por aquí.
+    //
+    // Los ceros que **sí** trae `data.metrics` se respetan: un `streams: 0`
+    // curado a mano es un dato real y la instrucción es no borrar las métricas
+    // que no se puedan reemplazar por datos buenos.
+    metrics: data.metrics
+      ? { streams: 0, saves: 0, playlist_additions: 0, top_countries: [], ...data.metrics }
+      : null,
     production_details: { daw: null, guitars: null, effects_chain: null, tuning: null, key: null, ...data.production_details },
     lyrics: data.lyrics || null,
     stems_urls: data.stems_urls || null,

@@ -3,6 +3,14 @@ export interface TopCountry {
   pct: number;
 }
 
+/**
+ * Métricas curadas de una pista. **Los campos NO son nullable**: si este objeto
+ * existe, sus cuatro números son un dato, y un `0` aquí es un `0` real (alguien
+ * lo escribió, o vino de una integración que respondió).
+ *
+ * La ausencia de dato NO se representa con ceros: se representa con
+ * `Track["metrics"] === null`. Ver el comentario de ese campo.
+ */
 export interface Metrics {
   streams: number;
   saves: number;
@@ -51,7 +59,22 @@ export interface Track {
   audio_preview_url: string;
   spotify_url: string | null;
   youtube_video_id: string | null;
-  metrics: Metrics;
+  /**
+   * RC.33 · Ola 3 — `null` significa **"no hay dato"**, y es distinto de cero.
+   *
+   * Antes `parseMetrics` (`lib/db.ts`) devolvía
+   * `{ streams: 0, saves: 0, playlist_additions: 0, top_countries: [] }` cuando
+   * la columna venía `NULL`, `""` o con JSON inválido. Eso convertía "no lo
+   * sabemos" en "nadie escuchó esto", y como el pie de `EPKCard` sumaba
+   * `?? 0`, la tarjeta pintaba un `0` con aspecto de dato real. Era el bug que
+   * reportó el usuario.
+   *
+   * Ahora la ausencia se propaga. Quien muestre esto **no** debe escribir
+   * `?? 0`: ese operador es justamente el bug. Lo que se hace es pasar el valor
+   * a `resolveMetrics` (`lib/metrics-source.ts`), que devuelve
+   * `{ value: number | null, source }`, y pintar "—" cuando `value` es `null`.
+   */
+  metrics: Metrics | null;
   production_details: ProductionDetails;
   lyrics: string | null;
   // Release approval workflow
