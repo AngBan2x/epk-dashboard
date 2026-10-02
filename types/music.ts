@@ -264,6 +264,54 @@ export interface RawTrackSubmissionRow {
   updated_at: string;
 }
 
+/**
+ * P4 · Buzón de sugerencias — estados del ciclo de vida de un mensaje.
+ *
+ * `new` es el único estado de entrada. `read` y `resolved` los pone el admin a
+ * mano (no hay nada automático que marque "leído": el buzón es anónimo, así que
+ * no hay bandeja de entrada del destinatario que acusar recibo). `spam` existe
+ * para que el admin pueda sacar un mensaje de la vista sin borrarlo, que es
+ * distinto de borrarlo.
+ */
+export type SuggestionStatus = "new" | "read" | "resolved" | "spam";
+
+/**
+ * P4 · Una sugerencia o reporte del buzón anónimo.
+ *
+ * `user_id` es NULLABLE A PROPÓSITO: el buzón es anónimo. Cuando quien escribe
+ * tenía sesión iniciada se guarda el `userId` solo como contexto para el admin
+ * (para poder preguntar por el caso), nunca como condición para poder escribir.
+ *
+ * `ip_hash` es un HMAC-SHA256 de la IP, no la IP. Ver `hashSuggestionFingerprint`
+ * en `lib/db.ts` para por qué.
+ */
+export interface Suggestion {
+  id: string;
+  email: string;
+  message: string;
+  status: SuggestionStatus;
+  user_id: string | null;
+  ip_hash: string | null;
+  admin_notes: string | null;
+  created_at: string;
+  read_at: string | null;
+  resolved_at: string | null;
+}
+
+/** Fila cruda de SQLite/Turso: todo llega como `unknown` desde la BD. */
+export interface RawSuggestionRow {
+  id: string;
+  email: string;
+  message: string;
+  status: string;
+  user_id: string | null;
+  ip_hash: string | null;
+  admin_notes: string | null;
+  created_at: string;
+  read_at: string | null;
+  resolved_at: string | null;
+}
+
 export interface Like {
   id: string;
   user_id: string;
