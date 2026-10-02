@@ -7,9 +7,11 @@ import { DownloadCenter } from "@/components/DownloadCenter";
 import { SubscriptionButton } from "@/components/subscriber/SubscriptionButton";
 import { SubscriberCount } from "@/components/subscriber/SubscriberCount";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import type { Track } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
+import { decodeSessionToken, isSessionValid } from "@/lib/auth";
 import { collectVideoIds, getVideoStatsBatch, toStatsRecord } from "@/lib/youtube";
 import { fetchTopTracks } from "@/lib/lastfm";
 import {
@@ -21,6 +23,50 @@ import {
 export const dynamic = "force-dynamic";
 
 const BASE_URL = "https://epk-dashboard.vercel.app";
+
+/**
+ * ¿Puede quien está viendo esta página descargar el dossier y el rider?
+ *
+ * ## Por qué hace falta
+ *
+ * Esta página es **pública** y montaba `DownloadCenter` con `artistId` siempre
+ * puesto. Como `DownloadGrid` solo mira si le pasaron `artistId`, las 9 celdas
+ * salían habilitadas para cualquiera que abriera `/artists/<id>` sin sesión —
+ * mientras que en el catálogo global el mismo componente pintaba 6 de esas
+ * celdas deshabilitadas. "Invitado" significaba una cosa en un sitio y otra en el
+ * otro, y la diferencia la decidía un prop de una página pública.
+ *
+ * ## Cómo se decide
+ *
+ * Se resuelve **en servidor**, con la misma cookie y las mismas dos funciones
+ * que usa el middleware (`decodeSessionToken` + `isSessionValid`), y no leyendo
+ * el rol en cliente. Leerlo en cliente sería el error de siempre: la UI se
+ * ajustaría después de pintar, y `DownloadGrid` no tiene por qué saber de
+ * sesiones.
+ *
+ * El predicado es una **lista blanca de roles** (`artist`, `admin`) y no un
+ * `role !== "subscriber"`. Es el mismo motivo por el que `middleware.ts:50`
+ * declara `KNOWN_ROLES`: `SessionData.role` es `string`, no una unión, así que
+ * un token con un rol desconocido tiene que caer por defecto, no dentro.
+ *
+ * ## Lo que esto NO es
+ *
+ * No es una frontera de seguridad. `POST /api/export` es público
+ * (`app/api/export/route.ts` solo aplica rate limit), así que un visitante que
+ * sepa construir la petición puede pedir el dossier igual. Lo que se arregla
+ * aquí es la **promesa de la interfaz**: que los 9 botones no se le ofrezcan a
+ * quien la página ha decidido tratar como invitado. Cerrar el endpoint es
+ * `app/api/**` y `lib/**`, fuera de la ownership de esta ola.
+ */
+async function viewerCanDownloadArtistSections(): Promise<boolean> {
+  const token = cookies().get("auth_session")?.value;
+  if (!token) return false;
+
+  const session = await decodeSessionToken(token);
+  if (!session || !isSessionValid(session)) return false;
+
+  return session.role === "artist" || session.role === "admin";
+}
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const artist = await getArtistById(params.id);
@@ -132,6 +178,8 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
     loadLastfmByTrack(),
   ]);
 
+  const canDownloadArtistSections = await viewerCanDownloadArtistSections();
+
   // `safeString` devuelve "—" (truthy) como fallback por defecto, asi que con
   // `|| undefined` el JSON-LD emitia "—" en vez de omitir el campo.
   const jsonLd = {
@@ -180,10 +228,18 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
             había `pt-6` y los botones quedaban pegados al borde superior. */}
         {artist.social_links && artist.social_links.length > 0 && (
           <div className="pt-6 mb-6">
+            {/*
+              El título va como prop de `ArtistSocialLinks` y no como un `<p>`
+              suelto aquí: es el encabezado de esta sección, y el bloque entero
+              (título + lista) es una unidad. `h2` lo pone el componente; ver
+              `components/ArtistSocialLinks.tsx` para por qué ese nivel no
+              rompe la jerarquía de la página.
+            */}
             <ArtistSocialLinks
               socialLinks={artist.social_links}
               artistName={artist.name}
               showLabels
+              title={`Sigue a ${safeString(artist.name, "este artista")} en sus redes`}
               ariaLabel={`Redes sociales de ${artist.name}`}
             />
           </div>
@@ -201,10 +257,16 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
 
         {/* B1: descargas de prensa también en la página pública del artista.
             Es el mismo DownloadCenter del dashboard: solo recibe props planas
-            (artistId, artistName, trackCount) y ya es un client component. */}
+            (artistId, artistName, trackCount) y ya es un client component.
+
+            `artistId` se pasa SOLO si hay sesión con perfil de artista o admin
+            (`viewerCanDownloadArtistSections`). Antes se pasaba siempre, y como
+            `DownloadGrid` solo mira si le llegaron las 9 celdas salían
+            habilitadas para un visitante anónimo. Ahora, sin sesión, esta
+            rejilla muestra lo mismo que el catálogo global: una sola fila. */}
         <div className="mt-8">
           <DownloadCenter
-            artistId={artist.id}
+            artistId={canDownloadArtistSections ? artist.id : undefined}
             artistName={artist.name}
             trackCount={tracks.length}
           />
