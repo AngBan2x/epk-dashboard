@@ -55,7 +55,9 @@ gh release create v4.0.0-beta.1 --prerelease \
 - **Framework:** Next.js 14 (App Router), TypeScript 5 strict
 - **Package manager:** pnpm (NO npm)
 - **Dev server:** `pnpm dev`
-- **Admin:** admin@epk.local / admin123
-- **Test user:** angab06@gmail.com / 12345678
+- **Credenciales:** ya **no** están en el repo (RC.33 P1). Van en `.env.local`
+  (gitignored) como `TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD` /
+  `TEST_ARTIST_EMAIL` / `TEST_ARTIST_PASSWORD`. Ver
+  `docs/ROTACION_CREDENCIALES.md`.
 - **Repo:** https://github.com/AngBan2x/epk-dashboard
 - **Vercel:** https://epk-dashboard.vercel.app

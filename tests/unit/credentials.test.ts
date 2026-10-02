@@ -23,10 +23,22 @@ type EnvKey = (typeof ENV_KEYS)[number];
 
 let saved: Partial<Record<EnvKey, string | undefined>> = {};
 
-/** Credenciales que estaban en el repo antes de esta subfase. */
-const CRED_A_EMAIL = "angab06@gmail.com";
-const CRED_A_PASSWORD = "12345678";
-const CRED_B_PASSWORD = "admin123";
+/**
+ * Valores centinela. **Sinteticos y distintos de cualquier credencial real.**
+ *
+ * La primera version de este fichero usaba las cadenas que estaban en el repo
+ * como centinela, y eso era una contradiccion: el test que protege contra que
+ * la credencia vuelva a estar hardcodeada **la metia de vuelta en el repo para
+ * poder comprobarlo**. Un check que necesita el secreto para funcionar no
+ * protege del secreto.
+ *
+ * Ademas, si alguien restituyera el default real en `scripts/lib/credentials.ts`,
+ * estos centinelas NO lo detectarian — y por eso el test usa tambien una forma
+ * que no depende de conocer ningun valor: comprueba que el default este vacio.
+ */
+const CRED_A_EMAIL = "artista-centinela@example.invalid";
+const CRED_A_PASSWORD = "clave-centinela-artista";
+const CRED_B_PASSWORD = "clave-centinela-admin";
 
 async function loadHelper() {
   vi.resetModules();
