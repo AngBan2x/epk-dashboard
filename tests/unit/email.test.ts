@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { getEmailTemplate, escapeHtml, type NotificationType } from "@/lib/email-templates";
+import {
+  sentResult,
+  failedResult,
+  notAttemptedResult,
+  type EmailResult,
+  type EmailTransport,
+  type EmailTransportArgs,
+} from "@/lib/email-transport";
 
 const ALL_TYPES: NotificationType[] = [
   "submission_approved",
@@ -108,6 +116,181 @@ describe("P4.4 sendEmail", () => {
     const before = getEmailStats().skipped;
     await sendEmail({ to: "malo", subject: "Hola", html: "<p>x</p>" });
     expect(getEmailStats().skipped).toBe(before + 1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P3 - transporte inyectado. Esta es la capa que corre en CADA push, y por eso no
+// habla con Resend: todos los fallos se simulan con un doble en memoria. Un solo
+// correo por corrida de suite y, cuando Resend este caido o sin cuota, la suite
+// sigue verde y el fallo real queda visible.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("P3 sendEmail con transporte inyectado", () => {
+  /** Registro de lo que el transporte recibió, para asertar sobre la entrada. */
+  function recorder(result: EmailResult | (() => Promise<EmailResult> | EmailResult)) {
+    const calls: EmailTransportArgs[] = [];
+    const transport: EmailTransport = async (args) => {
+      calls.push(args);
+      return typeof result === "function" ? await result() : result;
+    };
+    return { calls, transport };
+  }
+
+  const VALID = { to: "  destinatario@ejemplo.com  ", subject: " Aviso ", html: "<p>x</p>" };
+
+  it("un envio aceptado devuelve sent:true y su messageId", async () => {
+    const { sendEmail, getEmailStats } = await import("@/lib/email");
+    const { calls, transport } = recorder(sentResult("msg-abc-123"));
+    const sentBefore = getEmailStats().sent;
+    const lastSentBefore = getEmailStats().lastSentAt;
+
+    const res = await sendEmail(VALID, transport);
+
+    expect(res.sent).toBe(true);
+    expect(res.messageId).toBe("msg-abc-123");
+    expect(getEmailStats().sent).toBe(sentBefore + 1);
+    expect(getEmailStats().lastMessageId).toBe("msg-abc-123");
+    expect(getEmailStats().lastSentAt).not.toBe(lastSentBefore);
+    expect(getEmailStats().lastError).toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("un {status:'sent'} sin messageId sigue siendo un envio correcto", async () => {
+    const { sendEmail } = await import("@/lib/email");
+    const { transport } = recorder({ status: "sent" });
+    const res = await sendEmail(VALID, transport);
+    expect(res.sent).toBe(true);
+    expect(res.messageId).toBeUndefined();
+  });
+
+  it("una excepcion del transporte se traduce a fallo y NO se propaga", async () => {
+    const { sendEmail, getEmailStats } = await import("@/lib/email");
+    const { transport } = recorder(() => {
+      throw new Error("ECONNRESET se rompio el socket");
+    });
+    const failedBefore = getEmailStats().failed;
+
+    // La excepcion es lo que tumbaba el camino de aprobaciones. Se comprueba
+    // aqui que sendEmail la absorbe.
+    const res = await sendEmail(VALID, transport);
+
+    expect(res.sent).toBe(false);
+    expect(res.reason).toContain("ECONNRESET");
+    expect(getEmailStats().failed).toBe(failedBefore + 1);
+    expect(getEmailStats().lastError).toContain("ECONNRESET");
+  });
+
+  it("una excepcion asincrona (rechazo de promesa) tambien se absorbe", async () => {
+    const { sendEmail, getEmailStats } = await import("@/lib/email");
+    const { transport } = recorder(async () => {
+      throw new Error("timeout de 30s");
+    });
+    const failedBefore = getEmailStats().failed;
+
+    const res = await sendEmail(VALID, transport);
+
+    expect(res.sent).toBe(false);
+    expect(res.reason).toContain("timeout de 30s");
+    expect(getEmailStats().failed).toBe(failedBefore + 1);
+  });
+
+  it("un {status:'failed'} cuenta como fallo, con su motivo", async () => {
+    const { sendEmail, getEmailStats } = await import("@/lib/email");
+    const { transport } = recorder(failedResult("resend_error: validation_error: remitente invalido"));
+    const failedBefore = getEmailStats().failed;
+
+    const res = await sendEmail(VALID, transport);
+
+    expect(res.sent).toBe(false);
+    expect(res.reason).toContain("validation_error");
+    expect(getEmailStats().failed).toBe(failedBefore + 1);
+    expect(getEmailStats().sent).toBeGreaterThanOrEqual(0);
+  });
+
+  it("un {status:'not_attempted'} cuenta como omitido, NO como fallo", async () => {
+    const { sendEmail, getEmailStats } = await import("@/lib/email");
+    const { transport } = recorder(
+      notAttemptedResult("remitente_onboarding_sin_destinatario_permitido: sin FROM_EMAIL")
+    );
+    const skippedBefore = getEmailStats().skipped;
+    const failedBefore = getEmailStats().failed;
+
+    const res = await sendEmail(VALID, transport);
+
+    expect(res.sent).toBe(false);
+    expect(res.reason).toContain("remitente_onboarding_sin_destinatario_permitido");
+    expect(getEmailStats().skipped).toBe(skippedBefore + 1);
+    // Esta es la aserción que distingue el tercer estado: si "no se intentó" se
+    // contara como fallo, el panel de admin diria que se perdreon correos que
+    // nunca se iba a mandar.
+    expect(getEmailStats().failed).toBe(failedBefore);
+  });
+
+  it("no llama al transporte si el destinatario es invalido", async () => {
+    const { sendEmail } = await import("@/lib/email");
+    const { calls, transport } = recorder(sentResult("no-deberia-importar"));
+    const res = await sendEmail({ to: "no-es-un-email", subject: "Hola", html: "<p/>" }, transport);
+    expect(res.reason).toBe("destinatario_invalido");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("no llama al transporte si el asunto queda vacio tras sanear", async () => {
+    const { sendEmail } = await import("@/lib/email");
+    const { calls, transport } = recorder(sentResult("no-deberia-importar"));
+    const res = await sendEmail({ to: "a@b.com", subject: "\r\n  \r\n", html: "<p/>" }, transport);
+    expect(res.reason).toBe("asunto_vacio");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("pasa destinatario recortado y asunto sin CRLF al transporte", async () => {
+    const { sendEmail } = await import("@/lib/email");
+    const { calls, transport } = recorder(sentResult("ok"));
+    await sendEmail(
+      { to: "  con-espacios@ejemplo.com  ", subject: "  Titulo\r\ninyectado: cabecera", html: "<p>x</p>", text: "x" },
+      transport
+    );
+    expect(calls[0].to).toBe("con-espacios@ejemplo.com");
+    expect(calls[0].subject).toBe("Titulo inyectado: cabecera");
+    expect(calls[0].subject).not.toContain("\n");
+    expect(calls[0].text).toBe("x");
+  });
+
+  it("recorta un asunto de mas de 300 caracteres", async () => {
+    const { sendEmail } = await import("@/lib/email");
+    const { calls, transport } = recorder(sentResult("ok"));
+    await sendEmail({ to: "a@b.com", subject: "x".repeat(500), html: "<p/>" }, transport);
+    expect(calls[0].subject).toHaveLength(300);
+  });
+
+  it("sin transporte inyectado cae al transporte real y no lanza sin clave", async () => {
+    const saved = process.env.RESEND_API_KEY;
+    delete process.env.RESEND_API_KEY;
+    const { sendEmail, getEmailStats } = await import("@/lib/email");
+    const skippedBefore = getEmailStats().skipped;
+
+    const res = await sendEmail(VALID);
+
+    expect(res.sent).toBe(false);
+    expect(res.reason).toContain("RESEND_API_KEY");
+    expect(getEmailStats().skipped).toBe(skippedBefore + 1);
+    if (saved !== undefined) process.env.RESEND_API_KEY = saved;
+  });
+
+  it("enmascara la RESEND_API_KEY si un fallo llega a contenerla", async () => {
+    const savedKey = process.env.RESEND_API_KEY;
+    const savedFrom = process.env.FROM_EMAIL;
+    const secret = "re_secreto_no_debe_salir_en_logs";
+    process.env.RESEND_API_KEY = secret;
+
+    const { sendEmail, getEmailStats } = await import("@/lib/email");
+    await sendEmail(VALID, recorder(failedResult(`resend_excepcion: fallo usando ${secret}`)).transport);
+
+    expect(getEmailStats().lastError).not.toContain(secret);
+    expect(getEmailStats().lastError).toContain("***");
+
+    process.env.RESEND_API_KEY = savedKey;
+    if (savedFrom === undefined) delete process.env.FROM_EMAIL;
+    else process.env.FROM_EMAIL = savedFrom;
   });
 });
 
