@@ -107,15 +107,68 @@ const ICONS: Record<string, { node: React.ReactNode; wrapper: string }> = {
   },
 };
 
+/**
+ * ## P2 · Ola 10 — a dónde lleva cada notificación
+ *
+ * Dos arreglos, y el primero es el que hace el 80% del trabajo:
+ *
+ * **1. Gana el destino de LANZAMIENTO.** Antes `track_id` se miraba *antes*
+ * que `release_id`. Una notificación `new_release` trae **los dos** —y el
+ * `track_id` es el id del PADRE (`app/api/releases/route.ts:884`, dentro del
+ * `data`), así que la campana llevaba al `/track/<id del release>` de un
+ * lanzamiento que ya tiene su propia página. Ahora manda `release_id`.
+ *
+ * **2. Una pista que es hija lleva a su padre.** `track_liked` solo trae
+ * `trackId`, y si esa pista es el corte 3 de un álbum, `/track/<corte-3>`
+ * **redirige** a `/releases/<álbum>`: el usuario ve un salto extra y un cambio
+ * de URL sin motivo. Como la columna `release_id` solo se sabe preguntando, y
+ * `notificationHref` es pura y no puede hacer red, la resolución va en
+ * `resolveChildHref`, que es pura *también*, y el componente pregunta una vez
+ * por id y lo cachea para siempre (`parentIndexRef`).
+ *
+ * El caso "hija cuyo padre ya no existe" cae en el mismo sitio que en la ruta:
+ * se deja el enlace a la pista, que es donde el contenido sigue siendo real.
+ */
 export function notificationHref(data: Record<string, unknown> | null): string | null {
   if (!data || typeof data !== "object") return null;
-  const track = data.track_id ?? data.trackId;
-  if (typeof track === "string" && track.length > 0) return `/track/${track}`;
+  // El lanzamiento va primero. Cuando vienen los dos, `track_id` es el padre.
   const release = data.release_id ?? data.releaseId;
   if (typeof release === "string" && release.length > 0) return `/releases/${release}`;
+  const track = data.track_id ?? data.trackId;
+  if (typeof track === "string" && track.length > 0) return `/track/${track}`;
   const show = data.show_id ?? data.showId;
   if (typeof show === "string" && show.length > 0) return "/shows";
   return null;
+}
+
+/**
+ * Reescribe `/track/<hija>` a `/releases/<padre>`.
+ *
+ * `lookupParent` devuelve el id del padre de esa pista, o `null`/`undefined` si
+ * no es hija, si no se sabe todavía, o si su padre ya no existe. Los tres casos
+ * se comportan igual: se deja el enlace a la pista, que es donde el contenido
+ * sigue siendo real y adonde `/track/<hija>` redirige por su cuenta.
+ *
+ * Pasa una función y no un `Map` para que la función siga siendo **pura** de
+ * verdad: el `Map` vive en un `ref` del componente y esto se prueba sin
+ * montar nada.
+ */
+export function resolveChildHref(
+  href: string | null,
+  lookupParent: (trackId: string) => string | null | undefined
+): string | null {
+  if (!href || !href.startsWith("/track/")) return href;
+  const trackId = href.slice("/track/".length);
+  if (!trackId) return href;
+  const parentId = lookupParent(trackId);
+  return parentId ? `/releases/${parentId}` : href;
+}
+
+/** ¿Esta URL es la de una pista que aún no sabemos si es hija? */
+export function needsParentLookup(href: string | null): string | null {
+  if (!href || !href.startsWith("/track/")) return null;
+  const trackId = href.slice("/track/".length);
+  return trackId.length > 0 ? trackId : null;
 }
 
 export function relativeTimeES(iso: string): string {
@@ -187,6 +240,38 @@ export function NotificationBell() {
   const [markingAll, setMarkingAll] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  /**
+   * Cache de "esta pista, ¿es hija?": `id -> id del padre | null`.
+   *
+   * Guarda también el `null` a propósito. Un `track_liked` sobre una pista que
+   * NO es hija es el caso más frecuente, y sin el negativo cada pulsación
+   * repetiría la petición para descubrir lo mismo. El `Map` es la memoria del
+   * componente, no un estado: no se re-renderiza al llenarse.
+   */
+  const parentIndexRef = useRef<Map<string, string | null>>(new Map());
+
+  /** Una pregunta por id. Un fallo se cachea como `null`: degrada al enlace. */
+  const lookupParent = useCallback(async (trackId: string): Promise<void> => {
+    if (parentIndexRef.current.has(trackId)) return;
+    let parentId: string | null = null;
+    try {
+      const res = await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          release_id?: unknown;
+        } | null;
+        const raw = body?.release_id;
+        if (typeof raw === "string" && raw.trim().length > 0) parentId = raw.trim();
+      }
+    } catch {
+      // Sin red: se deja el enlace a la pista. `/track/<hija>` redirige igual,
+      // así que el peor caso es un salto de más, no un destino roto.
+      parentId = null;
+    }
+    parentIndexRef.current.set(trackId, parentId);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -277,13 +362,30 @@ export function NotificationBell() {
     }
   };
 
-  const handleSelect = (item: NotificationItem) => {
-    const href = notificationHref(item.data);
+  const handleSelect = async (item: NotificationItem) => {
     if (!item.read) void markRead(item.id);
-    if (href) {
-      setOpen(false);
-      router.push(href);
+
+    let href = notificationHref(item.data);
+    if (!href) return;
+
+    /**
+     * ¿Es una pista? Solo entonces hay que preguntar si es hija. Una sola
+     * petición por id **por toda la vida del componente**: `parentIndexRef` es
+     * un `Map` y guarda también los "esta no es hija" (`null`), así que un
+     * `track_liked` repetido no genera tráfico repetido.
+     *
+     * `GET /api/tracks/:id` es público y devuelve la fila por `parseTrack`, que
+     * expone `release_id`. No se añade ninguna ruta nueva.
+     */
+    const candidateId = needsParentLookup(href);
+    if (candidateId && !parentIndexRef.current.has(candidateId)) {
+      await lookupParent(candidateId);
     }
+    const target = resolveChildHref(href, (trackId) => parentIndexRef.current.get(trackId));
+    if (!target) return;
+
+    setOpen(false);
+    router.push(target);
   };
 
   if (!user) return null;
