@@ -109,7 +109,8 @@ export async function ensureTursoSchema(): Promise<boolean> {
       updated_at TEXT,
       release_id TEXT,
       start_time REAL DEFAULT 0,
-      end_time REAL DEFAULT 0
+      end_time REAL DEFAULT 0,
+      video_kind TEXT
     )
   `);
   // Migrate: add columns if missing (safe for existing tables)
@@ -127,6 +128,20 @@ export async function ensureTursoSchema(): Promise<boolean> {
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN genre TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN description TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN admin_notes TEXT`); } catch {}
+  //
+  // RC.33 · Ola 4 — `video_kind`. Sin `DEFAULT` y sin `NOT NULL`, a propósito:
+  //
+  //   - Nullable porque `NULL` significa "no clasificado", que no es lo mismo que
+  //     `'videoclip'`. Un vídeo cuyo `video_kind` no se pudo determinar se queda
+  //     sin dato en vez de afirmar que es el videoclip oficial.
+  //   - Sin `DEFAULT` porque un `DEFAULT` es lo que hace un `REPLACE` destructivo
+  //     silencioso (ver `readTrackVideoKinds` más abajo y, para el mismo
+  //     problema, `artists.youtube_channel_id` en RC.32).
+  //   - Sin `CHECK` porque SQLite no permite añadir una restricción a una tabla
+  //     existente con `ALTER TABLE`, y una restricción que solo existe en el
+  //     `CREATE TABLE` protegería únicamente a las bases nuevas. Quien escribe
+  //     valida con `parseVideoKind` (`lib/youtube.ts`).
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN video_kind TEXT`); } catch {}
 
   // 2. artists (con user_id FK + P2.1)
   await client.execute(`
@@ -358,6 +373,19 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
   let synced = 0;
   let failed = 0;
 
+  // RC.33 · Ola 4. Este INSERT OR REPLACE omite a propósito 8 columnas
+  // (`release_id`, `start_time`, `end_time`, `track_number`, `genre`,
+  // `description`, `admin_notes`, `updated_at`) y `REPLACE` es DELETE + INSERT:
+  // lo omitido vuelve a DEFAULT. `video_kind` es una novena, y sin esto **cada
+  // sync borraría la clasificación de todos los vídeos** — que es el trabajo de
+  // 1483 candidatos y una verificación HTTP, y no se debe perder por un sync.
+  // Es el mismo problema que RC.32 resolvió para `artists.youtube_channel_id`:
+  // se lee antes y se devuelve el valor. Ver `readVerifiedYouTubeChannelIds`.
+  const preservedVideoKinds = await readTrackVideoKinds(
+    client,
+    localTracks.map((t) => t.id),
+  );
+
   for (const track of localTracks) {
     try {
       await client.execute({
@@ -366,8 +394,8 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
                audio_preview_url, spotify_url, youtube_video_id, metrics,
                production_details, lyrics, itunes_track_id, stems_urls,
                video_embed_url, gallery_images, external_links, disc_number, is_double_single,
-               sides_b, isrc, composers, status)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               sides_b, isrc, composers, status, video_kind)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           track.id,
           track.title,
@@ -393,6 +421,9 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
           (track as RawTrackRow & { isrc?: string | null }).isrc ?? null,
           (track as RawTrackRow & { composers?: string | null }).composers ?? null,
           (track as RawTrackRow & { status?: string | null }).status ?? 'draft',
+          (track as RawTrackRow & { video_kind?: string | null }).video_kind ??
+            preservedVideoKinds.get(track.id) ??
+            null,
         ],
       });
       synced++;
@@ -403,6 +434,51 @@ export async function syncLocalToTurso(localTracks: RawTrackRow[]): Promise<Sync
   }
 
   return { synced, failed, errors };
+}
+
+/**
+ * Lee los `tracks.video_kind` ya clasificados para poder **preservarlos**.
+ *
+ * Misma razón y mismo patrón que `readVerifiedYouTubeChannelIds` (RC.32), y por
+ * el mismo motivo: añadir la columna al `INSERT` no basta, porque un
+ * `RawTrackRow` construido a mano (que es lo que hace un script de seed) llega
+ * sin `video_kind`, el `?? null` lo borraría, y la clasificación se perdería en
+ * cada sincronización.
+ *
+ * Un valor que no es uno de los tres admitidos se descarta en vez de propagarse:
+ * `video_kind` alimenta la UI, y un valor inventado ahí se pinta.
+ */
+async function readTrackVideoKinds(
+  client: Client,
+  trackIds: readonly string[],
+): Promise<Map<string, string>> {
+  const preserved = new Map<string, string>();
+  const ids = trackIds.filter((id) => typeof id === 'string' && id.trim() !== '');
+  if (ids.length === 0) return preserved;
+
+  try {
+    // En lotes de 500: por encima, SQLite (y Turso) choca con el límite de
+    // variables por sentencia, y el fallo sería un error de SQL sin pista.
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      const result = await client.execute({
+        sql: `SELECT id, video_kind FROM tracks WHERE id IN (${chunk
+          .map(() => '?')
+          .join(', ')})`,
+        args: [...chunk] as InValue[],
+      });
+      for (const row of result.rows) {
+        const id = String(row.id ?? '');
+        const kind = typeof row.video_kind === 'string' ? row.video_kind.trim() : '';
+        if (id && kind) preserved.set(id, kind);
+      }
+    }
+  } catch {
+    // Si `video_kind` aún no existe en la tabla, el INSERT de abajo falla igual.
+    // No se enmascara: el error sale con su mensaje, como en el caso de los
+    // canales de artista.
+  }
+  return preserved;
 }
 
 // ─── Sync: Artists ──────────────────────────────────────────────────────────
