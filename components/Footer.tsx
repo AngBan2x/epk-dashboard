@@ -38,6 +38,14 @@ export function Footer() {
                   </a>
                 </li>
               )}
+              {/* Fuera del condicional a propósito: el buzón es anónimo y público.
+                  Quien va a reportar un problema muchas veces no tiene cuenta, y
+                  ponerlo tras el login sería justo perderlos. */}
+              <li>
+                <a href="/suggestions" className="hover:text-emerald-500 transition-colors">
+                  Sugerencias
+                </a>
+              </li>
             </ul>
           </div>
 

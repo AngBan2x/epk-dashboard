@@ -264,10 +264,57 @@ async function main() {
   } catch (e) {
     console.log(`seed_padres_con_duracion_correcta: ERROR ${(e as Error).message.slice(0, 120)}`);
   }
+
+  // ── Buzón de sugerencias (P4) ──────────────────────────────────────────
+  // El interés de este check no es el recuento: es el segundo. El buzón tiene
+  // cinco capas de anti-spam y la cuarta es "1 por correo cada 24 h". Si en
+  // producción hay dos sugerencias del mismo correo en 24 h, significa que esa
+  // capa no está funcionando en Turso aunque los tests digamos que pasa — y los
+  // tests corren contra SQLite, no contra Turso.
+  //
+  // `ip_hash` es un HMAC con SESSION_SECRET, así que aquí solo se comprueba que
+  // existe. Nunca se imprimen correos ni mensajes: son PII de quien escribió el
+  // formulario.
+  try {
+    const porEstado = await client.execute(
+      `SELECT status, COUNT(*) c FROM suggestions GROUP BY status ORDER BY status`
+    );
+    console.log("\nsuggestions_por_estado:");
+    if (porEstado.rows.length === 0) console.log("  (ninguna)");
+    for (const r of porEstado.rows) {
+      console.log(`  ${(r.status as string).padEnd(9)} ${r.c}`);
+    }
+
+    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { rows: dup } = await client.execute(
+      `SELECT COUNT(*) c FROM (
+         SELECT email FROM suggestions
+         WHERE created_at > ?
+         GROUP BY email HAVING COUNT(*) > 1
+       )`,
+      [hace24h]
+    );
+    const duplicados = Number(dup[0]?.c ?? 0);
+    console.log(`suggestions_email_duplicado_en_24h: ${duplicados}`);
+    if (duplicados > 0) {
+      console.log("  ⚠️  la capa 4 del anti-spam NO está conteniendo en Turso");
+    }
+
+    const { rows: sinHash } = await client.execute(
+      `SELECT COUNT(*) c FROM suggestions WHERE ip_hash IS NULL`
+    );
+    console.log(`suggestions_sin_ip_hash: ${Number(sinHash[0]?.c ?? 0)}`);
+  } catch (e) {
+    // La tabla se crea la primera vez que `ensureTursoSchema()` corre contra
+    // Turso. Antes de ese momento este check no puede existir.
+    console.log(
+      `suggestions: no disponible (${(e as Error).message.slice(0, 80)}) — ¿migración aplicada?`
+    );
+  }
 }
 
-  main().catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
 

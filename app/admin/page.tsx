@@ -655,6 +655,13 @@ export default function AdminPage() {
             >
               Envíos ({submissions.filter(s => s.status === "pending").length} pendientes) →
             </a>
+            {/* También otra ruta, no un tab: el buzón tiene su propia pantalla. */}
+            <a
+              href="/admin/suggestions"
+              className="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+            >
+              Buzón →
+            </a>
             <button
               type="button"
               onClick={() => setActiveTab("notifications")}
