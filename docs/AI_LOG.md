@@ -6579,3 +6579,110 @@ Commits: `ff5baea` (Ola 1), `8a45edd` (Ola 2), `4109794` (Ola 3 + README).
 - `WEBHOOK_SECRET`: lo define el usuario. Resend: falta `FROM_EMAIL` y hay cuota
   agotada.
 - `scripts/rc29-artist-shots.ts:277-284` roto desde antes de RC.31.
+
+---
+
+## RC.33: catalogo real, credenciales fuera del codigo, buzon y una pagina por release
+
+Cierra las diez olas de RC.33 y las cuatro subfases de la Fase P. Commit final
+`cebc700`. **1146/1146 tests** en 61 ficheros, tsc y lint limpios.
+
+### Las diez olas
+
+| Ola | Commit | Que resolvio |
+|---|---|---|
+| 0 | `11bd7a2` | `PATCH /api/tracks/[id]` no comprobaba ownership: cualquiera autenticado reescribia la pista de otro. |
+| 1+2 | `8b03954` | Un solo play de cola en `EPKCard`; fuera el aviso de "sin audio" para el álbum; badge Multipista y accion de envio. |
+| 3 | `9c370b8` | `Metrics \| null`: sin dato es `—`, nunca `0`. Cadena de fuentes. |
+| 5 | `e2374aa` | Estados dinamicos de shows tambien en el dashboard. |
+| 3bis | `2cc77fa` | Last.fm real como fallback; un album hereda playcounts de sus hijas. |
+| 4 | `98312d7` | `video_kind` y canales `- Topic`; `live` frente a `videoclip`. |
+| 6 | `d52451c` | Tarjetas de artista con nombre y foto; invitado ve solo el catalogo. |
+| 7 | `d90ca44` | Carrusel responsive 1/2/3/4, sustituida la rejilla global. |
+| 8 | `c8b4ca9` | Candidatos de Wikimedia, sin aplicar. |
+| 9 | `40327a2` | Datos: 29 de 74 videos, 5 canales, `video_kind` migrada, 3 banners. |
+| 10 | `cebc700` | Una pagina por release. |
+
+### Los cinco hallazgos que costaron tiempo
+
+**1. El dominio oficial no basta para YouTube.** El patron `UC...` sobre la
+descripcion del canal no dio **ni uno de los 5**: las descripciones estan en
+espanol o vacias. Lo que funciono fue la allowlist explicita
+(`lib/official-channels.ts`). Con `--trust-allowlist` se escribieron 29 IDs
+exactos; **las 14 coincidencias aproximadas se quedaron sin escribir** a proposito.
+
+**2. `FROM_EMAIL` no es lo que bloqueaba el correo, es el dominio.** Sin dominio
+verificado, Resend si envia, pero solo desde `onboarding@resend.dev` y **solo al
+titular**: a cualquier otra direccion, 403 garantizado. Esocersiono las tres
+estados en vez de dos.
+
+**3. `/track/[id]` y `/releases/[id]` eran la misma pagina con dos plantillas.** Un
+single es fila de `tracks` **y** cabecera con el mismo id. Dos URLs para un
+contenido: SEO partido, metricas partidas, y 535 lineas de ficha sin nada que la
+enlace. Ahora `/track/[id]` es un shim de 301 y solo queda una pagina.
+
+**4. La duracion de un single salia en 0, no "en blanco".** Se calculaba como
+`sumDurations(TracksByReleaseId(...))` sobre las hijas: cero hijas, cero
+segundos. Y el filtro de "no hay dato" **no puede ser un `isNaN`**, porque
+`sumDurations(["00:00"])` parsea bien y devuelve `{seconds: 0}`: `"00:00"` es el
+relleno del seed, no un disco de cero segundos.
+
+**5. "Reproducir" Once veces no informa a nadie.** `ReleaseTrackList.tsx` tenia el
+mismo `aria-label` en todas las filas, botones de 32 px (por debajo del minimo
+tactil de 36 px) y sin anillo de foco. Ahora: 44 px, anillo, y etiqueta con numero
+y titulo.
+
+### P1 — la credencial era de 41 ficheros
+
+`angab06@gmail.com` y su contrasena estaban en 16 scripts, 12 specs de Playwright
+y helpers. La regla que lo resuelve es mas fina de lo que parece:
+
+> **Contrasena sin default, correo con default solo si no es PII ni secreto.**
+
+Contrasenas a `""`. `TEST_ADMIN_EMAIL` conserva `admin@epk.local` (dominio
+inventado, no existe, no autentica nada). `TEST_ARTIST_EMAIL` **tampoco**: la
+unica cuenta de artista conocida es de una persona real, y el correo **es PII**.
+
+Si el helper hubiera sido `process.env.TEST_ARTIST_PASSWORD ?? "12345678"`,
+funcionaria y dejaria el secreto en el repo. Es un cambio cosmetico con forma de
+arreglo.
+
+Tambien: `playwright.config.ts` no cargaba `.env.local`, porque **Playwright no
+hereda la carga de Next**. Sin eso los 12 specs leian `undefined`.
+
+Y un bug que casi se introduce: al migrar `verify-wave2.cjs:178` al helper, la
+credencial hardcodeada era la de **artista** y se cambio a la de admin siguiendo
+el patron. El admin no tiene perfil de artista. Un refactorizacion mecanica de
+credenciales es justo donde un cambio de cuenta rompe un test en silencio.
+
+### Verificacion: los tests tienen que ponerse rojos
+
+Cinco reversiones, cinco rojos. La tabla esta en el commit de P2. Lo que mas
+importa: los tests de `resolveTrackRoute` leen el **SQLite local de verdad**, no un
+doble, asi que prueban que `parseTrack` expone `release_id`. Si manana esa columna
+deja de mapearse, el redirect se apaga en silencio y los tests lo detectan solos.
+
+Igual en P4: quitar `honeypotTriggered` -> 2 rojos; quitar el `if (recent) return
+accepted()` -> 2 rojos. **Un check que siempre pasa no protege de nada.**
+
+### Un fallo de la propia orquestacion
+
+El commit de P4 dejo `app/api/suggestions/[id]/route.ts` **sin trackear**, y con
+ella el PATCH que el propio panel necesita. Salio verde con la mitad de la API sin
+publicar. Se cerro con un commit aparte y explicito, porque es una correccion del
+commit anterior y no funcionalidad nueva: si no, se habria mezclado.
+
+Y: dos "fallos" que no lo eran. `Test-Path` fallo con `app\api\suggestions\[id\]`
+porque los corchetes son wildcards en PowerShell — el fichero existia de verdad. Y
+un `�` en un `Select-String` era la consola, no el fichero: no hay U+FFFD en el
+disco. Se comprobo antes de "arreglar" nada.
+
+### Estado de produccion
+
+83 tracks, 12 artistas, 2 shows. 29 videos con `video_kind`, 5 canales oficiales,
+3 banners (Pink Floyd, Radiohead, Kraftwerk). 65 portadas iTunes, cero Unsplash,
+cero huerfanas, cero datos de QA. Duraciones padre 9/9, timeline sin deriva.
+
+**Bowie y Bjork sin avatar ni banner**: su composicion no funciona en circulo ni
+en wide. La inicial con degradado es mejor que un recorte malo, y el usuario lo
+confirmo mirando la pagina.

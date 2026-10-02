@@ -9,8 +9,8 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `npx vitest run --no-file-parallelism` | **800 tests** (Vitest, 47 archivos). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
-| ⚠️ `--no-file-parallelism` no es opcional | Sin él, el reciclado de workers dispara una asertación nativa de teardown de V8 (`node::RemoveEnvironmentCleanupHook`, `(env) != nullptr`) y el run muere con `ERR_IPC_CHANNEL_CLOSED`. **No es un test rojo**: los 800 pasan. Se dispara desde que los ficheros superpower cargan un módulo nativo (`better-sqlite3`, vía `@/libsql/client`) a través de un route handler, y el hook de limpieza nativo se ejecuta con el isolate ya destruido. Verificado: excluyendo solo `tests/unit/official-videos.test.ts` el run en paralelo vuelve a ser verde; bajando concurrencia a 2 workers también crashea. Secuencial: 800/800, ~42 s. Aislado es un problema de **infraestructura de test**, no de producto |
+| `npx vitest run --no-file-parallelism` | **1146 tests** (Vitest, 61 archivos). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
+| ⚠️ `--no-file-parallelism` no es opcional | Sin él, el reciclado de workers dispara una asertación nativa de teardown de V8 (`node::RemoveEnvironmentCleanupHook`, `(env) != nullptr`) y el run muere con `ERR_IPC_CHANNEL_CLOSED`. **No es un test rojo**: los 1146 pasan. Se dispara desde que los ficheros superpower cargan un módulo nativo (`better-sqlite3`, vía `@/libsql/client`) a través de un route handler, y el hook de limpieza nativo se ejecuta con el isolate ya destruido. Verificado: excluyendo solo `tests/unit/official-videos.test.ts` el run en paralelo vuelve a ser verde; bajando concurrencia a 2 workers también crashea. Secuencial: 1146/1146, ~65 s. Aislado es un problema de **infraestructura de test**, no de producto |
 | `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast. Usa `PLAYWRIGHT_BASE_URL=https://epk-dashboard.vercel.app` para correr contra producción |
 | `npx tsx scripts/turso-check.ts` | Verifica la higiene de datos en Turso por SQL directo (tracks, shows, usuarios QA, huerfanos). Es la fuente de verdad, no las lecturas de API (la réplica va retrasada) |
 | `npx tsx scripts/qa-cleanup.ts --apply` | Limpia datos de QA de producción. **Dry-run por defecto**: siempre revisa el dry-run antes de aplicar |
@@ -68,9 +68,9 @@ tests/             # Vitest + Playwright
 ## Base de Datos
 
 - **Dual-mode**: Turso (producción) o SQLite local (dev)
-- **9 tablas**: users, artists, tracks, releases, shows, submissions, metrics_history, notifications, subscriptions (`tracks.admin_notes` y `track_submissions` con `admin_id`/`reviewed_at` añadidos en P4.5)
-- **Cascadas (P6)**: `deleteArtist` y `deleteUser` borran dependencias (suscripciones, dossiers, shows, tracks por `artist_name` y sus `metrics_history`/`likes`). `tracks` se relaciona por nombre, no por FK: por eso el borrado va por `artist_name`.
-- **Scripts de datos**: `scripts/seed-influential-catalog.ts` (P5.2, **NO aplicado en prod**), `scripts/backfill-artist-owners.ts` (6 de 7 artistas siguen con `user_id` NULL) y `scripts/qa-cleanup.ts`. Los tres con dry-run por defecto y `--apply` para escribir.
+  - **11 tablas**: users, artists, tracks, releases, shows, submissions, metrics_history, notifications, subscriptions, likes, suggestions (`tracks.admin_notes` y `track_submissions` con `admin_id`/`reviewed_at` añadidos en P4.5; `suggestions` en Fase P — buzón anónimo, ver abajo)
+  - **Cascadas (P6)**: `deleteArtist` y `deleteUser` borran dependencias (suscripciones, dossiers, shows, tracks por `artist_name` y sus `metrics_history`/`likes`). `tracks` se relaciona por nombre, no por FK: por eso el borrado va por `artist_name`. ⚠️ `deleteUser` **no** borra las sugerencias de ese usuario: es deliberado (el buzón es anónimo, `user_id` es nullable sin FK) pero está pendiente de decisión de privacidad.
+  - **Scripts de datos**: `scripts/seed-influential-catalog.ts` (P5.2, **NO aplicado en prod**), `scripts/backfill-artist-owners.ts` (6 de 7 artistas siguen con `user_id` NULL) y `scripts/qa-cleanup.ts`. Los tres con dry-run por defecto y `--apply` para escribir. **RC.33 withdrawing**: `scripts/fetch-official-videos.ts` y `scripts/apply-artist-images.ts` (Wikimedia, dry-run + `--apply`) — ya aplicados solo sobre allowlist.
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
 - ⚠️ **`vitest.config.ts:7-8` (los dos `delete process.env.TURSO_*`) es lo que protege Turso en los tests. NO los borres.** Parecen higiene de test y no lo son: bajo vitest el env está ausente, así que `isTursoEnabled()` es falso y los **83 guards `if (isTursoConfigured()) return;` nunca saltan** — están muertos. Si se restaura el env, cualquier import mal resuelto pasa de latente a destructivo: `createUser()` (que sí usa el predicado de tiempo de llamada) escribiría filas de QA en producción, y el fallo sería **verde**. Si alguna vez hay que tocar ese fichero, verifica los conteos con `scripts/turso-check.ts` antes y después.
@@ -79,6 +79,85 @@ tests/             # Vitest + Playwright
   - **El patrón roto que sustituye** (GAP-B): ramificar con `isTursoConfigured()` de `@/lib/db` (lee `process.env` al llamar) y ejecutar con `getTursoClient()` de `@/lib/turso` (lee el env al **importar**, `lib/turso.ts:31-32`). Con el env cargando tarde —el caso normal en un bundle de Vercel— la primera decía "turso" y la segunda `null`, se lanzaba y la ruta respondía **500**. Ya no queda ninguna ruta con este patrón.
   - **`getDbWrite()` / `getLocalDbWrite()` siguen siendo legítimos** en un **script** (`scripts/*`, que necesita escribir sí o sí) y en el camino local de una ruta, siempre detrás del `getTursoClientSync() === null`. Lo prohibido es usarlos como fuente de decisión.
   - **Deuda conocida**: `lib/artist-promotion.ts:139` sigue llamando `getDbWrite()` en el camino de aprobación de releases y shows. Funciona porque lo protege un `isTursoEnabled()`, pero es el patrón anterior y merece su propia ola.
+
+## Fase P — invariantes que no se pueden romper
+
+Las cuatro subfases están en `docs/PLAN_FASE_P.md`. Lo que sigue son las
+decisiones que, si alguien las revierte sin saber por qué, rompe algo en silencio.
+
+### P1 — las credenciales de test no tienen default
+
+`scripts/lib/credentials.ts` es la **única** definición; `tests/e2e/credentials.ts`
+es un reexport puro (un test ata la identidad de la función: si alguien copia la
+lógica, se rompe).
+
+**Contraseñas con default `""`, correos con default solo si no son PII ni secreto.**
+`TEST_ADMIN_EMAIL` default `admin@epk.local` (dominio inventado); `TEST_ARTIST_EMAIL`
+**sin** default, porque la única cuenta de artista conocida es de una persona real.
+Un default con la credencial real sería un cambio cosmético: el secreto sigue en el
+repo.
+
+`playwright.config.ts` **debe** hacer `dotenv.config({ path: ".env.local" })` antes de
+`defineConfig`: Playwright no hereda la carga de Next, y sin eso los 12 specs E2E
+leen `undefined`.
+
+⚠️ **`scripts/seed-admin.ts` sigue con `hashSync("admin123")` y es una decisión
+pendiente, no un olvido.** Si el admin de producción se rota, el seed debe leer del
+entorno y fallar sin `TEST_ADMIN_PASSWORD` en vez de crear una cuenta con una
+contraseña que nadie conoce.
+
+### P2 — `/track/[id]` es un shim de 301, no una segunda puerta
+
+Un single es fila de `tracks` **y** cabecera de release con el **mismo id**
+(`getReleaseWithTracks` = `getTrackById` + `getTracksByReleaseId`, sin tabla
+aparte). Por eso `/track/<id>` y `/releases/<id>` son la misma página y solo queda
+una: la de release. Las cuatro salidas de `resolveTrackRoute` son `missing`,
+`release`, `orphan` (hija sin padre: se renderiza **con aviso**, no 404) y `track`,
+que es rama de seguridad inalcanzable hoy.
+
+**`"00:00"` es el relleno del seed, no un disco de cero segundos.** `sumDurations`
+lo parsea bien y devuelve `{seconds: 0}`, así que ningún `isNaN` salta: el filtro
+compara contra el relleno.
+
+**`parseTrack` sigue sin exportar a propósito.** `lib/releases.ts` compone
+`getTrackById` + `getTracksByReleaseId`: 2 consultas donde bastaría 1, pero **una
+sola fuente de parseo**. Un `SELECT *` reconstruido a mano divergiría del original
+— y divergiría el nuevo, que es el que se ve en producción.
+
+### P3 — el correo tiene tres estados, no dos
+
+`sent` / `failed` / **`not_attempted`**. "No se intentó" ≠ "falló": sin `FROM_EMAIL`
+no hay llamada, y contarlo como fallo haría que el panel dijera que se perdieron
+correos que nadie iba a mandar.
+
+`RESEND_SMOKE=1` es la **única** puerta al envío real, y sin dominio verificado solo
+funciona `onboarding@resend.dev` → **solo** `RESEND_SMOKE_TO` (a otra dirección es un
+403 garantizado). Hay un test que ata `RESEND_SMOKE !== "1"` a "desactivado". El
+smoke es **script, no spec**, porque gasta cuota real de Resend.
+
+⚠️ **`lib/resend.ts` está huérfano** y conserva el patrón de env en ámbito de módulo
+(`resend.ts:3-4`), el mismo que RC.32 rompió en `lib/turso.ts`.
+
+### P4 — el buzón no distingue cuál capa rechazó
+
+Las cinco capas viven en el **servidor**: honeypot `empresa`, tiempo de formulario
+(≥2 s), rate limit por IP (10/h), **1 por correo cada 24 h** y topes de longitud.
+Las cuatro de descarte devuelven **exactamente el mismo 201 `{ok:true}`**: si
+distinguieran, un bot solo tendría que recorrerlas en orden. La única excepción es
+el **429**, porque quien comparte IP con media oficina y se bloquea sin explicación
+no tiene forma de saber que tiene que esperar.
+
+`ip_hash` es un **HMAC con `SESSION_SECRET`**, no un SHA: el espacio IPv4 son 2³²
+valores y un SHA suelto *es* la IP con tres pasos de más.
+
+El límite duro es el de **correo**, no el de IP: castiga más al spam y no castiga a
+quien comparte NAT. `scripts/turso-check.ts` tiene un check de
+`suggestions_email_duplicado_en_24h` **porque los tests corren contra SQLite, no
+contra Turso** — si esa capa falla en producción, los tests no lo ven.
+
+El aviso al admin es **best-effort**: se escribe primero y se avisa después. Un 502
+de Resend no puede llevarse por delante el mensaje de alguien que solo quería
+reportar un problema.
 
 ## Reglas de Delegación (CRÍTICO)
 
