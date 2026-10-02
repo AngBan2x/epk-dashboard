@@ -43,6 +43,9 @@ import type {
   SubmissionType,
   UserPreferences,
   ReleaseStatus,
+  // P4: buzón de sugerencias
+  Suggestion,
+  SuggestionStatus,
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
 // RC.33 · Ola 4. `parseVideoKind` es pura y no trae nada de la red: importarla
@@ -470,6 +473,28 @@ function initLocalTables(): void {
   `);
   try { db.exec(`ALTER TABLE dossiers ADD COLUMN genre TEXT`); } catch {}
   try { db.exec(`ALTER TABLE dossiers ADD COLUMN description TEXT`); } catch {}
+
+  // suggestions (P4 · buzón anónimo)
+  // Las dos mitades del esquema —local y Turso— tienen que ser idénticas o el
+  // mismo INSERT falla en uno de los dos sitios. La versión de Turso y su
+  // justificación están en `lib/turso.ts` (`ensureTursoSchema`, tabla 11).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS suggestions (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
+      user_id TEXT,
+      ip_hash TEXT,
+      admin_notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      read_at TEXT,
+      resolved_at TEXT
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_suggestions_email_created ON suggestions(email, created_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_suggestions_ip_created ON suggestions(ip_hash, created_at)`);
 }
 
 // Initialize local tables on module load.
@@ -1094,6 +1119,353 @@ export async function updateTrackSubmissionStatus(
     db.prepare("UPDATE track_submissions SET status = ?, admin_id = ?, reviewed_at = ?, updated_at = ? WHERE id = ?").run(status, adminId ?? null, now, now, id);
   }
   return getTrackSubmissionById(id);
+}
+
+// ─── Suggestions CRUD (P4 · buzón anónimo) ──────────────────────────────────
+
+/**
+ * Los cuatro estados del buzón, en el orden en que se recorren en el panel.
+ * `new` es el único de entrada; el resto los pone el admin.
+ */
+export const SUGGESTION_STATUSES: readonly SuggestionStatus[] = ["new", "read", "resolved", "spam"];
+
+export function isSuggestionStatus(value: unknown): value is SuggestionStatus {
+  return typeof value === "string" && (SUGGESTION_STATUSES as readonly string[]).includes(value);
+}
+
+/**
+ * El `email` se guarda SIEMPRE normalizado (minúsculas, sin espacios
+ * alrededor). No es solo estética: la capa 4 del anti-spam compara contra lo
+ * que hay en la tabla, y sin normalizar `Jose@Example.com` y `jose@example.com`
+ * serían dos personas distintas para el índice.
+ */
+export function normalizeSuggestionEmail(raw: unknown): string {
+  return String(raw ?? "").trim().toLowerCase();
+}
+
+function parseSuggestion(row: Record<string, unknown>): Suggestion {
+  const status = String(row.status ?? "new");
+  return {
+    id: String(row.id),
+    email: String(row.email ?? ""),
+    message: String(row.message ?? ""),
+    // Una fila con un estado desconocido (escrito a mano en la BD, por ejemplo)
+    // se lee como `new` en vez de propagar un valor que la UI no sabe pintar.
+    status: isSuggestionStatus(status) ? status : "new",
+    user_id: row.user_id === null || row.user_id === undefined ? null : String(row.user_id),
+    ip_hash: row.ip_hash === null || row.ip_hash === undefined ? null : String(row.ip_hash),
+    admin_notes: row.admin_notes === null || row.admin_notes === undefined ? null : String(row.admin_notes),
+    created_at: String(row.created_at ?? ""),
+    read_at: row.read_at === null || row.read_at === undefined ? null : String(row.read_at),
+    resolved_at: row.resolved_at === null || row.resolved_at === undefined ? null : String(row.resolved_at),
+  };
+}
+
+/**
+ * P4 · La huella de la IP: **HMAC-SHA256 con `SESSION_SECRET`**, en hex.
+ *
+ * Por qué no la IP en claro, y por qué no un hash simple:
+ *
+ *  1. La IP es dato personal. Aquí no se usa para nada más que para el rate
+ *     limit, y un dato personal que se guarda «por si acaso» se acaba
+ *     descargando en un backup.
+ *  2. Un SHA-256 **sin clave** no protege nada aquí: el espacio IPv4 entero son
+ *     2^32 valores y se recorre por fuerza bruta en segundos. Un digest «irreversible»
+ *     de una IP es una IP con tres pasos de más. La clave es lo que convierte el
+ *     hash en algo que no se puede revertir sin `SESSION_SECRET`.
+ *
+ * El prefijo `suggestions:ip:` es separación de dominio: la misma IP produce
+ * huellas distintas en otros usos, así que un digest de aquí no sirve para
+ * correlacionar a nadie con otra tabla.
+ *
+ * Devuelve `null` (la columna es nullable) cuando no hay clave o no hay IP, en
+ * vez de lanzar: un `SESSION_SECRET` ausente no puede convertir un formulario
+ * público en un 500. Sin huella, la capa 4 (que compara por `email`, no por IP)
+ * sigue impidiendo el reenvío.
+ */
+export async function hashSuggestionFingerprint(ip: unknown): Promise<string | null> {
+  const raw = String(ip ?? "").trim();
+  if (!raw) return null;
+
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (!secret) return null;
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(`suggestions:ip:${raw}`));
+  return Array.from(new Uint8Array(signature))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export interface CreateSuggestionInput {
+  id: string;
+  email: string;
+  message: string;
+  user_id?: string | null;
+  ip_hash?: string | null;
+}
+
+/**
+ * `created_at` se escribe SIEMPRE explícito y en ISO con `Z`.
+ *
+ * No se deja el `DEFAULT (datetime('now'))` de la tabla porque SQLite devuelve
+ * `"YYYY-MM-DD HH:MM:SS"` (espacio, sin zona) y la comparación de la capa 4 es
+ * lexicográfica contra un umbral ISO: `"2026-10-02 10:00:00"` ordena **antes**
+ * que `"2026-10-02T10:00:00.000Z"` porque `' '` (0x20) < `'T'` (0x54), y una fila
+ * reciente se contaría como antigua. Es el mismo desajuste de formato que
+ * `toEpochMs` resuelve en `lib/approval-notifications.ts`.
+ */
+export async function createSuggestion(input: CreateSuggestionInput): Promise<Suggestion> {
+  const now = new Date().toISOString();
+  const email = normalizeSuggestionEmail(input.email);
+  const userId = input.user_id ?? null;
+  const ipHash = input.ip_hash ?? null;
+
+  if (isTursoEnabled()) {
+    await tursoExec(
+      `INSERT INTO suggestions (id, email, message, status, user_id, ip_hash, admin_notes, created_at, read_at, resolved_at)
+       VALUES (?, ?, ?, 'new', ?, ?, NULL, ?, NULL, NULL)`,
+      [input.id, email, input.message, userId, ipHash, now]
+    );
+  } else {
+    const db = getLocalDbWrite();
+    db.prepare(
+      `INSERT INTO suggestions (id, email, message, status, user_id, ip_hash, admin_notes, created_at, read_at, resolved_at)
+       VALUES (?, ?, ?, 'new', ?, ?, NULL, ?, NULL, NULL)`
+    ).run(input.id, email, input.message, userId, ipHash, now);
+  }
+
+  const created = await getSuggestionById(input.id);
+  if (!created) throw new Error("Failed to create suggestion");
+  return created;
+}
+
+export async function getSuggestionById(id: string): Promise<Suggestion | null> {
+  if (isTursoEnabled()) {
+    const row = await tursoExecSingle("SELECT * FROM suggestions WHERE id = ?", [id]);
+    return row ? parseSuggestion(row) : null;
+  }
+  const db = getLocalDb();
+  const row = db.prepare("SELECT * FROM suggestions WHERE id = ?").get(id) as
+    | Record<string, unknown>
+    | undefined;
+  return row !== undefined ? parseSuggestion(row) : null;
+}
+
+export interface SuggestionsQuery {
+  status?: SuggestionStatus | "all";
+  page?: number;
+  limit?: number;
+}
+
+export interface SuggestionsPage {
+  suggestions: Suggestion[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+/**
+ * Listado paginado del panel de admin. El recorte por estado va en SQL (no en
+ * memoria) para que `total` sea el total REAL de la consulta y no el de la
+ * página cargada: con filtrado en memoria, la paginación miente.
+ *
+ * El `limit` se acota a 100 porque el parámetro viene de la query string y sin
+ * tope un `?limit=100000` arrastra la tabla entera al proceso.
+ */
+export async function getSuggestions(query: SuggestionsQuery = {}): Promise<SuggestionsPage> {
+  const page = Math.max(1, Math.floor(query.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Math.floor(query.limit ?? 20)));
+  const offset = (page - 1) * limit;
+  const status = query.status && query.status !== "all" && isSuggestionStatus(query.status) ? query.status : null;
+
+  const where = status ? "WHERE status = ?" : "";
+  const args: unknown[] = status ? [status] : [];
+
+  if (isTursoEnabled()) {
+    const totalRow = await tursoExecSingle(`SELECT COUNT(*) AS total FROM suggestions ${where}`, args);
+    const total = Number(totalRow?.total ?? 0);
+    const rows = await tursoExec(
+      `SELECT * FROM suggestions ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      [...args, limit, offset]
+    );
+    return {
+      suggestions: rows.map((row) => parseSuggestion(row as Record<string, unknown>)),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  const db = getLocalDb();
+  const totalRow = db.prepare(`SELECT COUNT(*) AS total FROM suggestions ${where}`).get(...args) as
+    | { total: number }
+    | undefined;
+  const total = Number(totalRow?.total ?? 0);
+  const rows = db
+    .prepare(`SELECT * FROM suggestions ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(...args, limit, offset) as Record<string, unknown>[];
+
+  return {
+    suggestions: rows.map(parseSuggestion),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+}
+
+/**
+ * Contadores por estado. Se calculan SIEMPRE sobre el total, nunca sobre el
+ * filtro activo: si no, al filtrar por «Nuevas» el resto de contadores saldrían
+ * en cero y los botones de filtro mentirían.
+ */
+export async function countSuggestionsByStatus(): Promise<{
+  new: number;
+  read: number;
+  resolved: number;
+  spam: number;
+  total: number;
+}> {
+  const counts = { new: 0, read: 0, resolved: 0, spam: 0, total: 0 };
+
+  if (isTursoEnabled()) {
+    const rows = await tursoExec("SELECT status, COUNT(*) AS total FROM suggestions GROUP BY status");
+    for (const row of rows) {
+      const status = String((row as Record<string, unknown>).status ?? "");
+      const total = Number((row as Record<string, unknown>).total ?? 0);
+      if (isSuggestionStatus(status)) counts[status] = total;
+      counts.total += total;
+    }
+    return counts;
+  }
+
+  const db = getLocalDb();
+  const rows = db
+    .prepare("SELECT status, COUNT(*) AS total FROM suggestions GROUP BY status")
+    .all() as { status: string; total: number }[];
+  for (const row of rows) {
+    if (isSuggestionStatus(row.status)) counts[row.status] = Number(row.total ?? 0);
+    counts.total += Number(row.total ?? 0);
+  }
+  return counts;
+}
+
+/**
+ * Capa 4 del anti-spam: ¿hay ya un mensaje de este `email` dentro de la
+ * ventana? Devuelve el más reciente.
+ *
+ * El enunciado pedía la pareja `email+IP`. Se implementa **`email` a secas**, que
+ * es estrictamente más fuerte y no castiga a quien comparte IP:
+ *
+ *   - Por la pareja, un bot podría mandar N veces con el mismo correo rotando
+ *     IP, y lo único que lo frenaría sería el rate limit por IP (alta a
+ *     propósito, para no bloquear NAT). Por `email`, eso no cuela.
+ *   - El caso que la regla por IP sí castiga —una oficina, una facultad, un
+ *     móvil con CGNAT— no lo castiga esta: dos personas distintas detrás del
+ *     mismo NAT tienen correos distintos.
+ *   - Lo que se pierde es el reenvío legítimo desde otro dispositivo (móvil +
+ *     wifi) con el mismo correo en 24 h. Un mensaje, no una queja.
+ *
+ * `sinceIso` es un umbral ISO, no un `datetime('now')` de SQLite: ver la nota de
+ * formato en `createSuggestion`.
+ */
+export async function findRecentSuggestionByEmail(
+  email: string,
+  sinceIso: string
+): Promise<Suggestion | null> {
+  const normalized = normalizeSuggestionEmail(email);
+  if (!normalized) return null;
+
+  if (isTursoEnabled()) {
+    const row = await tursoExecSingle(
+      "SELECT * FROM suggestions WHERE email = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 1",
+      [normalized, sinceIso]
+    );
+    return row ? parseSuggestion(row) : null;
+  }
+
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      "SELECT * FROM suggestions WHERE email = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 1"
+    )
+    .get(normalized, sinceIso) as Record<string, unknown> | undefined;
+  return row !== undefined ? parseSuggestion(row) : null;
+}
+
+/** Nº de mensajes de una misma huella de IP dentro de la ventana. Diagnóstico. */
+export async function countSuggestionsByFingerprint(
+  ipHash: string | null,
+  sinceIso: string
+): Promise<number> {
+  if (!ipHash) return 0;
+
+  if (isTursoEnabled()) {
+    const row = await tursoExecSingle(
+      "SELECT COUNT(*) AS total FROM suggestions WHERE ip_hash = ? AND created_at >= ?",
+      [ipHash, sinceIso]
+    );
+    return Number(row?.total ?? 0);
+  }
+
+  const db = getLocalDb();
+  const row = db
+    .prepare("SELECT COUNT(*) AS total FROM suggestions WHERE ip_hash = ? AND created_at >= ?")
+    .get(ipHash, sinceIso) as { total: number } | undefined;
+  return Number(row?.total ?? 0);
+}
+
+/**
+ * Cambio de estado + notas internas del admin.
+ *
+ * `read_at` y `resolved_at` son marcas de tiempo, no estado: se rellenan la
+ * PRIMERA vez y no se borran aunque la sugerencia vuelva atrás (p. ej. de
+ * «resuelta» a «pendiente de revisar»). Perder el instante en que se leyó por
+ * primera vez no aporta nada y sí borra información.
+ *
+ * Resolver marca también como leída si no lo estaba: una sugerencia resuelta
+ * que nadie ha leído es una incoherencia que el panel no debería mostrar.
+ */
+export async function updateSuggestionStatus(
+  id: string,
+  status: SuggestionStatus,
+  adminNotes?: string
+): Promise<Suggestion | null> {
+  if (!isSuggestionStatus(status)) {
+    throw new Error(`Estado de sugerencia inválido: ${String(status)}`);
+  }
+
+  const current = await getSuggestionById(id);
+  if (!current) return null;
+
+  const now = new Date().toISOString();
+  const readAt = current.read_at ?? (status === "read" || status === "resolved" ? now : null);
+  const resolvedAt = current.resolved_at ?? (status === "resolved" ? now : null);
+  const notes = adminNotes === undefined ? current.admin_notes : adminNotes.trim() === "" ? null : adminNotes;
+
+  if (isTursoEnabled()) {
+    await tursoExec(
+      "UPDATE suggestions SET status = ?, admin_notes = ?, read_at = ?, resolved_at = ? WHERE id = ?",
+      [status, notes, readAt, resolvedAt, id]
+    );
+  } else {
+    const db = getLocalDbWrite();
+    db.prepare(
+      "UPDATE suggestions SET status = ?, admin_notes = ?, read_at = ?, resolved_at = ? WHERE id = ?"
+    ).run(status, notes, readAt, resolvedAt, id);
+  }
+
+  return getSuggestionById(id);
+}
+
+export async function deleteSuggestion(id: string): Promise<boolean> {
+  if (isTursoEnabled()) {
+    const affected = await tursoExecUpdate("DELETE FROM suggestions WHERE id = ?", [id]);
+    return affected > 0;
+  }
+  const db = getLocalDbWrite();
+  return db.prepare("DELETE FROM suggestions WHERE id = ?").run(id).changes > 0;
 }
 
 // ─── Subscriptions CRUD ───────────────────────────────────────────────────────

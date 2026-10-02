@@ -358,6 +358,50 @@ export async function ensureTursoSchema(): Promise<boolean> {
     )
   `);
 
+  // 11. suggestions (P4 — buzón anónimo de sugerencias)
+  //
+  // Idempotente por construcción: `IF NOT EXISTS` en la tabla y en los tres
+  // índices. No hay bloque `ALTER TABLE` porque es una tabla NUEVA: no existe
+  // ninguna base con ella, así que no hay deriva que migrar. Si algún día se
+  // añadiera una columna, aquí sí haría falta el `try { ALTER } catch {}` que
+  // usan las demás.
+  //
+  // SIN `FOREIGN KEY` a propósito, a diferencia de las otras nueve tablas:
+  //   - `user_id` es NULLABLE y anónimo. Una FK a `users(id)` no impediría el
+  //     INSERT (NULL es siempre válido en una FK), pero obligaría a decidir qué
+  //     pasa cuando se borra un usuario, y para un buzón anónimo esa pregunta no
+  //     tiene respuesta útil: el mensaje no es de nadie.
+  //   - `ip_hash` no puede referenciar nada por definición: es un digest.
+  // `CHECK` tampoco: SQLite no permite añadir restricciones a una tabla
+  // existente con `ALTER TABLE`, así que un `CHECK` aquí solo protegería a las
+  // bases nuevas y daría una falsa sensación de garantía. Quien escribe valida
+  // el estado en `updateSuggestionStatus` (`lib/db.ts`).
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS suggestions (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
+      user_id TEXT,
+      -- HMAC-SHA256(SESSION_SECRET, IP) en hex. NO es la IP: se guarda porque el
+      -- rate limit y el diagnóstico necesitan una huella estable entre
+      -- peticiones, y una IP en claro sería dato personal sin ningún uso más.
+      -- Un SHA suelto no serviría (el espacio IPv4 se recorre por fuerza bruta
+      -- en segundos); con clave no se revierte sin SESSION_SECRET.
+      ip_hash TEXT,
+      admin_notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      read_at TEXT,
+      resolved_at TEXT
+    )
+  `);
+  // El contador de "nuevas" del panel de admin.
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status)`);
+  // Capa 4 del anti-spam: una búsqueda por `email` con ventana de 24 h.
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_suggestions_email_created ON suggestions(email, created_at)`);
+  // Diagnóstico por huella de IP cuando el rate limit salta.
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_suggestions_ip_created ON suggestions(ip_hash, created_at)`);
+
   return true;
 }
 

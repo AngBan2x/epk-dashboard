@@ -18,6 +18,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/dashboard`, lastModified: now, changeFrequency: "daily", priority: 0.7 },
     { url: `${BASE_URL}/login`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${BASE_URL}/register`, lastModified: now, changeFrequency: "yearly", priority: 0.5 },
+    // P4 · buzón público. Prioridad baja y `yearly`: la página no cambia nunca,
+    // pero es la vía de entrada para quien no tiene cuenta, y una página de
+    // contacto que no está en el sitemap es una página que los buscadores no
+    // encuentran.
+    { url: `${BASE_URL}/suggestions`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];
 
   const dinamicas: MetadataRoute.Sitemap = [];
