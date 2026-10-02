@@ -31,9 +31,32 @@ interface ArtistTracksSectionProps {
    * y una visita = N llamadas upstream.
    */
   youtubeStats?: YouTubeStatsRecord;
+  /**
+   * RC.34: scrobbles de Last.fm **ya resueltos por pista**, indexados por
+   * `track.id`.
+   *
+   * El mismo motivo que `youtubeStats`, y además evita repetir aquí la
+   * normalización de títulos: la página del artista pide `artist.gettoptracks`
+   * una vez (NO `track.getInfo` por fila, que serían 65 llamadas para un
+   * álbum de 65 hijas), arma el índice `título normalizado -> playcount` y
+   * entrega el número de cada pista ya buscado.
+   *
+   * Se indexa por id y no por título a propósito: el consumidor no necesita
+   * entonces ninguna normalización, y una clave por id no puede desincronizarse
+   * de la que construyó el índice.
+   *
+   * El valor es `number | null`. `null` = Last.fm no conoce esa pista (o no
+   * respondió) y `EPKCard` pinta "—" con su `title` explicativo. Un `0` aquí
+   * sería mentir: afirmar que nadie escuchó la pista.
+   */
+  lastfmByTrack?: Record<string, number | null>;
 }
 
-export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksSectionProps) {
+export function ArtistTracksSection({
+  groups,
+  youtubeStats = {},
+  lastfmByTrack = {},
+}: ArtistTracksSectionProps) {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   // Estado de colapso por release, no global: plegar un álbum no debe
   // replegar los demás. Objeto plano, no Map.
@@ -45,6 +68,14 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
 
   const statsFor = (track: Track) =>
     track.youtube_video_id ? youtubeStats[track.youtube_video_id] ?? null : null;
+
+  /**
+   * Scrobbles de Last.fm de la fila, ya resueltos por el servidor. `?? null`
+   * convierte "el lote no trajo este id" en "sin dato", que es lo que la
+   * tarjeta sabe pintar; un `undefined` suelto se colaría en el pie como dato
+   * ausente sin motivo.
+   */
+  const lastfmFor = (track: Track) => lastfmByTrack[track.id] ?? null;
 
   const toggleRelease = (releaseId: string) => {
     setExpanded((prev) => ({ ...prev, [releaseId]: !prev[releaseId] }));
@@ -136,6 +167,8 @@ export function ArtistTracksSection({ groups, youtubeStats = {} }: ArtistTracksS
                 track={release}
                 onLoginPrompt={handleLoginPrompt}
                 youtubeStats={statsFor(release)}
+                lastfmPlaycount={lastfmFor(release)}
+        lastfmByTrack={lastfmByTrack}
                 detailHref={
                   tracks.length > 0 ? `/releases/${release.id}` : `/track/${release.id}`
                 }

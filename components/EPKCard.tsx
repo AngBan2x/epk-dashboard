@@ -82,6 +82,16 @@ interface EPKCardProps {
    *   esta tarjeta y `resolveAlbumMetrics` ya lo agregan sin tocar nada más.
    */
   lastfmPlaycount?: number | null;
+  /**
+   * Playcounts de Last.fm indexados por `track.id` de las **hijas** de un
+   * álbum. Sin esto, un álbum del que solo conocemos el scrobble de sus pistas
+   * se enseña como `"—"`: el padre no tiene dato curado ni de YouTube, y la
+   * agregación nunca llega a la fuente que sí tiene datos.
+   *
+   * Por `id` y no por título: es lo que ya construye quien monta la rejilla, y
+   * así no hay que renormalizar el título otra vez aquí.
+   */
+  lastfmByTrack?: Record<string, number | null>;
 }
 
 export function EPKCard({
@@ -95,6 +105,7 @@ export function EPKCard({
   childrenTracks,
   queue,
   lastfmPlaycount = null,
+  lastfmByTrack = {},
 }: EPKCardProps) {
   const { user } = useAuth();
   const audio = useAudioPlayer();
@@ -128,9 +139,13 @@ export function EPKCard({
    * medición real.
    *
    * Ahora decide `lib/metrics-source.ts`: una sola fuente, y `null` —no `0`—
-   * cuando ninguna habló. Un álbum se agrega **dentro de una sola fuente**; por
-   * eso las hijas aportan solo su JSON curado, que es lo único que esta tarjeta
-   * tiene de ellas.
+   * cuando ninguna habló. Un álbum se agrega **dentro de una sola fuente**: por
+   * eso las hijas aportan su JSON curado y su Last.fm, y nunca una suma mezclada.
+   *
+   * `lastfmByTrack` viene indexado por `track.id` (no por título) porque es lo
+   * que ya construye quien monta la rejilla, y así no hay que renormalizar el
+   * título otra vez aquí. `?? null` y no `?? 0`: mandar 0 cuando la integración
+   * falló es exactamente el bug que esta tarjeta arregla.
    */
   const ownMetricsCandidates: MetricsCandidates = {
     curated: track.metrics,
@@ -140,7 +155,12 @@ export function EPKCard({
   const metrics = childrenTracks?.length
     ? resolveAlbumMetrics(
         ownMetricsCandidates,
-        childrenTracks.map((child): MetricsCandidates => ({ curated: child.metrics }))
+        childrenTracks.map(
+          (child): MetricsCandidates => ({
+            curated: child.metrics,
+            lastfmPlaycount: lastfmByTrack[child.id] ?? null,
+          })
+        )
       )
     : resolveMetrics(ownMetricsCandidates);
   const streams = metrics.value === null ? "—" : formatNumber(metrics.value);
@@ -508,6 +528,7 @@ export function EPKCard({
               className="inline-flex items-center gap-1"
               title={statsTooltip}
               aria-label={statsTooltip}
+              data-testid="epkcard-streams"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A2 2 0 0010 9.87v4.263a2 2 0 001.555.832l3.197-2.132a2 2 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               {streams}
