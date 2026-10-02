@@ -1535,7 +1535,7 @@ Corregir problemas de auth/UI + implementar RBAC por rol + sistema de Shows & Bo
 
 #### UI Fixes
 - **L4:** Eliminado gradiente CSS que terminaba en `#fff` (causaba barra blanca). `body` ahora usa color sólido. Eliminado `pb-24` del wrapper en `layout.tsx`
-- **L5:** Footer ahora es `"use client"` con `useAuth()`. Link "Panel Admin" solo visible para `role === "admin"`. Red社会ales reemplazadas: solo Instagram + X (Twitter), eliminados PressPlay link y Apple Music
+- **L5:** Footer ahora es `"use client"` con `useAuth()`. Link "Panel Admin" solo visible para `role === "admin"`. Redes sociales reemplazadas: solo Instagram + X (Twitter), eliminados PressPlay link y Apple Music
 - **L6:** Título de EPKCard cambiado de `dark:text-slate-100` a `dark:text-white` para mejor contraste
 
 #### Likes
@@ -2122,7 +2122,7 @@ Hero proporcionado → Features con iconos reales → Pasos numerados limpios �
 - **Archivo**: `components/GlobalAudioPlayer.tsx`
 
 #### Fix B: Audio Visualizer — CORS + Cache Fix
-- **Causa**: `createMediaElementSource()` solo puede llamarse 1 vez por elemento `<audio>`. Al abrir/cerrar visualizador多次, fallaba silenciosamente
+- **Causa**: `createMediaElementSource()` solo puede llamarse 1 vez por elemento `<audio>`. Al abrir/cerrar visualizador varias veces, fallaba silenciosamente
 - **Solución**: Agregar `WeakMap` cache para reusar el `AudioVisualizerNode` existente en vez de recrearlo
 - **Archivo**: `lib/web-audio.ts`
 
@@ -5351,7 +5351,8 @@ px tsc --noEmit EXIT:0 (0 errores)
 Screenshots: 	ests/screenshots/batch2/{dark,light}/
 
 **Bugs extra corregidos (Windows + Auth):**
-- package.json prebuild m -f Unix-only → node -e cross-platform
+- package.json prebuild 
+m -f Unix-only → node -e cross-platform
 - /api/auth/me 401 sin cache headers → no-store en route + AuthContext.fetchUser
 - Contexto: after login cached 401 dejaba header en "Iniciar Sesión" hasta fix
 
@@ -5610,7 +5611,7 @@ El usuario reporto 13 problemas con capturas (animacion shows, carrusel ausente,
 - Auditorias: `docs/SECURITY_AUDIT_P5_P6.md` (sin riesgos altos ni criticos de codigo) y `docs/P6_QA_REPORT.md` (297+ verificaciones sin fallos). Del reporte de seguridad se corrigio M-3: `PATCH /api/admin/shows/[id]` aprobaba o rechazaba saltandose el minimo de 10 caracteres cuando se usaba el campo booleano `approved`.
 - **Higiene de datos:** se detectaron y borraron **13 usuarios de prueba de fases anteriores** que llevaban semanas en produccion (Q4 lessons). Estado final verificado por SQL directo a Turso: **9 tracks, 2 shows, 2 usuarios reales, 0 QA, 0 notificaciones huerfanas, 0 suscripciones huerfanas**.
 
-**Pendiente por决策 del usuario (no bloquea):**
+**Pendiente por decision del usuario (no bloquea):**
 1. `FROM_EMAIL` sigue sin configurar y `pressplay.eu.org` continua pendiente de aprobacion manual en eu.org, asi que **ningun correo sale a un destinatario distinto del email de la cuenta de Resend**. La cuota diaria de Resend tambien se agoto durante la sesion, por lo que no se lanzo ninguna prueba de email. El banner ambar del panel admin lo muestra.
 2. P5.2: el seed del catalogo influyente esta implementado y verificado en dry-run, pero **no se aplico en produccion** para no meter 65 tracks ficticios en el catalogo real.
 3. 6 de los 7 artistas siguen sin `user_id` (`scripts/backfill-artist-owners.ts` existe y es conservador: no adivina, solo sugiere; necesita que existan usuarios reales que coincidan). Mientras tanto, un artista sin dueno no recibe la notificacion de aprobacion.
@@ -6463,7 +6464,7 @@ a `draft`. Se deshabilito con `410` antes de la autenticacion.
 
 Un 410 en un endpoint de sync **rompe la portabilidad local a Turso**, que es el
 motivo por el que existe. Queda como pendiente construir el sustituto seguro;
-prefers eso a un endpoint que看起来 arreglado y borre el trabajo del admin.
+prefers eso a un endpoint que ya estaba arreglado y borre el trabajo del admin.
 
 ### `lib/turso.ts`: el diagnostico que costaba tres despliegues
 
@@ -6674,7 +6675,7 @@ commit anterior y no funcionalidad nueva: si no, se habria mezclado.
 
 Y: dos "fallos" que no lo eran. `Test-Path` fallo con `app\api\suggestions\[id\]`
 porque los corchetes son wildcards en PowerShell — el fichero existia de verdad. Y
-un `�` en un `Select-String` era la consola, no el fichero: no hay U+FFFD en el
+un caracter de reemplazo (U+FFFD) en un Select-String era la consola, no el fichero: no hay U+FFFD en el
 disco. Se comprobo antes de "arreglar" nada.
 
 ### Estado de produccion
