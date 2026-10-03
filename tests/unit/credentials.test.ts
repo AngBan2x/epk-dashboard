@@ -45,11 +45,25 @@ async function loadHelper() {
   return await import("@/scripts/lib/credentials");
 }
 
+/**
+ * Simula "entorno sin configurar" ponemos **cadena vacia**, no borrando la
+ * variable.
+ *
+ * La distincion parece cosmetica y no lo es: `scripts/lib/credentials.ts` llama
+ * a `dotenv.config()` al evaluarse (para que las ~30 rutas que lo importan no
+ * dependan del orden de los imports), y dotenv **no sobreescribe** una variable
+ * que ya existe. Con `delete`, el modulo la repoblaba desde `.env.local` y el
+ * test dejaba de estar probando lo que dice probar.
+ *
+ * Para este modulo "" e `undefined` son lo mismo: ambas acaban en `""` y las dos
+ * hacen que `requireCredentials` lance. Asi que la version que representa de
+ * verdad "no configurado" es la que dotenv respeta.
+ */
 beforeEach(() => {
   saved = {};
   for (const k of ENV_KEYS) {
     saved[k] = process.env[k];
-    delete process.env[k];
+    process.env[k] = "";
   }
 });
 

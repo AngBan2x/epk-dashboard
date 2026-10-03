@@ -3,6 +3,25 @@
  * Seed: Crear usuario admin por defecto
  * - En LOCAL: crea en better-sqlite3
  * - En TURSO: también sincroniza al remote
+ *
+ * ── P7 · la contrasena viene del entorno ───────────────────────────────────
+ *
+ * Antes este script fijaba `CONTRASENA_ADMIN_ROTADA` en las dos ramas. Eso era peor de lo que
+ * parecian: las contrasenas ya estan rotadas en produccion, y seguir dejando
+ * la cadena ahi significaba que **cualquier ejecucion del seed reintroducia una
+ * contrasena conocida en la cuenta de administracion**.
+ *
+ * El default vacio no es el default "CONTRASENA_ADMIN_ROTADA con otro nombre": es lo unico que
+ * hace que ejecutar el seed sin `TEST_ADMIN_PASSWORD` falle en vez de crear una
+ * cuenta que nadie conoce. Ver `scripts/lib/credentials.ts`.
+ *
+ * La comprobacion es **perezosa**: `requireCredentials` se llama en el punto
+ * exacto donde se va a insertar, no al principio del script. Si el admin ya
+ * existe, este seed no necesita la contrasena para nada y no debe exigirla.
+ *
+ * Nunca imprime la contrasena. Antes lo hacia (`console.log("Password:
+ * CONTRASENA_ADMIN_ROTADA")`), y un seed que imprime un secreto lo convierte en un secreto de
+ * mas sitios.
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
@@ -10,6 +29,7 @@ config({ path: ".env.local" });
 import path from "path";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import { requireCredentials } from "./lib/credentials";
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -40,19 +60,21 @@ async function main() {
   if (existingAdmin) {
     console.log("✅ Usuario admin ya existe en SQLite:", (existingAdmin as Record<string, unknown>).email);
   } else {
-    const passwordHash = bcrypt.hashSync("CONTRASENA_ADMIN_ROTADA", 10);
+    // Perezoso, y solo aqui. Lanza con un mensaje util si falta la variable.
+    const { email, password } = requireCredentials("admin", "seed del usuario administrador");
+    const passwordHash = bcrypt.hashSync(password, 10);
     const adminId = randomUUID();
 
     db.prepare(`
       INSERT INTO users (id, name, email, password_hash, role)
       VALUES (?, ?, ?, ?, ?)
-    `).run(adminId, "Admin EPK", "admin@epk.local", passwordHash, "admin");
+    `).run(adminId, "Admin EPK", email, passwordHash, "admin");
 
     console.log("✅ Usuario admin creado en SQLite:");
-    console.log("   Email: admin@epk.local");
-    console.log("   Password: CONTRASENA_ADMIN_ROTADA");
+    console.log("   Email:", email);
     console.log("   Role: admin");
     console.log("   ID:", adminId);
+    console.log("   Password: <la de TEST_ADMIN_PASSWORD, no se imprime>");
   }
 
   db.close();
@@ -81,17 +103,22 @@ async function main() {
     if (result.rows.length > 0) {
       console.log("✅ Admin ya existe en Turso:", result.rows[0].email);
     } else {
-      const passwordHash = bcrypt.hashSync("CONTRASENA_ADMIN_ROTADA", 10);
+      const { email, password } = requireCredentials(
+        "admin",
+        "seed del usuario administrador en Turso"
+      );
+      const passwordHash = bcrypt.hashSync(password, 10);
       const adminId = randomUUID();
 
       await turso.execute({
         sql: "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
-        args: [adminId, "Admin EPK", "admin@epk.local", passwordHash, "admin"],
+        args: [adminId, "Admin EPK", email, passwordHash, "admin"],
       });
 
       console.log("✅ Admin creado en Turso:");
-      console.log("   Email: admin@epk.local");
+      console.log("   Email:", email);
       console.log("   ID:", adminId);
+      console.log("   Password: <la de TEST_ADMIN_PASSWORD, no se imprime>");
     }
   } else {
     console.log("\nℹ️  Turso no configurado (saltando sync remoto)");
@@ -100,4 +127,7 @@ async function main() {
   console.log("\n✅ Seed admin completado\n");
 }
 
-main().catch(console.error);
+main().catch((e) => {
+  console.error(e instanceof Error ? e.message : e);
+  process.exit(1);
+});

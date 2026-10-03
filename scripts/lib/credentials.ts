@@ -15,7 +15,30 @@
  * - local: `.env.local` (ver `.env.example`). Playwright carga ese fichero en
  *   `playwright.config.ts` porque no hereda la carga de Next.
  * - CI: secret store del proveedor. Nunca en el repositorio.
+ *
+ * ── Por que este modulo carga el entorno ───────────────────────────────────
+ *
+ * Este fichero hace `config()` el mismo, y no por comodidad. En ES modules
+ * **todos los imports se evaluan antes que cualquier sentencia del cuerpo del
+ * modulo**: si el consumidor pone
+ *
+ *     import { config } from "dotenv";
+ *     config({ path: ".env.local" });
+ *     import { ADMIN_PASSWORD } from "./lib/credentials";
+ *
+ * la segunda linea sigue ejecutandose DESPUES de que este modulo ya capturo
+ * `process.env`, y las constas exportadas salen vacias. El `config()` del
+ * consumidor no sirve de nada aqui.
+ *
+ * Es el mismo patron que RC.32 rompio en `lib/turso.ts` (const a nivel de modulo
+ * con snapshot del env) y por el que dos rutas respondian 500. Por eso el
+ * modulo que LEE el entorno es el que lo CARGA, y por eso `current()` relee en
+ * tiempo de llamada y no se apoya solo en las constas.
  */
+
+import { config } from "dotenv";
+
+config({ path: ".env.local" });
 
 export type TestRole = "artist" | "admin";
 
@@ -32,10 +55,42 @@ export type TestCredential = { email: string; password: string };
  */
 export const DEFAULT_ADMIN_EMAIL = "admin@epk.local";
 
-export const ARTIST_EMAIL = process.env.TEST_ARTIST_EMAIL ?? "";
-export const ARTIST_PASSWORD = process.env.TEST_ARTIST_PASSWORD ?? "";
-export const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL;
-export const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD ?? "";
+/**
+ * Lee una variable tratando **la cadena vacia como "no definida"**.
+ *
+ * `process.env.X ?? DEF` no hace eso: `??` solo cae en el default cuando el valor
+ * es `null` o `undefined`, no cuando es `""`. Y una variable presente pero
+ * vacia es justo lo que se encuentra quien exporta mal un secreto en CI, o quien
+ * escribe `TEST_ADMIN_EMAIL=` en un `.env.local`.
+ *
+ * Con `??` a secas, ese caso dejaba `ADMIN_EMAIL === ""`: el default del admin
+ * desaparecia justo cuando el entorno estaba mal configurado, y los scripts de
+ * QA del panel intentaban autenticarse con una cadena vacia en vez de con
+ * `admin@epk.local`.
+ *
+ * Aqui se distingue a proposito entre las dos situacones:
+ * - **Con default** (el email del admin): "" cae al default, porque el default
+ *   no es un secreto y no queremos que un entorno mal configurado rompa los
+ *   scripts de solo lectura.
+ * - **Sin default** (las contrasenas): "" se queda "", que es justo lo que hace
+ *   que `requireCredentials` falle en vez de autenticarse con nada.
+ */
+function readEnv(name: string, fallback: string): string {
+  const raw = process.env[name];
+  if (raw === undefined || raw === null) return fallback;
+  const trimmed = raw.trim();
+  return trimmed === "" ? fallback : trimmed;
+}
+
+/** Igual que `readEnv` pero sin default: devuelve "" si no esta o esta vacia. */
+function readEnvStrict(name: string): string {
+  return readEnv(name, "");
+}
+
+export const ARTIST_EMAIL = readEnvStrict("TEST_ARTIST_EMAIL");
+export const ARTIST_PASSWORD = readEnvStrict("TEST_ARTIST_PASSWORD");
+export const ADMIN_EMAIL = readEnv("TEST_ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL);
+export const ADMIN_PASSWORD = readEnvStrict("TEST_ADMIN_PASSWORD");
 
 /** Variable de entorno que hay que definir para un rol, para el mensaje de error. */
 const ENV_NAME: Record<TestRole, { email: string; password: string }> = {
@@ -43,10 +98,24 @@ const ENV_NAME: Record<TestRole, { email: string; password: string }> = {
   admin: { email: "TEST_ADMIN_EMAIL", password: "TEST_ADMIN_PASSWORD" },
 };
 
+/**
+ * Relee `process.env` en tiempo de llamada en vez de usar las constas de arriba.
+ *
+ * Las constas se snapshotan al evaluar este modulo. Si un consumidor importa
+ * este fichero antes de que su propio `dotenv.config()` corra, las constas estan
+ * vacias para siempre; releer aqui es lo que hace que `requireCredentials` —la
+ * via que usan los seeds— siga siendo correcta en ese caso.
+ */
 function current(role: TestRole): TestCredential {
   return role === "artist"
-    ? { email: ARTIST_EMAIL, password: ARTIST_PASSWORD }
-    : { email: ADMIN_EMAIL, password: ADMIN_PASSWORD };
+    ? {
+        email: readEnvStrict("TEST_ARTIST_EMAIL"),
+        password: readEnvStrict("TEST_ARTIST_PASSWORD"),
+      }
+    : {
+        email: readEnv("TEST_ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL),
+        password: readEnvStrict("TEST_ADMIN_PASSWORD"),
+      };
 }
 
 /** Que falta para poder autenticarse, sin imprimir ningun valor. */
