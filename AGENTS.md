@@ -82,10 +82,13 @@ tests/             # Vitest + Playwright
 
 ## Fase P — invariantes que no se pueden romper
 
-Las cuatro subfases están en `docs/PLAN_FASE_P.md`. Lo que sigue son las
-decisiones que, si alguien las revierte sin saber por qué, rompe algo en silencio.
+Las cuatro subfases estan en `docs/PHASE_P7.md` … `docs/PHASE_P10.md`, y el
+indice de todas las fases en `docs/PHASES.md`. **La numeracion P1-P6 ya estaba
+ocupada** por otros documentos (`PHASE_P3.md`, `PHASE_P4.md`, `PHASE_P5.md`,
+`PHASE_P6.md`), asi que estas empiezan en P7: no las renumeres. Lo que sigue son
+las decisiones que, si alguien las revierte sin saber por que, rompe algo en silencio.
 
-### P1 — las credenciales de test no tienen default
+### P7 - las credenciales de test no tienen default
 
 `scripts/lib/credentials.ts` es la **única** definición; `tests/e2e/credentials.ts`
 es un reexport puro (un test ata la identidad de la función: si alguien copia la
@@ -106,7 +109,7 @@ pendiente, no un olvido.** Si el admin de producción se rota, el seed debe leer
 entorno y fallar sin `TEST_ADMIN_PASSWORD` en vez de crear una cuenta con una
 contraseña que nadie conoce.
 
-### P2 — `/track/[id]` es un shim de 301, no una segunda puerta
+### P8 - `/track/[id]` es un shim de 301, no una segunda puerta
 
 Un single es fila de `tracks` **y** cabecera de release con el **mismo id**
 (`getReleaseWithTracks` = `getTrackById` + `getTracksByReleaseId`, sin tabla
@@ -124,7 +127,7 @@ compara contra el relleno.
 sola fuente de parseo**. Un `SELECT *` reconstruido a mano divergiría del original
 — y divergiría el nuevo, que es el que se ve en producción.
 
-### P3 — el correo tiene tres estados, no dos
+### P9 - el correo tiene tres estados, no dos
 
 `sent` / `failed` / **`not_attempted`**. "No se intentó" ≠ "falló": sin `FROM_EMAIL`
 no hay llamada, y contarlo como fallo haría que el panel dijera que se perdieron
@@ -138,7 +141,7 @@ smoke es **script, no spec**, porque gasta cuota real de Resend.
 ⚠️ **`lib/resend.ts` está huérfano** y conserva el patrón de env en ámbito de módulo
 (`resend.ts:3-4`), el mismo que RC.32 rompió en `lib/turso.ts`.
 
-### P4 — el buzón no distingue cuál capa rechazó
+### P10 - el buzon no distingue cual capa rechazo
 
 Las cinco capas viven en el **servidor**: honeypot `empresa`, tiempo de formulario
 (≥2 s), rate limit por IP (10/h), **1 por correo cada 24 h** y topes de longitud.
