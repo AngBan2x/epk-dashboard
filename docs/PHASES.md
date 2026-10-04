@@ -29,7 +29,7 @@ decisiones ya tomadas.
 | Fase | Documento | Estado |
 |---|---|---|
 | P7 | [`PHASE_P7.md`](./PHASE_P7.md) — credenciales de test fuera del código | completada |
-| P8 | [`PHASE_P8.md`](./PHASE_P8.md) — una página por release | completada **con reserva**: el diseño se revierte |
+| P8 | [`PHASE_P8.md`](./PHASE_P8.md) — una página por release | completada; el diseño se revirtió en C1 (2026-10-04) |
 | P9 | [`PHASE_P9.md`](./PHASE_P9.md) — pruebas de correo sin `eu.org` | completada |
 | P10 | [`PHASE_P10.md`](./PHASE_P10.md) — buzón de sugerencias anónimo | completada |
 

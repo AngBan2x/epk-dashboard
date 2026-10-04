@@ -1,9 +1,10 @@
 # PHASE P8 — Una página por release
 
-**Estado:** COMPLETADA CON RESERVA (2026-10-03) — commit `cebc700`
-**Reserva abierta:** el usuario pidió (2026-10-03) **revertir el diseño nuevo**
-y volver al anterior. Ver "Lo pendiente" abajo.
-**Gate:** 1146/1146 tests · `tsc` limpio · lint sin avisos · a11y y axe sin
+**Estado:** COMPLETADA (2026-10-04) — commits `cebc700` y `6baefc2`
+**Reserva cerrada:** el diseño nuevo se revirtió en C1 (2026-10-04). Ver
+"Lo pendiente — el usuario pidió revertir el diseño" abajo, que ahora es el
+registro de lo que se hizo.
+**Gate:** 1153/1153 tests · `tsc` limpio · lint sin avisos · a11y sin
 violaciones nuevas
 
 > **Por qué P8 y no P2.** Mismo criterío que P7: P1–P6 de la Fase P ya tenían
@@ -97,7 +98,7 @@ filas, botones de 32 px (por debajo del mínimo táctil de 36 px) y **sin anillo
 foco**. Corregido: 44 px, anillo visible, etiqueta con número y título. Un lector
 de pantalla anunciaba once botones idénticos.
 
-## Lo pendiente — el usuario pidió revertir el diseño
+## Lo pendiente — el usuario pidió revertir el diseño → HECHO (C1)
 
 > "el diseño de las páginas de release habíamos acordado que iba a ser basado en
 > el diseño anterior, no este diseño nuevo; hace los demás datos inaccesibles"
@@ -116,7 +117,31 @@ El diseño anterior tiene **4 secciones** (Descripción, Pistas, Enlaces, Letra)
 el nuevo tiene **3**: un revert de layout es donde se cuela una sección sin
 avisar, así que hace falta un test que compruebe las 4.
 
+### Lo que se hizo (2026-10-04, commit `6baefc2`)
+
+Todo el plan de la tabla se cumplió, y el test existe: bloque 6 de
+`tests/unit/release-page.test.ts`, con las cuatro secciones, **en su orden**, con
+su `aria-labelledby`, y sin inventar la que no tiene dato. Mutado tres veces
+para comprobar que puede fallar.
+
+Lo que **no** estaba en el plan y salió al hacerlo: el diseño anterior usaba
+`getTrackById`, `childTracks.length` y `release.duration` en crudo, o sea que un
+revert a pelo deshacía **cuatro arreglos de P2**. Se conservaron los seis
+(`getReleaseWithTracks`, `ownDurationLabel`, `trackCount`, sección de pistas del
+single sin hijas, `getReleaseNeighbours` y el `—` de las métricas). La tabla con
+el porqué de cada uno está en el commit y en `docs/AI_LOG.md`.
+
+**Y una consecuencia de P8 que el revert dejó a la vista**, escrita aquí porque es
+de esta fase y no del revert: `/track/[id]` es 301 para **toda** fila (hija o
+cabecera), así que su ficha —videoclip, galería, detalles de producción, bio,
+descarga para prensa, Last.fm— **solo se renderiza para las huérfanas**. El
+diseño de P2 tampoco mostraba nada de eso, así que no se perdió con el revert,
+pero estaba perdido desde P8 y **es el mismo síntoma** que motivó la petición del
+usuario. Queda abierto.
+
 ## Verificación
+
+De `cebc700` (P8):
 
 - `tsc` limpio, lint sin avisos, **1146/1146** en 61 ficheros.
 - a11y y axe extendidos a las rutas de P8: **0 violaciones nuevas**. Los dos
@@ -127,3 +152,14 @@ avisar, así que hace falta un test que compruebe las 4.
   **SQLite local de verdad**, no un doble: prueban que `parseTrack` expone
   `release_id`. Si esa columna deja de mapearse, el redirect se apaga en
   silencio y los tests lo detectan solos.
+
+De `6baefc2` (C1, el revert):
+
+- `tsc` limpio, lint sin avisos, **1153/1153** en 61 ficheros, build correcto.
+- Visual a 375/768/1440, claro y oscuro: dentro de `main`, 0 targets táctiles
+  <36 px, 0 botones con etiqueta genérica, 0 iconos sin `aria-hidden`, 0 enlaces
+  a `/track/`, y el número de botones de play igual al número de pistas.
+- Producción (despliegue automático tras el push): 200 en las tres rutas
+  comprobadas, y la marca del diseño nuevo ausente (`blur-3xl` y el gradiente
+  del hero a 0; el `data-testid` del sitio de play pasa de `div` a `section`).
+- **3 mutaciones del test nuevo, 3/2/5 rojos.**

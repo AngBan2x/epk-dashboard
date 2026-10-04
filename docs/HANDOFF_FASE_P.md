@@ -1,8 +1,13 @@
 # HANDOFF — sesión del 2026-10-03
 
 **Estado al cerrar esta sesión:** `main` en `a451b4d` + los 3 commits de este
-handoff. **1146/1146 tests**, `tsc` limpio, lint sin avisos, `pnpm build`
+handoff. **1146/1146 tests** (hoy: **1153/1153**), `tsc` limpio, lint sin avisos, `pnpm build`
 correcto. Producción desplegada y verificada.
+
+> **Actualizado el 2026-10-04.** `main` está ahora en `6baefc2` (+ lo que se
+> añada después): **C1 está hecha** y los tests son **1153/1153**. El resto del
+> documento sigue valiendo; los números que se contaban a mano se refrescan con
+> el comando al lado, porque se desfasan solos.
 
 Este es **el** documento de arranque. Si solo vas a leer uno, lee este.
 
@@ -18,7 +23,7 @@ node -v                                  # debe decir v24
 pnpm dev                                 # servidor en :3000
 npx tsc --noEmit                         # debe salir limpio
 npx next lint                            # debe salir sin avisos
-npx vitest run --no-file-parallelism     # 1146/1146, ~110 s
+npx vitest run --no-file-parallelism     # 1153/1153, ~70-110 s
 ```
 
 **`--no-file-parallelism` NO es opcional.** Sin él el reciclado de workers
@@ -78,30 +83,49 @@ dos rutas eran la misma página con dos plantillas. Ya solo queda una.
 
 Ordenados por dependencia, no por número. **C1 y C2 son independientes de C3.**
 
-### C1 · Revertir el diseño de la página de release ← urgente
+### C1 · Revertir el diseño de la página de release ← HECHA 2026-10-04
 
-**El usuario lo pidió (2026-10-03):** el diseño agreed era el anterior, no el
-nuevo. El nuevo hace los demás datos inaccesibles.
+Commit `6baefc2`. **Lo que pidió el usuario, hecho**: el diseño acordado es el
+anterior, con sus **cuatro** secciones a la vista.
 
-**Revierte** a `git show cebc700~1`:
-- `app/releases/[id]/page.tsx` (199 → 464 líneas ahora)
-- `components/ReleaseTracklistSection.tsx`
+Volvieron a `cebc700~1` `app/releases/[id]/page.tsx` (464 → 431) y
+`components/ReleaseTracklistSection.tsx` (524 → 130). No se tocaron
+`lib/releases.ts`, `app/track/[id]/page.tsx`, `lib/release-page.ts`,
+`app/sitemap.ts` ni `NotificationBell.tsx`.
 
-**NO toques**, porque ahí viven arreglos que no tienen nada que ver con el diseño:
-| Fichero | Qué vive ahí |
-|---|---|
-| `lib/releases.ts` | el 301 y las 4 salidas |
-| `app/track/[id]/page.tsx` | el 301 por la otra puerta |
-| `lib/release-page.ts` | el fix de duración del single |
-| `app/sitemap.ts`, `NotificationBell.tsx` | hijas fuera de ambos |
+**No se revirtió nada que no sea maquetación**, y eso era lo difícil: el diseño
+anterior usaba `getTrackById`, `childTracks.length` y `release.duration` en
+crudo, o sea que un revert a pelo deshacía cuatro arreglos de P2. Se conservan
+`getReleaseWithTracks`, `ownDurationLabel`, `trackCount`, la sección de pistas
+para el single sin hijas, `getReleaseNeighbours` y el `—` de las métricas. La
+tabla de los seis, con el porqué, está en el commit y en `AI_LOG.md`.
 
-**Trasplanta del diseño nuevo:** anillos de foco, `aria-label` con número y
-título, botones de 44 px. Ya están hechos en `components/ReleaseTrackList.tsx`
-(fichero aparte, no se revierte).
+Del diseño nuevo se trasplantó lo que es a11y y no diseño: los botones de 44 px,
+el anillo de foco y el `aria-label` con número y título de
+`ReleaseTrackList.tsx` (**no** se revirtió ese fichero). Y dos cosas que el
+revert dejó al descubierto en ese mismo componente: `aria-hidden` en los cuatro
+iconos, y el filtro del relleno `"00:00"` en la columna de duración.
 
-⚠️ **El diseño anterior tiene 4 secciones** (Descripción, Pistas, Enlaces, Letra)
-y el nuevo **3**. Un revert de layout es donde se cuela una sección sin avisar:
-pon un test que compruebe las 4.
+**El test de las 4 secciones** es el bloque 6 de `tests/unit/release-page.test.ts`:
+las cuatro, **en su orden**, con su `aria-labelledby`, y sin inventar la que no
+tiene dato. Mira los `<h2>`, no el `textContent`: `Descripción` es subcadena de
+`Descripción del álbum`. **Mutado tres veces** para comprobar que puede fallar
+(3 / 2 / 5 rojos).
+
+#### Tres cosas que el revert destapó y que quedan abiertas
+
+1. **`/track/[id]` es 301 para toda fila**, así que la ficha de 597 líneas
+   (videoclip, galería, detalles de producción, bio, descarga para prensa,
+   Last.fm) **solo se renderiza para huérfanas**. No es pérdida de este revert —
+   ya estaba perdida desde P8, porque el diseño de P2 tampoco mostraba eso — pero
+   es el mismo síntoma que motivó la petición. **Decisión que hay que tomar.**
+2. **Las métricas de los 5 álbumes son un 0 curado** en Turso
+   (`{"streams":0,...}` en la cabecera), así que la página dice "0 reproducciones
+   del lanzamiento". `EPKCard` dice lo mismo. **Es un bug de datos**, no de
+   código: limpiar la columna de los álbumes que solo tienen ceros, con dry-run y
+   aprobación.
+3. **`components/ReleaseActions.tsx`**: sus tres enlaces sin anillo de foco.
+   Preexistente en los dos diseños; no se mezcló en el commit del revert.
 
 ### C2 · Consolidar el reproductor de las EPKCard
 
@@ -180,8 +204,15 @@ de email, ni el broadcast. Es lo que más superficie de bug deja sin cubrir.
 
 ### C7 · Reorganizar la documentación
 
-`docs/AI_LOG.md`: **6.689 líneas, 379 KB, 111 epígrafes de nivel 2, 573 de nivel
+`docs/AI_LOG.md`: **6.794 líneas, 384 KB, 112 epígrafes de nivel 2, 579 de nivel
 3**. El bloque más largo son 432 líneas. Es ilegible por inspección humana.
+
+> Las tres cifras se cuentan con
+> `(Get-Content -LiteralPath docs/AI_LOG.md).Count`,
+> `Select-String -Path docs/AI_LOG.md -Pattern '^## '` y
+> `Select-String -Path docs/AI_LOG.md -Pattern '^### '`, porque **se desfasan
+> solas con cada commit**: las de arriba ya eran 6.689 antes de C1 y 6.794
+> después. Es el mismo aviso que el de C9.
 
 Propuesta: `docs/ai-log/` con un fichero por época, y `AI_LOG.md` reducido a
 índice. **Nada se borra**: es mover, no resumir.

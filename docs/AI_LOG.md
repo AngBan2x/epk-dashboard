@@ -6687,3 +6687,108 @@ cero huerfanas, cero datos de QA. Duraciones padre 9/9, timeline sin deriva.
 **Bowie y Bjork sin avatar ni banner**: su composicion no funciona en circulo ni
 en wide. La inicial con degradado es mejor que un recorte malo, y el usuario lo
 confirmo mirando la pagina.
+
+---
+
+## C1 - el diseño de la página de release vuelve al acordado
+
+**Petición del usuario (2026-10-03, repetida al abrir la sesión del 2026-10-04):**
+el diseño acordado era el anterior, no el de P2. El nuevo ponía la descripción,
+la letra y los enlaces por debajo de un hero con degradado y una caja de pistas,
+y los demás datos quedaban a un pliegue de distancia.
+
+### Lo que vuelve
+
+`app/releases/[id]/page.tsx` (464 -> 431) y
+`components/ReleaseTracklistSection.tsx` (524 -> 130) vuelven a `cebc700~1`:
+cabecera sobria con la portada a un lado y la ficha al otro, y las **cuatro**
+secciones en planas y a la vista — Descripción, Pistas, Enlaces, Letra. La lista
+de pistas vuelve a ser `ReleaseTrackList`, sin la caja con encabezado propio.
+
+### Lo que NO vuelve, porque no es diseño
+
+Un revert de maquetación es el sitio donde se pierden arreglos sin que nadie lo
+note. Estos se conservan, y cada uno tiene su test:
+
+| Arreglo | Por qué no es diseño |
+|---|---|
+| `getReleaseWithTracks` en vez de `getTrackById` | es la misma lectura más la FORMA del lanzamiento, y es lo que da `metrics` en una sola fuente (RC.33) |
+| `ownDurationLabel` | un single sin hijas de 3:45 real ya no cae al `"00:00"` del seed |
+| `trackCount` | un single suelto tiene **una** pista, no cero |
+| sección de pistas con `[release]` | un single conserva su control de play (bug nº 1 de P2) |
+| `getReleaseNeighbours` | anterior/siguiente **sobre lanzamientos**, el arreglo que más se resistió en P2 |
+| `NO_VALUE` en métricas | `—` en vez de `0`: `0` afirma que nadie escuchó |
+
+### El test que pedía el handoff
+
+Bloque 6 de `tests/unit/release-page.test.ts`: las cuatro secciones, **en su
+orden**, con su `aria-labelledby`, y sin inventar la que no tiene dato. El test
+mira los `<h2>`, no el `textContent` de la página: `Descripción` es subcadena de
+`Descripción del álbum`, y un `includes` sobre el texto completo daría verde con
+la sección equivocada.
+
+**Mutado tres veces para comprobar que puede fallar** (RC.32 gastó una release
+entera por no hacerlo):
+
+| Mutación | Rojos |
+|---|---|
+| quitar la sección de letra | 3 |
+| quitar el filtro del relleno `"00:00"` de `ReleaseTrackList` | 2 |
+| condicionar la sección de pistas a `isMultiTrack` | 5 |
+
+### Lo que sí se trasplantó del diseño nuevo
+
+Los arreglos de a11y de `ReleaseTrackList.tsx` (fichero que **no** se revierte):
+botones de 44 px, anillo de foco y `aria-label` con número y título. Y dos cosas
+que ese componente tenía pendientes y que el revert dejaba al descubierto:
+
+- `aria-hidden` en los cuatro iconos de las filas.
+- El **filtro del relleno `"00:00"`** en la columna de duración. Sin él la fila
+  pintaba `"00:00"` mientras la cabecera decía `—`: dos números distintos para
+  la misma canción en la misma pantalla. El filtro vive en
+  `releaseRowDurationLabel`, no reimplementado.
+
+### Tres hallazgos que el revert destapó
+
+**1. `/track/[id]` es un 301 para TODA fila, así que su ficha está
+inaccessible.** `resolveTrackRoute` devuelve `release` tanto si la fila es hija
+como si es cabecera de su propio release. La ficha de 597 líneas —videoclip,
+galería de prensa, detalles de producción, bio, descarga de catálogo para prensa,
+Last.fm— **solo se renderiza para las huérfanas**. El diseño de P2 ya no
+mostraba nada de eso, así que **no es una pérdida de este revert**: ya estaba
+perdida desde P8. No se toca aquí (P8 es territorio del 301, y el handoff lo
+marca como intocable), pero queda escrito porque es el mismo síntoma que motivó
+la petición del usuario: "el nuevo hace los demás datos inaccesibles".
+
+**2. Las métricas de los álbumes son un 0 curado, y se pintan como 0.** En Turso,
+las 5 cabeceras de álbum tienen `{"streams":0,"saves":0,...}` en la columna
+`metrics`. `parseMetrics` devuelve `null` en ese caso, así que el objeto existe:
+es un cero escrito a propósito, y `lib/metrics-source.ts` lo trata como dato
+(hay un test que lo fija). Resultado: **"0 reproducciones del lanzamiento"** en
+Kid A, OK Computer, The Wall, The Dark Side of the Moon y Vulnicura Strings.
+
+No es un bug de esta página: `EPKCard` usa el mismo `resolveAlbumMetrics` y pinta
+lo mismo. **Es un bug de datos**, y arreglarlo es limpiar la columna de los
+álbumes que solo tienen ceros — con dry-run y aprobación, no de paso. Apuntado,
+no ejecutado.
+
+**3. `components/ReleaseActions.tsx` tiene sus tres enlaces sin anillo de foco**
+("Explorar el catálogo", "Ver fechas"). Preexistente en los dos diseños, así que
+no es una violación *nueva*; no se mezcla en un commit de revert. Candidato a su
+propia ola.
+
+### Gates
+
+tsc limpio, lint sin avisos, **1153/1153 en 61 ficheros**, build correcto.
+
+Visual en local a 375/768/1440, claro y oscuro: 0 targets táctiles <36 px dentro
+de `main`, 0 botones con etiqueta genérica, 0 iconos sin `aria-hidden`, 0 enlaces
+a `/track/`, 12 botones de play en el álbum de 12 pistas y 1 en los singles.
+
+Producción verificada tras el push (despliegue automático): 200 en las tres
+rutas, `section[data-testid="release-play-section"]` presente y `div` ausente (la
+marca del diseño nuevo), `blur-3xl` y el gradiente del hero a 0, y las mismas
+cifras de a11y. **Ningún spec E2E navega a `/releases/[id]`** (los 12 usan
+endpoints de API y `/releases/new`), así que la corrida completa de E2E no
+aporta nada para este cambio.
+
