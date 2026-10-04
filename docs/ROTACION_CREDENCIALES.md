@@ -185,20 +185,23 @@ corrompe los png/jpg/woff2 del historial), no deja refs de respaldo en
 
 ### 4.2 — Los TAGS son una puerta trasera
 
-Hay **61 tags** (`v1.0.0` … `v4.0.0-rc.33`) y cada uno apunta a un commit
+Hay **61 tags** en el momento de escribir esto — `git tag | wc -l`; 33 son de la
+serie `v4.0.0-rc.*` y 28 de versiones anteriores — y cada uno apunta a un commit
 concreto. **Aunque limpies `main`, un tag devuelve el historial viejo con la
 credencial dentro.** Hay que reescribirlos también:
 
 ```bash
-node scripts/git/purge-history.js refs/tags/v4.0.0-rc.33   # uno por tag
-git for-each-ref --format='%(refname)' refs/tags | wc -l   # dan 58
-```
-
-O, si prefieres filter-repo para los tags:
-
-```bash
+# Vía recomendada para los tags: de una vez, con filter-repo.
 git filter-repo --replace-text replacements.txt --force --refs refs/tags/*
+
+# O con plumbing, uno por tag.
+node scripts/git/purge-history.js refs/tags/v4.0.0-rc.33
 ```
+
+> **Vuelve a mirar el número antes de empezar.** Las cifras de este documento son
+> una foto del momento de escribirlo y **se desfasan solas con cada commit**: en
+> una tarde pasaron de 58 a 61 sin que nadie las tocara. Los comandos van al lado
+> de cada cifra justamente por eso.
 
 ### 4.3 — Limpiar los objetos sueltos
 

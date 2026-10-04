@@ -231,9 +231,15 @@ los espacios.** Se descartó cada hipótesis con un probe:
 
 Sin diagnóstico útil, se hizo con plumbing.
 
-**3. Los 61 TAGS son una puerta trasera.** Aunque limpies `main`, cada tag sigue
-apuntando al commit viejo y devuelve el historial con la credencial. Hay que
+**3. Los TAGS son una puerta trasera.** Hay 61 en el momento de escribir esto
+(`git tag | wc -l`), y cada uno apunta a un commit concreto. **Aunque limpies
+`main`, un tag devuelve el historial viejo con la credencial.** Hay que
 reescribirlos uno a uno.
+
+> **Vuelve a mirar el número, no lo des por bueno.** Estas cifras se
+> desfasaron solas dos veces en una tarde: al añadir commits, el conteo de
+> commits y el de tags cambian. Los números de este documento son una foto del
+> momento de escribirlo, y por eso los que importan llevan el comando al lado.
 
 **El orden correcto:**
 
