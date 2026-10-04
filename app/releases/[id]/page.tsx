@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ReleaseActions } from "@/components/ReleaseActions";
-import { ReleaseTracklistSection } from "@/components/ReleaseTracklistSection";
+import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import {
   capitalizeReleaseType,
   formatDateES,
@@ -22,6 +22,41 @@ interface ReleaseDetailPageProps {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * ## Por qué esta página se ve como se ve (C1)
+ *
+ * P2 (RC.33) maquetó aquí un diseño "rico": cabecera con degradado a partir de
+ * la portada, type-line en mayúsculas, un panel de métricas y la lista de
+ * pistas dentro de una caja con su propio encabezado. **El usuario lo pidió
+ * revertido** (2026-10-03): el diseño acordado era el anterior, y el nuevo
+ * dejaba los demás datos por debajo del pliegue.
+ *
+ * Así que la maquetación vuelve a la de `cebc700~1`: cabecera sobria con la
+ * portada a un lado y la ficha al otro, y las **cuatro secciones** —
+ * Descripción, Pistas, Enlaces, Letra — en secciones planas y a la vista.
+ *
+ * Lo que NO vuelve atrás, porque no es diseño sino arreglos, y viven fuera de
+ * este fichero (o en helpers que no se tocan):
+ *
+ * - **`getReleaseWithTracks`** (`lib/releases.ts`) en vez de `getTrackById`: es
+ *   la misma lectura más la FORMA del lanzamiento, y es lo que da `metrics`
+ *   resuelto en una sola fuente (RC.33).
+ * - **La duración con filtro de relleno**: `ownDurationLabel`, no
+ *   `release.duration` en crudo. Un single sin hijas de 3:45 real ya no cae al
+ *   `"00:00"` del seed.
+ * - **`trackCount`, no `childTracks.length`**: un single suelto tiene **una**
+ *   pista, no cero. "0 pistas" era un dato falso.
+ * - **Anterior / siguiente sobre lanzamientos** (`getReleaseNeighbours`), que
+ *   corrigió el peor de los cuatro puntos de P2: el vecino ya no avanza por
+ *   dentro de un álbum.
+ * - **`—` en vez de `0`** en las métricas (`NO_VALUE`), porque `0` afirma que
+ *   nadie escuchó y lo único que sabemos es que nadie preguntó.
+ *
+ * Y lo que sí se trasplanta del diseño nuevo, porque son arreglos de a11y y
+ * no se pierden al revertir: botones con anillo de foco, `aria-label` con
+ * número y título, y 44 px de área táctil. Viven en `components/ReleaseTrackList.tsx`,
+ * que es el componente que vuelve a montar esta sección y **no** se revierte.
+ */
 export async function generateMetadata({ params }: ReleaseDetailPageProps): Promise<Metadata> {
   const data = await getReleaseWithTracks(params.id);
   if (!data) return { title: "Release no encontrado" };
@@ -82,24 +117,15 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
    * P15 (RC.31) ya fijó —y `tests/unit/itunes-previews.test.ts` sigue fijando,
    * con un check sobre el TEXTO de este fichero— que la etiqueta sale de la
    * SUMA de las hijas cuando hay hijas, y nunca del valor crudo del padre. Esa
-   * forma se conserva tal cual.
+   * forma se conserva tal cual, porque es lo que evita que un disco de cero
+   * segundos se pinte como tal.
    *
    * Lo que P2 añade es la rama de los **0 hijas**, que antes no existía:
    * `sumDurations([])` es `null`, así que la expresión caía a
    * `release.duration` en crudo, y el relleno `"00:00"` del seed salía como si
-   * el disco durara cero. Los 6 singles sin hijas del catálogo son
-   * precisamente los que sufferían ese caso, y son los que el usuario pidió
-   * cerrar.
-   *
-   * `ownDurationLabel` (`lib/release-page.ts`) es la que aplica el filtro del
-   * relleno, y está en UN sitio: aquí no se reimplementa nada, se le pregunta.
-   *
-   * Asimetría que se acepta a propósito: el filtro de `0` segundos no se aplica
-   * a la rama con hijas. Solo lo dispararía un tracklist entero de `"00:00"`,
-   * que no aparece en el catálogo (las duraciones de las hijas las escribe una
-   * persona), mientras que sí aparece el `"00:00"` del padre. La versión
-   * estricta, que cubre los dos casos, es `releaseDurationLabel` y es la que
-   * usan los tests y `generateMetadata`.
+   * el disco durara cero. `ownDurationLabel` (`lib/release-page.ts`) es la que
+   * aplica el filtro del relleno, y está en UN sitio: aquí no se reimplementa
+   * nada, se le pregunta.
    */
   const totalDuration = sumDurations(childTracks.map((t) => t.duration));
   const durationLabel = (isMultiTrack ? totalDuration?.label : null) ?? ownDurationLabel(release);
@@ -108,261 +134,195 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
 
   const cover = getCoverImage(release);
   const type = capitalizeReleaseType(release.release_type);
-  const year =
-    release.release_date && /^\d{4}/.test(release.release_date)
-      ? release.release_date.slice(0, 4)
-      : null;
   const metricsTitle = metricsTooltip(metrics);
   const metricsValue = metrics.value === null ? NO_VALUE : formatNumber(metrics.value);
 
   const description = (release as unknown as { description?: string | null }).description;
 
+  /**
+   * Las pistas que se montan. Con hijas, las hijas. Sin hijas, **la fila del
+   * propio release**: en el esquema un single es a la vez pista y cabecera, así
+   * que su lista de pistas tiene una fila, y esa fila es él.
+   *
+   * Antes (diseño de `cebc700~1`) esta sección solo se montaba
+   * `if (isMultiTrack)`, y los 6 singles sin hijas del catálogo se quedaban sin
+   * un solo control de reproducción en su propia página. Es el arreglo nº 1 de
+   * P2 y no es diseño: se conserva.
+   */
+  const listedTracks = childTracks.length > 0 ? childTracks : [release];
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
-        <nav aria-label="Miga de pan" className="mb-6">
-          <ol className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <li>
-              <Link
-                href="/artists"
-                className="rounded transition-colors hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-primary-400"
-              >
-                Catálogo
-              </Link>
-            </li>
-            <li aria-hidden="true" className="text-slate-300 dark:text-slate-600">
-              /
-            </li>
-            <li className="min-w-0">
-              <span className="block truncate font-medium text-slate-900 dark:text-white">
-                {safeString(release.title)}
+      <main className="max-w-4xl mx-auto px-4 py-12">
+        {/* ── Cabecera ────────────────────────────────────────────────────────
+            La de siempre: portada a un lado, ficha al otro. Sin degradado, sin
+            velo, sin type-line en mayúsculas. Lo que hace "rico" un lanzamiento
+            es que se le vea la portada de un vistazo, y para eso basta con la
+            portada, no con fondo desenfocado. */}
+        <div className="flex flex-col md:flex-row gap-8 mb-8">
+          {cover ? (
+            <div className="w-full md:w-64 flex-shrink-0">
+              <Image
+                src={cover}
+                alt={safeString(release.title)}
+                width={256}
+                height={256}
+                unoptimized
+                className="w-full aspect-square object-cover rounded-xl shadow-lg"
+              />
+            </div>
+          ) : null}
+
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="px-2 py-1 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded">
+                {type}
               </span>
-            </li>
-          </ol>
-        </nav>
+            </div>
 
-        {/* ── Cabecera ────────────────────────────────────────────────────── */}
-        <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-          {/*
-            El degradado. "Rico" aquí no es adorno: la ficha de un disco se
-            reconoce de un vistazo por su portada, y el color es la mitad de esa
-            señal. Se hace con la portada ampliada y desenfocada detrás de un
-            velo oscuro, en vez de sacar el promedio de los píxeles: promediar exige
-            descargar la imagen, y eso en servidor es una llamada de red por
-            render (con el `unoptimized` que usa el catálogo, la descarga entera).
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+              {safeString(release.title)}
+            </h1>
 
-            El velo `bg-slate-950/72` no es decorativo: es lo que garantiza el
-            contraste del texto blanco sobre lo que sea que haya detrás. Sin
-            él, un álbum con portada blanca pasa de 4.5:1 a 2:1.
-          */}
-          <div className="relative">
-            <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
-              {cover ? (
-                <Image
-                  src={cover}
-                  alt=""
-                  fill
-                  unoptimized
-                  sizes="100vw"
-                  className="scale-110 object-cover opacity-60 blur-3xl"
-                />
+            <p className="text-lg text-slate-600 dark:text-slate-400 mb-4">
+              {release.artist_name}
+            </p>
+
+            <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-400 mb-4">
+              {release.release_date ? (
+                <span>📅 {formatDateES(release.release_date, { month: "long" })}</span>
               ) : null}
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-950/80 via-slate-950/70 to-primary-950/80" />
+              <span>⏱️ {durationLabel}</span>
+              {/* `trackCount`, no `childTracks.length`: sin hijas, un single
+                  tiene UNA pista. Decir "0 pistas" es afirmar algo falso. */}
+              <span>
+                🎵 {trackCount} {trackCount === 1 ? "pista" : "pistas"}
+                {discCount > 1 ? ` · ${discCount} discos` : ""}
+              </span>
             </div>
 
-            <div className="relative flex flex-col gap-6 p-5 sm:p-8 md:flex-row md:items-end">
-              <div className="w-40 shrink-0 sm:w-48 md:w-56">
-                {cover ? (
-                  <Image
-                    src={cover}
-                    alt={`Portada de ${safeString(release.title)}`}
-                    width={224}
-                    height={224}
-                    unoptimized
-                    className="aspect-square w-full rounded-xl object-cover shadow-2xl ring-1 ring-white/20"
-                  />
-                ) : (
-                  <div
-                    role="img"
-                    aria-label={`Portada de ${safeString(release.title)}`}
-                    className="flex aspect-square w-full items-center justify-center rounded-xl bg-white/10 text-5xl font-bold text-white/80 shadow-2xl ring-1 ring-white/20"
-                  >
-                    {safeString(release.title).trim().charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
+            {/*
+              Las métricas, en la línea de datos y no en un panel propio.
+              `value === null` se pinta como `—` y se explica con el mismo
+              `title` que el diseño nuevo usaba: sin texto, un guion suelto
+              parece un bug de render. Y el texto va también en `sr-only`,
+              porque el `title` solo existe en hover.
+            */}
+            <p
+              className="mb-4 text-sm text-slate-500 dark:text-slate-400"
+              title={metricsTitle}
+              data-testid="release-metrics"
+            >
+              {metricsValue} {isMultiTrack ? "reproducciones del lanzamiento" : "streams"}
+              <span className="sr-only">. {metricsTitle}</span>
+            </p>
 
-              <div className="min-w-0 flex-1 text-white">
-                {/* Jerarquía: el tipo es lo más pequeño (es un dato), el título
-                    es lo más grande (es lo que se recuerda). Ese orden es el
-                    que la plantilla de pista suelta no tenía. */}
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-                  {type}
-                  {year ? ` · ${year}` : ""}
-                </p>
-                <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-                  {safeString(release.title)}
-                </h1>
-                <p className="mt-2 text-base text-white/80">{release.artist_name}</p>
-
-                <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-white/80">
-                  <li className="flex items-center gap-1.5">
-                    <span aria-hidden="true">🎵</span>
-                    <span className="tabular-nums">
-                      <span className="sr-only">Pistas: </span>
-                      {trackCount} {trackCount === 1 ? "pista" : "pistas"}
-                      {discCount > 1 ? ` · ${discCount} discos` : ""}
-                    </span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    {/*
-                        El caso de 0 hijas: `durationLabel` sale de la duración
-                        del PROPIO release, filtrada por `ownDurationLabel`. Antes
-                        aquí se pintaba `release.duration` en crudo y el relleno
-                        `"00:00"` del seed salía como si el disco durara cero.
-                    */}
-                    <span className="tabular-nums">
-                      <span className="sr-only">Duración: </span>⏱️ {durationLabel}
-                    </span>
-                  </li>
-                  {release.release_date ? (
-                    <li className="flex items-center gap-1.5">
-                      <span aria-hidden="true">📅</span>
-                      <span>
-                        <span className="sr-only">Fecha: </span>
-                        {formatDateES(release.release_date, { month: "long" })}
-                      </span>
-                    </li>
-                  ) : null}
-                </ul>
-
-                <div className="mt-5">
-                  <ReleaseActions
-                    releaseId={release.id}
-                    artistName={release.artist_name}
-                    status={release.status}
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Acciones + badge de estado (solo admin o dueño) */}
+            <ReleaseActions
+              releaseId={release.id}
+              artistName={release.artist_name}
+              status={release.status}
+            />
           </div>
-
-          {/*
-            Métricas del lanzamiento. `Metrics | null` se resuelve con
-            `lib/metrics-source.ts` —padre y hijas en la MISMA fuente (RC.33)— y
-            `value === null` se pinta como `—`.
-
-            No se reutiliza `UnifiedMetrics`: ese componente formatea
-            `streamCount` con `formatNumber(...)`, y un release sin dato
-            llegaría con `0` y saldría un "0 Streams" con tipografía de dato.
-            Eso es exactamente el bug que RC.33 cerró en `EPKCard`, y el
-            reintroducir aquí lo dejaría vivo por otro camino.
-          */}
-          <div className="border-t border-white/10 bg-slate-900/40 px-5 py-4 sm:px-8">
-            <div className="text-center">
-              <p
-                className="text-2xl font-bold text-white sm:text-3xl"
-                title={metricsTitle}
-              >
-                {metricsValue}
-                {/* El `title` solo sale en hover: en móvil y en lector de
-                    pantalla no existe, así que el mismo texto va en `sr-only`. */}
-                <span className="sr-only">. {metricsTitle}</span>
-              </p>
-              <p className="mt-0.5 text-xs uppercase tracking-wide text-white/60">
-                {isMultiTrack ? "Reproducciones del lanzamiento" : "Streams"}
-              </p>
-            </div>
-          </div>
-        </header>
-
-        {/* ── El único sitio de play ──────────────────────────────────────── */}
-        <div className="mt-6">
-          <ReleaseTracklistSection
-            release={release}
-            tracks={childTracks}
-            durationLabel={durationLabel}
-          />
         </div>
 
+        {/* ── 1 · Descripción ───────────────────────────────────────────────── */}
         {description ? (
-          <section aria-labelledby="release-description" className="mt-8">
+          <section className="mb-8" aria-labelledby="release-description">
             <h2
               id="release-description"
-              className="mb-3 text-lg font-bold text-slate-900 dark:text-white"
+              className="text-xl font-bold text-slate-900 dark:text-white mb-4"
             >
               Descripción
             </h2>
-            <p className="whitespace-pre-wrap text-slate-600 dark:text-slate-400">
-              {description}
-            </p>
+            <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{description}</p>
           </section>
         ) : null}
 
+        {/* ── 2 · Pistas ─────────────────────────────────────────────────────
+            Vuelve `ReleaseTrackList`, el componente de antes, con sus arreglos
+            de a11y (44 px, anillo de foco, etiqueta con número y título). Las
+            filas NO enlazan a `/track/`: esa ruta es hoy un 301 a esta misma
+            página, así que un enlace ahí sería un enlace a donde ya estás. */}
+        <section
+          className="mb-8"
+          aria-labelledby="release-tracks"
+          data-testid="release-play-section"
+        >
+          <h2 id="release-tracks" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+            Pistas ({trackCount})
+          </h2>
+          <ReleaseTrackList
+            tracks={listedTracks}
+            releaseTitle={safeString(release.title)}
+            releaseCoverImage={release.cover_image}
+            releaseYoutubeVideoId={release.youtube_video_id || undefined}
+          />
+        </section>
+
+        {/* ── 3 · Enlaces ──────────────────────────────────────────────────── */}
+        {release.external_links && Object.keys(release.external_links).length > 0 ? (
+          <section className="mb-8" aria-labelledby="release-links">
+            <h2 id="release-links" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+              Enlaces
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              {release.external_links.spotify ? (
+                <ExternalLink
+                  href={release.external_links.spotify}
+                  className="bg-[#1DB954] hover:bg-[#1ed760]"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+                  </svg>
+                  Spotify
+                </ExternalLink>
+              ) : null}
+              {release.external_links.apple_music ? (
+                <ExternalLink
+                  href={release.external_links.apple_music}
+                  className="bg-[#FC3C44] hover:bg-[#e0353c]"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043A5.022 5.022 0 0019.2.25a9.472 9.472 0 00-1.317-.24c-.58-.06-1.16-.08-1.74-.06H7.857c-.58-.02-1.16 0-1.74.06-.46.04-.92.1-1.36.2A5.022 5.022 0 002.426.89C1.308 1.624.564 2.624.246 3.934a9.23 9.23 0 00-.24 2.19c-.06.58-.08 1.16-.06 1.74v10.68c-.02.58 0 1.16.06 1.74.04.46.1.92.24 1.36.318 1.31 1.062 2.31 2.18 3.043a9.472 9.472 0 001.868.64c.44.1.9.16 1.36.2.58.06 1.16.08 1.74.06h8.286c.58.02 1.16 0 1.74-.06.46-.04.92-.1 1.36-.2a5.022 5.022 0 001.868-.64c1.118-.734 1.862-1.734 2.18-3.043.14-.44.2-.9.24-1.36.06-.58.08-1.16.06-1.74V7.864c.02-.58 0-1.16-.06-1.74zM17.994 15.854l-.002-6.48-5.496 3.22v6.08l5.498-2.82z" />
+                  </svg>
+                  Apple Music
+                </ExternalLink>
+              ) : null}
+              {release.external_links.youtube ? (
+                <ExternalLink
+                  href={release.external_links.youtube}
+                  className="bg-[#FF0000] hover:bg-[#cc0000]"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                  </svg>
+                  YouTube
+                </ExternalLink>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {/* ── 4 · Letra ─────────────────────────────────────────────────────── */}
         {release.lyrics ? (
-          <section aria-labelledby="release-lyrics" className="mt-8">
-            <h2
-              id="release-lyrics"
-              className="mb-3 text-lg font-bold text-slate-900 dark:text-white"
-            >
+          <section className="mb-8" aria-labelledby="release-lyrics">
+            <h2 id="release-lyrics" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
               Letra
             </h2>
-            <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-              <p className="whitespace-pre-wrap font-mono text-sm text-slate-600 dark:text-slate-400">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+              <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-mono text-sm">
                 {release.lyrics}
               </p>
             </div>
           </section>
         ) : null}
 
-        {release.external_links && Object.keys(release.external_links).length > 0 ? (
-          <section aria-labelledby="release-links" className="mt-8">
-            <h2
-              id="release-links"
-              className="mb-3 text-lg font-bold text-slate-900 dark:text-white"
-            >
-              Enlaces
-            </h2>
-            <ul className="flex flex-wrap gap-3">
-              {release.external_links.spotify ? (
-                <li>
-                  <ExternalLink href={release.external_links.spotify} className="bg-[#1DB954] hover:bg-[#1ed760]">
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                    </svg>
-                    Escuchar en Spotify
-                  </ExternalLink>
-                </li>
-              ) : null}
-              {release.external_links.apple_music ? (
-                <li>
-                  <ExternalLink href={release.external_links.apple_music} className="bg-[#FC3C44] hover:bg-[#e0353c]">
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043A5.022 5.022 0 0019.2.25a9.472 9.472 0 00-1.317-.24c-.58-.06-1.16-.08-1.74-.06H7.857c-.58-.02-1.16 0-1.74.06-.46.04-.92.1-1.36.2A5.022 5.022 0 002.426.89C1.308 1.624.564 2.624.246 3.934a9.23 9.23 0 00-.24 2.19c-.06.58-.08 1.16-.06 1.74v10.68c-.02.58 0 1.16.06 1.74.04.46.1.92.24 1.36.318 1.31 1.062 2.31 2.18 3.043a9.472 9.472 0 001.868.64c.44.1.9.16 1.36.2.58.06 1.16.08 1.74.06h8.286c.58.02 1.16 0 1.74-.06.46-.04.92-.1 1.36-.2a5.022 5.022 0 001.868-.64c1.118-.734 1.862-1.734 2.18-3.043.14-.44.2-.9.24-1.36.06-.58.08-1.16.06-1.74V7.864c.02-.58 0-1.16-.06-1.74zM17.994 15.854l-.002-6.48-5.496 3.22v6.08l5.498-2.82z" />
-                    </svg>
-                    Escuchar en Apple Music
-                  </ExternalLink>
-                </li>
-              ) : null}
-              {release.external_links.youtube ? (
-                <li>
-                  <ExternalLink href={release.external_links.youtube} className="bg-[#FF0000] hover:bg-[#cc0000]">
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                    </svg>
-                    Ver en YouTube
-                  </ExternalLink>
-                </li>
-              ) : null}
-            </ul>
-          </section>
-        ) : null}
-
         {/* ── Anterior / siguiente, SOBRE LANZAMIENTOS ────────────────────── */}
         {/*
           Los vecinos llegan de `getReleaseNeighbours`, que usa el catálogo del
-          ARTISTA. No usan `getAllTracks()`: ese array mezcla las 18 cabeceras
-          con todas sus hijas, así que el "siguiente" de un álbum era su primer
+          ARTISTA. No usan `getAllTracks()`: ese array mezcla las cabeceras con
+          todas sus hijas, así que el "siguiente" de un álbum era su primer
           corte — y ese corte, desde P2, redirige a la página del propio álbum.
           Un enlace que vuelve al sitio del que saliste no es navegación.
         */}
@@ -396,6 +356,14 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   );
 }
 
+/**
+ * Un enlace externo de la sección de Enlaces.
+ *
+ * Lo que trae del diseño nuevo y NO es adorno: `min-h-[44px]` (el botón del
+ * diseño anterior era `py-2` con un icono de 20 px, que se quedaba en 36) y el
+ * anillo de foco. El icono va `aria-hidden`: el nombre de la plataforma ya lo
+ * dice el texto, y un lector de pantalla no necesita oír "Spotify" dos veces.
+ */
 function ExternalLink({
   href,
   className,
@@ -417,8 +385,7 @@ function ExternalLink({
   );
 }
 
-const CHEVRON_LEFT =
-  "M15 19l-7-7 7-7";
+const CHEVRON_LEFT = "M15 19l-7-7 7-7";
 const CHEVRON_RIGHT = "M9 5l7 7-7 7";
 
 function NeighbourLink({

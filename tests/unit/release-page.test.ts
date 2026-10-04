@@ -29,6 +29,21 @@ import { cleanup, render, screen } from "@testing-library/react";
  * 4. **RC.33 no se rompe**: en un álbum, padre e hijas se resuelven con la
  *    MISMA fuente y se suman solo las hijas de esa fuente. Un refactor de
  *    maquetación no puede cambiar la aritmética de las métricas.
+ *
+ * ## Y el bloque de C1, que es de otra cosa
+ *
+ * El usuario pidió revertida la maquetación de P2 (2026-10-03): el diseño
+ * acordado tenía **cuatro** secciones y el de P2 tenía **tres**. El revert no
+ * puede reponer los arreglos de arriba —este fichero lo comprueba—, pero
+ * tampoco puede perder una sección por el camino, que es justo lo que un revert
+ * de layout hace sin avisar. De ahí el bloque 6: las cuatro secciones, su orden
+ * y su enlace al encabezado.
+ *
+ * Los tres que importan se han **mutado** para comprobar que el test se pone
+ * rojo al deshacer el arreglo (RC.32 gastó una release entera por no hacerlo):
+ * quitar la sección de letra → 3 rojos; quitar el filtro del relleno `"00:00"`
+ * de `ReleaseTrackList` → 2 rojos; condicionar la sección de pistas a
+ * `isMultiTrack` → 5 rojos.
  */
 
 const { mockPlayQueue } = vi.hoisted(() => ({ mockPlayQueue: vi.fn() }));
@@ -127,10 +142,15 @@ function metrics(streams: number): Metrics {
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
 
-async function renderPage(
-  release: Partial<Track>,
-  children: Partial<Track>[]
-) {
+/**
+ * `description` no está en el tipo `Track` (la columna existe y `parseTrack` la
+ * mapea —`lib/db.ts:774`— pero el tipo no la declara, y por eso la página la lee
+ * con un cast). El fixture necesita poder ponerla, o la sección de Descripción
+ * no se puede probar.
+ */
+type ReleaseFixture = Partial<Track> & { description?: string | null };
+
+async function renderPage(release: ReleaseFixture, children: Partial<Track>[]) {
   const rel = { ...baseTrack, ...release } as Track;
   const kids = children.map(
     (child, index) =>
@@ -226,9 +246,16 @@ describe("P2 · la duración de un lanzamiento", () => {
 /* ── 2. El único punto de play ───────────────────────────────────────────── */
 
 describe("P2 · un solo sitio de play", () => {
-  it("un single SIN hijas tiene reproductor — antes no tenía ninguno", async () => {
-    await renderPage({ id: "rel-single" }, []);
-    expect(document.querySelector('[data-testid="release-audio-player"]')).not.toBeNull();
+    it("un single SIN hijas tiene un control de play — antes no tenía ninguno", async () => {
+    await renderPage({ id: "rel-single", title: "Cancion suelta" }, []);
+    // El diseño revertido vuelve a `ReleaseTrackList`, así que el control es la
+    // fila de la lista, no el reproductor grande del diseño rico. Lo que no
+    // puede volver a pasar es que la página del single no tenga NINGÚN sitio de
+    // play: la fila es la del propio release, porque en el esquema un single es
+    // a la vez pista y cabecera.
+    const section = screen.getByTestId("release-play-section");
+    expect(section.textContent).toContain("Cancion suelta");
+    expect(screen.getByRole("button", { name: /Cancion suelta/ })).not.toBeNull();
   });
 
   it("un single SIN hijas no dice '0 pistas'", async () => {
@@ -245,7 +272,8 @@ describe("P2 · un solo sitio de play", () => {
   it("un álbum monta la lista de pistas en el MISMO sitio de play", async () => {
     await renderPage({ id: "rel-album" }, [{ id: "c1" }, { id: "c2" }]);
     expect(screen.getByTestId("release-play-section")).not.toBeNull();
-    // El reproductor grande del ALBÚM no se monta: un álbum no tiene audio.
+    // El reproductor grande no se monta en ninguna de las dos ramas: es el
+    // diseño rico el que lo traía, y aquí no hay caso que lo necesite.
     expect(document.querySelector('[data-testid="release-audio-player"]')).toBeNull();
   });
 
@@ -279,23 +307,31 @@ describe("P2 · un solo sitio de play", () => {
     }
   });
 
-  it("cada fila del álbum trae miniatura y su duración alineada", async () => {
+  it("el botón de play es táctil: 44 px de área, no 32", async () => {
+    await renderPage({ id: "rel-album" }, [{ id: "c1" }]);
+    const button = screen.getByRole("button", { name: /^Reproducir \d+: / });
+    // `p-2` con un icono de 16 px se quedaba en 32 px, por debajo del mínimo
+    // táctil que mira `scripts/a11y-check.ts`. El arreglo vive en
+    // `ReleaseTrackList.tsx`, que no se revirtió con el diseño.
+    expect(button.className).toContain("p-2.5");
+  });
+
+  it("cada fila del álbum trae su duración, y el relleno '00:00' no se pinta", async () => {
     await renderPage(
       { id: "rel-album", cover_image: "https://example.test/cover.jpg" },
       [
         { id: "c1", duration: "3:45" },
         { id: "c2", duration: "4:18" },
+        // El relleno del seed: si se pintara, la fila daría "0:00" mientras la
+        // cabecera da la suma de las demás. El filtro vive en
+        // `releaseRowDurationLabel` y NO se revierte con el diseño.
+        { id: "c3", duration: "00:00" },
       ]
     );
-// La miniatura es decorativa: la portada del disco ya está-described arriba.
-const section = screen.getByTestId("release-play-section");
-const thumbs = section.querySelectorAll('img[src="https://example.test/cover.jpg"]');
-expect(thumbs.length).toBeGreaterThanOrEqual(2);
-for (const thumb of Array.from(thumbs)) {
-  expect(thumb.getAttribute("alt")).toBe("");
-}
-expect(section.textContent).toContain("3:45");
-expect(section.textContent).toContain("4:18");
+    const section = screen.getByTestId("release-play-section");
+    expect(section.textContent).toContain("3:45");
+    expect(section.textContent).toContain("4:18");
+    expect(section.textContent).not.toContain("00:00");
   });
 
   it("la sección de play se anuncia con un encabezado accesible", async () => {
@@ -394,5 +430,128 @@ describe("P2 · un id que no existe", () => {
     await expect(
       ReleaseDetailPage({ params: { id: "no-existe" } })
     ).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+});
+
+/* ── 6. C1 · las cuatro secciones del diseño acordado ─────────────────────── */
+
+/**
+ * ## Por qué este bloque existe
+ *
+ * El diseño de P2 tenía **tres** secciones y el acordado tiene **cuatro**:
+ * Descripción, Pistas, Enlaces y Letra. Un revert de maquetación es
+ * exactamente el sitio donde se cuela una sección sin avisar: el fichero
+ * compila igual de bien con tres, nadie lo nota en el diff, y la sección que
+ * falta es la que un periodista venía a buscar.
+ *
+ * Por eso el test no mira "que se vea algo": mira **las cuatro, con su
+ * encabezado y en su orden**. Y el fixture se da con las cuatro fuentes de
+ * datos puestas a la vez, que es el caso en el que una sección puede quedarse
+ * vacía sin que nadie se entere.
+ *
+ * Para que el test pueda FALLAR, hay dos comprobaciones más que no son
+ * decorativas:
+ *
+ * - El orden. Un `querySelectorAll("h2")` que solo compara longitudes dejaría
+ *   pasar un revert que devolviera las secciones en otro orden.
+ * - La letra pequeña: `Descripción` no es `Descripción del álbum`, y el
+ *   `includes` de un texto más largo no distingue una cosa de la otra.
+ */
+describe("C1 · la página de release tiene las cuatro secciones", () => {
+  /** Las cuatro, en el orden del diseño acordado. */
+  const SECTIONS = ["Descripción", "Pistas", "Enlaces", "Letra"] as const;
+
+  async function renderFullRelease() {
+    await renderPage(
+      {
+        id: "rel-full",
+        title: "Cancion suelta",
+        description: "Una cancion con los cuatro bloques de datos.",
+        lyrics: "Primera linea de la letra.\nSegunda linea.",
+        external_links: {
+          spotify: "https://open.spotify.test/album/rel-full",
+          apple_music: "https://music.apple.test/album/rel-full",
+          youtube: "https://youtube.test/watch?v=rel-full",
+        },
+      },
+      [{ id: "c1", title: "Aguante" }]
+    );
+  }
+
+  /** Los encabezados `<h2>` de la página, en orden de documento y tal cual. */
+  const rawHeadings = () =>
+    Array.from(document.querySelectorAll("h2")).map((h) => (h.textContent ?? "").trim());
+
+  /**
+   * Los mismos, sin el contador de pistas. El diseño escribe "Pistas (8)" en
+   * el álbum y "Pistas (1)" en el single, así que comparar contra una lista
+   * fija obligaría a duplicar la lista por cada número posible. El contador se
+   * comprueba aparte, en el test de la sección de pistas.
+   */
+  const headings = () =>
+    rawHeadings().map((text) => text.replace(/\s*\(\d+\)$/, ""));
+
+  it("con descripción, pistas, enlaces y letra salen las CUATRO", async () => {
+    await renderFullRelease();
+    const rendered = headings();
+    for (const section of SECTIONS) {
+      expect(rendered).toContain(section);
+    }
+    expect(rendered).toHaveLength(SECTIONS.length);
+  });
+
+  it("y en el orden del diseño: descripción, pistas, enlaces, letra", async () => {
+    await renderFullRelease();
+    expect(headings()).toEqual([...SECTIONS]);
+  });
+
+  it("las tres secciones de datos quedan enlazadas a su encabezado", async () => {
+    // Sin `aria-labelledby`, un lector de pantalla anuncia cuatro bloques
+    // ("region", "region") sin decir de qué son. Y el revert las dejó sin
+    // enlazar: el diseño rico usaba un helper con el `id` puesto a mano.
+    await renderFullRelease();
+    for (const id of ["release-description", "release-tracks", "release-links", "release-lyrics"]) {
+      const section = document.querySelector(`section[aria-labelledby="${id}"]`);
+      expect(section).not.toBeNull();
+      const heading = document.getElementById(id);
+      expect(heading?.tagName).toBe("H2");
+      expect(heading?.textContent?.trim()).not.toBe("");
+    }
+  });
+
+  it("la sección de pistas se monta aunque el lanzamiento no tenga hijas", async () => {
+    // Un single suelto tiene una pista, y su sección es la del propio release.
+    // Si la sección se condicionara a `isMultiTrack`, un single se quedaría sin
+    // ella: es el bug nº 1 de P2, y el revert de diseño no lo puede reponer.
+    await renderPage({ id: "rel-single" }, []);
+    expect(rawHeadings()).toContain("Pistas (1)");
+  });
+
+  it("una sección sin dato NO se inventa: sin letra ni enlaces no hay sección", async () => {
+    // Lo contrario también es un bug: pintar "Letra no disponible" y "No hay
+    // enlaces externos" es lo que hizo la plantilla de `/track/[id]` con los
+    // álbumes, y es ruido que ocupa media pantalla.
+    await renderPage(
+      {
+        id: "rel-empty",
+        description: "Solo descripcion.",
+        lyrics: null,
+        external_links: {},
+      },
+      [{ id: "c1" }]
+    );
+    const rendered = headings();
+    expect(rendered).not.toContain("Letra");
+    expect(rendered).not.toContain("Enlaces");
+    expect(rendered).toEqual(["Descripción", "Pistas"]);
+  });
+
+  it("el texto de una sección ausente no puede pasar por presente", async () => {
+    // `Descripción` es subcadena de `Descripción del álbum`: un `includes`
+    // sobre el texto completo de la página daría verde con la sección
+    // equivocada. El test mira los `<h2>`, no el `bodyText`.
+    await renderPage({ id: "rel-nodesc", description: null, lyrics: null }, [{ id: "c1" }]);
+    expect(headings()).not.toContain("Descripción");
+    expect(bodyText()).not.toContain("Descripción del álbum");
   });
 });
