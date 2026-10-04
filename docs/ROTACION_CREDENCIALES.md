@@ -5,7 +5,7 @@ porque **rotar antes de reescribir rompe los tests**, y reescribir antes de rota
 deja el secreto vivo en un solo sitio.
 
 Estado actual: la credencial **ya no está en el código** (P1), pero sigue en el
-historial de git en **29 commits**.
+historial de git en **33 commits**.
 
 ---
 
@@ -116,8 +116,9 @@ repositorio**, cada una a su manera:
 Por eso `--path '*Zone.Identifier' --invert-paths` **no sirve**: el fichero ya
 está dentro del flujo cuando el filtro de Python llega a mirarlo.
 
-Afecta a **16 de los 341 commits** (del bootstrap `f92d377` al `6952683` que lo
-borra). En HEAD **no está**.
+Afecta a **16 de los 342 commits** — de los cuales solo **2 lo tocan**: el
+bootstrap `f92d377` que lo añadió y `6952683` que lo borró. Los otros 14 lo tienen
+en el árbol heredado. En HEAD **no está**.
 
 ```bash
 # 1. Backup (esto reescribe hashes, no es reversible sin el backup)
@@ -144,7 +145,7 @@ node -e "const m=require('./mapa.json');for(const [o,n] of Object.entries(m)){
   if(d.length)console.log('CAMBIO INESPERADO en',o,d.join(', '))}"
 ```
 
-Si no imprime nada, los 341 commits difieren únicamente en la eliminación del
+Si no imprime nada, los 342 commits difieren únicamente en la eliminación del
 fichero basura.
 
 **A partir de aquí `git filter-repo` ya funciona** y se puede usar la
@@ -184,7 +185,7 @@ corrompe los png/jpg/woff2 del historial), no deja refs de respaldo en
 
 ### 4.2 — Los TAGS son una puerta trasera
 
-Hay **58 tags** (`v1.0.0` … `v4.0.0-rc.33`) y cada uno apunta a un commit
+Hay **61 tags** (`v1.0.0` … `v4.0.0-rc.33`) y cada uno apunta a un commit
 concreto. **Aunque limpies `main`, un tag devuelve el historial viejo con la
 credencial dentro.** Hay que reescribirlos también:
 

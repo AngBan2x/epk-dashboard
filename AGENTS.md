@@ -130,9 +130,9 @@ descargado de internet). El `:` no es válido en NTFS, y por eso
 `git filter-branch` con `Could not initialize the index`.
 
 **Mientras ese fichero esté en la historia, ninguna reescritura funciona en
-Windows.** Afecta a 16 de los 341 commits y **no está en HEAD**. Se quita con
+Windows.** Afecta a 16 de los 342 commits y **no está en HEAD**. Se quita con
 `node scripts/git/rewrite-invalid-path.js`; después `filter-repo` ya funciona.
-Detalles y los 58 tags (que son otra puerta trasera al historial viejo) en
+Detalles y los 61 tags (que son otra puerta trasera al historial viejo) en
 `docs/ROTACION_CREDENCIALES.md`.
 
 ### P8 - `/track/[id]` es un shim de 301, no una segunda puerta

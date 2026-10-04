@@ -25,8 +25,9 @@
  * Por eso `filter-repo --path '*Zone.Identifier' --invert-paths` **no sirve**:
  * el fichero ya esta dentro del flujo cuando el filtro podria quitarlo.
  *
- * Solo afecta a **16 de los 341 commits** (del bootstrap `f92d377`, que es el
- * commit raiz, hasta `6952683`, que lo borra). En HEAD **no esta**.
+ * Solo afecta a **16 de los 342 commits**, y de esos solo **2 lo tocan**: el
+ * commit raiz `f92d377`, que lo anadio, y `6952683`, que lo borro. Los otros 14
+ * lo heredan en el arbol. En HEAD **no esta**.
  *
  * ============================================================
  * POR QUE PLUMBING Y NO LAS HERRAMIENTAS
@@ -67,7 +68,7 @@
  *          .filter(f=>f!=='Directrices del Proyecto Final.md:Zone.Identifier');
  *          if(d.length)console.log('CAMBIO INESPERADO en',o,d.join(', '))}"
  *
- *        Si no imprime nada, los 341 commits difieren unicamente en la
+ *        Si no imprime nada, los 342 commits difieren unicamente en la
  *        eliminacion del fichero basura.
  *
  *   5. A partir de aqui **`git filter-repo` ya funciona**, y se puede purgar la

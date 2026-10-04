@@ -74,7 +74,7 @@ dos rutas eran la misma página con dos plantillas. Ya solo queda una.
 
 ---
 
-## 3. Los 9 puntos de trabajo abiertos
+## 3. Los 10 puntos de trabajo abiertos
 
 Ordenados por dependencia, no por número. **C1 y C2 son independientes de C3.**
 
@@ -218,8 +218,10 @@ commiteado como fichero. En NTFS el `:` no es válido, y:
   sirve)
 - `filter-branch` → `Could not initialize the index` (hace checkout)
 
-Afecta a **16 de 341 commits**; en HEAD no está. **Mientras siga ahí, ninguna
-reescritura funciona en Windows.** Los scripts para quitarlo están en el repo.
+Afecta a **16 de los 342 commits** (de los cuales solo **2 lo tocan**: el bootstrap
+que lo añadió y `6952683` que lo borró); en HEAD no está. **Mientras siga ahí,
+ninguna reescritura funciona en Windows.** Los scripts para quitarlo están en el
+repo.
 
 **2. El `OSError: [Errno 22]` de `filter-repo` NO es el blob, ni el tamaño, ni
 los espacios.** Se descartó cada hipótesis con un probe:
@@ -229,7 +231,7 @@ los espacios.** Se descartó cada hipótesis con un probe:
 
 Sin diagnóstico útil, se hizo con plumbing.
 
-**3. Los 58 TAGS son una puerta trasera.** Aunque limpies `main`, cada tag sigue
+**3. Los 61 TAGS son una puerta trasera.** Aunque limpies `main`, cada tag sigue
 apuntando al commit viejo y devuelve el historial con la credencial. Hay que
 reescribirlos uno a uno.
 
@@ -288,7 +290,7 @@ como fuente de verdad, no las lecturas de API: la réplica va retrasada.
 
 ---
 
-## 5. Los tres fallos propios de esta sesión
+## 5. Los cinco fallos propios de esta sesión
 
 Se escriben porque son el tipo de cosa que se repite si no queda constancia.
 
