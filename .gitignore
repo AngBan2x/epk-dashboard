@@ -64,3 +64,20 @@ prod-*.json
 # TTF de Noto Serif: se descargan y se incrustan en lib/pdf/fonts.generated.ts
 # con scripts/build-pdf-font-embed.ts. No se versionan.
 lib/pdf/fonts/*.ttf
+
+# Candidatos de imagen de artistas — GENERADO, nunca se versiona.
+# Lo produce `scripts/fetch-official-videos.ts` / `apply-artist-images.ts` al
+# rodar en dry-run. Son ~30 KB de URLs de Wikimedia Commons que se re-descargan
+# cada vez, y su valor es de una ejecución: la decisión de qué se aplica queda
+# en el allowlist de `lib/official-channels.ts` y en los commits, no aquí.
+artist-image-candidates.json
+
+# Scratch de planes del orquestador (`.opencode/plans/`).
+# Son borradores de trabajo, no documentación: se commitea el plan que se ejecuta
+# (`docs/PHASE_P*.md`), nunca su cuaderno.
+#
+# Los dos anteriores salen como `??` en cada `git status`, y con un `git add -A`
+# por descuido acaban versionados. Ya pasó una vez: `git add app components lib`
+# se tragó `middleware.ts` en RC.31, y por eso AGENTS.md manda stagear con rutas
+# explícitas. Ignorarlos quita esa segunda vía de error.
+.opencode/plans/
