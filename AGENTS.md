@@ -104,10 +104,36 @@ repo.
 `defineConfig`: Playwright no hereda la carga de Next, y sin eso los 12 specs E2E
 leen `undefined`.
 
-⚠️ **`scripts/seed-admin.ts` sigue con `hashSync("CONTRASENA_ADMIN_ROTADA")` y es una decisión
-pendiente, no un olvido.** Si el admin de producción se rota, el seed debe leer del
-entorno y fallar sin `TEST_ADMIN_PASSWORD` en vez de crear una cuenta con una
-contraseña que nadie conoce.
+**Los seeds ya leen del entorno** (`scripts/seed-admin.ts`, `scripts/create-test-artist.ts`):
+usan `requireCredentials()` **en el punto exacto donde insertan**, no al principio,
+para que un seed que no tiene que crear nada no exija la contraseña.
+
+⚠️ **`scripts/lib/credentials.ts` carga el `.env.local` él mismo, y eso es
+obligatorio, no redundante.** En ES modules todos los imports se evalúan antes que
+cualquier sentencia del cuerpo del módulo, así que un `dotenv.config()` en el
+*consumidor* corre **después** de que este módulo capturó `process.env`, y las
+constas exportadas salen vacías. No son solo estos 2 scripts: los ~30 que importan
+las constas dependían del mismo orden y autenticaban con cadenas vacías, en
+silencio. Es el mismo patrón que RC.32 rompió en `lib/turso.ts`.
+
+⚠️ **`readEnv` vs `readEnvStrict`**: `??` no cae en el default ante una cadena
+vacía, solo ante `null`/`undefined`. Una variable presente pero vacía (CI que
+exporta mal un secreto) dejaba `ADMIN_EMAIL === ""`, o sea el default
+**desaparecía justo cuando el entorno estaba mal configurado**.
+
+### P7bis · El repo tiene un path INVÁLIDO que rompe las reescrituras
+
+`Directrices del Proyecto Final.md:Zone.Identifier` es un **flujo de datos
+alternativo de NTFS** commiteado como fichero (la marca que Windows pone a lo
+descargado de internet). El `:` no es válido en NTFS, y por eso
+`git filter-repo` muere con `fatal: invalid path` dentro de `fast-import` y
+`git filter-branch` con `Could not initialize the index`.
+
+**Mientras ese fichero esté en la historia, ninguna reescritura funciona en
+Windows.** Afecta a 16 de los 341 commits y **no está en HEAD**. Se quita con
+`node scripts/git/rewrite-invalid-path.js`; después `filter-repo` ya funciona.
+Detalles y los 58 tags (que son otra puerta trasera al historial viejo) en
+`docs/ROTACION_CREDENCIALES.md`.
 
 ### P8 - `/track/[id]` es un shim de 301, no una segunda puerta
 

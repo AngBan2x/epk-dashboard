@@ -197,13 +197,74 @@ peor se hace con el contexto lleno.
 Las subfases de RC.33 se renumeraron a **P7–P10**. La numeración P1–P6 **ya
 estaba ocupada**. Ver `docs/PHASES.md`. **No las renumeres otra vez.**
 
-### C9 · Reescritura del historial ← pendiente del usuario
+### C9 · Reescritura del historial ← a medias, y no es lo más urgente
 
-Las contraseñas **ya están rotadas** y propagadas a `.env.local`. Falta el paso
-final, que es manual: instalar `git filter-repo` (**no está en esta máquina**),
-reescribir, y `git push --force-with-lease`.
+Los pasos 1 a 3 **ya están hechos**: contraseñas rotadas en la app y
+propagadas a `.env.local`, y los seeds leen del entorno (P7). Falta el paso 4.
 
-La credencial sigue en **30 commits**. Guía: `docs/ROTACION_CREDENCIALES.md`.
+> **Lo que queda en la historia es un valor MUERTO.** Las contraseñas ya no
+> sirven para nada, así que la reescritura no es urgente por seguridad de
+> acceso: es defensa en profundidad y, sobre todo, **PII** (el correo). El orden
+> correcto es seguir con los 8 puntos de trabajo y hacer esto cuando haya sitio.
+
+**Tres cosas que la sesión anterior descubrió probándolas, no suponiéndolas:**
+
+**1. El repo tiene un path INVÁLIDO que rompe las dos herramientas.**
+`Directrices del Proyecto Final.md:Zone.Identifier` — un **flujo de datos
+alternativo de NTFS** (la marca que Windows pone a lo descargado de internet)
+commiteado como fichero. En NTFS el `:` no es válido, y:
+- `filter-repo` → `fatal: invalid path` dentro de **`fast-import`**, al leer el
+  flujo, antes de que el filtro pueda verlo (por eso `--path --invert-paths` no
+  sirve)
+- `filter-branch` → `Could not initialize the index` (hace checkout)
+
+Afecta a **16 de 341 commits**; en HEAD no está. **Mientras siga ahí, ninguna
+reescritura funciona en Windows.** Los scripts para quitarlo están en el repo.
+
+**2. El `OSError: [Errno 22]` de `filter-repo` NO es el blob, ni el tamaño, ni
+los espacios.** Se descartó cada hipótesis con un probe:
+- probe con el blob exacto de `pnpm-lock.yaml` (199 KB) → **pasa**
+- probe con un repo de 78 MB → **pasa**
+- clon en una ruta **sin espacios** → **falla igual**
+
+Sin diagnóstico útil, se hizo con plumbing.
+
+**3. Los 58 TAGS son una puerta trasera.** Aunque limpies `main`, cada tag sigue
+apuntando al commit viejo y devuelve el historial con la credencial. Hay que
+reescribirlos uno a uno.
+
+**El orden correcto:**
+
+```bash
+git clone --mirror . ../epk-respaldo.git          # backup PRIMERO
+node scripts/git/rewrite-invalid-path.js          # quita el path inválido
+node scripts/git/purge-history.js main            # purga la credencial
+node scripts/git/purge-history.js refs/tags/v4.0.0-rc.33   # x58
+git reflog expire --expire=now --all && git gc --prune=now --force
+git push --force-with-lease origin main
+git push --force origin 'refs/tags/*'
+```
+
+**La verificación buena NO es "los tests pasan".** Eso no distingue una
+reescritura correcta de una que perdió medio repositorio. Es comprobar que **cada
+commit viejo y su reescrito difieran SOLO en lo esperado**; el comando está
+escrito en `docs/ROTACION_CREDENCIALES.md` §4.0.
+
+Guía completa: `docs/ROTACION_CREDENCIALES.md`. Ya tiene el orden de los tags y
+el aviso de no borrar los tags del remoto antes de subir los reescritos (las
+releases se rompen).
+
+### C10 · Un fallo propio que dejó el working tree sucio ← ya corregido
+
+`git filter-branch` **falló a medias** y dejó el `working tree` del repo
+principal con un `pnpm-lock.yaml` **viejo** (bajaba `@libsql/client` a ^0.14 y
+eliminaba `bcryptjs` y `@vercel/blob`). No se detectó por `git status` hasta
+después, y un `git commit -a` lo habría subido.
+
+**La lección:** una herramienta de reescritura que falla **no es inocua** aunque
+diga que no ha escrito nada. Después de usarla, `git checkout -- .` sobre los
+ficheros que no deben haber cambiado, y comprobar las dependencias
+críticas del lockfile. Está corregido en esta sesión.
 
 ---
 
@@ -254,6 +315,17 @@ Verificar **contra los codepoints**, no contra la consola:
 Y ojo: `Select-String` con el patrón `[\u4E00-\u9FFF]` **no encuentra nada en
 silencio**, porque `\uXXXX` no existe en el regex de PowerShell. Un patrón de
 búsqueda que no busca es peor que uno que falla.
+
+**4. Una herramienta que falla no es inocua.** `git filter-branch` falló con
+`Could not initialize the index` y **dejó el working tree a medias**, con un
+`pnpm-lock.yaml` viejo que bajaba dependencias. No lo detectó `git status` hasta
+después, y un `git commit -a` lo habría subido. **Detalle en C10.**
+
+**5. Descarta hipotesis con probes, no con suposiciones.** Se perdio casi una hora
+creyendo que el fallo de ilter-repo era el blob, luego el tamano del repo,
+luego los espacios en el path. **Las tres eran falsas**, y cada una se comprobó
+con un repo mínimo que pasaba sin problema. Un probe que demuestra que algo **no**
+es la causa vale tanto como uno que lo demuestra.
 
 ---
 

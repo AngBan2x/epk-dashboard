@@ -93,64 +93,145 @@ aplico.
 
 ## Paso 4 — Reescribir el historial
 
-**`git filter-repo` NO está instalado** en esta máquina. Instálalo primero:
+> ⚠️ **Este paso ya se intentó el 2026-10-03 y falló.** No por culpa de
+> `git filter-repo`, sino porque **el repositorio tiene un fichero con un path
+> inválido que rompe las dos herramientas de reescritura**. Está resuelto en el
+> paso 4.0. Léelo antes de tocar nada.
+
+### 4.0 — Purgar primero el path inválido (OBLIGATORIO)
+
+Alguien commiteó un **flujo de datos alternativo de NTFS** como si fuera un
+fichero: `Directrices del Proyecto Final.md:Zone.Identifier`. `:Zone.Identifier`
+es la marca que Windows pone a lo descargado de internet, y en NTFS el `:` no es
+un carácter válido.
+
+Consecuencia: **`git filter-repo` y `git filter-branch` no pueden con este
+repositorio**, cada una a su manera:
+
+| Herramienta | Cómo muere |
+|---|---|
+| `git filter-repo` | `fatal: invalid path ...` dentro de **`fast-import`**, al leer el path del flujo — antes de que el filtro pueda verlo |
+| `git filter-branch` | `Could not initialize the index`, porque hace checkout y no puede escribir ese nombre |
+
+Por eso `--path '*Zone.Identifier' --invert-paths` **no sirve**: el fichero ya
+está dentro del flujo cuando el filtro de Python llega a mirarlo.
+
+Afecta a **16 de los 341 commits** (del bootstrap `f92d377` al `6952683` que lo
+borra). En HEAD **no está**.
 
 ```bash
-pip install git-filter-repo
-# o, sin Python:
-#   descarga el .exe de https://github.com/newren/git-filter-repo/releases
-#   y ponlo en el PATH
-```
-
-Verifica antes de seguir:
-
-```bash
-git filter-repo --version   # debe imprimir un número, no "not a git command"
-```
-
-Haz **antes** un clon limpio de repuesto, por si algo sale mal:
-
-```bash
+# 1. Backup (esto reescribe hashes, no es reversible sin el backup)
 git clone --mirror . ../epk-dashboard-respaldo.git
+
+# 2. Purgar el path
+node scripts/git/rewrite-invalid-path.js
+
+# 3. Verificar que ya no está en ninguna parte
+git log --all --oneline -- '*Zone.Identifier*'   # debe dar 0 líneas
 ```
 
-**Solo tú tienes el repo abierto**, así que no hay ramas ni clones de otras
-personas que se rompan. Aun así, esto reescribe **todos** los hashes.
-
-### Dos opciones
-
-**A. Reescribir el texto (lo recomendado para este caso).** Sustituye la
-credencial literal por un marcador en todo el historial:
+**La verificación buena no es "los tests pasan"** — eso no distingue una
+reescritura correcta de una que perdió medio repositorio. Es que **cada commit
+viejo y su reescrito difieran SOLO en ese fichero**:
 
 ```bash
-git filter-repo --replace-text replacements.txt
+node -e "const m=require('./mapa.json');for(const [o,n] of Object.entries(m)){
+  if(o===n)continue;
+  const d=require('child_process').execFileSync('git',
+    ['diff','--name-status',o+'^{tree}',n+'^{tree}'],{encoding:'utf8'})
+    .trim().split('\n').filter(Boolean).map(l=>l.split('\t').pop())
+    .filter(f=>f!=='Directrices del Proyecto Final.md:Zone.Identifier');
+  if(d.length)console.log('CAMBIO INESPERADO en',o,d.join(', '))}"
 ```
 
-donde `replacements.txt` contiene:
+Si no imprime nada, los 341 commits difieren únicamente en la eliminación del
+fichero basura.
 
-```
-test-artist@example.invalid==>TEST_ARTIST_EMAIL@example.invalid
-12345678==>TEST_ARTIST_PASSWORD_REDACTED
-```
-
-**B. Borrar los ficheros de una vez.** Si solo quieres que el secreto desaparezca
-y no te importa conservar cada commit:
+**A partir de aquí `git filter-repo` ya funciona** y se puede usar la
+herramienta estándar. Y si prefieres seguir con plumbing (más lento pero
+verificable commit a commit):
 
 ```bash
-git filter-repo --path scripts/create-test-artist.ts --invert-paths
+node scripts/git/purge-history.js main
 ```
 
-Menos quirúrgico: se pierde el historial de esos ficheros entero. **A** deja la
-historia intacta y quita solo la cadena.
+### 4.1 — Purgar la credencial
 
-Comprueba que ya no está:
+**`git filter-repo` ya está instalado** en esta máquina (`2.47.0`, en el Python
+del usuario, no en el PATH de git). Verifica:
+
+```bash
+git filter-repo --version   # imprime un hash; si dice "not a git command", reinstálalo
+```
+
+Dos vías:
+
+**A. `filter-repo`, la estándar:**
+
+```bash
+git filter-repo --replace-text replacements.txt --force
+```
+
+**B. Plumbing con `scripts/git/purge-history.js`**, que es binary-safe (no
+corrompe los png/jpg/woff2 del historial), no deja refs de respaldo en
+`refs/original/`, y **no reemplaza el `12345678` suelto** porque en
+`tests/unit/account-settings.test.ts:91` ese número va sin comillas: es un
+`number` en un test de validación de tipo.
+
+> **Sobre el `replacements.txt`:** el patrón `12345678==>...` que aparece en
+> versiones anteriores de esta guía **rompería ese test**. Sustituye la pareja
+> entera, no el número suelto.
+
+### 4.2 — Los TAGS son una puerta trasera
+
+Hay **58 tags** (`v1.0.0` … `v4.0.0-rc.33`) y cada uno apunta a un commit
+concreto. **Aunque limpies `main`, un tag devuelve el historial viejo con la
+credencial dentro.** Hay que reescribirlos también:
+
+```bash
+node scripts/git/purge-history.js refs/tags/v4.0.0-rc.33   # uno por tag
+git for-each-ref --format='%(refname)' refs/tags | wc -l   # dan 58
+```
+
+O, si prefieres filter-repo para los tags:
+
+```bash
+git filter-repo --replace-text replacements.txt --force --refs refs/tags/*
+```
+
+### 4.3 — Limpiar los objetos sueltos
+
+```bash
+git reflog expire --expire=now --all
+git gc --prune=now --force
+```
+
+Sin esto, `git fsck --lost-found` todavía encuentra los blobs viejos, y con
+ellos la credencial.
+
+Comprueba que ya no está en **ninguna** parte:
 
 ```bash
 git log --all --oneline -S 'test-artist@example.invalid'   # debe dar 0 líneas
 git grep -n 'angab06' $(git rev-list --all)      # debe dar 0 líneas
+git fsck --lost-found                            # no debe listar blobs con la cadena
 ```
 
+GitHub mantiene los commits viejos en su caché aunque reescribas, y puede
+indexarlos de nuevo. Si el repositorio fuera público, lo normal sería pedir a
+que lo pusieran en cola de gc; siendo privado y con las contraseñas ya
+rotadas, el valor que queda es **muros** y el riesgo real es el **correo** (PII).
+
+### Nota sobre `git filter-branch`
+
+No se usa, y por dos motivos: rompe con el path inválido, y **deja un backup en
+`refs/original/`** con la historia antigua. Ese backup es una puerta trasera:
+aunque limpies `main`, el secreto sigue accesible con `git log refs/original/...`.
+`scripts/git/*.js` no crea refs de respaldo.
+
 ## Paso 5 — Forzar el push
+
+**Primero `main`, y verifica antes de tocar los tags:**
 
 ```bash
 git push --force-with-lease origin main
@@ -159,21 +240,42 @@ git push --force-with-lease origin main
 `--force-with-lease` y **no** `--force`: si alguien ha subido algo entre tu
 último `fetch` y el push, aborta en vez de pisarlo.
 
-Y en el remoto:
+**Luego los tags**, que son 58 y apuntan a commits reescritos. Las releases de
+GitHub cuelgan de ellos:
 
 ```bash
-git tag -l | xargs git push --force --delete origin   # solo si hay tags
+git push --force origin 'refs/tags/*'
 ```
 
-porque las releases de GitHub apuntan a commits reescritos.
+**Y borrar los tags antiguos del remoto**, que siguen apuntando al historial con
+la credencial:
+
+```bash
+# Ver cuáles siguen apuntando a commits que ya no existen en la rama
+git ls-remote --tags origin | while read sha ref; do
+  git cat-file -e "$sha^{commit}" 2>/dev/null || echo "obsoleto: $ref"
+done
+
+git push origin --delete v1.0.0 v2.1.0 ...   # los que salgan en la lista
+```
+
+> **Orden importante.** Si borras los tags del remoto **antes** de subirlos
+> reescritos, las releases de GitHub se quedan apuntando a commits que ya no
+> existen en ninguna rama y se rompen. Primero sube los nuevos, luego borra los
+> viejos.
 
 ## Por qué esto es necesario y no Inbound
 
-Borrar la cadena del **fichero** no la borra del **historial**: sigue en 29
+Borrar la cadena del **fichero** no la borra del **historial**: sigue en 30
 commits, y cualquiera con un clon puede hacer `git log -p` y leerla. Por eso la
 rotación y la reescritura son las dos mitades del mismo arreglo: la rotación
 invalida el valor, la reescritura quita el texto.
 
+**Y por qué la reescritura es la parte menos urgente.** Las contraseñas
+**ya están rotadas** (2026-10-03), así que lo que queda en la historia es un valor
+**muerto**: no permite autenticarse. El riesgo residual es el **correo**, que es
+PII, y el hecho de que un tag o el caché de GitHub lo hagan legible. Por eso el
+orden correcto es: rotar primero, y luego, si hay tiempo, la reescritura.
 ---
 
 # Rotación de claves API de redes sociales
