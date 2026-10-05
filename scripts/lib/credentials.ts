@@ -40,7 +40,7 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
-export type TestRole = "artist" | "admin";
+export type TestRole = "artist" | "admin" | "subscriber";
 
 export type TestCredential = { email: string; password: string };
 
@@ -92,10 +92,27 @@ export const ARTIST_PASSWORD = readEnvStrict("TEST_ARTIST_PASSWORD");
 export const ADMIN_EMAIL = readEnv("TEST_ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL);
 export const ADMIN_PASSWORD = readEnvStrict("TEST_ADMIN_PASSWORD");
 
+/**
+ * C6 — el suscriptor de pruebas.
+ *
+ * El correo **sí** lleva default, y por el mismo motivo que el del admin: es un
+ * dominio inventado, no PII de nadie. La contrasena no, como ninguna: sin ella el
+ * seed falla visible en vez de crear una cuenta con una clave que esté en el
+ * repositorio.
+ *
+ * `DEFAULT_SUBSCRIBER_EMAIL` es lo que permite que
+ * `scripts/create-test-subscriber.ts` se pueda ejecutar en modo dry-run sin
+ * configurar nada, que es justo cuando no hay que escribir nada.
+ */
+export const DEFAULT_SUBSCRIBER_EMAIL = "subscriber@epk.local";
+export const SUBSCRIBER_EMAIL = readEnv("TEST_SUBSCRIBER_EMAIL", DEFAULT_SUBSCRIBER_EMAIL);
+export const SUBSCRIBER_PASSWORD = readEnvStrict("TEST_SUBSCRIBER_PASSWORD");
+
 /** Variable de entorno que hay que definir para un rol, para el mensaje de error. */
 const ENV_NAME: Record<TestRole, { email: string; password: string }> = {
   artist: { email: "TEST_ARTIST_EMAIL", password: "TEST_ARTIST_PASSWORD" },
   admin: { email: "TEST_ADMIN_EMAIL", password: "TEST_ADMIN_PASSWORD" },
+  subscriber: { email: "TEST_SUBSCRIBER_EMAIL", password: "TEST_SUBSCRIBER_PASSWORD" },
 };
 
 /**
@@ -107,15 +124,22 @@ const ENV_NAME: Record<TestRole, { email: string; password: string }> = {
  * via que usan los seeds— siga siendo correcta en ese caso.
  */
 function current(role: TestRole): TestCredential {
-  return role === "artist"
-    ? {
-        email: readEnvStrict("TEST_ARTIST_EMAIL"),
-        password: readEnvStrict("TEST_ARTIST_PASSWORD"),
-      }
-    : {
-        email: readEnv("TEST_ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL),
-        password: readEnvStrict("TEST_ADMIN_PASSWORD"),
-      };
+  if (role === "artist") {
+    return {
+      email: readEnvStrict("TEST_ARTIST_EMAIL"),
+      password: readEnvStrict("TEST_ARTIST_PASSWORD"),
+    };
+  }
+  if (role === "subscriber") {
+    return {
+      email: readEnv("TEST_SUBSCRIBER_EMAIL", DEFAULT_SUBSCRIBER_EMAIL),
+      password: readEnvStrict("TEST_SUBSCRIBER_PASSWORD"),
+    };
+  }
+  return {
+    email: readEnv("TEST_ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL),
+    password: readEnvStrict("TEST_ADMIN_PASSWORD"),
+  };
 }
 
 /** Que falta para poder autenticarse, sin imprimir ningun valor. */

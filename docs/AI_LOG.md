@@ -7177,3 +7177,72 @@ deploy de `fe6b575`.
   como la última.
 - **Las 5 métricas de los 5 álbumes** siguen a 0 curado: es una escritura en
   producción y va con su dry-run y su OK, no colada dentro de un lote de UI.
+---
+
+# C5 · C6 — 2026-10-05
+
+## C5 — el dry-run de fotos proponía lo que se había rechazado
+
+Ejecuté el dry-run buscando el delta real y propose **10 escrituras, 4 de las
+cuales eran exactamente las que la ficha de C5 decía que no se querían**: el
+perfil de Björk, el de Bowie y el banner de Bowie. Las candidatas seguían en la
+tabla `CURATED` después de la decisión de dejarlas fuera, así que un `--apply`
+cualquiera las habría escrito.
+
+Las saqué de la tabla y dejé el motivo con las URLs. Miradas una a una:
+
+- **Bowie: confirmado que no funciona.** 1280x1280, sujeto en el tercio derecho,
+  40% izquierdo negro puro. El recorte circular centrado sale negro con una franja
+  de traje. Ni perfil ni banner.
+- **Björk: sí funcionaría.** 1000x1416, portrait, centrada y ocupando el
+  encuadre. Se queda fuera por decisión, no por calidad, y ahora está escrito.
+
+Lo que **no** escribí: las 7 canonicalizaciones `thumb` → `upload` que propone el
+dry-run. Son la misma imagen y el alias funciona; es cosmético.
+
+## C6 — por fin hay un suscriptor que probar
+
+0 cuentas suscriptor en producción, que es la superficie más grande sin cubrir:
+suscripciones, notificaciones, preferencias de email y broadcast.
+
+- Rol `subscriber` en `scripts/lib/credentials.ts`, con P7 intacta: la contraseña
+  **no** tiene default, el correo sí (`subscriber@epk.local`).
+- Contraseña de 32 caracteres aleatorios en `.env.local` (gitignored), nunca
+  impresa ni commiteada.
+- `scripts/create-test-subscriber.ts` con dry-run por defecto, y **comprueba si el
+  correo ya existe** antes de escribir: `INSERT OR REPLACE` con id nuevo haría un
+  duplicado en un segundo seed.
+- **1 fila en `users`** en Turso.
+- Verificado: login 200, rol `subscriber`, y el ciclo `Suscribirse` → `Suscrito` →
+  confirmación de baja. La suscripción se queda (1 fila) porque un suscriptor sin
+  suscripciones no puede probar el fan-out.
+
+## El fallo que casi es el de P7
+
+La primera ejecución de los tests **imprimió la contraseña real**:
+
+    expected 'eBCFf7pa4V6...' to be ''
+
+`ENV_KEYS` en `tests/unit/credentials.test.ts` limpia `TEST_ARTIST_*` y
+`TEST_ADMIN_*` antes de importar el helper, y no conocía el rol nuevo. Como
+`credentials.ts` hace `dotenv.config()` en su propio cuerpo, la variable se
+repoblaba desde `.env.local` y el test comparaba contra la clave de verdad.
+
+El test cuya misión es "ninguna contraseña tiene default" estaba leyendo una
+contraseña real. Arreglado, y el comentario del `ENV_KEYS` dice que el rol nuevo
+tiene que entrar ahí **el mismo día que se crea**, con el motivo.
+
+## C4 de la documentación: la cuarta vez con `not.toContain`
+
+C5 tropieza otra vez con lo mismo y por eso `sinComentarios()` pasa a
+`tests/helpers/strip-comments.ts`, compartido:
+
+- El comentario del script de fotos incluye la entrada de Björk como ejemplo de
+  "si cambias de idea", y la aserción de que no existe se ponía roja.
+- El helper documenta su límite real: en ese mismo script hay un `console.log`
+  con `content-type image/*`, y ese `/*` no es un comentario, así que el stripper
+  se come un trozo. Por eso los tests **recortan** lo que comparan.
+
+## Puertas
+
+`1200/1200` en 62 ficheros, `tsc` limpio, `next lint` sin warnings.

@@ -17,6 +17,13 @@ const ENV_KEYS = [
   "TEST_ARTIST_PASSWORD",
   "TEST_ADMIN_EMAIL",
   "TEST_ADMIN_PASSWORD",
+  // C6: el rol nuevo tiene que entrar aqui **el mismo dia que se crea**. Si se
+  // olvida, `credentials.ts` repuebla la variable desde `.env.local` —que es lo
+  // que hace el dotenv de su propio cuerpo— y este test imprime la contraseña
+  // real en el fallo de una aserción. Pasó: la primera ejecución de C6 la
+  // enseñó en la salida del test.
+  "TEST_SUBSCRIBER_EMAIL",
+  "TEST_SUBSCRIBER_PASSWORD",
 ] as const;
 
 type EnvKey = (typeof ENV_KEYS)[number];
@@ -97,6 +104,9 @@ describe("scripts/lib/credentials", () => {
     expect(c.ARTIST_PASSWORD).toBe("");
     expect(c.ADMIN_PASSWORD).toBe("");
     expect(c.ARTIST_EMAIL).toBe("");
+    // C6: el suscriptor entra en la misma regla. Su correo sí tiene default
+    // (dominio inventado), pero la contrasena no.
+    expect(c.SUBSCRIBER_PASSWORD).toBe("");
   });
 
   it("SIN variables NO devuelve ninguna credencial real (protege el default)", async () => {
@@ -119,6 +129,37 @@ describe("scripts/lib/credentials", () => {
     process.env.TEST_ADMIN_EMAIL = "otro@example.test";
     const c2 = await loadHelper();
     expect(c2.ADMIN_EMAIL).toBe("otro@example.test");
+  });
+
+  /**
+   * C6 — el rol `subscriber` no es una excepción a la regla de P7.
+   *
+   * Es la inviting: `subscriber@epk.local` es un dominio inventado y puede tener
+   * default, pero la contraseña **no**, porque una cuenta de suscriptor con una
+   * clave en el repositorio sería una puerta real a producción. Y `requireCredentials`
+   * tiene que decir qué variable falta, no fallar en silencio.
+   */
+  it("el suscriptor: correo con default, contrasena sin", async () => {
+    const c = await loadHelper();
+
+    expect(c.SUBSCRIBER_EMAIL).toBe(c.DEFAULT_SUBSCRIBER_EMAIL);
+    expect(c.SUBSCRIBER_EMAIL).toBeTruthy();
+    expect(c.SUBSCRIBER_PASSWORD).toBe("");
+    expect(c.SUBSCRIBER_PASSWORD).not.toContain("@");
+  });
+
+  it("requireCredentials('subscriber') dice que falta la contrasena, y solo eso", async () => {
+    const c = await loadHelper();
+
+    expect(c.missingCredentialEnvVars("subscriber")).toEqual(["TEST_SUBSCRIBER_PASSWORD"]);
+
+    process.env.TEST_SUBSCRIBER_PASSWORD = "pw-suscriptor";
+    const c2 = await loadHelper();
+    expect(c2.missingCredentialEnvVars("subscriber")).toEqual([]);
+    expect(c2.requireCredentials("subscriber", "test")).toEqual({
+      email: c2.DEFAULT_SUBSCRIBER_EMAIL,
+      password: "pw-suscriptor",
+    });
   });
 
   it("requireCredentials devuelve las credenciales cuando estan completas", async () => {

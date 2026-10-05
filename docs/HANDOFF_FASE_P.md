@@ -340,50 +340,93 @@ la clase CSS del botón que se eliminó, el JSX desde `<form`, no el fichero.
 - **Las 5 métricas de los 5 álbumes** (siguen a 0 curado, y `lib/metrics-source.ts`
   dice "hay dato" porque el objeto existe): es una **escritura en producción** y
   va con su propio dry-run y tu OK, no colada aquí.
-### C5 · Fotos de perfil de los 5 artistas
+### C5 · Fotos de perfil — HECHA 2026-10-05 (el no era el que creías)
 
-Verificado en Turso: **0 fotos de perfil** en Björk, David Bowie, Kraftwerk,
-Pink Floyd y Radiohead. Hay **3 banners** (Kraftwerk, Pink Floyd, Radiohead);
-Björk y Bowie **no tienen ninguno**.
+**Lo que encontré al ejecutar el dry-run:** 10 escrituras, y **4 de ellas eran
+precisamente las que la ficha de C5 decía que no se quería** — el perfil de Björk,
+el de Bowie y el banner de Bowie. Las candidatas seguían en la tabla `CURATED`
+después de que se decidiera dejarlas fuera, así que un `--apply` cualquiera las
+habría escrito sin preguntar.
 
-`scripts/apply-artist-images.ts` ya admite `profile` y `banner` por artista, pero
-su allowlist curada solo cubre otros nombres. Hay que añadir 5 perfiles y buscar
-2 banners.
+Un dry-run que propone lo que no se quiere es peor que no tener dry-run, porque
+enseña a no leerlo. Las entradas salen de la tabla; el motivo y las URLs quedan
+en un comentario, con el código de 4 líneas para recuperarlas.
 
-**Regla que ya paying:** dry-run, revisión visual una a una, `--apply` solo
-después. Bowie y Björk se quedaron fuera a propósito: su composición no funciona
-en círculo ni en wide, y la inicial con degradado es mejor que un recorte malo.
+### Las dos fotos, miradas una a una
 
-### C6 · Cuenta suscriptor de prueba
+**David Bowie — confirmado que no funciona.** 1280×1280, Bowie en el tercio
+derecho y el **40 % izquierdo negro puro**. El recorte circular centrado —que es
+como se pinta el avatar— sale negro con una franja de traje blanco. Como banner
+tampoco: es cuadrada. Ni perfil ni banner, y no es una pena.
 
-Verificado en Turso: **0 cuentas suscriptor**. Hay 7 artistas y 1 admin.
+**Björk — sí funcionaría.** 1000×1416, portrait, **centrada y ocupando el
+encuadre**: en círculo funciona, con la cara y el tocado naranja. Es una foto de
+escenario con grano, pero el contraste es real. Se queda fuera por decisión del
+usuario, **no por calidad**, y ahora se sabe por escrito para que la decisión no
+se pierda. Si cambias de idea, es una entrada de 4 líneas y un dry-run.
 
-Credenciales a `.env.local` con el mismo patrón que P7 (`scripts/lib/credentials.ts`),
-y el registro público ya crea `subscriber` (P4 de la fase P original).
+**Los otros tres sí están en la tabla y siguen sin avatar, a propósito:** Pink
+Floyd, Radiohead y Kraftwerk no tienen retrato de grupo utilizable en Commons,
+solo fotos de escenario. El degradado de `ArtistHero` hace de avatar, que es
+mejor que un recorte malo.
 
-Sin esto **no se puede verificar**: suscripciones, notificaciones, preferencias
-de email, ni el broadcast. Es lo que más superficie de bug deja sin cubrir.
+**Lo que NO se ha escrito:** las 7 canonicalizaciones de host
+(`thumb.wikimedia.org` → `upload.wikimedia.org`) que propone el dry-run. Son **la
+misma imagen** y el alias funciona, así que es cosmético y no se ha tocado la
+base.
 
-### C7 · Reorganizar la documentación
+### C6 · Cuenta de suscriptor de pruebas — HECHA 2026-10-05
 
-`docs/AI_LOG.md`: **7.027 líneas, 396 KB, 114 epígrafes de nivel 2, 592 de nivel
-3**. El bloque más largo son 432 líneas. Es ilegible por inspección humana.
+**Lo que faltaba:** 0 cuentas suscriptor en producción. Seven artistas, un admin,
+nadie que pueda ejercitar suscripciones, notificaciones, preferencias de email ni
+el broadcast — que es la parte más grande de la superficie sin cubrir.
 
-> Las tres cifras se cuentan con
-> `(Get-Content -LiteralPath docs/AI_LOG.md).Count`,
-> `Select-String -Path docs/AI_LOG.md -Pattern '^## '` y
-> `Select-String -Path docs/AI_LOG.md -Pattern '^### '`, porque **se desfasan
-> solas con cada commit**: las de arriba ya eran 6.689 antes de C1 y 7.027
-> después de C1-ter. Es el mismo aviso que el de C9.
+**Lo hecho:**
 
-Propuesta: `docs/ai-log/` con un fichero por época, y `AI_LOG.md` reducido a
-índice. **Nada se borra**: es mover, no resumir.
+1. `scripts/lib/credentials.ts` admite el rol `subscriber`
+   (`TEST_SUBSCRIBER_EMAIL` / `TEST_SUBSCRIBER_PASSWORD`), con la regla de P7
+   intacta: **la contraseña no tiene default**, el correo sí (`subscriber@epk.local`
+   es un dominio inventado, como `admin@epk.local`).
+2. `.env.example` documenta las dos variables **sin valor**.
+3. `.env.local` (que está en `.gitignore`) tiene la contraseña: 32 caracteres
+   aleatorios, **nunca impresa, nunca commiteada**.
+4. `scripts/create-test-subscriber.ts`: dry-run por defecto, `--apply` para
+   escribir, y **comprueba si el correo ya existe antes** — con `INSERT OR
+   REPLACE` y un id nuevo, un segundo seed crearía un duplicado.
+5. **Una fila en `users`** en Turso, rol `subscriber`.
 
-`docs/` tiene 24 ficheros en la raíz con nombres heterogéneos. `docs/PHASES.md`
-ya cubre las fases; falta un índice del resto.
+**Verificado en producción:** login 200, `rol: subscriber`, la cabecera muestra
+"Suscriptor de pruebas (subscriber)", y el ciclo de suscripción funciona de
+punta a punta: `Suscribirse` → `Suscrito`, y al abrir la baja aparece la
+confirmación con `Confirmar baja` / `Mantener suscripción`.
 
-**Va el último a propósito:** es el único ítem que no bloquea a otro, y es el que
-peor se hace con el contexto lleno.
+**La suscripción se queda** (1 fila, al primer artista del catálogo): un suscriptor
+sin suscripciones no puede probar el fan-out, que es justo lo que la cuenta existe
+para cubrir. `/api/subscriptions` devuelve 1, `/api/notifications` 0.
+
+### El fallo que cometí aquí, y que casi es el de P7
+
+La primera ejecución de los tests **imprimió la contraseña real** en el fallo de
+una aserción: `ENV_KEYS` en `tests/unit/credentials.test.ts` limpia
+`TEST_ARTIST_*` y `TEST_ADMIN_*` antes de importar el helper, y no conocía el rol
+nuevo. Como `credentials.ts` hace `dotenv.config()` en su propio cuerpo, la
+variable se repoblaba desde `.env.local` y el test comparaba contra la clave de
+verdad.
+
+Arreglado, y el comentario del `ENV_KEYS` dice ahora que **el rol nuevo tiene que
+entrar ahí el mismo día que se crea**, con el motivo. Era la contraseña: ahí
+sugerida: `expected 'eBCFf7pa4V6…' to be ''` — o sea, el test cuya misión es que
+"ninguna contraseña tiene default" estaba leyendo una contraseña real.
+
+## La cuarta vez con lo mismo, y por eso el helper es compartido
+
+`tests/helpers/strip-comments.ts` sustituye a la copia local que tenía
+`show-status-vocabulary.test.ts`. Documenta los cuatro casos (C3 ×2, C4, C5) y
+su **límite exacto**: en `apply-artist-images.ts` hay un `console.log` con el
+texto `content-type image/*`, y ese `/*` no es un comentario, así que el stripper
+se come un trozo. Por eso los tests **recortan** lo que comparan en vez de mirar
+el fichero entero: un recorte acota el daño de un stripper que no entiende
+strings.
 
 ### C8 · Renumeración de fases ← ya hecho, no repetir
 
