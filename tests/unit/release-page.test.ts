@@ -808,3 +808,104 @@ describe("C1-bis · la ficha de una pista vuelve a la página de release", () =>
     expect(bodyText()).toContain("Bandcamp");
   });
 });
+
+/* ── 8. C1-ter · los vídeos, y cuál de ellos se puede llamar videoclip ─────── */
+
+/**
+ * ## Qué protects
+ *
+ * `tracks.video_kind` (RC.33, Ola 4) tiene tres valores y **solo uno** es el
+ * vídeo que la ficha quiere mostrar. Antes de esta ola **ninguna parte de la UI
+ * lo leía**: `grep video_kind app components` no devolvía nada, o sea que nada
+ * impedía enseñar un `- Topic` autogenerado por YouTube con el nombre
+ * "Videoclip Oficial".
+ *
+ * Y hay que decirlo porque el dato es incómodo: de las 28 hijas con vídeo, **11
+ * son `live` y 17 son `topic_audio`, y no hay ni un `videoclip`**. El catálogo no
+ * tiene ningún vídeo oficial curado de un álbum. La sección existe para cuando
+ * lo haya, y sobre todo para que la **exclusión** sea una regla testeada en vez
+ * de un olvido.
+ */
+describe("C1-ter · un - Topic no es el videoclip de la pista", () => {
+  it("un `- Topic` autogenerado NO se enseña", async () => {
+    // Un canal `- Topic` es el audio del tema con una imagen fija. Enseñarlo
+    // como videoclip oficial del álbum sería afirmar algo que es falso.
+    await renderPage({ id: "rel-album" }, [
+      { id: "c1", title: "Aguante", youtube_video_id: "TOPIC123456", video_kind: "topic_audio" },
+    ]);
+    expect(bodyText()).not.toContain("Videoclips oficiales");
+    expect(headings()).not.toContain("Videoclips oficiales");
+  });
+
+  it("un directo tampoco", async () => {
+    // Un `live` es una grabación en directo: no es la pista del lanzamiento.
+    await renderPage({ id: "rel-album" }, [
+      { id: "c1", title: "Aguante", youtube_video_id: "LIVE1234567", video_kind: "live" },
+    ]);
+    expect(bodyText()).not.toContain("Videoclips oficiales");
+  });
+
+  it("un `videoclip` sí, con su miniatura y su enlace", async () => {
+    await renderPage({ id: "rel-album" }, [
+      { id: "c1", title: "Aguante", youtube_video_id: "VIDEOCLIP1", video_kind: "videoclip" },
+      { id: "c2", title: "Medianoche" },
+    ]);
+    expect(headings()).toContain("Videoclips oficiales");
+    // El recuento es honesto: 1 de 2, no "2 vídeos".
+    expect(bodyText()).toContain("1 de las pistas tiene videoclip oficial");
+    const hrefs = Array.from(document.querySelectorAll('a[target="_blank"]')).map(
+      (a) => a.getAttribute("href") ?? ""
+    );
+    expect(hrefs).toContain("https://www.youtube.com/watch?v=VIDEOCLIP1");
+    // La miniatura de `VideoShowcase`, la misma.
+    const thumbs = document.querySelectorAll(
+      'img[src="https://img.youtube.com/vi/VIDEOCLIP1/hqdefault.jpg"]'
+    );
+    expect(thumbs).toHaveLength(1);
+    // Decorativa: el título ya está en el texto de al lado.
+    expect(thumbs[0].getAttribute("alt")).toBe("");
+  });
+
+  it("varias a la vez: el recuento usa el plural", async () => {
+    await renderPage({ id: "rel-album" }, [
+      { id: "c1", youtube_video_id: "VIDEOAAA111", video_kind: "videoclip" },
+      { id: "c2", youtube_video_id: "VIDEOBBB222", video_kind: "videoclip" },
+      { id: "c3", youtube_video_id: "LIVECCC333", video_kind: "live" },
+    ]);
+    expect(bodyText()).toContain("2 de las pistas tienen videoclip oficial");
+  });
+
+  it("el single NO monta la lista de vídeos: ya tiene su Videoclip Oficial", async () => {
+    // Un single es su propia pista. Montar las dos cosas sería enseñar el mismo
+    // vídeo dos veces, una como tarjeta grande y otra como fila.
+    await renderPage(
+      { id: "rel-single", youtube_video_id: "VIDEOAAA111", video_kind: "videoclip" },
+      []
+    );
+    expect(bodyText()).toContain("Videoclip Oficial");
+    expect(bodyText()).not.toContain("Videoclips oficiales");
+  });
+
+  it("un single con vídeo `- Topic` tampoco lo enseña como videoclip", async () => {
+    // La regla es la MISMA para las dos ramas, y por eso vive en
+    // `showableVideo` y no en la página: dos copias divergirían en silencio.
+    await renderPage(
+      { id: "rel-single", youtube_video_id: "TOPIC123456", video_kind: "topic_audio" },
+      []
+    );
+    expect(bodyText()).not.toContain("Videoclip Oficial");
+  });
+
+  it("un `null` se conserva: son los ids curados a mano del seed", async () => {
+    // Los 9 singles del catálogo tienen `video_kind = NULL` porque los escribió
+    // una persona antes de que la columna existiera. Si `null` se excluyera, la
+    // página de 9 singles perdería su vídeo y el arreglo de C1-bis sería inútil.
+    await renderPage({ id: "rel-single", youtube_video_id: "CURADOMANO1" }, []);
+    expect(bodyText()).toContain("Videoclip Oficial");
+  });
+
+  it("un álbum sin ningún vídeo de pista no monta la sección", async () => {
+    await renderPage({ id: "rel-album" }, [{ id: "c1" }, { id: "c2" }]);
+    expect(headings()).not.toContain("Videoclips oficiales");
+  });
+});

@@ -5,7 +5,7 @@ import {
   resolveMetrics,
   type ResolvedMetrics,
 } from "@/lib/metrics-source";
-import type { Track } from "@/types/music";
+import type { Track, VideoKind } from "@/types/music";
 
 /**
  * P2 · Ola 10 — la FORMA de un lanzamiento, derivada de sus datos. Nada de red,
@@ -153,6 +153,52 @@ export function releaseRowDurationLabel(track: Track): string {
   if (!label.text || label.isChapterRange) return label.text;
   const parsed = sumDurations([label.text]);
   return parsed && parsed.seconds > 0 ? label.text : "";
+}
+
+/**
+ * ## El vídeo de una fila, y si se puede enseñar como el videoclip de la pista
+ *
+ * `tracks.video_kind` (RC.33, Ola 4) tiene tres valores y **solo uno** es el
+ * vídeo que la ficha quiere mostrar:
+ *
+ * | `video_kind` | Qué es | ¿Se enseña? |
+ * |---|---|---|
+ * | `videoclip` | canal humano verificado del artista | **sí** |
+ * | `live` | una grabación en directo: no es la pista del lanzamiento | **no** |
+ * | `topic_audio` | el canal `- Topic` autogenerado: es el audio del tema, con una imagen fija y sin comentarios | **no** |
+ * | `null` | no se sabe el canal | **sí** (ver abajo) |
+ *
+ * ### Por qué `null` se enseña
+ *
+ * Porque los dos únicos que escriben `youtube_video_id` sin `video_kind` son la
+ * **allowlist versionada** y el **seed curado a mano** ("canciones reales
+ * verificadas", `scripts/seed-f9-catalog.ts`), que escribieron antes de que la
+ * columna existiera. El script que automatiza la escritura
+ * (`scripts/fetch-official-videos.ts`) **siempre** escribe las dos columnas
+ * juntas, así que un `null` con id es una afirmación de una persona, no un
+ * olvido de un proceso.
+ *
+ * ### Por qué `live` y `topic_audio` no se enseñan
+ *
+ * Porque Presentarlos como "Videoclip Oficial" sería **afirmar algo falso**: un
+ * `- Topic` es un canal autogenerado por YouTube, y un directo no es la canción
+ * del lanzamiento. El catálogo tiene hoy 11 `live` y 17 `topic_audio` entre sus
+ * hijas, y **0 `videoclip`**: no hay ningún vídeo oficial curado de un álbum.
+ *
+ * ### Por qué esto vive aquí y no en la página
+ *
+ * Porque hay **dos** páginas que toman la decisión —la del single y la del álbum—
+ * y dos copias divergirían en silencio: exactamente lo que pasó con
+ * `hasProductionDetails` antes de moverlo a `lib/production-fields.ts`.
+ */
+export function showableVideo(
+  track: Pick<Track, "youtube_video_id" | "video_embed_url" | "video_kind">
+): { youtubeVideoId: string | null; videoEmbedUrl: string | null; kind: VideoKind | null } | null {
+  if (track.video_kind === "live" || track.video_kind === "topic_audio") return null;
+  const youtubeVideoId = track.youtube_video_id ?? null;
+  const videoEmbedUrl = track.video_embed_url ?? null;
+  if (!youtubeVideoId && !videoEmbedUrl) return null;
+  return { youtubeVideoId, videoEmbedUrl, kind: track.video_kind ?? null };
 }
 
 /** Toda la forma de un lanzamiento en una llamada. */

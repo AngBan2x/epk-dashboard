@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ReleaseActions } from "@/components/ReleaseActions";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import { VideoShowcase } from "@/components/VideoShowcase";
+import { ReleaseVideoList } from "@/components/ReleaseVideoList";
 import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper";
 import { ImageGalleryWrapper } from "@/components/ImageGalleryWrapper";
 import { CatalogDownloadButton } from "@/components/CatalogDownloadButton";
@@ -20,7 +21,7 @@ import {
 } from "@/lib/null-safe";
 import { metricsTooltip } from "@/lib/metrics-source";
 import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
-import { NO_VALUE, ownDurationLabel } from "@/lib/release-page";
+import { NO_VALUE, ownDurationLabel, showableVideo } from "@/lib/release-page";
 import type { Track } from "@/types/music";
 
 interface ReleaseDetailPageProps {
@@ -185,6 +186,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
    */
   const isTrackRow = !isMultiTrack;
   const links = buildReleaseLinks(release);
+  /** El vídeo de **esta** fila, si se puede enseñar. `null` en un álbum. */
+  const ownVideo = showableVideo(release);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -347,16 +350,31 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           enseñar esos datos como si los tuviera sería la tarjeta vacía que este
           proyecto ya pagó una vez (era la rama `isRelease` de `/track/[id]`).
         */}
-        {isTrackRow && (release.youtube_video_id || release.video_embed_url) ? (
+        {isTrackRow && ownVideo ? (
           <section className="mb-8">
             <VideoShowcase
-              youtubeVideoId={release.youtube_video_id}
-              videoEmbedUrl={release.video_embed_url}
+              youtubeVideoId={ownVideo.youtubeVideoId}
+              videoEmbedUrl={ownVideo.videoEmbedUrl}
               title="Videoclip Oficial"
               coverImage={cover}
             />
           </section>
         ) : null}
+
+        {/* ── Y los del ÁLBUM, que son de sus hijas ─────────────────────────── */}
+        {/*
+          Un álbum no tiene un vídeo propio: sus vídeos son los de sus pistas. Y
+          aquí hay una regla que antes no existía en ninguna parte de la UI:
+          `video_kind` (RC.33, Ola 4) **no lo leía nadie**. Con la sección por
+          scoped, se lee, y su regla es la de `showableVideo`: un `- Topic`
+          autogenerado o un directo **no** son el videoclip de la pista.
+
+          Con los datos de hoy la sección **no se monta**: las 28 hijas con vídeo
+          son 11 `live` y 17 `topic_audio`, y no hay ningún `videoclip` curado.
+          Está para cuando lo haya, y para que la exclusión esté testeada en vez
+          de depender de la memoria.
+        */}
+        {!isTrackRow ? <ReleaseVideoList tracks={childTracks} releaseTitle={safeString(release.title)} /> : null}
 
         {isTrackRow && hasProductionDetails(release.production_details) ? (
           <section className="mb-8">
