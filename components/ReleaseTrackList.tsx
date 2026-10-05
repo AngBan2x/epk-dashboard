@@ -29,7 +29,7 @@ interface ReleaseTrackListProps {
  * P2 — la cola de un lanzamiento, en una sola fuente de verdad.
  *
  * Vive AQUÍ y no en quien la pide porque la necesitan dos consumidores del
- * mismo grupo — las filas de esta lista y el botón "Escuchar N pistas" de la
+ * mismo grupo — las filas de esta lista y el botón "Reproducir • N pistas" de la
  * `EPKCard` de arriba — y dos copias de esta lógica acabarían divergiendo: la
  * tarjeta diría "4 pistas" y la lista pondría 3 en cola.
  *

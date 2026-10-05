@@ -84,7 +84,7 @@ export function ArtistTracksSection({
   /**
    * P2: una cola por lanzamiento, construida una sola vez por grupo con
    * `buildReleaseQueue` — la MISMA función que usa `ReleaseTrackList` para sus
-   * filas, para que el "Escuchar N pistas" de la tarjeta y las filas de abajo
+   * filas, para que el "Reproducir • N pistas" de la tarjeta y las filas de abajo
    * no puedan discrepar sobre cuántas pistas suenan y cuáles.
    *
    * `useMemo` y no un `map` en el render porque `playQueue` recibe el array
@@ -155,9 +155,12 @@ export function ArtistTracksSection({
                   Un padre no tiene audio propio (`audio_preview_url` vacío, que
                   `lib/db.ts` convierte en el truthy `"—"`), así que su botón de
                   play era un control inerte. Con `childrenTracks` + `queue` la
-                  tarjeta cambia ese estado muerto por uno honesto: botón
-                  deshabilitado con la explicación y "Escuchar N pistas", que
-                  monta la cola completa en el contexto con avance automático.
+                  tarjeta cambia ese estado muerto por uno honesto: un play
+                  circular real rotulado "Reproducir • N pistas", que monta la
+                  cola completa en el contexto con avance automático. (El
+                  "botón deshabilitado con la explicación" que había aquí se
+                  retiró en RC.33 Ola 1: decía "no hay audio" sobre una tarjeta
+                  que sí lo tenía.)
                   La duración mostrada también sale de las hijas (`sumDurations`).
 
                   `detailHref` apunta a la ficha que corresponda: un single suelto
@@ -208,7 +211,7 @@ export function ArtistTracksSection({
                     {/*
                       `queueTracks` es la lista COMPLETA, no `visibleTracks`.
                       Plegar a 6 es una decisión de pantalla, no de audio: si la
-                      cola saliera de las 6 filas visibles, "Escuchar 6 pistas"
+                      cola saliera de las 6 filas visibles, "Reproducir • 6 pistas"
                       pararía en el sexto tema de un disco de 8 y el avance
                       automático se acabaría antes de tiempo.
                     */}

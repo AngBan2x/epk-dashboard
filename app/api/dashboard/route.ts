@@ -180,7 +180,7 @@ export async function GET(req: NextRequest) {
      * (una cabecera es, por definición, una fila sin `release_id`), así que la
      * rejilla no cambia: los mismos lanzamientos, en el mismo orden y con el
      * mismo número. Lo que cambia es que las hijas ya no se tiran, y con ellas
-     * la tarjeta puede pintar "Escuchar N pistas" en vez de un "Preview (30s)"
+     * la tarjeta puede pintar "Reproducir • N pistas" en vez de un "Preview (30s)"
      * de un álbum de 10 pistas.
      */
     const tracks = heads.filter(isVisible);

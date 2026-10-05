@@ -197,7 +197,7 @@ export default function DashboardPage() {
   /**
    * Una cola por lanzamiento, con `buildReleaseQueue` — la MISMA función que
    * usa `ReleaseTrackList` para sus filas y que consume `ArtistTracksSection`.
-   * Si esta copia dijera otra cosa, la tarjeta prometería "Escuchar 4 pistas" y
+   * Si esta copia dijera otra cosa, la tarjeta prometería "Reproducir • 4 pistas" y
    * el reproductor pondría 3.
    *
    * El orden de las hijas es el que el endpoint ya aplicó (el de

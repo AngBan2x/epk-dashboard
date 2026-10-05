@@ -346,7 +346,7 @@ export function EPKCard({
         {/*
           Badge "Nuevo", y el único que queda sobre la portada. El de
           "Multipista" se fue en RC.33 (ver `hasQueue`): repetía en texto lo que
-          el botón de cola ya dice —"Escuchar 12 pistas"—, no tenía etiqueta
+          el botón de cola ya dice —"Reproducir • 12 pistas"—, no tenía etiqueta
           accesible, y la condición que lo traía (`isReleaseParent ||
           track.release_id`) metía en la misma etiqueta cosas distintas, que es
           un lanzamiento con hijas y una fila hija suelta.
@@ -449,12 +449,21 @@ export function EPKCard({
           Ahora:
           - Si hay cola reproducible, el control es un play circular real, con
             el mismo lenguaje visual que el de `AudioPlayer` (40px, `rounded-full`,
-            `bg-primary-600`, triángulo `M8 5v14l11-7z`). El texto "Escuchar N
-            pistas" pasa a ser la etiqueta legible al lado, no un enlace
-            disfrazado.
+            `bg-primary-600`, triángulo `M8 5v14l11-7z`). El texto va **al lado,
+            como etiqueta legible**, no como enlace disfrazado.
           - Si hay hijas pero ninguna es reproducible, no se pinta NINGÚN
             control: solo la frase honesta. Un botón apagado ahí sería ruido
             igual de vacío.
+
+          La etiqueta es `Reproducir • <fuente>`, y es el **mismo patrón que
+          escribe `AudioPlayer`** en una pista suelta (línea 260: `{statusText} •
+          {primarySource.label}` → "Reproducir • Preview (30s)", "Reproducir •
+          YouTube"). Aquí `<fuente>` son las N hijas. La palabra "Escuchar" se
+          retiró porque era una **tercera** manera de nombrar la misma acción:
+          con "Reproducir", "Escuchar N pistas" y "▶" conviviendo en la misma
+          tarjeta, el visitante no sabía si eran el mismo control. El `aria-label`
+          del botón sigue siendo "Reproducir N pistas de <título>", porque ahí sí
+          cuenta quién reproduce y qué.
 
           El estado de la cola no vive aquí: vive en `useAudioPlayer()`, y esta
           tarjeta solo llama a `playQueue` con el array que le pasó quien tiene
@@ -475,7 +484,7 @@ export function EPKCard({
                   </svg>
                 </button>
                 <p className="min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Escuchar {playableRows.length}{" "}
+                  Reproducir &bull; {playableRows.length}{" "}
                   {playableRows.length === 1 ? "pista" : "pistas"}
                 </p>
               </>

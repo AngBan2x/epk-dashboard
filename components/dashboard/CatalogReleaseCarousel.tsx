@@ -20,7 +20,7 @@ import type { YouTubeStatPair } from "@/lib/youtube";
  * `app/dashboard/page.tsx` sobre los lotes que esa página ya pide —las colas con
  * `buildReleaseQueue`, las stats de YouTube por `youtube_video_id` y el playcount
  * de Last.fm por artista+título normalizado— y duplicar esa lógica aquí
- * produciría dos copias que divergen. La tarjeta acabaría diciendo "Escuchar 4
+ * produciría dos copias que divergen. La tarjeta acabaría diciendo "Reproducir • 4
  * pistas" con 3 en cola, que es el bug que ya se corrigió una vez.
  *
  * Por eso son **funciones** y no un objeto ya calculado: el padre se las pasa y

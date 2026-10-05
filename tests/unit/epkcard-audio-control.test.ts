@@ -120,7 +120,11 @@ describe("EPKCard — control de audio de un lanzamiento multipista (RC.33 Ola 1
     const play = screen.getByRole("button", { name: /Reproducir 2 pistas de OK Computer/ });
     expect(play).toBeTruthy();
     expect((play as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.getByText(/Escuchar 2 pistas/)).toBeTruthy();
+    // C2: la etiqueta pasa a "Reproducir • N pistas", el mismo patrón que
+    // escribe `AudioPlayer` en una pista suelta ("Reproducir • Preview (30s)").
+    // Antes decía "Escuchar 2 pistas", que era una TERCERA forma de nombrar la
+    // misma acción y hacía dudar de si era el mismo control.
+    expect(screen.getByText(/Reproducir • 2 pistas/)).toBeTruthy();
   });
 
   it("no dice NUNCA 'no tiene audio propio' sobre una tarjeta que sí tiene audio", () => {
@@ -145,8 +149,9 @@ describe("EPKCard — control de audio de un lanzamiento multipista (RC.33 Ola 1
     const { container } = renderAlbum(UNPLAYABLE_QUEUE, [CHILD, CHILD_2]);
     expect(screen.queryByRole("button", { name: /Reproducir/ })).toBeNull();
     expect(screen.getByText(/Ninguna de sus pistas tiene audio disponible/)).toBeTruthy();
-    // Y tampoco cae en la mentira contraria.
-    expect(container.textContent ?? "").not.toMatch(/Escuchar/);
+    // Y tampoco cae en la mentira contraria: sin cola no hay etiqueta que prometa
+    // reproducción. Antes esta línea miraba /Escuchar/, la palabra que C2 retiró.
+    expect(container.textContent ?? "").not.toMatch(/Reproducir/);
   });
 
   it("el badge 'Multipista' ya no existe en la tarjeta", () => {
@@ -163,6 +168,52 @@ describe("EPKCard — control de audio de un lanzamiento multipista (RC.33 Ola 1
     );
     // Sin hijas no hay bloque de lanzamiento: el texto de "no tiene audio" no debe aparecer.
     expect(document.body.textContent ?? "").not.toMatch(/no tiene audio propio/i);
+  });
+});
+
+/**
+ * C2 — el patrón único: **`Reproducir • <fuente>`**.
+ *
+ * La mitad derecha (una pista suelta) ya lo escribía `AudioPlayer` en su línea
+ * 260: `{statusText} • {primarySource.label}`. La mitad izquierda —un álbum— decía
+ * "Escuchar N pistas", y con las dos conviviendo en la misma tarjeta el visitante
+ * no sabía si eran el mismo control.
+ *
+ * Estos dos tests existen porque **ninguno de los dos patrones estaba atado**:
+ * `AudioPlayer` no tenía ni un test sobre su etiqueta, y el del álbum miraba la
+ * palabra que C2 retira. Revertidos, los dos se ponen rojos.
+ */
+describe("EPKCard — el patrón 'Reproducir • <fuente>' (C2)", () => {
+  it("un álbum dice 'Reproducir • N pistas' y la palabra 'Escuchar' no aparece", () => {
+    const { container } = renderAlbum(PLAYABLE_QUEUE, [CHILD, CHILD_2]);
+    const text = container.textContent ?? "";
+
+    expect(text).toMatch(/Reproducir • 2 pistas/);
+    expect(text).not.toMatch(/Escuchar/);
+  });
+
+  it("con una sola hija dice 'pista' en singular", () => {
+    renderAlbum([PLAYABLE_QUEUE[0]], [CHILD]);
+    // El `s` en contra "(?!s)": si mañana sale "1 pistas" el test se pone rojo.
+    expect(document.body.textContent ?? "").toMatch(/Reproducir • 1 pista(?!s)/);
+  });
+
+  it("una pista suelta dice lo mismo: 'Reproducir • Preview (30s)'", () => {
+    render(
+      createElement(EPKCard, {
+        track: {
+          id: "trk-005",
+          title: "Shape of You",
+          artist_name: "Ed Sheeran",
+          release_type: "single",
+          duration: "3:53",
+          audio_preview_url: "https://cdn.example.com/shape.m4a",
+        } as never,
+        detailHref: "/track/trk-005",
+      })
+    );
+
+    expect(document.body.textContent ?? "").toMatch(/Reproducir • Preview \(30s\)/);
   });
 });
 
