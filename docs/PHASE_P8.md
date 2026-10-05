@@ -154,10 +154,16 @@ todos sus campos a `null`—, y de esos 28 vídeos **ninguno es `videoclip`**: s
 Resuelto en C1-ter (2026-10-04) por el lado del código: `showableVideo()`
 (`lib/release-page.ts`) decide qué vídeo puede enseñarse como el videoclip de una
 pista, y `components/ReleaseVideoList.tsx` los lista en la página del álbum. Antes
-**ninguna parte de la UI leía `video_kind`**. Con los datos de hoy la sección no se
-monta —no hay ningún `videoclip` curado— y para llenarla está
-`scripts/fetch-official-videos.ts --trust-allowlist`, que **gasta cuota de la API
-de YouTube** y es decisión del usuario.
+**ninguna parte de la UI leía `video_kind`**.
+
+**Y el dry-run dice que no se va a ver, y hay que decirlo porque es lo
+importante.** `scripts/fetch-official-videos.ts --trust-allowlist` verifica los
+**5 de 5** canales, pero de las 74 pistas que resuelve **ninguna** sale
+`videoclip`: 21 `live`, 35 `topic_audio`. Y de las 55 que escribiría, 21 serían
+directos de concierto —para "Eclipse", *"Eclipse (Live At The Deutschlandhalle,
+Berlin 18 May 1972)"*—, lo que cambiaría la línea de tiempo del tracklist porque
+`lib/audio-priority.ts` se apoya en `youtube_video_id`. **No aplicado, y no
+reintentar sin un dato nuevo revisado a mano.**
 
 ## Verificación
 

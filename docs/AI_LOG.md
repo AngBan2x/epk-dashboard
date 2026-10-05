@@ -7023,5 +7023,68 @@ verificación son los 8 tests del bloque, que comprueban las dos ramas —con
 `videoclip` y sin él— más el `alt=""` de la miniatura y el recuento honesto
 ("1 de las pistas tiene videoclip oficial", no "2 vídeos").
 
+### El dry-run de `--trust-allowlist`: **no aplicar**
+
+Era lo que faltaba para poder decidir, y la respuesta es no. Primero la sonda
+barata (`--channels`, 5 unidades), luego la completa.
+
+**La puerta funciona:** con el flag, los **5 de 5** canales pasan. Los cinco
+imprimen `VERIFICADO` y la advertencia de que su descripción no enlaza el dominio
+oficial, que es exactamente lo que el flag baja y lo único que baja.
+
+**Pero el kinds que salen siguen sin ser `videoclip`:**
+
+```
+Pistas con vídeo para la ruta "showcase": 56 de 74
+  por kind:
+    sin kind     18
+    live         21
+    topic_audio  35
+A escribir en tracks: 55 fila(s)
+Consumo real: 86 llamadas / 86 unidades de 10 000 diarias
+```
+
+**Cero `videoclip`, igual que antes.** Los 18 "sin kind" son las pistas de los 7
+artistas que **no** están en la allowlist (Queen, Nirvana, Kate Bush…), que el
+script ni toca.
+
+Y el detalle que decide el no: **21 escrituras serían `live`, y el vídeo elegido
+para varias es un directo de concierto.** El más claro:
+
+```
+─ Eclipse (trk-09f2889b)
+  ✓ Eclipse (Live At The Deutschlandhalle, Berlin 18 May 1972)  →  "live"
+  alternativas para la misma ruta: 6
+```
+
+Un álbum de estudio con la pista "Eclipse" pasando a apuntar a un directo de 1972
+en Berlín. Como `lib/audio-priority.ts` usa `youtube_video_id` para la línea de
+tiempo del tracklist, **eso no es una etiqueta: es cambiar lo que el visitante
+oye al recorrer el disco**. El `topic_audio` de las otras 34 es un cambio lateral
+—de un vídeo `- Topic` a otro `- Topic` del mismo tema—, sin ganancia visible.
+
+La ruta alternativa `--route=playback` (sin `live`) deja 34 escrituras, todas
+`topic_audio`, y **también cero `videoclip`**. Así que no hay ruta que compense.
+
+**Conclusión: estos cinco artistas no tienen videoclip oficial en su canal
+verificado.** Lo que hay son directos y audios de `- Topic`, y el catálogo ya lo
+tiene etiquetado con honestidad desde la Ola 4. La sección `ReleaseVideoList` se
+queda vacía, y no es un bug: es la verdad sobre el material.
+
+### Un contador del script que mentía
+
+El dry-run imprimía **`Canales verificados: 0 de 5`** mientras los cinco bloques
+de artista imprimían `VERIFIED`. La línea contaba `channelUpdates` —los ids **a
+escribir**—, y como los 5 ya estaban correctos en `artists`, salía 0. Dos
+preguntas distintas con un contador:
+
+```
+Canales verificados: 5 de 5  ·  ids a escribir en artists: 0
+```
+
+Son cinco unidades de API las que costaron descubrirlo, y un rato de duda. Es
+justo el tipo de línea que hace que alguien concluya que la puerta está cerrada
+cuando lo que está cerrado es el contador.
+
 
 

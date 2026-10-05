@@ -183,12 +183,30 @@ dos ramas) y `components/ReleaseVideoList.tsx`, un Server Component con miniatur
 y enlace. **La sección no se monta en producción y es lo correcto**: con 0
 `videoclip`, `showableVideo` devuelve `null` para las 28.
 
-**El camino para que se vea, y es decisión del usuario:**
-`scripts/fetch-official-videos.ts --trust-allowlist`. Los 28 son `- Topic` porque
-`verifyOfficialChannel` **no pasa para ninguno de los 5 canales verificados**: hoy
-ninguno enlaza su dominio oficial en la descripción (Radiohead la tiene vacía).
-`--trust-allowlist` baja solo esa tercera comprobación, con tres guardas, y
-**gasta cuota de la API de YouTube**. Dry-run antes, como siempre.
+**El camino para que se vea, y la respuesta es que NO se ve.** Dry-run hecho
+(2026-10-04):
+
+```bash
+npx tsx scripts/fetch-official-videos.ts --channels --trust-allowlist        # 5 u
+npx tsx scripts/fetch-official-videos.ts --trust-allowlist --pages=30        # 86 u
+```
+
+**La puerta funciona: 5 de 5 canales verificados.** Pero los kinds que salen son
+**21 `live`, 35 `topic_audio` y 0 `videoclip`** — igual que antes. Las 18 pistas
+"sin kind" son las de los 7 artistas que no están en la allowlist, que el script
+ni toca.
+
+Y el motivo del no: **21 escrituras serían `live`, y el vídeo elegido para
+varias es un directo de concierto.** Para "Eclipse" (trk-09f2889b) sale
+*"Eclipse (Live At The Deutschlandhalle, Berlin 18 May 1972)"*. Como
+`lib/audio-priority.ts` usa `youtube_video_id` para la línea de tiempo del
+tracklist, eso **no es una etiqueta: es cambiar lo que se escucha al recorrer el
+disco**. `--route=playback` deja 34 escrituras, todas `topic_audio`, y también
+cero `videoclip`: no hay ruta que compense.
+
+**Conclusión: estos cinco artistas no tienen videoclip oficial en su canal
+verificado.** Hay directos y audios de `- Topic`. `ReleaseVideoList` se queda
+vacía y no es un bug. **No reintentar sin un dato nuevo que revisar a mano.**
 
 ### C2 · Consolidar el reproductor de las EPKCard
 
