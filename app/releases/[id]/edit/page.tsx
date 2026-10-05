@@ -29,41 +29,62 @@ interface TrackInput {
 }
 
 /**
- * RC.32 — texto del botón de guardado y qué estado produce cada uno.
+ * C3 — **un solo botón**, y su etiqueta **es** la consecuencia.
  *
- * Antes prometía guardar un borrador y NO lo guardaba: conservaba el estado
- * vigente. Y la línea de ayuda que hay debajo se lo decía al usuario en la
- * cara mientras el botón prometía otra cosa. Los dos textos describían
- * operaciones distintas.
+ * Antes coexistían dos controles en el mismo formulario: uno que **guardaba**
+ * ("Guardar cambios", "Actualizar publicación") y otro que **despublicaba**
+ * ("Enviar para revisión (retira del catálogo)"). Dos botones para decidir si el
+ * release se guarda o se retira, sin jerarquía entre ellos: el que guardaba y el
+ * que desaparecía del catálogo tenían el mismo peso visual.
  *
- * `submitState` es lo que se manda, y es SIEMPRE una Intención —nunca el estado
- * que devuelve el servidor—:
+ * Ahora hay uno, y el texto dice qué va a pasar:
  *
- *   - `save`         → el servidor conserva el estado vigente (ver
- *                      `app/api/releases/route.ts`, Tarea 1).
- *   - `request`      → `pending`: entrar en la cola de revisión.
+ *   borrador              → "Publicar"                 entra en revisión
+ *   aprobado              → "Actualizar publicación"  sigue publicado
+ *   pendiente / rechazado → "Enviar para revisión"    entra en revisión
  *
- * Para un `rejected` la acción principal ES pedir revisión, así que el botón
- * principal ya la dispara y el secundario se oculta. Para un `approved`, la
- * secundaria existe y lo devuelve a la cola: es el camino que pedía el usuario
- * ("vuelva a entrar en la cola") y por eso lleva confirmación.
+ * El estado es lo único que decide, así que la etiqueta y la operación no pueden
+ * separarse: `primaryLabel` y `primaryIntent` son la misma tabla partida en dos, y
+ * un test ata que no se puedan contradecir.
+ *
+ * ## Lo que se pierde, y por qué se acepta
+ *
+ * El botón secundario era el **único** camino del artista para retirar del
+ * catálogo un release ya aprobado. Ya no existe desde aquí. Queda el camino del
+ * admin (`POST /api/admin/approvals/[id]` → `rejected`), que además te da el
+ * motivo escrito y la cola de revisión: es más lento, y es la razón por la que
+ * esta decisión está escrita aquí y no en un commit.
+ *
+ * Y con él se cae la confirmación de `window.confirm` que lo protegía
+ * (`handleSubmit` la tenía). No es que se haya eliminado un cuidado: es que la
+ * combinación que la disparaba —intención "request" sobre un `approved`— ya no
+ * es alcanzable desde este formulario.
  */
-function primarySaveLabel(status: ReleaseStatus): string {
+function primaryLabel(status: ReleaseStatus): string {
   switch (status) {
-    case "pending":
-      return "Guardar actualización";
+    case "draft":
+      return "Publicar";
     case "approved":
       return "Actualizar publicación";
-    case "rejected":
-      return "Guardar y solicitar revisión";
     default:
-      return "Guardar cambios";
+      return "Enviar para revisión";
   }
 }
 
-/** Botón secundario de "Enviar para revisión": visible si aporta algo. */
-function canRequestReview(status: ReleaseStatus): boolean {
-  return status === "draft" || status === "approved";
+/**
+ * La Intención que corresponde a `primaryLabel`. `submitState` es lo que se manda
+ * y es SIEMPRE una Intención —nunca el estado que devuelve el servidor—:
+ *
+ *   - `save`    → el servidor conserva el estado vigente (ver
+ *                 `app/api/releases/route.ts`, Tarea 1).
+ *   - `request` → `pending`: entrar en la cola de revisión.
+ *
+ * Para `pending` la operación es idempotente: ya está en la cola, y volver a
+ * pedirla no cambia nada. Es lo que hace que la etiqueta pueda ser la misma en
+ * `pending` y en `rejected` sin mentir en ninguno de los dos.
+ */
+function primaryIntent(status: ReleaseStatus): "save" | "request" {
+  return status === "approved" ? "save" : "request";
 }
 
 export default function EditReleasePage() {
@@ -351,9 +372,7 @@ export default function EditReleasePage() {
     const children = tracks.filter((t) => t.title.trim().length > 0);
     return {
       id: releaseId,
-      // Un rechazo se corrige y se reenvía: la acción principal de un `rejected`
-      // es pedir revisión, no "guardar sin hacer nada".
-      status: submitState === "request" || currentStatus === "rejected" ? "pending" : "draft",
+      status: submitState === "request" ? "pending" : "draft",
       title: form.title,
       release_type: capitalizeReleaseType(form.type),
       artist_name: form.artist_name,
@@ -373,18 +392,15 @@ export default function EditReleasePage() {
     };
   };
 
-  const handleSubmit = async (e: React.FormEvent, submitState: "save" | "request" = "save") => {
+  /**
+   * La Intención sale de `primaryIntent(currentStatus)`, no de un argumento: con
+   * un solo botón ya no hay quién elija. El botón sigue siendo `type="submit"`,
+   * y eso es a propósito —los cuatro `required` del formulario dependen de la
+   * validación nativa, que un `type="button"` se saltaría.
+   */
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Pedir revisión sobre un release ya publicado lo saca del catálogo hasta
-    // que un admin lo vuelva a aprobar. Es lo que quiere el botón, pero no es
-    // un clic que deba pasar por encima.
-    if (submitState === "request" && currentStatus === "approved") {
-      const confirmed = window.confirm(
-        "Este release está publicado. Si lo envías para revisión, dejará de aparecer en el catálogo hasta que un administrador lo apruebe de nuevo. ¿Continuar?"
-      );
-      if (!confirmed) return;
-    }
+    const submitState = primaryIntent(currentStatus);
 
     setLoading(true);
     setMessage(null);
@@ -398,7 +414,7 @@ export default function EditReleasePage() {
 
       if (res.ok) {
         const json = await res.json().catch(() => null);
-        const askedForReview = submitState === "request" || currentStatus === "rejected";
+        const askedForReview = submitState === "request";
         const msg = askedForReview ? "Release enviado para revisión" : "Release actualizado exitosamente";
         // Si el servidor ignora el estado (no debería pasar con este
         // formulario, pero el contrato lo garantiza), el aviso lo dice en
@@ -714,13 +730,13 @@ export default function EditReleasePage() {
                   </span>
                 </div>
                 {/* El texto de abajo tiene que describir lo que hace el botón de
-                    al lado. Antes describían operaciones distintas: el botón
-                    prometía guardar un borrador y esta línea, lo contrario. */}
+                    al lado. Con C3 solo hay un botón, así que la línea ya no
+                    puede señalar "usa el otro": describe la consecuencia. */}
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {currentStatus === "draft" && "Guarda los cambios. Cuando estés listo, usa 'Enviar para revisión'."}
-                  {currentStatus === "pending" && "En revisión. Los cambios se guardan y el release sigue en la cola."}
-                  {currentStatus === "approved" && "Publicado. 'Actualizar publicación' guarda los cambios sin quitarlo del catálogo."}
-                  {currentStatus === "rejected" && "Rechazado. Corrige lo que quieras y guarda: se reenvía para revisión."}
+                  {currentStatus === "draft" && "Borrador. Al publicar, el release entra en la cola de revisión y un administrador lo aprueba."}
+                  {currentStatus === "pending" && "En revisión. Al guardar los cambios, el release sigue en la cola."}
+                  {currentStatus === "approved" && "Publicado. Al actualizar, sigue en el catálogo sin pasar por revisión."}
+                  {currentStatus === "rejected" && "Rechazado. Corrige lo que quieras y envíalo de nuevo a revisión."}
                 </p>
                 {currentStatus === "rejected" && releaseData.admin_notes && (
                   <p className="mt-2 text-sm text-red-600 dark:text-red-400">
@@ -730,28 +746,18 @@ export default function EditReleasePage() {
               </div>
             )}
 
-            {/* Submit Buttons — RC.32 Tarea 6 */}
+            {/* C3 — UN botón de envío, y su etiqueta ES la consecuencia
+                (`primaryLabel`). El secundario "Enviar para revisión" ya no
+                existe: con dos botones, el que guardaba y el que despublicaba
+                tenían el mismo peso visual. */}
             <div className="flex flex-wrap gap-4 pt-4">
               <button
                 type="submit"
                 disabled={loading}
                 className="flex-1 min-w-[200px] px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Guardando..." : primarySaveLabel(currentStatus)}
+                {loading ? "Guardando..." : primaryLabel(currentStatus)}
               </button>
-              {/* Para `rejected` la acción principal YA es pedir revisión
-                  (ver `buildPayload`), así que el secundario solo aparece cuando
-                  aporta algo: en `draft` y en `approved`. */}
-              {canRequestReview(currentStatus) && (
-                <button
-                  type="button"
-                  onClick={(e) => handleSubmit(e, "request")}
-                  disabled={loading}
-                  className="flex-1 min-w-[200px] px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? "Enviando..." : currentStatus === "approved" ? "Enviar para revisión (retira del catálogo)" : "Enviar para revisión"}
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => router.push("/dashboard")}

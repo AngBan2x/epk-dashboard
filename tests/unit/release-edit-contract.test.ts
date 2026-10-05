@@ -41,8 +41,8 @@ const PRODUCTION_FIELDS_SRC = readFileSync(resolve(process.cwd(), "lib/productio
 
 /**
  * Extrae `function <name>(...)` del fuente, la compila y devuelve una función
- * real. Se usa con las helpers puras de la página (`primarySaveLabel`,
- * `canRequestReview`), que son la tabla de textos de los botones.
+ * real. Se usa con las helpers puras de la página (`primaryLabel`,
+ * `primaryIntent`), que son la tabla de textos y operaciones del botón único.
  */
 function loadPageHelper<T>(source: string, name: string): T {
   const start = source.indexOf(`function ${name}(`);
@@ -69,8 +69,8 @@ function loadPageHelper<T>(source: string, name: string): T {
   return new Function(`"use strict"; ${js}; return ${name};`)() as T;
 }
 
-const primarySaveLabel = loadPageHelper<(status: string) => string>(EDIT_PAGE, "primarySaveLabel");
-const canRequestReview = loadPageHelper<(status: string) => boolean>(EDIT_PAGE, "canRequestReview");
+const primaryLabel = loadPageHelper<(status: string) => string>(EDIT_PAGE, "primaryLabel");
+const primaryIntent = loadPageHelper<(status: string) => "save" | "request">(EDIT_PAGE, "primaryIntent");
 
 describe("RC.32 Tarea 1 — el payload del form NO lleva el status de origen", () => {
   it("el estado del formulario no tiene campo `status` (era la causa del 403)", () => {
@@ -109,9 +109,7 @@ describe("RC.32 Tarea 1 — el payload del form NO lleva el status de origen", (
       EDIT_PAGE.indexOf("const buildPayload"),
       EDIT_PAGE.indexOf("const handleSubmit")
     );
-    expect(buildPayload).toContain(
-      'submitState === "request" || currentStatus === "rejected" ? "pending" : "draft"'
-    );
+    expect(buildPayload).toContain('submitState === "request" ? "pending" : "draft"');
   });
 });
 
@@ -245,25 +243,84 @@ describe("RC.32 Tarea 5 — el género muerto desaparece del form", () => {
   });
 });
 
-describe("RC.32 Tarea 6 — el texto del botón dice lo que hace", () => {
+describe("C3 — un solo botón, y su etiqueta es la consecuencia", () => {
   // La tabla que adoptó el usuario. Se EJECUTA la función de la página, no se
   // busca su texto: revertir el arreglo la hace fallar.
-  it("pending → «Guardar actualización»", () => {
-    expect(primarySaveLabel("pending")).toBe("Guardar actualización");
+  it("borrador → «Publicar»", () => {
+    expect(primaryLabel("draft")).toBe("Publicar");
   });
 
-  it("approved → «Actualizar publicación»", () => {
-    expect(primarySaveLabel("approved")).toBe("Actualizar publicación");
+  it("aprobado → «Actualizar publicación»", () => {
+    expect(primaryLabel("approved")).toBe("Actualizar publicación");
   });
 
-  it("rejected → «Guardar y solicitar revisión»", () => {
-    expect(primarySaveLabel("rejected")).toBe("Guardar y solicitar revisión");
+  it("pendiente y rechazado → «Enviar para revisión»", () => {
+    expect(primaryLabel("pending")).toBe("Enviar para revisión");
+    expect(primaryLabel("rejected")).toBe("Enviar para revisión");
   });
 
-  it("draft u otro → «Guardar cambios»", () => {
-    expect(primarySaveLabel("draft")).toBe("Guardar cambios");
-    expect(primarySaveLabel("revision")).toBe("Guardar cambios");
-    expect(primarySaveLabel("")).toBe("Guardar cambios");
+  it("lo que no sea borrador ni aprobado cae en «Enviar para revisión»", () => {
+    expect(primaryLabel("revision")).toBe("Enviar para revisión");
+    expect(primaryLabel("")).toBe("Enviar para revisión");
+  });
+
+  /**
+   * El corazón de C3: **la etiqueta y la operación no pueden separarse.**
+   *
+   * Con dos botones eran dos tablas y podían divergir sin que nada se quejara:
+   * podía salir "Actualizar publicación" con una intención de "request", que es
+   * despublicar un release con un botón que dice lo contrario. Ahora son la misma
+   * tabla partida en dos, y esta tabla ata las dos mitades.
+   */
+  it("cada etiqueta corresponde a la operación que promete", () => {
+    // "Publicar" / "Enviar para revisión" → entra en la cola.
+    expect(primaryIntent("draft")).toBe("request");
+    expect(primaryIntent("pending")).toBe("request");
+    expect(primaryIntent("rejected")).toBe("request");
+    // "Actualizar publicación" → se queda donde está.
+    expect(primaryIntent("approved")).toBe("save");
+  });
+
+  it("ninguna etiqueta promete guardar sin más", () => {
+    // Los tres textos que se retiraron, en cualquier estado.
+    const labels = ["draft", "approved", "pending", "rejected"].map(primaryLabel);
+    for (const label of labels) {
+      expect(label).not.toMatch(/Guardar cambios/);
+      expect(label).not.toMatch(/Guardar actualización/);
+      expect(label).not.toMatch(/Guardar y solicitar/);
+    }
+  });
+
+  it("NO queda botón secundario: ni la helper ni el texto existen", () => {
+    expect(EDIT_PAGE).not.toContain("canRequestReview");
+    expect(EDIT_PAGE).not.toContain("primarySaveLabel");
+    // Estructural, no textual: la clase del botón secundario. Un `not.toContain`
+    // del rótulo no valía —el comentario que documenta C3 lo cita para explicar
+    // qué se retiró— y una cadena en un comentario no es un botón.
+    expect(EDIT_PAGE).not.toContain("bg-emerald-500");
+    // El `window.confirm` que protegía la retirada del catálogo también se fue:
+    // su combinación (`request` sobre `approved`) ya no es alcanzable.
+    expect(EDIT_PAGE).not.toContain("dejará de aparecer en el catálogo");
+    // Y solo hay un `type="submit"` **en el JSX**: el de "Cancelar" es
+    // `type="button"`. Se mira desde `<form`, no en el fichero entero, porque el
+    // comentario de `handleSubmit` cita `type="submit"` al explicar por qué se
+    // conserva — y contar un comentario como un botón es el falso verde que este
+    // repo ya ha pagado dos veces.
+    const jsx = EDIT_PAGE.slice(EDIT_PAGE.indexOf("<form onSubmit"));
+    expect(jsx.match(/type="submit"/g) ?? []).toHaveLength(1);
+  });
+
+  it("la retirada del catálogo no tiene camino desde este formulario", () => {
+    // No es un descuido: es la consecuencia escrita de C3. Si algún día vuelve a
+    // haberla, tiene que volver con su confirmación y decidiendo el usuario.
+    const intentTable = EDIT_PAGE.slice(
+      EDIT_PAGE.indexOf("function primaryIntent("),
+      EDIT_PAGE.indexOf("export default function EditReleasePage")
+    );
+    expect(intentTable).toContain('status === "approved" ? "save" : "request"');
+    // Es decir: `approved` es el único estado que no pide revisión, y por eso es
+    // el único que no puede despublicarse desde aquí.
+    expect(primaryIntent("approved")).toBe("save");
   });
 
   it("el texto viejo, que prometía guardar un borrador, ya no está", () => {
@@ -278,23 +335,11 @@ describe("RC.32 Tarea 6 — el texto del botón dice lo que hace", () => {
     expect(NEW_PAGE).toContain('status: submitForReview ? "pending" : "draft"');
   });
 
-  it("el botón secundario aparece donde aporta y se oculta donde el principal ya la hace", () => {
-    // En `rejected` la acción principal ES pedir revisión, así que un segundo
-    // botón igual sería ruido.
-    expect(canRequestReview("draft")).toBe(true);
-    expect(canRequestReview("approved")).toBe(true);
-    expect(canRequestReview("rejected")).toBe(false);
-    expect(canRequestReview("pending")).toBe(false);
-  });
-
-  it("volver a la cola desde `approved` pide confirmación (saca el release del catálogo)", () => {
-    expect(EDIT_PAGE).toContain('submitState === "request" && currentStatus === "approved"');
-    expect(EDIT_PAGE).toContain("dejará de aparecer en el catálogo");
-  });
-
-  it("la ayuda de estado ya no contradice al botón", () => {
-    expect(EDIT_PAGE).not.toContain("Guarda cambios sin enviar.");
-    expect(EDIT_PAGE).toContain("Guarda los cambios. Cuando estés listo, usa 'Enviar para revisión'.");
+  it("la ayuda de estado describe la consecuencia y ya no señala otro botón", () => {
+    // Antes decía "usa 'Enviar para revisión'", que era un botón que ya no está.
+    expect(EDIT_PAGE).not.toContain("usa 'Enviar para revisión'");
+    expect(EDIT_PAGE).toContain("Al publicar, el release entra en la cola de revisión");
+    expect(EDIT_PAGE).toContain("Al actualizar, sigue en el catálogo sin pasar por revisión");
   });
 });
 
