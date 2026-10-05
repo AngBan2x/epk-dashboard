@@ -137,7 +137,18 @@ cabecera), así que su ficha —videoclip, galería, detalles de producción, bi
 descarga para prensa, Last.fm— **solo se renderiza para las huérfanas**. El
 diseño de P2 tampoco mostraba nada de eso, así que no se perdió con el revert,
 pero estaba perdido desde P8 y **es el mismo síntoma** que motivó la petición del
-usuario. Queda abierto.
+usuario.
+
+**Cerrado en C1-bis** (`5ed5354`, 2026-10-04), que es donde se decidi: los bloques
+de **pista** (videoclip, ficha de producción, galería) vuelven a la página de
+release cuando la fila **es** una pista, y la descarga de dossier y rider —que es
+**del artista**— se monta en los dos casos. De paso se arregló que la sección de
+Enlaces no se montaba para 7 de los 9 singles: leía solo `external_links`, y sus
+enlaces viven en `spotify_url`, `itunes_track_id` y `youtube_video_id`.
+
+**Lo que queda de esta fase, sin decidir:** las **65 hijas de álbum** (65 con
+ficha de producción, 28 con videoclip) redirigen a su padre y el padre no enseña
+sus datos. Es un problema de diseño distinto, no de este 301.
 
 ## Verificación
 

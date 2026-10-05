@@ -6792,3 +6792,131 @@ cifras de a11y. **Ningún spec E2E navega a `/releases/[id]`** (los 12 usan
 endpoints de API y `/releases/new`), así que la corrida completa de E2E no
 aporta nada para este cambio.
 
+---
+
+## C1-bis · la ficha de una pista vuelve a la página de release
+
+**Cierra el hallazgo 1 de C1**, que era el que el usuario eligió primero.
+
+### Lo que estaba perdido, medido en Turso
+
+`resolveTrackRoute` devuelve `release` para **toda** fila: si es hija va al
+release de su padre, y si es cabecera va a su propio release. La ficha de
+`/track/[id]` —597 líneas— solo se renderiza para las huérfanas, y el diseño de
+P2 no mostraba nada de eso. O sea: los bloques **no tenían ninguna página donde
+estar**. Y no era solo el vacio:
+
+| Dato | Dónde está | En singles |
+|---|---|---|
+| Videoclip oficial | `youtube_video_id` / `video_embed_url` | 9 de 9 |
+| Ficha de producción | `production_details` | 8 de 9 |
+| Enlaces a plataformas | `spotify_url`, `itunes_track_id`, `youtube_video_id` | 7 de 9 **sin sección** |
+| Descarga de dossier y rider | `CatalogDownloadButton` con `artist_id` | **0 con página** |
+| Galería de prensa | `gallery_images` | 0 de 83 filas (no hay datos) |
+
+Lo del dossier es lo más grave: `dossier` y `rider` exigen `artist_id` en
+servidor (`lib/export-bundle.ts` responde 400 sin él) y la **única** página que
+lo montaba con alcance de artista era el 301. Es decir que desde una ficha de
+lanzamiento no había forma de bajar nada, en un producto que es un EPK.
+
+### Lo que se hizo
+
+Todo lo que es de **pista** se monta solo cuando la fila **es** una pista
+(`!isMultiTrack`, que es la única señal que hay: en el esquema no se puede
+distinguir un single de un álbum por otra cosa):
+
+| Bloque | Condición |
+|---|---|
+| Videoclip Oficial | hay `youtube_video_id` o `video_embed_url` |
+| Ficha de Producción | `hasProductionDetails(...)` |
+| Galería de prensa | `gallery_images` con elementos |
+| **Ficha técnica para prensa** | **siempre**, y en los dos casos |
+
+El cuarto es **del artista**, no de la pista, y por eso se monta también en un
+álbum: es la mitad del motivo por el que existe un EPK.
+
+Que un álbum no monte los tres primeros es la decisión que ya estaba escrita en
+`/track/[id]` (su rama `isRelease`, que sigue intacta para las huérfanas): un
+disco no tiene un videoclip oficial propio ni una única afinación, y enseñárselas
+al visitante sería afirmar algo que no es cierto. Kid A tiene `youtube_video_id`
+en su cabecera, y con la regla de "si tiene dato, se muestra" se le habría
+atribuido un videoclip al álbum entero.
+
+### Los enlaces: la unión que faltaba
+
+La condición era `Object.keys(external_links).length > 0`. Para 7 de los 9
+singles esa columna está **vacía**: su Spotify está en `spotify_url`, su Apple en
+`itunes_track_id` y su vídeo en `youtube_video_id`. La sección entera no se
+montaba, con el single lleno de enlaces en la base de datos.
+
+`buildReleaseLinks()` hace ahora la unión, con tres reglas que las tres importan:
+
+1. **Primero `external_links`, después la columna de la fila.** La que escribe una
+   persona gana sobre la que rellena un proceso.
+2. **`""` y `"—"` son ausencia.** `lib/db.ts` pasa las columnas por `safeString`,
+   que convierte `""` en el string **truthy** `"—"`. Un `!= null` pintaba un botón
+   que llevaba a una página que no existe.
+3. **Un enlace por plataforma.** Con un `??` por plataforma sale solo.
+
+Deezer y Bandcamp, que no se leían, también salen. Hay test de las tres.
+
+### Una sola fuente para "¿hay ficha?"
+
+`hasProductionDetails()` estaba copiada en `app/track/[id]/page.tsx`. Pasa a
+`lib/production-fields.ts`, junto a la especificación de los campos, y las dos
+vistas la importan. El detalle que hace que sirva: un objeto con **todos** los
+campos a `null` —lo que escribe el seed en las cabeceras de álbum— **no** cuenta.
+Sin ese filtro salía "Sin datos de producción" debajo del título, que es la
+tarjeta vacía que el propio proyecto ya describe en su propio código.
+
+### Dos violaciones de área táctil que introduce el commit
+
+Montar estos bloques trajo 10 controles por debajo de 36 px: los nueve botones
+HTML/JSON/PDF de la rejilla de descargas (28 px) y el desplegable de la ficha
+(32 px). Corregidos con `min-h-[36px]`, lo que **también** arregla `/dashboard` y
+`/artists/[id]`, que montan los mismos componentes. Y de paso, `aria-label` en los
+dos botones de icono de `ProductionDetails`, que solo tenían `title`.
+
+Un test **verde** no significa "sin violaciones nuevas": la primera versión de
+esta ola pasó los 1162 con 10 controles de área táctil en pantalla. Los cuenta un
+`getBoundingClientRect` en el navegador, no un aserto.
+
+### Un aviso que hay que volver a decir
+
+**`tests/unit/release-page.test.ts` tiene que mockear `@/lib/db` entero**, no solo
+`@/lib/releases`. La página ahora importa `getArtistByName` de `lib/db`, y eso
+carga **`better-sqlite3`**: un módulo nativo. Al descargar el worker, el hook de
+limpieza nativo se ejecuta con el isolate ya destruido y el run muere con la
+aserción `node::RemoveEnvironmentCleanupHook (env) != nullptr` y
+`ERR_IPC_CHANNEL_CLOSED` que documenta AGENTS.md. No es un test rojo: es el
+**proceso** muriendo, y por eso no sale un "3 failed" sino una traza nativa.
+
+El mock va en el fichero porque la página es una ruta que llega a la base de
+datos, que es exactamente el escenario que dispara el fallo.
+
+### Gates
+
+tsc limpio, lint sin avisos, **1162/1162 en 61 ficheros**, build correcto.
+Visual local a 375/1440 y producción a 375/1440: el single con la ficha entera,
+el álbum sin los bloques de pista pero con las descargas, 0 targets táctiles
+<36 px dentro de `main`, 0 errores de página.
+
+**Mutado tres veces**: quitar el bloque de vídeo → 1 rojo; dejar de respetar
+`isTrackRow` → 2; `hasProductionDetails` que siempre dice que sí → 1.
+
+### Lo que sigue abierto: las 65 hijas
+
+Las **hijas de álbum** son el agujero que queda, y es mayor que el que se cerró:
+
+| Dato de las 65 hijas | Con dato |
+|---|---|
+| Ficha de producción | **65** |
+| Videoclip oficial | 28 |
+| Letra | 0 |
+| Galería | 0 |
+
+Redirigen a su padre, y el padre no enseña sus datos. Es un problema de **diseño
+distinto**: donde metes una hoja de créditos por pista sin ensuciar el tracklist
+que el usuario acaba de aprobar. No se ha decidido, y no se decide aquí.
+
+

@@ -1,13 +1,13 @@
 # HANDOFF — sesión del 2026-10-03
 
 **Estado al cerrar esta sesión:** `main` en `a451b4d` + los 3 commits de este
-handoff. **1146/1146 tests** (hoy: **1153/1153**), `tsc` limpio, lint sin avisos, `pnpm build`
+handoff. **1146/1146 tests** (hoy: **1162/1162**), `tsc` limpio, lint sin avisos, `pnpm build`
 correcto. Producción desplegada y verificada.
 
-> **Actualizado el 2026-10-04.** `main` está ahora en `6baefc2` (+ lo que se
-> añada después): **C1 está hecha** y los tests son **1153/1153**. El resto del
-> documento sigue valiendo; los números que se contaban a mano se refrescan con
-> el comando al lado, porque se desfasan solos.
+> **Actualizado el 2026-10-04.** `main` está ahora en `5ed5354` (+ lo que se
+> añada después): **C1 y C1-bis están hechas** y los tests son **1162/1162**. El
+> resto del documento sigue valiendo; los números que se contaban a mano se
+> refrescan con el comando al lado, porque se desfasan solos.
 
 Este es **el** documento de arranque. Si solo vas a leer uno, lee este.
 
@@ -23,7 +23,7 @@ node -v                                  # debe decir v24
 pnpm dev                                 # servidor en :3000
 npx tsc --noEmit                         # debe salir limpio
 npx next lint                            # debe salir sin avisos
-npx vitest run --no-file-parallelism     # 1153/1153, ~70-110 s
+npx vitest run --no-file-parallelism     # 1162/1162, ~70-180 s
 ```
 
 **`--no-file-parallelism` NO es opcional.** Sin él el reciclado de workers
@@ -114,11 +114,10 @@ tiene dato. Mira los `<h2>`, no el `textContent`: `Descripción` es subcadena de
 
 #### Tres cosas que el revert destapó y que quedan abiertas
 
-1. **`/track/[id]` es 301 para toda fila**, así que la ficha de 597 líneas
-   (videoclip, galería, detalles de producción, bio, descarga para prensa,
-   Last.fm) **solo se renderiza para huérfanas**. No es pérdida de este revert —
-   ya estaba perdida desde P8, porque el diseño de P2 tampoco mostraba eso — pero
-   es el mismo síntoma que motivó la petición. **Decisión que hay que tomar.**
+1. ~~**`/track/[id]` es 301 para toda fila**~~ → **CERRADO en C1-bis** (abajo).
+   La ficha solo se renderizaba para las huérfanas y sus bloques no estaban en la
+   página de release: el videoclip, la ficha de producción, la galería y **la
+   descarga de dossier y rider** no tenían ninguna página donde estar.
 2. **Las métricas de los 5 álbumes son un 0 curado** en Turso
    (`{"streams":0,...}` en la cabecera), así que la página dice "0 reproducciones
    del lanzamiento". `EPKCard` dice lo mismo. **Es un bug de datos**, no de
@@ -126,6 +125,47 @@ tiene dato. Mira los `<h2>`, no el `textContent`: `Descripción` es subcadena de
    aprobación.
 3. **`components/ReleaseActions.tsx`**: sus tres enlaces sin anillo de foco.
    Preexistente en los dos diseños; no se mezcló en el commit del revert.
+
+### C1-bis · La ficha de una pista vuelve a la página ← HECHA 2026-10-04
+
+Commit `5ed5354`. Cierra el punto 1 de arriba, y de paso un agujero que era mayor
+de lo que parecía: **la sección de Enlaces no se montaba para 7 de los 9 singles**
+(la condición era `Object.keys(external_links).length > 0` y sus enlaces viven en
+`spotify_url`, `itunes_track_id` y `youtube_video_id`), y **no había ninguna forma
+de bajar el dossier o el rider** desde una ficha, porque la única página que lo
+montaba con `artist_id` era el 301.
+
+Vuelve, **solo cuando la fila es una pista** (`!isMultiTrack`): Videoclip Oficial,
+Ficha de Producción y Galería de prensa. La **Ficha técnica para prensa** se
+monta en los dos casos, porque es del **artista**. Y los enlaces son ahora la
+unión de `external_links` + las columnas de la fila, con `""` y `"—"` tratados
+como ausencia y un enlace por plataforma.
+
+**Ojo con dos cosas si se toca ese test:**
+
+- **`tests/unit/release-page.test.ts` tiene que mockear `@/lib/db` entero.** La
+  página ahora importa `getArtistByName` de ahí, y eso carga `better-sqlite3`: un
+  módulo nativo. Al descargar el worker el run muere con la aserción
+  `node::RemoveEnvironmentCleanupHook` y `ERR_IPC_CHANNEL_CLOSED` — el proceso,
+  no un test. Es el escenario que describe AGENTS.md para el paralelismo, aquí
+  disparado por una ruta.
+- **El guard de las 4 secciones mira `section[aria-labelledby]`, no todos los
+  `<h2>`.** Los bloques de ficha traen su propio `<h2>` dentro, y un guard que
+  cuenta cabeceras de terceros se rompe solo un día sin avisar.
+
+### C1-ter · Las 65 hijas de álbum ← NUEVO, sin decidir
+
+Descubierto midiendo el de C1-bis, y es **mayor** que el que se cerró:
+
+| Dato de las 65 hijas | Con dato |
+|---|---|
+| Ficha de producción | **65** |
+| Videoclip oficial | 28 |
+| Letra | 0 |
+
+Redirigen a su padre (el 301 de P8) y el padre **no enseña sus datos**. Es un
+problema de diseño distinto del de C1: dónde metes una hoja de créditos por pista
+sin ensuciar el tracklist que el usuario acaba de aprobar. **No decidido.**
 
 ### C2 · Consolidar el reproductor de las EPKCard
 
@@ -204,15 +244,15 @@ de email, ni el broadcast. Es lo que más superficie de bug deja sin cubrir.
 
 ### C7 · Reorganizar la documentación
 
-`docs/AI_LOG.md`: **6.794 líneas, 384 KB, 112 epígrafes de nivel 2, 579 de nivel
+`docs/AI_LOG.md`: **6.922 líneas, 390 KB, 113 epígrafes de nivel 2, 587 de nivel
 3**. El bloque más largo son 432 líneas. Es ilegible por inspección humana.
 
 > Las tres cifras se cuentan con
 > `(Get-Content -LiteralPath docs/AI_LOG.md).Count`,
 > `Select-String -Path docs/AI_LOG.md -Pattern '^## '` y
 > `Select-String -Path docs/AI_LOG.md -Pattern '^### '`, porque **se desfasan
-> solas con cada commit**: las de arriba ya eran 6.689 antes de C1 y 6.794
-> después. Es el mismo aviso que el de C9.
+> solas con cada commit**: las de arriba ya eran 6.689 antes de C1 y 6.922
+> después de C1-bis. Es el mismo aviso que el de C9.
 
 Propuesta: `docs/ai-log/` con un fichero por época, y `AI_LOG.md` reducido a
 índice. **Nada se borra**: es mover, no resumir.
