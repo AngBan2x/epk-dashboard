@@ -208,57 +208,138 @@ cero `videoclip`: no hay ruta que compense.
 verificado.** Hay directos y audios de `- Topic`. `ReleaseVideoList` se queda
 vacía y no es un bug. **No reintentar sin un dato nuevo que revisar a mano.**
 
-### C2 · Consolidar el reproductor de las EPKCard
+## C2 · Un solo patrón para reproducir — HECHA 2026-10-05
 
-**Decisión tomada:** todo al patrón **`Reproducir • <fuente>`**. Los álbumes pasan
-de `Escuchar N pistas` a `Reproducir • N pistas`.
+**Decisión:** `Reproducir • <fuente>`, en las tarjetas y en el reproductor.
 
-Hoy conviven cuatro etiquetas: `Reproducir • YouTube`, `Reproducir • Preview
-(30s)`, `Escuchar N pistas`, `Ninguna de sus pistas tiene audio disponible`. La
-cuarta **se queda**: es información honesta, no una variante del botón.
+El álbum decía `Escuchar N pistas`; la pista suelta decía
+`Reproducir • Preview (30s)`. Dos nombres para la misma acción en la misma
+tarjeta, y el visitante no sabía si eran el mismo control.
 
-Fichero: `components/EPKCard.tsx:463-502` (rama de padre) y la rama de single.
+Ahora el álbum dice `Reproducir • N pistas` — el mismo patrón que ya escribía
+`AudioPlayer.tsx:260`, donde `<fuente>` son las N hijas. **"Escuchar"
+desaparece.**
 
-⚠️ `playQueue` recibe la cola completa y el contador del reproductor tiene que
-seguir diciendo la verdad. `buildReleaseQueue` **se importa, no se copia**.
+El `aria-label` del botón NO cambia (`Reproducir N pistas de <título>`): ahí sí
+cuenta quién reproduce y qué, y lo localizan los tests E2E.
 
-### C3 · Un solo botón en el formulario de edición
+**El cuarto rótulo se queda:** `Ninguna de sus pistas tiene audio disponible`
+("Heroes" y "Vulnicura Strings"). No es una etiqueta de control, es información.
 
-**Decisión tomada:** un botón principal cuya etiqueta depende del estado.
-El secundario desaparece.
+**Verificado en producción:** David Bowie → `Reproducir • 2 pistas`. Cero
+`Escuchar N pistas` en las 6 fichas de artista revisadas. Björk y Bowie muestran
+además la frase honesta.
 
-`borrador` → "Publicar" · `aprobado` → "Actualizar publicación" ·
-`pendiente`/`rechazado` → "Enviar para revisión"
+**Tres tests nuevos, porque ninguno de los dos patrones estaba atado:**
+`AudioPlayer` no tenía ni un test sobre su etiqueta, y el del álbum miraba la
+palabra que C2 retira. Revertido el label: 3 de 10 se ponen rojos.
 
-Hoy conviven en `app/releases/[id]/edit/page.tsx`:
-- `:752` — "Enviar para revisión (retira del catálogo)" → `status: "pending"`
-- `:56` — "Actualizar publicación" → guarda sin tocar el estado
+## C3 · Un solo botón en el formulario de edición — HECHA 2026-10-05
 
-Uno **guarda** y otro **despublica**, en el mismo formulario. Con un solo botón,
-la etiqueta **es** la consecuencia.
+**Decisión:** un botón principal cuya etiqueta **es** la consecuencia. El
+secundario desaparece.
 
-### C4 · Recortar los estados de show
+| Estado | Etiqueta | Efecto |
+|---|---|---|
+| `borrador` | **Publicar** | entra en revisión |
+| `aprobado` | **Actualizar publicación** | sigue publicado |
+| `pendiente` / `rechazado` | **Enviar para revisión** | entra en revisión |
 
-**Decisión tomada: 6 seleccionables + derivados por fecha.**
+`primaryLabel` y `primaryIntent` son la misma tabla partida en dos, y un test ata
+que no se contradigan. Con dos botones eran dos tablas: podía salir "Actualizar
+publicación" con una intención `request`, o sea **despublicar con un botón que
+dice lo contrario**.
 
-- **6 seleccionables:** `proximamente`, `confirmado`, `activo`, `pospuesto`,
-  `cancelado`, `suspendido`
-- **Derivados de la fecha, no elegibles:** `hoy`, `pasado`. Ya existe
-  `computeDynamicStatus` en `lib/show-dynamic-status.ts:138`.
-- **Se eliminan por redundantes:** `finalizado` (= pasado),
-  `en_venta`/`disponible`/`activo` (lo mismo tres veces), `agotado` (inventario de
-  entradas, no ciclo de vida), `reprogramado` (= pospuesto + nueva fecha).
+El botón sigue siendo `type="submit"` a propósito: los cuatro `required` del
+formulario dependen de la validación nativa, que un `type="button"` se saltaría.
 
-Ficheros: `lib/show-status.ts` (tipo `:4-17`, `SHOW_STATUS_OPTIONS` `:78`),
-`components/ShowForm.tsx:244-248`.
+**Lo que se pierde, escrito para que no se lea como descuido:** el secundario era
+el **único** camino del artista para retirar del catálogo un release aprobado. Ya
+no existe desde aquí; queda el del admin (`POST /api/admin/approvals/[id]` →
+`rejected`), más lento y con motivo escrito. Con él se cae también el
+`window.confirm` que lo protegía: no se eliminó un cuidado, es que la combinación
+que lo disparaba ya no es alcanzable.
 
-⚠️ **`ShowStatus` termina en `| string`** (`lib/show-status.ts:18`), lo que
-**anula la validación por completo**: hoy cualquier string es un estado válido.
-Hay que cerrar el tipo.
+**Verificado en producción:** `approved → ["Actualizar publicación"]`. Un solo
+submit, cero rastro de "retira del catálogo", y la ayuda de estado coherente.
 
-**Sin riesgo de datos:** en producción hay **1 show, en `proximamente`**. Los 12
-que se quitan tienen cero registros.
+## C4 · Vocabulario de show: 6 elegibles + 2 derivados — HECHA 2026-10-05
 
+**Decisión:** el vocabulario se cierra.
+
+| | Estados |
+|---|---|
+| **Elegibles (6)** | `proximamente` · `confirmado` · `activo` · `pospuesto` · `cancelado` · `suspendido` |
+| **Derivados (2)** | `hoy` · `pasado` — los pone `computeDynamicStatus` |
+
+**Lo que estaba:** el estado estaba declarado **cuatro veces** y nadie lo
+comprobaba.
+
+| Dónde | Qué declaraba |
+|---|---|
+| `types/music.ts` | 13 literales |
+| `lib/show-status.ts` | los 13 + 7 alias legacy **+ `\| string`** |
+| `components/BookingModule.tsx` | 10, que no coincidían con ninguna |
+| `app/api/shows/route.ts` | `z.enum` de 13, en POST y en PUT |
+
+El `| string` era lo que lo hacía inútil: `ShowStatus` no restringía nada, así que
+un estado inventado pasaba por TypeScript. Y el `z.enum` —que sí restringía, a
+13— era la única defensa real: **el backend aceptaba `finalizado` y `en_venta`
+mientras el compilador decía que no podían existir.**
+
+**Retirados por redundantes:** `finalizado` (= `pasado`), `en_venta` /
+`disponible` (= `activo`, tres nombres para un estado), `agotado` (inventario de
+entradas, no ciclo de vida: con `ticket_url` null no hay entradas y con
+`approved` false no hay venta — los dos datos ya existen) y `reprogramado` (=
+`pospuesto` + nueva fecha).
+
+**Comprobado contra Turso antes de tocar nada (2026-10-05):** `shows` tiene **1
+fila** y su estado es `proximamente`. Ningún retirado tenía un solo registro, así
+que la poda no mueve nada de la base.
+
+**Lo que cambia de verdad:**
+- `lib/show-status.ts` ya no **redeclara** `ShowStatus`: importa el de
+  `types/music`, y su `| string` desaparece.
+- `computeDynamicStatus` devuelve `ShowStatus` de verdad. Se fueron los **5**
+  `as ShowStatus` que quedaban (4 en `/api/shows`, 1 en `withDynamicStatus`).
+- `lib/db.ts` estrecha con `toShowStatus()` en vez de castear, y **avisa por
+  consola** si el valor no está en el vocabulario. Un dato raro visible en el log
+  es mejor que uno tipado como si fuera bueno.
+- El **filtro** de `/shows` ofrece los 8, no los 6: un show del pasado se
+  muestra como "Pasado", y sin la opción sería visible pero imposible de buscar.
+  El formulario son 6 porque no se eligen; el filtro son 8 porque se buscan.
+- `ShowCover`: 20 gradientes → 8. Los 12 sobrantes no los generaba nadie.
+
+**Verificado en producción:** el filtro devuelve `["Todos","Próximamente",
+"Confirmado","Activo","Pospuesto","Cancelado","Suspendido","Hoy","Pasado"]`, y
+**cero avisos de `show-status`** en consola (que es la prueba de que ninguna fila
+traía un valor raro).
+
+## El helper que hizo falta: `sinComentarios()`
+
+Apareció **tres veces** en este lote, y por eso quedó en
+`tests/unit/show-status-vocabulary.test.ts` en vez de copiado test a test.
+
+Un `expect(src).not.toContain("en_venta")` cuenta **cualquier cadena** del
+fichero, y los comentarios que *documentan* lo que se retiró citan exactamente lo
+que se retiró — que es lo que tienen que hacer para que el cambio se entienda.
+Los dos primeros casosFallaron en C3 (mi comentario citaba `type="submit"`), el
+tercero en C4 (el de `lib/db.ts` citaba `as ShowStatus`).
+
+Un comentario no es código. La comparación va sobre el código sin comentarios, y
+el que no se pueda comprobar con una aserción textual se comprueba estructural:
+la clase CSS del botón que se eliminó, el JSX desde `<form`, no el fichero.
+
+## Lo que NO se hizo
+
+- **C9** (reescritura del historial con `filter-repo`): queda fuera, y no por
+  descuido. Es destructiva, hace `force-push`, y tú la marcaste como "la última y
+  no urgente". Con el fichero de path inválido (`P7bis`) sigue en la historia,
+  así que además no funcionaría en Windows hasta quitarlo con
+  `node scripts/git/rewrite-invalid-path.js`.
+- **Las 5 métricas de los 5 álbumes** (siguen a 0 curado, y `lib/metrics-source.ts`
+  dice "hay dato" porque el objeto existe): es una **escritura en producción** y
+  va con su propio dry-run y tu OK, no colada aquí.
 ### C5 · Fotos de perfil de los 5 artistas
 
 Verificado en Turso: **0 fotos de perfil** en Björk, David Bowie, Kraftwerk,

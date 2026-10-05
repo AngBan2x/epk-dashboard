@@ -7088,3 +7088,92 @@ cuando lo que está cerrado es el contador.
 
 
 
+
+---
+
+# C2 · C3 · C4 — 2026-10-05
+
+Tres puntos cerrados del handoff, con la misma regla que los demás: dry-run o
+SQL directo antes de tocar datos, y verificación en producción después.
+
+## C2 — un solo patrón para reproducir
+
+`Escuchar N pistas` (álbum) y `Reproducir • Preview (30s)` (pista suelta) eran dos
+nombres de la misma acción en la misma tarjeta. Ahora el álbum dice
+`Reproducir • N pistas`, que es el patrón que ya escribía `AudioPlayer.tsx:260`.
+"Escuchar" desaparece; el `aria-label` no cambia.
+
+**Producción:** David Bowie → `Reproducir • 2 pistas`, cero `Escuchar N pistas` en
+las 6 fichas revisadas, y la frase honesta intacta en Heroes y Vulnicura Strings.
+
+**3 tests nuevos, porque ninguno de los dos patrones estaba atado.** `AudioPlayer`
+no tenía ni un test sobre su etiqueta. Revertido el label: 3 de 10 se ponen rojos.
+
+## C3 — un solo botón en el formulario de edición
+
+| Estado | Etiqueta | Efecto |
+|---|---|---|
+| `borrador` | Publicar | entra en revisión |
+| `aprobado` | Actualizar publicación | sigue publicado |
+| `pendiente` / `rechazado` | Enviar para revisión | entra en revisión |
+
+El secundario "Enviar para revisión (retira del catálogo)" desaparece. `primaryLabel`
+y `primaryIntent` son la misma tabla partida en dos, con un test que ata que no se
+contradigan — que era el agujero real, porque con dos botones podían no
+contradecirse: despublicar con un botón que decía "Actualizar publicación".
+
+**Lo que se pierde, a propósito:** era el único camino del artista para retirar del
+catálogo un release aprobado. Queda el del admin. Y con él se cae el
+`window.confirm` que lo protegía: no se quitó un cuidado, es que ya no había
+combinación que lo disparara.
+
+**Producción:** `approved → ["Actualizar publicación"]`. Un submit, sin rastro del
+rótulo retirado, ayuda de estado coherente.
+
+## C4 — el vocabulario de show, cerrado
+
+8 estados: 6 elegibles y 2 que pone la fecha. Antes eran 13 + 7 alias + `| string`,
+declarados en cuatro ficheros sin que nadie comprobara que coincidieran.
+
+Lo que más me gusta de este cambio es que **el compilador encontró los sitios**:
+en cuanto `ShowStatus` dejó de ser `| string`, tsc señaló los cuatro comparaciones
+con `agotado` y el `z.enum` de 13. Ese era el punto: el tipo no restringía nada, y
+el único filtro real era un array de Zod que el compilador no vigilaba.
+
+**Producción:** el filtro de `/shows` devuelve los 8 + "Todos", y **cero avisos de
+`show-status`** en consola — que es la prueba de que ninguna fila traía un valor
+raro.
+
+## Tres veces el mismo tropiezo: `not.toContain` cuenta comentarios
+
+Tres tests que escribí se pusieron rojos **no porque el código estuviera mal,
+sino porque mis comentarios citan lo que se retiró**:
+
+1. C3: `not.toContain('retira del catálogo')` — el comentario de C3 lo cita.
+2. C3: `un solo type="submit"` — el comentario de `handleSubmit` lo cita.
+3. C4: `not.toContain("as ShowStatus")` — el comentario de `lib/db.ts` lo cita.
+
+Un comentario no es código, y una aserción textual sobre el fichero entero no
+distingue. Lo que quedó:
+
+- Las textuales van sobre `sinComentarios(src)`.
+- Las que no se pueden expresar así, **estructurales**: la clase CSS
+  (`bg-emerald-500`) en vez del rótulo del botón, y el JSX desde `<form` en vez de
+  todo el fichero.
+- El helper vive en `tests/unit/show-status-vocabulary.test.ts` para que el cuarto
+  caso no lo vuelva a pagar.
+
+## Puertas
+
+`1195/1195` en 62 ficheros, `tsc` limpio, `next lint` sin warnings, `pnpm build`
+correcto, y los tres puntos verificados contra `epk-dashboard.vercel.app` con el
+deploy de `fe6b575`.
+
+## Lo que sigue abierto, y por qué
+
+- **C5** (fotos de perfil), **C6** (cuenta de prueba) y **C7** (trocear la
+  documentación) están sin empezar.
+- **C9** fuera de alcance: destructiva, con `force-push`, y marcada por el usuario
+  como la última.
+- **Las 5 métricas de los 5 álbumes** siguen a 0 curado: es una escritura en
+  producción y va con su dry-run y su OK, no colada dentro de un lote de UI.
