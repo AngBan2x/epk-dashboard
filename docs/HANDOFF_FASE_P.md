@@ -6,7 +6,73 @@ correcto. Producción desplegada y verificada.
 
 > **Actualizado el 2026-10-04.** `main` está ahora en `5ed5354` (+ lo que se
 > añada después): **C1 y C1-bis están hechas** y los tests son **1170/1170**. El
-> resto del documento sigue valiendo; los números que se contaban a mano se
+> resto d### C7 · Reorganizar la documentación — HECHA 2026-10-05
+
+**Lo que había:** `docs/AI_LOG.md` con **7.248 líneas, 406 KB, 125 H2 y 594 H3**.
+Ahora es un índice de 7 KB, y el texto está en `docs/ai-log/` con un fichero por
+época.
+
+> Las cifras se desfasan solas con cada commit —las de la ficha original ya eran
+> 6.689 antes de C1 y 7.027 después de C1-ter—, así que la comparación útil es
+> `git diff --stat`, no el número de aquí.
+
+**Nada se borró.** Verificado con `git`: de todas las líneas del original, las
+únicas que no aparecen en los ficheros de época son las **dos de la cabecera del
+propio fichero** (su H1 y su descripción), y esas están copiadas literales en el
+índice para que la comprobación las incluya.
+
+| Fichero | Líneas | Qué es |
+|---|---|---|
+| `ai-log/01-f0-f9.md` | 526 | F0–F9, la construcción |
+| `ai-log/02-refactor-fases-a-l.md` | 1.128 | Refactor integral y fases A–L |
+| `ai-log/03-hotfixes-y-sesiones.md` | 202 | v3.10–v3.11 |
+| `ai-log/04-v4-alpha-beta.md` | 2.331 | v4.0.0 alpha/beta, E2E y CORS |
+| `ai-log/05-rc10-rc28.md` | 1.433 | rc.10–rc.28 |
+| `ai-log/06-tranches-a-hoy.md` | 1.622 | Tranches, rc.29–rc.33 y C1–C6 |
+
+## El reparto es por corte posicional, no por patrón sobre el título
+
+El primer intento usó regex sobre el título de cada sección y salió mal: **69
+secciones en un fichero y otro vacío**. Motivo, dos:
+
+- `^(rc\.)` se come también rc.31–rc.33, que son de otra época.
+- Las secciones sin fecha ("Verificación", "Pendientes que siguen abiertos")
+  necesitan heredar la época anterior, y **heredar por regex reparte mal**.
+
+Con un marcador real de "aquí empieza esta época" el reparto es determinista y no
+hay que adivinar. Los seis marcadores se comprobaron antes de escribir nada:
+
+```
+## Fase F0            ## Refactorizaci         ## Fix: Dark Mode Consistency
+## v4.0.0-alpha.1     ## v4.0.0-rc.10           ## Tranche 0
+```
+
+**Además:** `docs/README.md`, el índice de los 27 ficheros de `docs/` —tabla de
+"si quieres X, lee Y"—, con los enlaces comprobados uno a uno.
+
+## El script del troceo no se commitea
+
+`c7-split.cjs` se escribió en la raíz, se ejecutó con `--dry-run` primero y se
+borró después. Es una migración de una vez: dejarlo sería un script que ya no
+tiene nada que trocear y que alguien ejecutaría por costumbre.
+
+## Dos cosas que me costaron un fichero
+
+Las dos por la misma razón: un `IndexOf` que devolvió `-1` y un `Substring` que
+no lanza antes de escribir.
+
+1. **Vacié `docs/HANDOFF_FASE_P.md` entero** al insertar el bloque de C7. Salió
+   con `git checkout` —no había nada sin commitear— pero por un momento el
+   handoff era un fichero de 0 bytes.
+2. **Antes ya había borrado esta misma sección C7** al reemplazar el bloque
+   C5+C6: usé `IndexOf('### C5')` → `IndexOf('### C8')` como rango a sustituir,
+   y C7 estaba en medio. Se quedó en el commit `2fcd4f3` y lo he recuperado de
+   `fe6b575`.
+
+La lección operativa: **antes de escribir, comprobar que el rango existe.** Un
+`if ($i -lt 0) { throw }` en este script era lo que faltaba, y lo puse después de
+que pasara.
+el documento sigue valiendo; los números que se contaban a mano se
 > refrescan con el comando al lado, porque se desfasan solos.
 
 Este es **el** documento de arranque. Si solo vas a leer uno, lee este.
@@ -208,7 +274,7 @@ cero `videoclip`: no hay ruta que compense.
 verificado.** Hay directos y audios de `- Topic`. `ReleaseVideoList` se queda
 vacía y no es un bug. **No reintentar sin un dato nuevo que revisar a mano.**
 
-## C2 · Un solo patrón para reproducir — HECHA 2026-10-05
+### C2 · Un solo patrón para reproducir — HECHA 2026-10-05
 
 **Decisión:** `Reproducir • <fuente>`, en las tarjetas y en el reproductor.
 
@@ -234,7 +300,7 @@ además la frase honesta.
 `AudioPlayer` no tenía ni un test sobre su etiqueta, y el del álbum miraba la
 palabra que C2 retira. Revertido el label: 3 de 10 se ponen rojos.
 
-## C3 · Un solo botón en el formulario de edición — HECHA 2026-10-05
+### C3 · Un solo botón en el formulario de edición — HECHA 2026-10-05
 
 **Decisión:** un botón principal cuya etiqueta **es** la consecuencia. El
 secundario desaparece.
@@ -263,7 +329,7 @@ que lo disparaba ya no es alcanzable.
 **Verificado en producción:** `approved → ["Actualizar publicación"]`. Un solo
 submit, cero rastro de "retira del catálogo", y la ayuda de estado coherente.
 
-## C4 · Vocabulario de show: 6 elegibles + 2 derivados — HECHA 2026-10-05
+### C4 · Vocabulario de show: 6 elegibles + 2 derivados — HECHA 2026-10-05
 
 **Decisión:** el vocabulario se cierra.
 
@@ -352,7 +418,7 @@ Un dry-run que propone lo que no se quiere es peor que no tener dry-run, porque
 enseña a no leerlo. Las entradas salen de la tabla; el motivo y las URLs quedan
 en un comentario, con el código de 4 líneas para recuperarlas.
 
-### Las dos fotos, miradas una a una
+#### Las dos fotos, miradas una a una
 
 **David Bowie — confirmado que no funciona.** 1280×1280, Bowie en el tercio
 derecho y el **40 % izquierdo negro puro**. El recorte circular centrado —que es
@@ -404,7 +470,7 @@ confirmación con `Confirmar baja` / `Mantener suscripción`.
 sin suscripciones no puede probar el fan-out, que es justo lo que la cuenta existe
 para cubrir. `/api/subscriptions` devuelve 1, `/api/notifications` 0.
 
-### El fallo que cometí aquí, y que casi es el de P7
+#### El fallo que cometí aquí, y que casi es el de P7
 
 La primera ejecución de los tests **imprimió la contraseña real** en el fallo de
 una aserción: `ENV_KEYS` en `tests/unit/credentials.test.ts` limpia
