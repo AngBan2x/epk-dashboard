@@ -823,6 +823,19 @@ async function main(): Promise<void> {
   const meter = createQuotaMeter();
   const artists = await readArtists();
   const channelUpdates: { artist: ArtistRow; channelId: string }[] = [];
+  /**
+   * Canales que **pasaron** la puerta, y que no es lo mismo que `channelUpdates`.
+   *
+   * Antes el resumen imprimía `Canales verificados: ${channelUpdates.length} de N`,
+   * y eso contaba **ids a escribir**: un canal verificado cuyo `artists.
+   * youtube_channel_id` ya era correcto salía como "no verificado". Con los 5
+   * canales ya escritos, un dry-run decía "0 de 5 verificados" mientras cada
+   * bloque delArtists imprimía `VERIFICADO` — cinco líneas de arriba.
+   *
+   * Son dos preguntas distintas y por eso son dos contadores: *¿pasa la puerta?* y
+   * *¿cambia algo en la base?*.
+   */
+  let verifiedChannels = 0;
   const resolutions: OfficialVideoResolution[] = [];
   const routingReports: RouteReport[] = [];
   const pendingWrites: PendingWrite[] = [];
@@ -887,7 +900,8 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const verified = verification.channel;
+const verified = verification.channel;
+    verifiedChannels += 1;
     console.log(`  ✓ VERIFICADO — ${verification.detail}`);
     console.log(`      tipo: ${verified.type ?? "(sin dato)"}`);
     console.log(
@@ -1131,7 +1145,10 @@ const resolution = await resolveOfficialVideo(
   }
 
   console.log("=".repeat(96));
-  console.log(`Canales verificados: ${channelUpdates.length} de ${entries.length}`);
+  console.log(
+    `Canales verificados: ${verifiedChannels} de ${entries.length}` +
+      `  ·  ids a escribir en artists: ${channelUpdates.length}`
+  );
   for (const update of channelUpdates) {
     console.log(`  ✓ ${update.artist.name} → ${update.channelId}`);
   }
