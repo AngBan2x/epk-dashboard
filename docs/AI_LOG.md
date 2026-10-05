@@ -233,3 +233,66 @@ experimentar" es la que salvó esto, no la precaución.
 
 `1200/1200` en 62 ficheros, `tsc` limpio, `next lint` sin warnings. C7 no toca
 código: el troceo es de Markdown y el índice son enlaces.
+---
+
+# Métricas de ceros: 74 filas a NULL, y una predicción que era falsa
+
+## Qué era
+
+74 filas de `tracks` (9 cabeceras de álbum + 65 hijas) llevaban exactamente
+
+    {"streams":0,"saves":0,"playlist_additions":0,"top_countries":[]}
+
+No es una métrica curada: es relleno de semilla. Pero `lib/metrics-source.ts`
+regla que "el primero es el JSON curado, y gana aunque valga 0", y el relleno se
+adueñaba de ese contrato. Las 9 cabeceras salían con **0 reproducciones** y el
+pie diciendo "métricas curadas del catálogo".
+
+## Por qué 74 filas y no 9
+
+`resolveAlbumMetrics` elige **una** fuente: la del padre si tiene, si no la
+primera que tenga una hija. **Con solo las cabeceras a NULL los álbumes habrían
+seguido mostrando 0**, porque las hijas también traen el objeto y la fuente
+seguiría siendo "curado" con total 0. Hay que vaciar el subárbol entero.
+
+## Aplicado y verificado
+
+74 filas a `NULL`. En la base: 77 nulos, 6 con dato, 83 en total. Las 6 con dato
+son exactamente las curadas de verdad (un single porcada uno de los 6 artistas no
+influyentes).
+
+En producción, los 9 álbumes:
+
+| Álbum | Antes | Después | Fuente |
+|---|---|---|---|
+| Radiohead — OK Computer | 0 | 1.269.807 | YouTube |
+| Radiohead — Kid A | 0 | 291.616.427 | Last.fm |
+| Pink Floyd — Dark Side of the Moon | 0 | 109.491.157 | Last.fm |
+| Pink Floyd — The Wall | 0 | 120.626.778 | Last.fm |
+| David Bowie — Heroes | 0 | 7.049.734 | Last.fm |
+| David Bowie — Ashes to Ashes | 0 | 7.493.122 | Last.fm |
+| Kraftwerk — The Model | 0 | 1.219.878 | Last.fm |
+| Kraftwerk — Tour de France | 0 | 1.752.248 | Last.fm |
+| Björk — Vulnicura Strings | 0 | 5.444.855 | Last.fm |
+
+Y el control: **Queen sigue en 2.100.000 curado**, que es lo que tenía que pasar.
+
+Cero álbumes muestran ya un 0.
+
+## La predicción del dry-run era falsa, y lo dice el propio script
+
+Escribí que "4 álbumes se quedarían en sin dato → —", porque ninguna de sus hijas
+tiene `youtube_video_id`. **Estaba mal: los 4 salen con dato de Last.fm.**
+
+El error es de modelo, no de ejecución: el script solo veía `youtube_video_id` en
+la base, y las dos fuentes que existen (YouTube y Last.fm) se rellenan **en
+ejecución** (`/api/youtube/stats`, `/api/lastfm`). Con la base vacía de esas
+señales, "no hay vídeo" no significa "no hay dato".
+
+Lo he corregido en el resumen del script, porque un script que se queda en el repo
+afirmando algo falso es peor que no tenerlo. La conclusión honesta es "sin dato **o**
+una fuente que solo existe en ejecución", y la diferencia no es cosmética: "—" en
+la tarjeta y 7.049.734 scrobbles no son lo mismo.
+
+**Lo único que el dry-run sí asegurar, porque es de la base, es el "antes":** los 9
+con 0 y fuente "curado". Eso estaba bien predicho.

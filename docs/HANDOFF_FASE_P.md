@@ -8,7 +8,31 @@ correcto. Producción desplegada y verificada.
 > añada después): **C1 y C1-bis están hechas** y los tests son **1170/1170**. El
 > resto d### C7 · Reorganizar la documentación — HECHA 2026-10-05
 
-**Lo que había:** `docs/AI_LOG.md` con **7.248 líneas, 406 KB, 125 H2 y 594 H3**.
+**Lo q### Las métricas de ceros de los 5 artistas influyentes — APLICADO 2026-10-05
+
+74 filas (9 cabeceras + 65 hijas) llevaban `{"streams":0,...}` de relleno, y
+`lib/metrics-source.ts` ("gana aunque valga 0") lo leía como métrica curada. Las 9
+cabeceras salían con **0 reproducciones** y el pie diciendo "métricas curadas".
+
+**El alcance eran 74 filas, no 9**: `resolveAlbumMetrics` elige la fuente del padre
+y si no tiene, la primera que tenga una hija — con solo la cabecera a `NULL` los
+álbumes seguirían mostrando 0, porque las hijas también traen el objeto.
+
+`scripts/clear-zero-release-metrics.ts`, dry-run por defecto, `WHERE` con el
+objeto literal exacto (las 6 filas curadas de verdad no se pueden tocar). Aplicado:
+74 filas a `NULL`.
+
+**Verificado en producción:** los 9 álbumes con cifra real (OK Computer 1.269.807 de
+YouTube; el resto de Last.fm, entre 1,2M y 291M) y **Queen sigue en 2.100.000
+curado**, que era el control. Cero álbumes con 0.
+
+⚠️ **Mi predicción del dry-run era falsa y el script lo dice ahora.** Escribí que 4
+álbumes se quedarían en "sin dato" porque sus hijas no tienen
+`youtube_video_id`; en producción salen con **Last.fm**. El error es de modelo: las
+dos fuentes se rellenan en ejecución, así que "no hay vídeo" no es "no hay dato".
+El script ya no afirma la fuente después del borrado, solo el "antes" (que sí es
+de la base y estaba bien predicho).
+ue había:** `docs/AI_LOG.md` con **7.248 líneas, 406 KB, 125 H2 y 594 H3**.
 Ahora es un índice de 7 KB, y el texto está en `docs/ai-log/` con un fichero por
 época.
 
