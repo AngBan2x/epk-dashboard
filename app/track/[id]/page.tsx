@@ -18,23 +18,12 @@ import { UnifiedMetrics } from "@/components/UnifiedMetrics";
 import { PageTransition, SlideIn } from "@/components/MotionWrappers";
 import { getTrackById, getAllTracks, getArtistByName, getTracksByReleaseId } from "@/lib/db";
 import { resolveTrackRoute } from "@/lib/releases";
+import { hasProductionDetails } from "@/lib/production-fields";
 import { safeString, formatNumber, capitalizeReleaseType, getCoverImage, sumDurations } from "@/lib/null-safe";
 import type { Track } from "@/types/music";
 
 interface TrackDetailPageProps {
   params: Promise<{ id: string }>;
-}
-
-/**
- * ¿Hay algún dato de producción que mostrar? Sin esta comprobación la tarjeta
- * aparece igualmente, con "Sin datos de producción" debajo del título, que es
- * ruido: si no hay datos, la tarjeta no debería existir.
- */
-function hasProductionDetails(details: Track["production_details"] | null | undefined): boolean {
-  if (!details) return false;
-  return Object.values(details).some(
-    (value) => value != null && String(value).trim() !== ""
-  );
 }
 
 export async function generateMetadata({ params }: TrackDetailPageProps): Promise<Metadata> {

@@ -128,10 +128,11 @@ export function ProductionDetails({
           {isOwner && !isEditing && (
             <button
               onClick={() => setIsEditing(true)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+              className="min-h-[36px] min-w-[36px] p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
               title="Editar producción"
+              aria-label="Editar la ficha de producción"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
               </svg>
             </button>
@@ -139,8 +140,9 @@ export function ProductionDetails({
         </div>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+          className="min-h-[36px] min-w-[36px] p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
           title={isExpanded ? "Colapsar" : "Expandir"}
+          aria-label={isExpanded ? "Colapsar la ficha de producción" : "Expandir la ficha de producción"}
         >
           <svg
             className={cn("w-5 h-5 transition-transform", isExpanded && "rotate-180")}

@@ -66,3 +66,34 @@ export const PRODUCTION_INPUT_CLASS =
 
 export const PRODUCTION_CREDITS_LABEL = "Créditos de producción";
 export const PRODUCTION_CREDITS_PLACEHOLDER = "Productor, ingeniero de mezcla, masterización...";
+
+/**
+ * ## ¿Hay ficha técnica que mostrar?
+ *
+ * `ProductionDetails` **siempre** se puede pintar: con todo a `null` enseña
+ * "Sin datos de producción", que es ruido —media tarjeta que dice que no hay
+ * nada—. La pregunta la tiene que responder quien decide si monta el bloque, y
+ * la respuesta es la misma en todas las vistas: la del padre de álbum, la de la
+ * ficha y ahora la de la página de release.
+ *
+ * Por eso vive **aquí**, junto a la especificación de los campos, y no en la
+ * página que la usa: la lógica que decide se comparte, la que lee no
+ * (mismo criterio que `lib/release-page.ts`).
+ *
+ * ⚠️ **Un objeto con todos los campos a `null` NO cuenta como ficha.** Es lo que
+ * escribe el seed en las cabeceras de álbum (`{"daw":null,"guitars":null,…}`),
+ * y confundirlos es lo que pinta "Sin datos de producción" debajo del título de
+ * un disco que sí tiene pistas con ficha.
+ *
+ * `production_credits` cuenta aunque no esté en `PRODUCTION_FIELDS`: es el campo
+ * libre que la gente rellena cuando la ficha no encaja en los diez campos, y
+ * perderlo sería justo el peor fallo de esta función.
+ */
+export function hasProductionDetails(
+  details: Partial<Record<ProductionFieldKey | "production_credits", unknown>> | null | undefined
+): boolean {
+  if (!details) return false;
+  return Object.values(details).some(
+    (value) => value != null && String(value).trim() !== ""
+  );
+}

@@ -240,7 +240,7 @@ export function DownloadGrid({ artistId, artistName = "PressPlay", className = "
                     disabled={loading}
                     aria-label={`Descargar ${row.name} de ${artistName} en ${format.label}`}
                     title={`Descargar ${row.name} en ${format.label}`}
-                    className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-2 py-1.5 text-center text-xs font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 [@container(min-width:30rem)]:px-2.5"
+                    className="inline-flex min-h-[36px] items-center justify-center rounded-lg bg-primary-600 px-2 py-1.5 text-center text-xs font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 [@container(min-width:30rem)]:px-2.5"
                   >
                     {loading ? "Generando…" : format.label}
                   </button>
@@ -260,7 +260,7 @@ export function DownloadGrid({ artistId, artistName = "PressPlay", className = "
           <button
             type="button"
             onClick={() => setError(null)}
-            className="rounded border border-red-400 px-2 py-1 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            className="inline-flex min-h-[36px] items-center rounded border border-red-400 px-2 py-1 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           >
             Cerrar
           </button>

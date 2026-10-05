@@ -65,6 +65,22 @@ vi.mock("@/lib/releases", () => ({
   resolveTrackRoute: vi.fn(),
 }));
 
+/**
+ * `@/lib/db` se mockea entero, y no por limpieza: **importarlo carga
+ * `better-sqlite3`**, un módulo nativo, y al descargar el worker el hook de
+ * limpieza nativo se ejecuta con el isolate ya destruido —la aserción
+ * `node::RemoveEnvironmentCleanupHook (env) != nullptr` y el
+ * `ERR_IPC_CHANNEL_CLOSED` que documenta AGENTS.md—. Se dispara al cargar un
+ * módulo nativo a través de una ruta, que es justo lo que hace esta página.
+ *
+ * Antes esta página solo llegaba a la base por `@/lib/releases`, que está
+ * mockeado, así que el módulo nativo no entraba. Por eso el mock es del módulo
+ * entero y no de una función.
+ */
+vi.mock("@/lib/db", () => ({
+  getArtistByName: vi.fn(),
+}));
+
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ user: null, loading: false, hasRole: () => false }),
 }));
@@ -93,6 +109,7 @@ vi.mock("next/image", () => ({
 }));
 
 import ReleaseDetailPage from "@/app/releases/[id]/page";
+import { getArtistByName } from "@/lib/db";
 import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
 import { NO_VALUE, releaseDurationLabel, releaseMetrics, releaseShape } from "@/lib/release-page";
 import type { Metrics, Track } from "@/types/music";
@@ -163,11 +180,49 @@ async function renderPage(release: ReleaseFixture, children: Partial<Track>[]) {
     ...releaseShape(rel, kids),
   });
   vi.mocked(getReleaseNeighbours).mockResolvedValue({ previous: null, next: null });
+  vi.mocked(getArtistByName).mockResolvedValue({
+    id: "art-1",
+    name: rel.artist_name,
+  } as Awaited<ReturnType<typeof getArtistByName>>);
 
   render(await ReleaseDetailPage({ params: { id: rel.id } }));
 }
 
 const bodyText = () => document.body.textContent ?? "";
+
+/**
+ * Los encabezados `<h2>` de la página, en orden de documento y tal cual.
+ *
+ * A diferencia de `sectionHeadings` (abajo), este mira **todos** los `<h2>`. Se
+ * usa para los bloques que traen su propio encabezado —`VideoShowcase` dice
+ * "Videoclip Oficial"—, que es donde hace falta verlos.
+ */
+const rawHeadings = () =>
+  Array.from(document.querySelectorAll("h2")).map((h) => (h.textContent ?? "").trim());
+
+/**
+ * Los encabezados de las **secciones de la página**, en orden de documento, sin
+ * el contador de pistas.
+ *
+ * Dos decisiones, y las dos importan:
+ *
+ * - **Por `aria-labelledby`, no por todos los `<h2>`.** Es lo que ata una sección
+ *   a su título: si alguien borra el atributo, esta lista deja de ver la sección y
+ *   el test se pone rojo por el motivo correcto. Y los bloques de ficha que se
+ *   montan en el bloque 7 traen su PROPIO `<h2>` dentro, así que contarlos sería
+ *   contar cosas que este test no controla.
+ * - **Sin el contador de pistas.** El diseño escribe "Pistas (8)" en el álbum y
+ *   "Pistas (1)" en el single, y comparar contra una lista fija obligaría a
+ *   duplicarla por cada número posible. El contador se comprueba aparte.
+ */
+const headings = () =>
+  Array.from(document.querySelectorAll("section[aria-labelledby]"))
+    .map((section) => {
+      const id = section.getAttribute("aria-labelledby") ?? "";
+      return document.getElementById(id)?.textContent?.trim() ?? "";
+    })
+    .filter((text) => text !== "")
+    .map((text) => text.replace(/\s*\(\d+\)$/, ""));
 
 beforeEach(() => {
   mockPlayQueue.mockClear();
@@ -456,10 +511,29 @@ describe("P2 · un id que no existe", () => {
  *   pasar un revert que devolviera las secciones en otro orden.
  * - La letra pequeña: `Descripción` no es `Descripción del álbum`, y el
  *   `includes` de un texto más largo no distingue una cosa de la otra.
+ *
+ * ⚠️ **Los encabezados se leen de los `<section aria-labelledby>`, no de todos
+ * los `<h2>` de la página**, y el motivo es concreto: los bloques de ficha que
+ * se montan en el bloque 7 (`VideoShowcase`, `ProductionDetails`) traen su
+ * PROPIO `<h2>` dentro. Con `querySelectorAll("h2")` este guard empezaría a
+ * contar cabeceras de terceros, y un test que cuenta cosas que no controla es un
+ * test que un día se rompe solo y nadie sabe qué protegía.
  */
 describe("C1 · la página de release tiene las cuatro secciones", () => {
   /** Las cuatro, en el orden del diseño acordado. */
   const SECTIONS = ["Descripción", "Pistas", "Enlaces", "Letra"] as const;
+
+  /**
+   * La quinta sección, y no es una más: la de **descargas para prensa**, que
+   * `/track/[id]` montaba con alcance de artista y que al quedar en 301 se quedó
+   * sin ninguna página donde estar (ver el bloque 7). Va **después** de las
+   * cuatro, para que el orden acordado no se mezcle con ella.
+   *
+   * Se nombra aquí y no en el bloque 7 porque este test es el que ata el
+   * **esqueleto completo** de la página: si mañana aparece una sexta sección sin
+   * que nadie laanuncia, esta lista la ve.
+   */
+  const PRESS = "Ficha técnica para prensa";
 
   async function renderFullRelease() {
     await renderPage(
@@ -478,18 +552,14 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
     );
   }
 
-  /** Los encabezados `<h2>` de la página, en orden de documento y tal cual. */
-  const rawHeadings = () =>
-    Array.from(document.querySelectorAll("h2")).map((h) => (h.textContent ?? "").trim());
-
   /**
-   * Los mismos, sin el contador de pistas. El diseño escribe "Pistas (8)" en
-   * el álbum y "Pistas (1)" en el single, así que comparar contra una lista
-   * fija obligaría a duplicar la lista por cada número posible. El contador se
-   * comprueba aparte, en el test de la sección de pistas.
+   * Los encabezados de las **secciones de la página**, en orden de documento.
+   *
+   * Se usa el `aria-labelledby` porque es lo que ata una sección a su título: si
+   * alguien borra el atributo, esta lista deja de ver la sección y el test se
+   * pone rojo por el motivo correcto (la sección ya no se anuncia).
    */
-  const headings = () =>
-    rawHeadings().map((text) => text.replace(/\s*\(\d+\)$/, ""));
+  const sectionHeadings = headings;
 
   it("con descripción, pistas, enlaces y letra salen las CUATRO", async () => {
     await renderFullRelease();
@@ -497,12 +567,11 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
     for (const section of SECTIONS) {
       expect(rendered).toContain(section);
     }
-    expect(rendered).toHaveLength(SECTIONS.length);
   });
 
-  it("y en el orden del diseño: descripción, pistas, enlaces, letra", async () => {
+  it("y en el orden del diseño: descripción, pistas, enlaces, letra, y prensa", async () => {
     await renderFullRelease();
-    expect(headings()).toEqual([...SECTIONS]);
+    expect(headings()).toEqual([...SECTIONS, PRESS]);
   });
 
   it("las tres secciones de datos quedan enlazadas a su encabezado", async () => {
@@ -543,15 +612,199 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
     const rendered = headings();
     expect(rendered).not.toContain("Letra");
     expect(rendered).not.toContain("Enlaces");
-    expect(rendered).toEqual(["Descripción", "Pistas"]);
+    expect(rendered).toEqual(["Descripción", "Pistas", PRESS]);
   });
 
   it("el texto de una sección ausente no puede pasar por presente", async () => {
     // `Descripción` es subcadena de `Descripción del álbum`: un `includes`
     // sobre el texto completo de la página daría verde con la sección
-    // equivocada. El test mira los `<h2>`, no el `bodyText`.
+    // equivocada. El test mira los encabezados de sección, no el `bodyText`.
     await renderPage({ id: "rel-nodesc", description: null, lyrics: null }, [{ id: "c1" }]);
     expect(headings()).not.toContain("Descripción");
     expect(bodyText()).not.toContain("Descripción del álbum");
+  });
+});
+
+/* ── 7. C1-bis · la ficha de una pista, que el 301 dejó sin página ─────────── */
+
+/**
+ * ## Qué es esto
+ *
+ * `/track/[id]` es un **301 para toda fila**: si es hija va al release de su
+ * padre, y si es cabecera va a su propio release. Su ficha —videoclip, ficha
+ * técnica, galería de prensa— queda por tanto solo para las huérfanas, y esos
+ * bloques no estaban en la página de release. Es decir: **no tenían ninguna
+ * página donde estar**.
+ *
+ * La regla es la del enunciado del enunciado de siempre: `!isMultiTrack` es
+ * "esta fila es una canción". Con hijas, un disco no tiene videoclip oficial
+ * propio ni una afinación única, y pintarlos sería la tarjeta vacía que este
+ * proyecto ya pagó una vez.
+ *
+ * Lo que se prueba aquí:
+ *
+ * 1. Los tres bloques de pista vuelven cuando hay dato.
+ * 2. **No** se montan cuando el lanzamiento tiene hijas.
+ * 3. La descarga de prensa se monta en **los dos** casos, porque es del artista.
+ * 4. Los enlaces se leen de **todas** las columnas, no solo de
+ *    `external_links`: para 7 de los 9 singles del catálogo esa columna está
+ *    vacía y sus enlaces viven en `spotify_url`, `itunes_track_id` y
+ *    `youtube_video_id`.
+ */
+describe("C1-bis · la ficha de una pista vuelve a la página de release", () => {
+  /** Un single con todo lo que tenía `/track/[id]` y ya no tenía página. */
+  const ficha = {
+    id: "rel-ficha",
+    title: "Bohemian Rhapsody",
+    youtube_video_id: "fJ9rUzIMcZQ",
+    video_embed_url: "https://www.youtube.com/watch?v=fJ9rUzIMcZQ",
+    gallery_images: ["https://example.test/prensa/1.jpg"],
+    spotify_url: "https://open.spotify.test/track/7tFiy",
+    itunes_track_id: "158672215",
+    production_details: {
+      daw: "EMI Studios (16-track tape)",
+      guitars: "Brian May Red Special",
+      effects_chain: "Deacy Amp + AC30 + Univibe",
+      tuning: "Standard E",
+      key: "B\u266d Major",
+    },
+  } as ReleaseFixture;
+
+  it("un single con vídeo monta el Videoclip Oficial", async () => {
+    await renderPage(ficha, []);
+    // `VideoShowcase` solo se monta si hay `youtubeVideoId` o `videoEmbedUrl`, y
+    // su encabezado trae un icono delante (`▶ Videoclip Oficial`), así que la
+    // comprobación es por `bodyText` y no por igualdad de `<h2>`.
+    expect(bodyText()).toContain("Videoclip Oficial");
+  });
+
+  it("un single con ficha técnica la muestra, y la del seed no", async () => {
+    await renderPage(ficha, []);
+    // `ProductionDetails` sale **plegado**: por defecto enseña el resumen
+    // (género, BPM, tonalidad, sub-género y mood) y no los diez campos. Por eso
+    // el test mira la tonalidad, que sí está en el resumen, y no la guitarra.
+    expect(bodyText()).toContain("B\u266d Major");
+
+    // El caso contrario, y es el importante: el objeto de `production_details`
+    // con TODO a `null` —lo que escribe el seed en las cabeceras de álbum— no es
+    // una ficha. Sin el filtro salía "Sin datos de producción" debajo del
+    // título, que es la tarjeta vacía.
+    await renderPage(
+      {
+        id: "rel-sinficha",
+        production_details: {
+          daw: null,
+          guitars: null,
+          effects_chain: null,
+          tuning: null,
+          key: null,
+        },
+      },
+      []
+    );
+    expect(bodyText()).not.toContain("Sin datos de producción");
+  });
+
+  it("un single con fotos de prensa monta la galería", async () => {
+    await renderPage(ficha, []);
+    expect(bodyText()).toContain("Galería de Prensa");
+  });
+
+  it("un álbum NO monta los bloques de pista: no tiene videoclip ni afinación propia", async () => {
+    // El padre puede tener `youtube_video_id` (Kid A lo tiene) y un
+    // `production_details` con todo a `null`. Ensañárselos al visitante sería
+    // afirmar que el disco entero tiene un videoclip y una afinación.
+    await renderPage(
+      {
+        id: "rel-album-ficha",
+        youtube_video_id: "ALBUMVIDEO01",
+        production_details: { daw: "Pro Tools", key: "D minor" } as Track["production_details"],
+      },
+      [{ id: "c1" }, { id: "c2" }]
+    );
+    expect(bodyText()).not.toContain("Videoclip Oficial");
+    expect(bodyText()).not.toContain("D minor");
+  });
+
+  it("la descarga de prensa sale en los dos casos, y con el alcance del artista", async () => {
+    // Es del ARTISTA, no de la pista: por eso se monta también en un álbum. Y es
+    // la mitad del motivo por el que existe un EPK.
+    await renderPage(ficha, []);
+    expect(bodyText()).toContain("Ficha técnica para prensa");
+
+    await renderPage({ id: "rel-album-press" }, [{ id: "c1" }]);
+    expect(bodyText()).toContain("Ficha técnica para prensa");
+  });
+
+  it("los enlaces se leen de spotify_url e itunes_track_id, no solo de external_links", async () => {
+    // El caso real de 7 de los 9 singles: `external_links` vacío y los enlaces en
+    // las columnas de la fila. Antes la sección entera no se montaba, porque la
+    // condición era `Object.keys(external_links).length > 0`.
+    await renderPage({ ...ficha, external_links: {} }, []);
+    const links = Array.from(document.querySelectorAll('a[target="_blank"]'));
+    const hrefs = links.map((a) => a.getAttribute("href") ?? "");
+    expect(hrefs).toContain("https://open.spotify.test/track/7tFiy");
+    // El dominio de Apple es el real y va **hardcodeado**, igual que en la ficha
+    // de `/track/[id]`: `itunes_track_id` es un id de iTunes y su URL pública se
+    // compone aquí, no hay columna que traiga el enlace completo.
+    expect(hrefs).toContain("https://music.apple.com/us/album/158672215");
+    expect(hrefs).toContain("https://www.youtube.com/watch?v=fJ9rUzIMcZQ");
+  });
+
+  it("el placeholder '—' de safeString no se convierte en un enlace", async () => {
+    // `lib/db.ts` pasa las columnas por `safeString`, que convierte `""` en el
+    // string truthy "—". Un `!= null` lo habría pintado como botón, y el botón
+    // llevaría a una página que no existe.
+    await renderPage(
+      {
+        id: "rel-placeholder",
+        spotify_url: "—",
+        itunes_track_id: null,
+        youtube_video_id: null,
+        external_links: { spotify: "", apple_music: "—", youtube: "" },
+      },
+      []
+    );
+    expect(document.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
+    expect(headings()).not.toContain("Enlaces");
+  });
+
+  it("no sale un enlace por plataforma cuando las dos columnas coinciden", async () => {
+    // `external_links.youtube` y `youtube_video_id` apuntan al mismo vídeo: sale
+    // UN botón, no dos.
+    await renderPage(
+      {
+        id: "rel-doble",
+        youtube_video_id: "fJ9rUzIMcZQ",
+        external_links: {
+          spotify: "",
+          apple_music: "",
+          youtube: "https://www.youtube.com/watch?v=fJ9rUzIMcZQ",
+        },
+      },
+      []
+    );
+    const hrefs = Array.from(document.querySelectorAll('a[target="_blank"]')).map(
+      (a) => a.getAttribute("href") ?? ""
+    );
+    expect(hrefs.filter((h) => h.includes("youtube.com"))).toHaveLength(1);
+  });
+
+  it("deezer y bandcamp salen, que antes no se leían", async () => {
+    await renderPage(
+      {
+        id: "rel-deezer",
+        external_links: {
+          spotify: "",
+          apple_music: "",
+          youtube: "",
+          deezer: "https://deezer.test/track/1",
+          bandcamp: "https://bandcamp.test/track/1",
+        },
+      },
+      []
+    );
+    expect(bodyText()).toContain("Deezer");
+    expect(bodyText()).toContain("Bandcamp");
   });
 });

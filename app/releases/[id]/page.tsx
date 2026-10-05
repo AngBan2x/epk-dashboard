@@ -4,6 +4,12 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ReleaseActions } from "@/components/ReleaseActions";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
+import { VideoShowcase } from "@/components/VideoShowcase";
+import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper";
+import { ImageGalleryWrapper } from "@/components/ImageGalleryWrapper";
+import { CatalogDownloadButton } from "@/components/CatalogDownloadButton";
+import { getArtistByName } from "@/lib/db";
+import { hasProductionDetails } from "@/lib/production-fields";
 import {
   capitalizeReleaseType,
   formatDateES,
@@ -15,6 +21,7 @@ import {
 import { metricsTooltip } from "@/lib/metrics-source";
 import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
 import { NO_VALUE, ownDurationLabel } from "@/lib/release-page";
+import type { Track } from "@/types/music";
 
 interface ReleaseDetailPageProps {
   params: { id: string };
@@ -132,6 +139,17 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
 
   const neighbours = await getReleaseNeighbours(release);
 
+  /**
+   * El artista, para el bloque de descargas de prensa.
+   *
+   * `getReleaseNeighbours` ya lo busca por dentro para el catálogo, así que esto
+   * no introduce una fuente de datos nueva: es la **misma** fila de `artists`,
+   * leída por su nombre. Lo que hace falta es el `id`, porque `dossier` y
+   * `rider` lo exigen en servidor (`lib/export-bundle.ts` responde 400 sin él) y
+   * son las dos secciones por las que un periodista viene aquí.
+   */
+  const artist = await getArtistByName(release.artist_name);
+
   const cover = getCoverImage(release);
   const type = capitalizeReleaseType(release.release_type);
   const metricsTitle = metricsTooltip(metrics);
@@ -150,6 +168,23 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
    * P2 y no es diseño: se conserva.
    */
   const listedTracks = childTracks.length > 0 ? childTracks : [release];
+
+  /**
+   * ## Esta fila ES una pista
+   *
+   * La misma fila es cabecera de release y pista, y **no hay forma de decirlo por
+   * el esquema**: la única señal es si tiene hijas. Así que `!isMultiTrack` es
+   * exactamente "esta fila es una canción".
+   *
+   * De eso depende la ficha: el videoclip, la ficha técnica y la galería de
+   * prensa son **datos de una pista**, no de un disco. Un álbum no tiene
+   * videoclip oficial propio ni una única afinación, y pintarlos sería la
+   * tarjeta vacía que la plantilla de `/track/[id]` ya tenía (era su rama
+   * `isRelease`). La descarga de prensa, en cambio, es **del artista**, y se
+   * muestra en los dos casos: es la mitad del motivo por el que existe un EPK.
+   */
+  const isTrackRow = !isMultiTrack;
+  const links = buildReleaseLinks(release);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -261,45 +296,26 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
         </section>
 
         {/* ── 3 · Enlaces ──────────────────────────────────────────────────── */}
-        {release.external_links && Object.keys(release.external_links).length > 0 ? (
+        {/*
+          `links` es la unión de todas las fuentes, no solo de
+          `external_links`. Antes se leía únicamente `external_links`, y para 7 de
+          los 9 singles del catálogo esa columna está vacía: su Spotify y su Apple
+          Music viven en `spotify_url` e `itunes_track_id`, y su vídeo en
+          `youtube_video_id`. El resultado era una sección de Enlaces que **no
+          salía**, con el single lleno de enlaces en la base de datos.
+        */}
+        {links.length > 0 ? (
           <section className="mb-8" aria-labelledby="release-links">
             <h2 id="release-links" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
               Enlaces
             </h2>
             <div className="flex flex-wrap gap-3">
-              {release.external_links.spotify ? (
-                <ExternalLink
-                  href={release.external_links.spotify}
-                  className="bg-[#1DB954] hover:bg-[#1ed760]"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                  </svg>
-                  Spotify
+              {links.map((link) => (
+                <ExternalLink key={link.key} href={link.href} className={link.className}>
+                  {link.icon}
+                  {link.label}
                 </ExternalLink>
-              ) : null}
-              {release.external_links.apple_music ? (
-                <ExternalLink
-                  href={release.external_links.apple_music}
-                  className="bg-[#FC3C44] hover:bg-[#e0353c]"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043A5.022 5.022 0 0019.2.25a9.472 9.472 0 00-1.317-.24c-.58-.06-1.16-.08-1.74-.06H7.857c-.58-.02-1.16 0-1.74.06-.46.04-.92.1-1.36.2A5.022 5.022 0 002.426.89C1.308 1.624.564 2.624.246 3.934a9.23 9.23 0 00-.24 2.19c-.06.58-.08 1.16-.06 1.74v10.68c-.02.58 0 1.16.06 1.74.04.46.1.92.24 1.36.318 1.31 1.062 2.31 2.18 3.043a9.472 9.472 0 001.868.64c.44.1.9.16 1.36.2.58.06 1.16.08 1.74.06h8.286c.58.02 1.16 0 1.74-.06.46-.04.92-.1 1.36-.2a5.022 5.022 0 001.868-.64c1.118-.734 1.862-1.734 2.18-3.043.14-.44.2-.9.24-1.36.06-.58.08-1.16.06-1.74V7.864c.02-.58 0-1.16-.06-1.74zM17.994 15.854l-.002-6.48-5.496 3.22v6.08l5.498-2.82z" />
-                  </svg>
-                  Apple Music
-                </ExternalLink>
-              ) : null}
-              {release.external_links.youtube ? (
-                <ExternalLink
-                  href={release.external_links.youtube}
-                  className="bg-[#FF0000] hover:bg-[#cc0000]"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                  </svg>
-                  YouTube
-                </ExternalLink>
-              ) : null}
+              ))}
             </div>
           </section>
         ) : null}
@@ -317,6 +333,94 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             </div>
           </section>
         ) : null}
+
+        {/* ── La ficha de una PISTA: lo que el 301 dejó sin página ─────────── */}
+        {/*
+          `/track/[id]` es hoy un 301 para **toda** fila —hija o cabecera—, así que
+          su ficha solo se renderiza para las huérfanas. Con eso, el videoclip
+          oficial, la ficha técnica y la galería de prensa de un single dejaron de
+          tener **ninguna** página donde estar: no estaban en la de release y la
+          otra es un redirect.
+
+          Aquí vuelven, y solo cuando la fila **es** una pista (`isTrackRow`): un
+          álbum no tiene un videoclip oficial propio ni una única afinación, y
+          enseñar esos datos como si los tuviera sería la tarjeta vacía que este
+          proyecto ya pagó una vez (era la rama `isRelease` de `/track/[id]`).
+        */}
+        {isTrackRow && (release.youtube_video_id || release.video_embed_url) ? (
+          <section className="mb-8">
+            <VideoShowcase
+              youtubeVideoId={release.youtube_video_id}
+              videoEmbedUrl={release.video_embed_url}
+              title="Videoclip Oficial"
+              coverImage={cover}
+            />
+          </section>
+        ) : null}
+
+        {isTrackRow && hasProductionDetails(release.production_details) ? (
+          <section className="mb-8">
+            <ProductionDetailsWrapper
+              details={release.production_details}
+              trackId={release.id}
+              artistName={release.artist_name}
+            />
+          </section>
+        ) : null}
+        {isTrackRow && release.gallery_images && release.gallery_images.length > 0 ? (
+          <section className="mb-8">
+            <ImageGalleryWrapper
+              images={release.gallery_images}
+              title="Galería de Prensa"
+              trackId={release.id}
+              artistName={release.artist_name}
+            />
+          </section>
+        ) : null}
+
+        {/* ── Ficha técnica para prensa ─────────────────────────────────────── */}
+        {/*
+          Esto NO es de la pista: es **del artista**, y es la mitad del motivo por
+          el que existe un EPK. `dossier` y `rider` exigen `artist_id` en servidor
+          (`lib/export-bundle.ts` responde 400 sin él), así que sin este bloque no
+          había forma de bajar nada desde una ficha de lanzamiento: la única otra
+          página que montaba `CatalogDownloadButton` con alcance de artista era
+          `/track/[id]`, que es un 301.
+
+          Sin artista en la tabla `artists` degrada solo: `artistId` va a `null`, el
+          componente **no monta** las dos filas que lo exigen (en vez de
+          deshabilitarlas) y el catálogo sigue funcionando.
+        */}
+        <section className="mb-8" aria-labelledby="release-press">
+          <h2 id="release-press" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+            Ficha técnica para prensa
+          </h2>
+          <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+            {artist ? (
+              <>
+                Descarga el catálogo de{" "}
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {safeString(artist.name)}
+                </span>
+                : dossier de prensa, rider técnico y fichas de cada lanzamiento
+                aprobado, con métricas y enlaces.
+              </>
+            ) : (
+              <>
+                Descarga el catálogo público de PressPlay con métricas, enlaces y
+                detalles de producción de cada lanzamiento aprobado. El dossier y el
+                rider son por artista y todavía no hay ficha de artista para{" "}
+                {safeString(release.artist_name)}.
+              </>
+            )}
+          </p>
+          <CatalogDownloadButton
+            artistId={artist?.id ?? null}
+            artistName={
+              artist ? safeString(artist.name) : safeString(release.artist_name, "PressPlay")
+            }
+          />
+        </section>
 
         {/* ── Anterior / siguiente, SOBRE LANZAMIENTOS ────────────────────── */}
         {/*
@@ -383,6 +487,148 @@ function ExternalLink({
       {children}
     </a>
   );
+}
+
+const SPOTIFY_ICON = (
+  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+  </svg>
+);
+
+const APPLE_ICON = (
+  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043A5.022 5.022 0 0019.2.25a9.472 9.472 0 00-1.317-.24c-.58-.06-1.16-.08-1.74-.06H7.857c-.58-.02-1.16 0-1.74.06-.46.04-.92.1-1.36.2A5.022 5.022 0 002.426.89C1.308 1.624.564 2.624.246 3.934a9.23 9.23 0 00-.24 2.19c-.06.58-.08 1.16-.06 1.74v10.68c-.02.58 0 1.16.06 1.74.04.46.1.92.24 1.36.318 1.31 1.062 2.31 2.18 3.043a9.472 9.472 0 001.868.64c.44.1.9.16 1.36.2.58.06 1.16.08 1.74.06h8.286c.58.02 1.16 0 1.74-.06.46-.04.92-.1 1.36-.2a5.022 5.022 0 001.868-.64c1.118-.734 1.862-1.734 2.18-3.043.14-.44.2-.9.24-1.36.06-.58.08-1.16.06-1.74V7.864c.02-.58 0-1.16-.06-1.74zM17.994 15.854l-.002-6.48-5.496 3.22v6.08l5.498-2.82z" />
+  </svg>
+);
+
+const YOUTUBE_ICON = (
+  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+);
+
+const DEEZER_ICON = (
+  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M18.81 4.16v3.19h-4.78V4.16h4.78zm0 4.57v3.19h-4.78V8.73h4.78zm0 4.58v3.19h-4.78v-3.19h4.78zM6.39 4.16v3.19H1.61V4.16h4.78zm0 4.57v3.19H1.61V8.73h4.78zm0 4.58v3.19H1.61v-3.19h4.78zM12.6 9.56v7.93h-4.78V9.56h4.78z" />
+  </svg>
+);
+
+interface ReleaseLink {
+  key: string;
+  href: string;
+  label: string;
+  className: string;
+  icon: React.ReactNode;
+}
+
+/**
+ * ## Los enlaces de un lanzamiento, de TODAS las fuentes
+ *
+ * Hay dos sitios donde vive un enlace a una plataforma, y se llenan por caminos
+ * distintos:
+ *
+ * | Plataforma | Columna "preferida" | La que se leía antes |
+ * |---|---|---|
+ * | Spotify | `external_links.spotify` | `external_links.spotify` |
+ * | Apple Music | `external_links.apple_music` | `external_links.apple_music` |
+ * | YouTube | `external_links.youtube` | `external_links.youtube` |
+ * | Deezer | `external_links.deezer` | — no salía |
+ * | Bandcamp | `external_links.bandcamp` | — no salía |
+ *
+ * Con **solo** `external_links`, 7 de los 9 singles del catálogo no tenían
+ * sección de Enlaces: su Spotify está en `spotify_url`, su Apple en
+ * `itunes_track_id` y su vídeo en `youtube_video_id`. La sección se escondía
+ * entera porque la condición era `Object.keys(external_links).length > 0`.
+ *
+ * Las reglas son tres, y las tres importan:
+ *
+ * 1. **Primero `external_links`, después la columna de la fila.** Es la que
+ *    escribe una persona; la otra la rellena un proceso. Si las dos existen, gana
+ *    la curada.
+ * 2. **`""` es ausencia.** `lib/db.ts` pasa la columna por `safeString`, que
+ *    convierte `""` en el string **truthy** `"—"`. Por eso hay que filtrar por
+ *    largo y no por "no es null": sin esto, un `external_links.spotify` vacío
+ *    pinta un botón que lleva a una página que no existe.
+ * 3. **Un enlace por plataforma.** Si `external_links.youtube` y
+ *    `youtube_video_id` apuntan al mismo vídeo, sale **un** botón. Con un
+ *    `??` por plataforma sale solo, y por eso no hace falta un `Set`.
+ */
+function buildReleaseLinks(release: Track): ReleaseLink[] {
+  const external = release.external_links ?? {};
+  const links: ReleaseLink[] = [];
+
+  const usable = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    // `—` es el placeholder de `safeString` para una columna vacía.
+    if (trimmed === "" || trimmed === "—" || trimmed === "-") return null;
+    return trimmed;
+  };
+
+  const spotify = usable(external.spotify) ?? usable(release.spotify_url);
+  if (spotify) {
+    links.push({
+      key: "spotify",
+      href: spotify,
+      label: "Spotify",
+      className: "bg-[#1DB954] hover:bg-[#1ed760]",
+      icon: SPOTIFY_ICON,
+    });
+  }
+
+  const apple =
+    usable(external.apple_music) ??
+    (usable(release.itunes_track_id)
+      ? `https://music.apple.com/us/album/${usable(release.itunes_track_id)}`
+      : null);
+  if (apple) {
+    links.push({
+      key: "apple",
+      href: apple,
+      label: "Apple Music",
+      className: "bg-[#FC3C44] hover:bg-[#e0353c]",
+      icon: APPLE_ICON,
+    });
+  }
+
+  const youtube =
+    usable(external.youtube) ??
+    (usable(release.youtube_video_id)
+      ? `https://www.youtube.com/watch?v=${usable(release.youtube_video_id)}`
+      : null);
+  if (youtube) {
+    links.push({
+      key: "youtube",
+      href: youtube,
+      label: "YouTube",
+      className: "bg-[#FF0000] hover:bg-[#cc0000]",
+      icon: YOUTUBE_ICON,
+    });
+  }
+
+  const deezer = usable(external.deezer);
+  if (deezer) {
+    links.push({
+      key: "deezer",
+      href: deezer,
+      label: "Deezer",
+      className: "bg-[#a238ff] hover:bg-[#8f2ee0]",
+      icon: DEEZER_ICON,
+    });
+  }
+
+  const bandcamp = usable(external.bandcamp);
+  if (bandcamp) {
+    links.push({
+      key: "bandcamp",
+      href: bandcamp,
+      label: "Bandcamp",
+      className: "bg-[#629aa9] hover:bg-[#548794]",
+      icon: null,
+    });
+  }
+
+  return links;
 }
 
 const CHEVRON_LEFT = "M15 19l-7-7 7-7";
