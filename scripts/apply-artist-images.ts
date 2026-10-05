@@ -112,21 +112,34 @@ const CURATED: Record<string, Curated> = {
       "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2025_Radiohead_live_concert_at_Uber_Arena%2C_Berlin_07.jpg/1280px-2025_Radiohead_live_concert_at_Uber_Arena%2C_Berlin_07.jpg",
     creditos: "Raph_PH, CC BY 4.0 - Uber Arena, Berlin, 2025",
   },
-  "Björk": {
-    profile:
-      "https://upload.wikimedia.org/wikipedia/commons/9/98/Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg",
-    // Sin banner: la unica panoramica decente (Björk live Paris 2023) sale
-    // casi negra con la artista diminuta al fondo. Mejor el degradado.
-    banner: null,
-    creditos: "Rlef89, CC BY-SA 2.0 - Cirque en Chantier, 2013",
-  },
-  "David Bowie": {
-    profile:
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/David_Bowie_Live_1974.jpg/1280px-David_Bowie_Live_1974.jpg",
-    banner:
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/David_Bowie_Live_1974.jpg/1280px-David_Bowie_Live_1974.jpg",
-    creditos: "RCA Records, dominio publico - Young Americans tour, 1974",
-  },
+  // ------------------------------------------------------------------
+  // Björk y David Bowie NO están en esta tabla, y antes sí.
+  //
+  // Tenían candidatas que pasaban el verificador HTTP, pero el usuario decidió
+  // dejarlos fuera, y el script seguía proponiéndolos: un `--apply` cualquiera
+  // habría escrito justo lo que se había rechazado. Un dry-run que propone lo
+  // que no se quiere es peor que no tener dry-run, porque enseña a no leerlo.
+  //
+  // **David Bowie — confirmado que no funciona.**
+  // https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/David_Bowie_Live_1974.jpg/1280px-David_Bowie_Live_1974.jpg
+  // 1280x1280, Bowie en el tercio derecho y el 40% izquierdo negro puro. Un
+  // recorte circular centrado —que es como se pinta el avatar— sale negro con
+  // una franja de traje blanco. Como banner tampoco: es cuadrada.
+  //
+  // **Björk — el veredicto es el contrario, y por eso queda anotado.**
+  // https://upload.wikimedia.org/wikipedia/commons/9/98/Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg
+  // 1000x1416, portrait, **centrada y ocupando el encuadre**: en círculo funciona,
+  // con la cara y el tocado naranja. Es una foto de escenario con grano, pero el
+  // contraste es real. Su banner sí que no hay: la única panorámica decente
+  // (Björk live Paris 2023) sale casi negra con la artista diminuta al fondo.
+  //
+  // Si se cambia de idea, es una entrada de 4 líneas y un dry-run:
+  //   "Björk": {
+  //     profile: "https://upload.wikimedia.org/wikipedia/commons/9/98/Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg",
+  //     banner: null,
+  //     creditos: "Rlef89, CC BY-SA 2.0 - Cirque en Chantier, 2013",
+  //   },
+  // ------------------------------------------------------------------
   Kraftwerk: {
     // Sin avatar: la foto buena de grupo es panoramica y a 850 px de ancho, y las
     // caras quedan diminutas al recortar en circulo.

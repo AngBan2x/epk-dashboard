@@ -27,6 +27,7 @@ import {
   type Candidate,
   type ImageRole,
 } from "@/lib/artist-images";
+import { sinComentarios } from "../helpers/strip-comments";
 
 const radiohead = getArtistIdentity("Radiohead") as ArtistIdentity;
 const bjork = getArtistIdentity("Björk") as ArtistIdentity;
@@ -396,6 +397,68 @@ describe("cobertura del catalogo", () => {
     for (const a of ARTIST_IDENTITIES) {
       expect(a.terms.length).toBeGreaterThan(0);
       for (const t of a.terms) expect(t.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
+
+/**
+ * C5 — el script de aplicación no debe proponer lo que el usuario rechazó.
+ *
+ * El fallo que motivó esto: Björk y David Bowie tenían candidatas que pasaban el
+ * verificador HTTP y **seguían en la tabla**, después de que se decidiera
+ * dejarlos fuera. El dry-run proponía 4 escrituras (2 perfiles + el banner de
+ * Bowie) que nadie quería, y `--apply` las habría hecho sin preguntar.
+ *
+ * Con estas dos fotos miradas una a una:
+ *
+ *   Bowie — confirmado que no funciona. 1280x1280, el 40% izquierdo negro puro
+ *           y el sujeto en el tercio derecho: el recorte circular centrado
+ *           (como se pinta el avatar) sale negro con una franja de traje.
+ *   Björk — sí funcionaría. 1000x1416, portrait, centrada y ocupando el
+ *           encuadre. Se queda fuera por decisión del usuario, no por calidad,
+ *           y por eso el script lo anota con la URL y el motivo.
+ *
+ * El resto del catálogo sí se queda como estaba: `thumb.wikimedia.org` es un
+ * alias que funciona, así que canonicalizarlo a `upload.wikimedia.org` es
+ * cosmético y no se ha escrito.
+ */
+describe("C5 — la tabla curada no revivida lo que se rechazo", () => {
+  const SCRIPT = fs.readFileSync(path.resolve(process.cwd(), "scripts/apply-artist-images.ts"), "utf8");
+  /** El fuente SIN comentarios: la tabla vive entre `const CURATED` y `type Campo`. */
+  const CODIGO = sinComentarios(SCRIPT);
+
+  /** El cuerpo de `CURATED` **sin comentarios**: si no, el ejemplo de
+   * "si cambias de idea" que hay arriba contaria como una entrada viva. */
+  function tablaCurada(): string {
+    return CODIGO.slice(CODIGO.indexOf("const CURATED"), CODIGO.indexOf("type Campo"));
+  }
+
+  it("Björk y David Bowie NO tienen entrada en la tabla", () => {
+    const tabla = tablaCurada();
+    // Se busca la clave como elemento del objeto ("Nombre": {), no la mención.
+    expect(tabla).not.toMatch(/"Björk":\s*\{/);
+    expect(tabla).not.toMatch(/"David Bowie":\s*\{/);
+  });
+
+  it("pero el motivo y la URL quedan escritos, para no perder el trabajo", () => {
+    // Si alguien las quita sin dejar rastro, la decisión se pierde y el
+    // siguiente tiene que volver a buscar la foto y a mirarla.
+    expect(SCRIPT).toContain("Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg");
+    expect(SCRIPT).toContain("David_Bowie_Live_1974.jpg");
+    expect(SCRIPT).toContain("centrada y ocupando el encuadre");
+  });
+
+  it("los tres que sí están en la tabla siguen sin avatar, a propósito", () => {
+    // Pink Floyd, Radiohead y Kraftwerk: no hay retrato de grupo utilizable en
+    // Commons, solo fotos de escenario. El degradado de ArtistHero hace de
+    // avatar, que es mejor que un recorte malo.
+    for (const nombre of ["Pink Floyd", "Radiohead", "Kraftwerk"]) {
+      // La clave puede ir con comillas ("Pink Floyd") o sin ellas (Radiohead):
+      // en JavaScript las dos formas son claves válidas y la tabla usa las dos.
+      const patron = new RegExp(`"?${nombre}"?:\\s*\\{[\\s\\S]*?\\n  \\}`);
+      const bloque = tablaCurada().match(patron);
+      expect(bloque, nombre).not.toBeNull();
+      expect(bloque?.[0]).toMatch(/profile:\s*null/);
     }
   });
 });

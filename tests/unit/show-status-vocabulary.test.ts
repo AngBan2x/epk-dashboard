@@ -11,7 +11,7 @@
  *   4. `app/api/shows/route.ts`       → `z.enum` de 13, en POST y en PUT
  *
  * Cuatro listas y ninguna comprobación de que coincidieran. Y el `| string` del
- * punto 2 era lo que lo wateringdownaba todo: un `ShowStatus` no restringía nada,
+ * punto 2 era lo que lo anulaba entero: un `ShowStatus` no restringía nada,
  * así que un estado inventado pasaba por TypeScript sin quejarse y el `z.enum` —
  * que sí restringía, y a 13 — era lo único que de verdad filtraba. Es decir: el
  * backend aceptaba `finalizado` y `en_venta` mientras el compilador decía que no
@@ -34,29 +34,13 @@ import {
   toShowStatus,
 } from "@/lib/show-status";
 import type { ShowStatus } from "@/types/music";
+import { sinComentarios } from "../helpers/strip-comments";
 
 const TYPES_SRC = readFileSync(resolve(process.cwd(), "types/music.ts"), "utf8");
 const SHOWS_ROUTE = readFileSync(resolve(process.cwd(), "app/api/shows/route.ts"), "utf8");
 const SHOW_FORM = readFileSync(resolve(process.cwd(), "components/ShowForm.tsx"), "utf8");
 const SHOW_COVER = readFileSync(resolve(process.cwd(), "components/shows/ShowCover.tsx"), "utf8");
 const DB_SRC = readFileSync(resolve(process.cwd(), "lib/db.ts"), "utf8");
-
-/**
- * Quita los comentarios antes de comparar.
- *
- * Sin esto, cualquier `not.toContain("en_venta")` de este fichero se rompe solo:
- * los comentarios que **documentan** lo que se retiró citan los estados
- * retirados, que es justo lo que tienen que hacer. Un comentario no es código,
- * y un `not.toContain` sobre el fichero entero los cuenta igual.
- *
- * Es la tercera vez que este repo se cruza con eso (los dos primeros en C3), y
- * por eso está aquí como helper y no copiado test a test.
- */
-function sinComentarios(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
-}
 
 /** Los 8, para comparar contra el tipo sin tener que invocarlo en runtime. */
 const LOS_8: ShowStatus[] = [
