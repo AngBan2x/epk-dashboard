@@ -94,7 +94,11 @@ test.describe("P4.6: Transiciones de shows QA", () => {
     const reactivated = await artist.request.post(`${BASE_URL}/api/shows/${show.id}/reactivate`);
     expect(reactivated.status()).toBe(200);
     const back = await reactivated.json();
-    expect(["confirmado", "proximamente", "disponible", "en_venta"]).toContain(back.status);
+    // Los dos que reactivate puede devolver son `confirmado` (fecha futura) o
+    // `proximamente` (fecha pasada o nula), segun la ruta. Antes la lista
+    // incluia `disponible` y `en_venta`, que el endpoint nunca devolvia y que C4
+    // retiró del vocabulario: era una tolerancia falsa.
+    expect(["confirmado", "proximamente"]).toContain(back.status);
     expect(back.postponement_reason).toBeFalsy();
 
     expect([200, 404]).toContain((await admin.request.delete(`${BASE_URL}/api/shows?id=${show.id}`)).status());

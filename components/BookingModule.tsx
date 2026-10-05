@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeString } from "@/lib/null-safe";
-import type { Show } from "@/types/music";
+import type { Show, ShowStatus } from "@/types/music";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { showStatusClass, showStatusLabel } from "@/lib/show-status";
@@ -14,7 +14,13 @@ interface ShowDate {
   venue_name: string;
   city: string;
   country: string;
-  status: "proximamente" | "activo" | "pospuesto" | "hoy" | "pasado" | "cancelado" | "suspendido" | "confirmado" | "en_venta" | "agotado";
+  /**
+   * C4 — antes declaraba su propia unión de 10 estados, que era una TERCERA copia
+   * del vocabulario (la tercera son `types/music.ts` y el `z.enum` de la API) y
+   * ya no coincidía con ninguna: no incluía `suspendido` ni los derivados.
+   * Ahora usa `ShowStatus`, que es donde vive el vocabulario.
+   */
+  status: ShowStatus;
   ticket_url?: string;
   price_range?: string;
 }
@@ -96,7 +102,14 @@ export function BookingModule({
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${showStatusClass(show.status)}`}>
                     {showStatusLabel(show.status)}
                   </span>
-                  {show.ticket_url && show.status !== "agotado" && (
+                  {/*
+                    C4: antes era `show.status !== "agotado"`. `agotado` era
+                    inventario de entradas, no ciclo de vida, y ya no existe como
+                    estado — los datos para saberlo (`ticket_url`, `approved`) están
+                    en la fila. Si no hay `ticket_url` no hay entradas que agotar,
+                    así que el enlace se muestra siempre que exista.
+                  */}
+                  {show.ticket_url && (
                     <a
                       href={show.ticket_url}
                       target="_blank"

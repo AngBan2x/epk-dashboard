@@ -17,32 +17,24 @@ import { safeString } from "@/lib/null-safe";
 export const BRAND_GRADIENT = "from-indigo-600 via-violet-600 to-pink-500";
 
 /**
- * Misma familia de tonos que `SHOW_STATUS_STYLES` (lib/show-status.ts): cada
+ * C4 — misma familia de tonos que `SHOW_STATUS_STYLES` (lib/show-status.ts): cada
  * estado pinta su portada con su matiz, de modo que la variedad de color de la
- * página salga del propio dato y no de una paleta nueva. La marca (indigo →
- * violet → pink) es el color por defecto y el de `en_venta`.
+ * página salga del propio dato y no de una paleta nueva.
+ *
+ * Solo los 8 estados que existen. Antes esta tabla tenía 20 entradas, con 7
+ * alias legacy (`proximo`, `aprobado`, `rechazado`, `propuesto`, `completado`,
+ * `en_vivo`) y los que C4 retiró, y ninguna las generaba: eran gradientes que
+ * nadie iba a ver, y cada una era un sitio más donde el vocabulario mentía.
  */
 const COVER_GRADIENT_BY_STATUS: Record<string, string> = {
   proximamente: "from-amber-500 via-orange-500 to-pink-500",
-  proximo: "from-amber-500 via-orange-500 to-pink-500",
-  pendiente: "from-amber-500 via-orange-500 to-pink-500",
   activo: "from-emerald-500 via-teal-500 to-cyan-500",
-  aprobado: "from-emerald-500 via-teal-500 to-cyan-500",
   hoy: "from-sky-500 via-indigo-500 to-violet-500",
   confirmado: "from-violet-600 via-purple-600 to-pink-500",
-  en_venta: BRAND_GRADIENT,
-  disponible: "from-teal-500 via-emerald-500 to-green-500",
   pospuesto: "from-orange-500 via-amber-500 to-yellow-500",
-  reprogramado: "from-cyan-500 via-sky-500 to-indigo-500",
   cancelado: "from-rose-500 via-pink-500 to-fuchsia-500",
-  agotado: "from-rose-500 via-pink-500 to-fuchsia-500",
-  rechazado: "from-rose-500 via-pink-500 to-fuchsia-500",
-  en_vivo: "from-rose-500 via-pink-500 to-fuchsia-500",
   pasado: "from-slate-500 via-slate-600 to-slate-700",
-  finalizado: "from-slate-500 via-slate-600 to-slate-700",
   suspendido: "from-slate-500 via-slate-600 to-slate-700",
-  completado: "from-slate-500 via-slate-600 to-slate-700",
-  propuesto: "from-slate-500 via-slate-600 to-slate-700",
 };
 
 function initialsOf(name: string): string {

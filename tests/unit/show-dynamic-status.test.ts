@@ -70,7 +70,10 @@ describe("computeDynamicStatus — con reloj inyectado", () => {
 
   it("fecha futura → conserva el estado guardado", () => {
     expect(computeDynamicStatus({ status: "confirmado", date: "2025-07-01" }, REF)).toBe("confirmado");
-    expect(computeDynamicStatus({ status: "en_venta", date: "2999-01-01" }, REF)).toBe("en_venta");
+    // C4: era `en_venta`, un estado que ya no existe. Se usa `activo`, que es el
+    // que lo sustituye — y el caso sigue siendo el mismo: fecha futura, el
+    // estado guardado manda.
+    expect(computeDynamicStatus({ status: "activo", date: "2999-01-01" }, REF)).toBe("activo");
   });
 
   it("el estado guardado sobrevive a la transición por el estado \"hoy\"", () => {
@@ -92,9 +95,50 @@ describe("computeDynamicStatus — con reloj inyectado", () => {
   });
 
   it("sin fecha → conserva el estado guardado, y si no hay, el default", () => {
-    expect(computeDynamicStatus({ status: "en_venta", date: null }, REF)).toBe("en_venta");
+    expect(computeDynamicStatus({ status: "activo", date: null }, REF)).toBe("activo");
     expect(computeDynamicStatus({ status: "pospuesto", date: "" }, REF)).toBe("pospuesto");
     expect(computeDynamicStatus({ status: "", date: null }, REF)).toBe(DEFAULT_SHOW_STATUS);
+  });
+
+  /**
+   * C4 — el vocabulario cerrado tiene una cara que hay que atar: un valor que ya
+   * no existe en la base **no** se propaga a la respuesta.
+   *
+   * Antes, `computeDynamicStatus` devolvía `string` y el `as ShowStatus` del
+   * route handler lo tipaba sin mirar: un `finalizado` en la base salía en el
+   * JSON de la API con un tipo que el compilador creía bueno. Ahora se estrecha
+   * de verdad, y el aviso es lo que hace que el dato no se pierda en silencio.
+   */
+  it("un estado retirado se trata como el default, no como si fuera válido", () => {
+    const retirado = ["finalizado", "en_venta", "disponible", "agotado", "reprogramado", "proximo"];
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      for (const estado of retirado) {
+        expect(computeDynamicStatus({ status: estado, date: "2999-01-01" }, REF)).toBe(
+          DEFAULT_SHOW_STATUS
+        );
+      }
+      // Uno por estado, y el mensaje dice a cuál corresponde: eso es lo que hace
+      // falta para arreglar la fila sin abrir el código.
+      expect(warn).toHaveBeenCalledTimes(retirado.length);
+      expect(String(warn.mock.calls[0][0])).toContain("pasado");
+      expect(String(warn.mock.calls[1][0])).toContain("activo");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("un estado válido NO avisa (el aviso es para el dato raro, no routine)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      for (const estado of ["proximamente", "confirmado", "activo", "pospuesto", "cancelado", "suspendido"]) {
+        expect(computeDynamicStatus({ status: estado, date: "2999-01-01" }, REF)).toBe(estado);
+      }
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("fecha ilegible → conserva el estado, NO revienta", () => {
@@ -322,7 +366,7 @@ describe("ShowsBooking — una sola etiqueta y ninguna promesa falsa", () => {
   it("no pinta DOS etiquetas de estado en la misma fila", () => {
     const { container } = renderBooking([PAST_SHOW]);
     const pills = Array.from(container.querySelectorAll("span")).filter((el) =>
-      /^(Próximamente|Hoy|Pasado|Cancelado|Suspendido|Confirmado|En Venta|Agotado|Pospuesto|Reprogramado|Disponible|Finalizado)$/.test(
+      /^(Próximamente|Hoy|Pasado|Cancelado|Suspendido|Confirmado|Activo|Pospuesto)$/.test(
         (el.textContent ?? "").trim()
       )
     );

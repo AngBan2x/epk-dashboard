@@ -449,7 +449,36 @@ export interface CreateArtistInput {
 }
 
 // Shows & Booking
-export type ShowStatus = "proximamente" | "activo" | "pospuesto" | "hoy" | "pasado" | "cancelado" | "suspendido" | "confirmado" | "en_venta" | "agotado" | "reprogramado" | "disponible" | "finalizado";
+//
+// C4 — el vocabulario de show tiene **8 estados, ninguno opcional**: 6 que elige
+// una persona y 2 que los calcula la fecha. Antes eran 13 mas 7 alias legacy y
+// un `| string` laxo en `lib/show-status.ts`, o sea que el compilador no
+// prohibia nada y tres ficheros distintos declaraban tres listas.
+//
+//   Elegibles (6):  proximamente · confirmado · activo · pospuesto ·
+//                   cancelado · suspendido
+//   Derivados (2):  hoy · pasado   -- `computeDynamicStatus`, no un `<select>`
+//
+// Lo que se fue y por qué:
+//   - `finalizado`   = `pasado` con otra palabra.
+//   - `en_venta`, `disponible` y `activo` = lo mismo, tres veces.
+//   - `agotado`      = inventario de entradas, no ciclo de vida. Con `ticket_url`
+//                      null no hay entradas y con `approved` false no hay venta:
+//                      los dos datos ya existen y no hacía falta un tercer estado.
+//   - `reprogramado` = `pospuesto` + nueva fecha. Los dos datos también existen.
+//
+// La lista de elegibles vive en `lib/show-status.ts` (`SHOW_STATUS_SELECTABLE`),
+// que es la que usan el `<select>`, el Zod de la API y esta unión. Si las dos se
+// separan, el compilador no avisa: por eso los tests comparan ambas.
+export type ShowStatus =
+  | "proximamente"
+  | "confirmado"
+  | "activo"
+  | "pospuesto"
+  | "cancelado"
+  | "suspendido"
+  | "hoy"
+  | "pasado";
 
 export interface Show {
   id: string;

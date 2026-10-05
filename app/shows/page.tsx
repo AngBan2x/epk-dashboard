@@ -9,6 +9,7 @@ import {
   paymentMethodLabel,
   showStatusClass,
   showStatusLabel,
+  SHOW_STATUS_DERIVED,
   SHOW_STATUS_OPTIONS,
 } from '@/lib/show-status';
 import { SortSelect, useListSort } from '@/components/SortSelect';
@@ -261,6 +262,15 @@ export default function ShowsPage() {
                 <option value="" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">
                   Todos
                 </option>
+                {/*
+                  C4 — el filtro ofrece los **8**, no los 6 del formulario.
+
+                  No es una inconsistencia: un show del pasado se muestra como
+                  "Pasado" y uno de hoy como "Hoy" (`computeDynamicStatus`), así
+                  que si el filtro no los ofreciera serían estados visibles en la
+                  lista que no se pueden buscar. El formulario son 6 porque `hoy`
+                  y `pasado` no se eligen; el filtro son 8 porque se buscan.
+                */}
                 {SHOW_STATUS_OPTIONS.map((option) => (
                   <option
                     key={option.value}
@@ -268,6 +278,15 @@ export default function ShowsPage() {
                     className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                   >
                     {showStatusLabel(option.value)}
+                  </option>
+                ))}
+                {SHOW_STATUS_DERIVED.map((estado) => (
+                  <option
+                    key={estado}
+                    value={estado}
+                    className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {showStatusLabel(estado)}
                   </option>
                 ))}
               </select>

@@ -6,6 +6,7 @@ import { sendNotificationEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { notifyArtistSubscribers } from "@/lib/subscriber-notifications";
 import { createDynamicStatusResolver } from "@/lib/show-dynamic-status";
+import { SHOW_STATUS_SELECTABLE } from "@/lib/show-status";
 import type { ShowStatus } from "@/types/music";
 import { randomUUID } from "crypto";
 
@@ -29,6 +30,17 @@ const OptionalUrl = z
     message: "debe ser una URL absoluta (http:// o https://)",
   });
 
+/**
+ * C4 — el `z.enum` de `status` se **deriva** de `SHOW_STATUS_SELECTABLE` en vez
+ * de reescribir los 13 literales, y por eso solo acepta los 6 elegibles: ni
+ * `hoy` ni `pasado` (los pone la fecha) ni los que C4 retiró.
+ *
+ * Antes esta lista era una cuarta copia del vocabulario, y era la que de verdad
+ * decidía: un cliente podía mandar `finalizado` o `en_venta` y el backend lo
+ * aceptaba sin pestañear, con el tipo de TypeScript diciendo que no podía pasar.
+ */
+const ShowStatusInput = z.enum(SHOW_STATUS_SELECTABLE);
+
 const CreateShowSchema = z.object({
   artist_id: z.string().min(1, "artist_id requerido"),
   venue_name: z.string().min(1, "venue_name requerido"),
@@ -38,7 +50,7 @@ const CreateShowSchema = z.object({
   date: z.string().nullish(),
   time: z.string().nullish(),
   price_range: z.string().nullish(),
-  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
+  status: ShowStatusInput.optional(),
   ticket_url: OptionalUrl,
   payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).nullish(),
   postponement_reason: z.string().nullish(),
@@ -57,7 +69,7 @@ const UpdateShowSchema = z.object({
   date: z.string().nullish(),
   time: z.string().nullish(),
   price_range: z.string().nullish(),
-  status: z.enum(["proximamente", "activo", "pospuesto", "hoy", "pasado", "cancelado", "suspendido", "confirmado", "en_venta", "agotado", "reprogramado", "disponible", "finalizado"]).optional(),
+  status: ShowStatusInput.optional(),
   ticket_url: OptionalUrl,
   payment_methods: z.array(z.object({ type: z.enum(["cash", "card", "transfer", "ticket_platform", "other"]), details: z.string().optional(), platform_url: z.string().optional() })).nullish(),
   postponement_reason: z.string().nullish(),
@@ -103,17 +115,17 @@ export async function GET(req: NextRequest) {
         if (!show) {
           return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
         }
-        return NextResponse.json({ ...show, status: resolveStatus(show) as ShowStatus });
+        return NextResponse.json({ ...show, status: resolveStatus(show) });
       }
       // Aprobado y no borrado → anyone.
       const approved = await getApprovedShowById(showId);
       if (approved) {
-        return NextResponse.json({ ...approved, status: resolveStatus(approved) as ShowStatus });
+        return NextResponse.json({ ...approved, status: resolveStatus(approved) });
       }
       // Sin aprobar: solo su dueño.
       const owned = await getShowById(showId);
       if (owned && (await ownsShow(owned.artist_id))) {
-        return NextResponse.json({ ...owned, status: resolveStatus(owned) as ShowStatus });
+        return NextResponse.json({ ...owned, status: resolveStatus(owned) });
       }
       return NextResponse.json({ error: "Show no encontrado" }, { status: 404 });
     }
@@ -122,7 +134,7 @@ export async function GET(req: NextRequest) {
       const shows = isAdmin
         ? await getShowsByArtist(artistId)
         : await getApprovedShowsByArtist(artistId);
-      return NextResponse.json({ shows: shows.map(s => ({ ...s, status: resolveStatus(s) as ShowStatus })) });
+      return NextResponse.json({ shows: shows.map(s => ({ ...s, status: resolveStatus(s) })) });
     }
 
     // S0/P12b: `/shows` NO está en el `matcher` de `middleware.ts`, así que la
@@ -132,7 +144,7 @@ export async function GET(req: NextRequest) {
     // catálogo público, porque `POST /api/shows:144` lo crea con
     // `approved = 0` salvo que lo cree un admin con `approved: true`.
     const shows = isAdmin ? await getAllShows() : await getApprovedShows();
-    return NextResponse.json({ shows: shows.map(s => ({ ...s, status: resolveStatus(s) as ShowStatus })) }, {
+    return NextResponse.json({ shows: shows.map(s => ({ ...s, status: resolveStatus(s) })) }, {
       headers: {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         "Surrogate-Control": "no-store",

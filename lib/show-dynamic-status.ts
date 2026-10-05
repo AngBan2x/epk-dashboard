@@ -43,16 +43,21 @@
  * la zona horaria ni del cambio de hora. Comportamiento idéntico en UTC —que es
  * donde corre producción— y correcto en el resto.
  *
- * ── Lo único que este módulo sigue mintiendo ───────────────────────────────
- * `status` es TEXT en la base y el vocabulario válido son 13 literales
- * (`types/music.ts:355`), pero además hay un `| string` laxo en
- * `lib/show-status.ts:4-18` y los arrays Zod de la API. Este módulo devuelve
- * `string` —honesto— y quien llama estrecha a `ShowStatus` en el borde de la
- * respuesta, que es donde ese `as` ya estaba. `withDynamicStatus` lo hace una
- * sola vez por array. Unificar las tres definiciones es deuda mayor y no se toca
- * aquí: cambiaría el contrato de `lib/show-status.ts` entero.
+ * ## Lo que este módulo ya no miente (C4)
+ *
+ * Antes `status` era TEXT en la base, el vocabulario válido eran 13 literales
+ * (`types/music.ts:355`), pero además había un `| string` laxo en
+ * `lib/show-status.ts`, una unión de 10 en `BookingModule` y un `z.enum` de 13
+ * en la API. Este módulo devolvía `string` —honesto— y quien llama estrechaba a
+ * `ShowStatus` con un `as` en la respuesta, que era donde ya estaba.
+ *
+ * Con el vocabulario cerrado, `computeDynamicStatus` devuelve **`ShowStatus` de
+ * verdad**: el `as` que quedaba en `withDynamicStatus` y en las cuatro rutas de
+ * `/api/shows` se fue, y un valor inesperado de la base pasa por `toShowStatus`,
+ * que avisa por `console.warn` en vez de colarse en la respuesta tipada.
  */
 
+import { toShowStatus } from "@/lib/show-status";
 import type { ShowStatus } from "@/types/music";
 
 /** Lo mínimo que hace falta de un show para decidir su estado. */
@@ -135,14 +140,15 @@ export function calendarDaysFromReference(showDate: string, reference: Date): nu
  * juzgue contra un único instante (dos llamadas que cruzan medianoche no pueden
  * discrepar) y permite testear sin reloj real.
  */
-export function computeDynamicStatus(show: ShowStatusInput, reference: Date = new Date()): string {
-  if (TERMINAL_STATUSES.has(show.status)) return show.status;
-  if (!show.date) return show.status || DEFAULT_SHOW_STATUS;
+export function computeDynamicStatus(show: ShowStatusInput, reference: Date = new Date()): ShowStatus {
+  const status = toShowStatus(show.status);
+  if (TERMINAL_STATUSES.has(status)) return status;
+  if (!show.date) return status;
 
   const delta = calendarDaysFromReference(show.date, reference);
   if (delta === 0) return "hoy";
   if (delta !== null && delta < 0) return "pasado";
-  return show.status || DEFAULT_SHOW_STATUS;
+  return status;
 }
 
 /**
@@ -151,9 +157,9 @@ export function computeDynamicStatus(show: ShowStatusInput, reference: Date = ne
  */
 export function createDynamicStatusResolver(
   reference: Date = new Date()
-): (show: ShowStatusInput) => string {
+): (show: ShowStatusInput) => ShowStatus {
   const frozen = new Date(reference.getTime());
-  return (show: ShowStatusInput): string => computeDynamicStatus(show, frozen);
+  return (show: ShowStatusInput): ShowStatus => computeDynamicStatus(show, frozen);
 }
 
 /**
@@ -168,5 +174,5 @@ export function withDynamicStatus<T extends ShowStatusInput>(
   reference: Date = new Date()
 ): Array<Omit<T, "status"> & { status: ShowStatus }> {
   const resolve = createDynamicStatusResolver(reference);
-  return shows.map((show) => ({ ...show, status: resolve(show) as ShowStatus }));
+  return shows.map((show) => ({ ...show, status: resolve(show) }));
 }

@@ -48,6 +48,7 @@ import type {
   SuggestionStatus,
 } from "@/types/music";
 import { safeString, safeNumber, safeArray, safeParseJSON } from "@/lib/null-safe";
+import { toShowStatus } from "@/lib/show-status";
 // RC.33 · Ola 4. `parseVideoKind` es pura y no trae nada de la red: importarla
 // aquí no abre `lib/youtube.ts` al resto del módulo.
 import { parseVideoKind } from "@/lib/youtube";
@@ -765,7 +766,12 @@ function parseShow(row: Record<string, unknown>): Show {
     date: (row.date as string) ?? null,
     time: (row.time as string) ?? null,
     price_range: (row.price_range as string) ?? null,
-    status: String(row.status) as ShowStatus,
+    // C4: era `String(row.status) as ShowStatus`. `shows.status` es TEXT, así que
+    // el `as` no convertía nada: solo silenciaba al compilador sobre el hecho de
+    // que la columna puede contener cualquier cosa. `toShowStatus` estrecha de
+    // verdad y avisa por consola si el valor no está en el vocabulario, que es la
+    // diferencia entre un dato raro visible y uno escondido.
+    status: toShowStatus(row.status),
     ticket_url: (row.ticket_url as string) ?? null,
     payment_methods: safeParseJSON<PaymentMethod[]>((row.payment_methods as string) ?? null, []),
     postponement_reason: (row.postponement_reason as string) ?? null,
