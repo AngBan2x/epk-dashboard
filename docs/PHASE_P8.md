@@ -146,9 +146,18 @@ release cuando la fila **es** una pista, y la descarga de dossier y rider —que
 Enlaces no se montaba para 7 de los 9 singles: leía solo `external_links`, y sus
 enlaces viven en `spotify_url`, `itunes_track_id` y `youtube_video_id`.
 
-**Lo que queda de esta fase, sin decidir:** las **65 hijas de álbum** (65 con
-ficha de producción, 28 con videoclip) redirigen a su padre y el padre no enseña
-sus datos. Es un problema de diseño distinto, no de este 301.
+**Lo que queda de esta fase, sin decidir:** las **65 hijas de álbum** tienen su
+vídeo (28 de ellas) pero **ninguna tiene ficha técnica** —la columna existe con
+todos sus campos a `null`—, y de esos 28 vídeos **ninguno es `videoclip`**: son 11
+`live` y 17 `topic_audio`. Redirigen a su padre y el padre no enseña sus datos.
+
+Resuelto en C1-ter (2026-10-04) por el lado del código: `showableVideo()`
+(`lib/release-page.ts`) decide qué vídeo puede enseñarse como el videoclip de una
+pista, y `components/ReleaseVideoList.tsx` los lista en la página del álbum. Antes
+**ninguna parte de la UI leía `video_kind`**. Con los datos de hoy la sección no se
+monta —no hay ningún `videoclip` curado— y para llenarla está
+`scripts/fetch-official-videos.ts --trust-allowlist`, que **gasta cuota de la API
+de YouTube** y es decisión del usuario.
 
 ## Verificación
 

@@ -1,11 +1,11 @@
 # HANDOFF — sesión del 2026-10-03
 
 **Estado al cerrar esta sesión:** `main` en `a451b4d` + los 3 commits de este
-handoff. **1146/1146 tests** (hoy: **1162/1162**), `tsc` limpio, lint sin avisos, `pnpm build`
+handoff. **1146/1146 tests** (hoy: **1170/1170**), `tsc` limpio, lint sin avisos, `pnpm build`
 correcto. Producción desplegada y verificada.
 
 > **Actualizado el 2026-10-04.** `main` está ahora en `5ed5354` (+ lo que se
-> añada después): **C1 y C1-bis están hechas** y los tests son **1162/1162**. El
+> añada después): **C1 y C1-bis están hechas** y los tests son **1170/1170**. El
 > resto del documento sigue valiendo; los números que se contaban a mano se
 > refrescan con el comando al lado, porque se desfasan solos.
 
@@ -23,7 +23,7 @@ node -v                                  # debe decir v24
 pnpm dev                                 # servidor en :3000
 npx tsc --noEmit                         # debe salir limpio
 npx next lint                            # debe salir sin avisos
-npx vitest run --no-file-parallelism     # 1162/1162, ~70-180 s
+npx vitest run --no-file-parallelism     # 1170/1170, ~70-180 s
 ```
 
 **`--no-file-parallelism` NO es opcional.** Sin él el reciclado de workers
@@ -153,19 +153,42 @@ como ausencia y un enlace por plataforma.
   `<h2>`.** Los bloques de ficha traen su propio `<h2>` dentro, y un guard que
   cuenta cabeceras de terceros se rompe solo un día sin avisar.
 
-### C1-ter · Las 65 hijas de álbum ← NUEVO, sin decidir
+### C1-ter · Los vídeos de las hijas ← HECHA 2026-10-04, y con una corrección
 
-Descubierto midiendo el de C1-bis, y es **mayor** que el que se cerró:
+**La cifra que yo di estaba mal y hay que leerla antes que el resto.** Dije "65
+hijas con ficha técnica". **Falso**, y era un error de filtro: conté
+`production_details NOT IN ('','{}')`, que responde "¿la columna está rellena?",
+no "¿tiene información?". Las 65 tienen `{"daw":null,"guitars":null,…}`: **todos
+los campos a `null`**, comprobado campo a campo con `json_extract`. **No hay
+ninguna hoja de créditos que enseñar.** La sección que iba a diseñar era diseño
+para un conjunto vacío.
 
-| Dato de las 65 hijas | Con dato |
-|---|---|
-| Ficha de producción | **65** |
-| Videoclip oficial | 28 |
-| Letra | 0 |
+Lo que sí tienen es vídeo: **28 hijas con `youtube_video_id`**, y el dato que lo
+gira todo:
 
-Redirigen a su padre (el 301 de P8) y el padre **no enseña sus datos**. Es un
-problema de diseño distinto del de C1: dónde metes una hoja de créditos por pista
-sin ensuciar el tracklist que el usuario acaba de aprobar. **No decidido.**
+| `video_kind` | Qué es | Catálogo |
+|---|---|---|
+| `videoclip` | canal humano verificado del artista | **0** |
+| `live` | directo: no es la pista del lanzamiento | 11 |
+| `topic_audio` | canal `- Topic` autogenerado | 17 + 1 cabecera |
+| `null` | no se sabe | 9 cabeceras (los singles) |
+
+**`video_kind` no lo leía nadie**: `grep video_kind app components` salía vacío.
+La columna se escribió, se migró y se documentó con su tabla de tres valores, y
+ninguna regla de render la consultaba. Nada impedía enseñar un `- Topic` de Pink
+Floyd como "Videoclip Oficial".
+
+**Lo hecho:** `showableVideo()` en `lib/release-page.ts` (una sola fuente para las
+dos ramas) y `components/ReleaseVideoList.tsx`, un Server Component con miniatura
+y enlace. **La sección no se monta en producción y es lo correcto**: con 0
+`videoclip`, `showableVideo` devuelve `null` para las 28.
+
+**El camino para que se vea, y es decisión del usuario:**
+`scripts/fetch-official-videos.ts --trust-allowlist`. Los 28 son `- Topic` porque
+`verifyOfficialChannel` **no pasa para ninguno de los 5 canales verificados**: hoy
+ninguno enlaza su dominio oficial en la descripción (Radiohead la tiene vacía).
+`--trust-allowlist` baja solo esa tercera comprobación, con tres guardas, y
+**gasta cuota de la API de YouTube**. Dry-run antes, como siempre.
 
 ### C2 · Consolidar el reproductor de las EPKCard
 
@@ -244,15 +267,15 @@ de email, ni el broadcast. Es lo que más superficie de bug deja sin cubrir.
 
 ### C7 · Reorganizar la documentación
 
-`docs/AI_LOG.md`: **6.922 líneas, 390 KB, 113 epígrafes de nivel 2, 587 de nivel
+`docs/AI_LOG.md`: **7.027 líneas, 396 KB, 114 epígrafes de nivel 2, 592 de nivel
 3**. El bloque más largo son 432 líneas. Es ilegible por inspección humana.
 
 > Las tres cifras se cuentan con
 > `(Get-Content -LiteralPath docs/AI_LOG.md).Count`,
 > `Select-String -Path docs/AI_LOG.md -Pattern '^## '` y
 > `Select-String -Path docs/AI_LOG.md -Pattern '^### '`, porque **se desfasan
-> solas con cada commit**: las de arriba ya eran 6.689 antes de C1 y 6.922
-> después de C1-bis. Es el mismo aviso que el de C9.
+> solas con cada commit**: las de arriba ya eran 6.689 antes de C1 y 7.027
+> después de C1-ter. Es el mismo aviso que el de C9.
 
 Propuesta: `docs/ai-log/` con un fichero por época, y `AI_LOG.md` reducido a
 índice. **Nada se borra**: es mover, no resumir.

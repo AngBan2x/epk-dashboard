@@ -6916,7 +6916,112 @@ Las **hijas de álbum** son el agujero que queda, y es mayor que el que se cerr�
 | Galería | 0 |
 
 Redirigen a su padre, y el padre no enseña sus datos. Es un problema de **diseño
-distinto**: donde metes una hoja de créditos por pista sin ensuciar el tracklist
+distinto**: dónde metes una hoja de créditos por pista sin ensuciar el tracklist
 que el usuario acaba de aprobar. No se ha decidido, y no se decide aquí.
+
+---
+
+## C1-ter · Un `- Topic` no es el videoclip de la pista
+
+### ⚠️ La cifra de arriba era falsa, y hay que decirlo primero
+
+La tabla anterior dice "Ficha de producción | **65**". **Es mentira, y era un
+error de filtro mío.** Conté con
+
+```sql
+production_details NOT IN ('', '{}')
+```
+
+que es cierto para las 65 —el JSON **existe**— pero no dice que tenga nada
+dentro. La columna real es `{"daw":null,"guitars":null,"effects_chain":null,
+"tuning":null,"key":null}`: **65 de 65 con todos los campos a `null`**. Comprobado
+campo a campo con `json_extract`: `daw` 0, `guitars` 0, `effects_chain` 0,
+`tuning` 0, `key` 0, `genre` 0, `bpm` 0, `mood` 0, `production_credits` 0.
+
+**No hay ninguna ficha técnica que enseñar en las hijas.** La hoja de créditos por
+pista que se iba a diseñar no tenía detrás ningún dato: era diseño para un
+conjunto vacío. Un filtro `NOT IN ('', '{}')` contesta "¿la columna está
+rellena?", y la pregunta era "¿la columna tiene información?".
+
+Lo único que las hijas tienen de más es vídeo: **28 con `youtube_video_id`**.
+
+### Y el dato que sí importa: ninguno de esos 28 es un videoclip
+
+`tracks.video_kind` (RC.33, Ola 4) tiene tres valores, y solo uno es "el vídeo que
+la ficha quiere mostrar":
+
+| `video_kind` | Qué es | En el catálogo |
+|---|---|---|
+| `videoclip` | canal humano verificado del artista | **0** |
+| `live` | grabación en directo: no es la pista del lanzamiento | 11 hijas |
+| `topic_audio` | canal `- Topic` autogenerado: el audio del tema, imagen fija, sin comentarios | 17 hijas + 1 cabecera |
+| `null` | no se sabe el canal | 9 cabeceras (todas singles) |
+
+Y el dato más incómodo de todos: **`video_kind` no lo leía nadie**. Un
+`grep video_kind app components` sale vacío. La columna se escribió, se migró, se
+documentó con su tabla de tres valores… y ninguna regla de render la consultaba.
+O sea que nada impedía que un `- Topic` de Pink Floyd apareciera como "Videoclip
+Oficial" del álbum. Hoy, con un `- Topic` de *The Dark Side of the Moon* como
+"Videoclip Oficial", funcionaría.
+
+**Por qué los 28 son `topic_audio` y no `videoclip`**, y está escrito en el propio
+script (`scripts/fetch-official-videos.ts:613-640`): `verifyOfficialChannel` exige
+que la descripción del canal enlace el dominio oficial del artista, y **ninguno de
+los 5 canales verificados lo hace hoy** —Pink Floyd tiene 991 caracteres de
+bio sin un enlace, Radiohead tiene la descripción vacía—. "Ningún vídeo" no es un
+resultado, así que existe `--trust-allowlist`, que baja **solo** esa tercera
+comprobación y solo si el id es el de la allowlist, el título es exactamente el
+nombre del artista y el canal no es de tipo `topic`. Ese flag es el camino, y
+**gasta cuota de la API de YouTube**: es una decisión del usuario, no una tarea
+silenciosa.
+
+### Lo que se hizo: la regla, no los datos
+
+1. **`showableVideo()` en `lib/release-page.ts`.** Una sola fuente para las dos
+   ramas —la del single y la del álbum—, porque dos copias divergirían en
+   silencio (que es lo que pasó con `hasProductionDetails`). Devuelve `null` para
+   `live` y `topic_audio`; acepta `videoclip` y `null`.
+2. **`null` se acepta, y el porqué está escrito.** Los dos únicos que escriben
+   `youtube_video_id` sin `video_kind` son la allowlist versionada y el seed
+   curado a mano ("canciones reales verificadas", `scripts/seed-f9-catalog.ts`),
+   que escribieron antes de que la columna existiera. El script automatizado
+   **siempre** escribe las dos columnas, así que un `null` con id es una afirmación
+   de una persona. Si `null` se excluyera, los 9 singles perderían su vídeo y el
+   arreglo de C1-bis sería inútil: hay un test que lo fija.
+3. **`components/ReleaseVideoList.tsx`**, un **Server Component**: N tarjetas y
+   ninguna necesita estado. Nada de `<details>` —al final no hizo falta— ni de
+   `ProductionDetails`, que son 277 líneas con `framer-motion` y un `useEffect`
+   por instancia: 12 en una página de álbum son 12 peticiones a `/api/auth/me`.
+   Un enlace y una miniatura, sin iframe: 10 iframes de YouTube son 10 cookies
+   antes de que el visitante haga nada.
+4. **La sección no se monta en producción, y es lo correcto.** Con 0 `videoclip`
+   entre las hijas, `showableVideo` devuelve `null` para las 28 y la sección
+   devuelve `null`. Está para cuando alguien curate el dato, y sobre todo para
+   que la **exclusión** sea una regla con test y no un olvido.
+
+### Un test que casi no prueba nada, y cómo se sabe
+
+El primer test del bloque 8 ("un `- Topic` NO se enseña") pasó **antes** de que
+existiera la sección, porque `ReleaseVideoList` devolvía `null` y no había nada
+que mirar. Un test verde que no depende del código nuevo no protege el código
+nuevo.
+
+Lo que lo salva son los otros: el `videoclip` que **sí** tiene que montar la
+sección, la miniatura, el enlace y el recuento. Y **mutado tres veces**: quitar la
+exclusión de `topic_audio` → 2 rojos; excluir también `null` → 3; invertir la
+condición de álbum → 2.
+
+### Gates
+
+tsc limpio, lint sin avisos, **1170/1170 en 61 ficheros**, build correcto.
+`/releases/[id]` sigue en 1.4 kB de JS: la sección es un Server Component y no
+cuesta un byte de bundle.
+
+Sin captura de pantalla, y el motivo es el dato: **no hay ninguna fila que
+dispare la sección**, así que una captura solo podría enseñar la ausencia. La
+verificación son los 8 tests del bloque, que comprueban las dos ramas —con
+`videoclip` y sin él— más el `alt=""` de la miniatura y el recuento honesto
+("1 de las pistas tiene videoclip oficial", no "2 vídeos").
+
 
 
