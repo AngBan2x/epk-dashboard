@@ -229,6 +229,56 @@ al script (`bytes: 0`), `git checkout -- <fichero>` y seguir. Todo lo que no
 estuviera commiteado se habría perdido, así que la regla de "commit antes de
 experimentar" es la que salvó esto, no la precaución.
 
+## Los dos que casi se van: el mensaje del commit y el tagger del tag
+
+Los dos ultimos hallazgos llegaron **tarde**, y los dos porque un check que
+daba 0 **no era verdad**: era 0 por una razon distinta a la que creia.
+
+**El mensaje del commit.** El purge tocaba blobs y metadata de autor, y no los
+mensajes. Y `git log --all -S 'needle'` da 0 sobre los mensajes **siempre**,
+porque `-S` cuenta ocurrencias en el **diff** entre commits, no en el texto del
+mensaje. Los dos checks de la guia pasaban mientras habia **249 mensajes** con el
+correo viejo y **5** con la contrasena.
+
+Lo que si los ve es `git log --all --grep`, que busca en el mensaje. O el barrido
+de objetos, que no distinctions.
+
+**El tagger del tag.** Al rehacer los 17 tags anotados "preservando la
+anotacion" preserve tambien el `tagger`, y su email. Los 17 lo tenían. Y
+`--format='%ae|%ce'` solo mira commits: la metadata de un tag es la linea
+`tagger` de su propio objeto. Otra vez 0, otra vez mentira.
+
+Y el **indice del worktree**: con `main` y los 61 tags ya limpios, el `gc`
+seguia sin podar 88 blobs con la credencial. Venian del **`.git/worktrees/*/index`**
+del worktree enlazado, que `git log --all` no recorre y `fsck` no lista porque no
+estan colgantes: estan **alcanzables por el indice**. Hay que hacer
+`reset --hard` **ahi tambien**, no solo re-apuntar el HEAD.
+
+## Como se comprueba de verdad
+
+Un barrido de **todos** los blobs del object store, con un control al lado:
+
+```powershell
+git cat-file --batch-all-objects --batch | Select-String -SimpleMatch -Pattern $correoViejo
+git cat-file --batch-all-objects --batch | Select-String -SimpleMatch -Pattern 'PressPlay'   # control: >0
+```
+
+El control es lo que convierte el 0 en informacion. **Y el needle se monta en
+runtime** (`'angab' + '06@gmail.com'`), porque un needle escrito en el propio
+fichero que documenta el check se encuentra a si mismo.
+
+Resultado: 0 con el correo viejo, 0 con la contrasena vieja, **6090 con
+`PressPlay`**. Y las cuatro vias de git, a 0:
+
+| Comprobacion | Que mira | Resultado |
+|---|---|---|
+| `git log --all -S` | diffs entre commits | 0 |
+| `git log --all --grep` | **mensajes** | 0 |
+| `git log --all --format=%ae\|%ce` | autor y committer | solo el placeholder |
+| barrido de objetos | blobs, commits y tags | 0 (control: 6090) |
+
+Las cuatro hacen falta: cada una tapa un agujero que las otras no ven.
+
 ## Puertas
 
 `1200/1200` en 62 ficheros, `tsc` limpio, `next lint` sin warnings. C7 no toca
@@ -296,3 +346,92 @@ la tarjeta y 7.049.734 scrobbles no son lo mismo.
 
 **Lo único que el dry-run sí asegurar, porque es de la base, es el "antes":** los 9
 con 0 y fuente "curado". Eso estaba bien predicho.
+---
+
+# C9 - reescribir la historia entera: 361 commits, 61 tags y un worktree fantasma
+
+## Qué era
+
+`Directrices delProyecto Final.md:Zone.Identifier` seguia en la historia. No es
+un fichero raro: es un **flujo de datos alternativo de NTFS** (la marca que
+Windows pone a lo descargado de internet) commiteado como fichero. El `:` no es
+valido en NTFS, y por eso `git filter-repo` moria con `fatal: invalid path` y
+`git filter-branch` con `Could not initialize the index`. Afectaba a 16 commits y
+**no estaba en HEAD**.
+
+Con el path fuera de juego, C9 era lo de verdad: quitar del historico las
+credenciales de antes de la rotacion. En 32 commits estaba la contrasena de
+administracion, y el correo y la contrasena del antiguo usuario de prueba
+aparecian como author/committer de la historia.
+
+## Qué se hizo
+
+Backup primero: un clon espejo bare en el temporal, 89,8 MB, 361 commits y 64
+refs, con `main` en `d74a91b`. **Ese clon contiene la historia vieja a proposito.**
+Si algo sale mal, la respuesta no es "no hay backup".
+
+Despues, en orden:
+
+1. **Path invalido fuera** de los 16 commits que lo tenian. 345 arboles quedaron
+   identicos byte a byte y 16 distintos **solo** por la ruta borrada; ningun
+   arbol cambio por otra cosa.
+2. **61 tags reescritos**, no solo `main`. 44 lightweight con `update-ref` y los
+   17 annotated reconstruidos a mano para conservar tagger, fecha y mensaje. Un
+   tag annotated es un objeto aparte: reescribir el commit al que apunta y
+   deixar el tag apuntando al viejo deja el viejo al alcance.
+3. **Credenciales fuera** de los 4 patterns, y de los metadatos. El patron del
+   par (`correo / contrasena`) va **antes** que el correo suelto y que la
+   contrasena, porque en el par el correo va seguido de su contrasena en la
+   misma linea: al revés, la primera pasada deja el contrasena huérfana.
+4. **`data/music_catalog.db` eliminado del historico.** Era una SQLite commiteada
+   por error (hoy la ignora `.gitignore`) y por dentro tenia el correo.
+5. **`gc --prune=now`**, y el `main` nuevo es `e8fb8b5`.
+
+## El worktree fantasma: la misma trampa de `refs/original`, otra vez
+
+Despues del `gc` seguian apareciendo 293 commits viejos, y `main` y los 61 tags
+ya estaban limpios. La causa **no era el repositorio**: habia un **worktree
+enlazado** de una sesion anterior en
+`%TEMP%/opencode/fase-e-before`, con su `HEAD` en un commit viejo. Vive en
+`.git/worktrees/`, comparte el object store, y `git log --all` lo recorre igual
+que una rama.
+
+Es exactamente el fallo que ya documentan los 61 tags y que casi documenta
+`refs/original/`: **reescribir la historia no es llegar a 0, es llegar a 0 en
+todos los sitios que la alcanzan.** Un worktree enlazado es uno mas.
+
+Lo **reapunte** en vez de borrarlo, porque el directorio existia y no era mio:
+`update-ref HEAD` a su commit equivalente ya purgado. Cero borrados, y los 293
+se quedaron sin alcance. Despues de eso `--all` da exactamente 361.
+
+## Lo que queda, y por que esta bien
+
+Quedan dos lineas con `angab06` a secas. **Son la aguja del propio script**:
+
+    git grep -n 'angab06' $(git rev-list --all)      # debe dar 0 lineas
+
+Es el comando de verificacion, en `scripts/git/purge-history.js` y en
+`docs/ROTACION_CREDENCIALES.md`. Purgarlo habria roto la comprobacion: el
+documento dejaria de encontrar su propia referencia. Un `angab06` suelto no es
+PII ni secreto; el correo entero, que si lo es, esta en 0.
+
+## `filter-repo` no funciona aqui, y el motivo no es mio
+
+Dos intentos, dos fallos distintos:
+
+- Con `--refs main refs/tags/*` el glob lo expande PowerShell y `main` quedo
+  mapeado a un SHA nulo: rama borrada y working tree vaciado. Se recupera con
+  `update-ref` al SHA bueno.
+- A pantalla completa, `OSError: [Errno 22] Invalid argument` escribiendo un blob.
+  El repositorio queda intacto.
+
+Lo que funciona es **plumbing puro** (`hash-object`, `mktree`, `commit-tree`,
+`update-ref`), porque no depende de reescribir ficheros del working tree. El
+script de referencia sigue siendo `scripts/git/rewrite-invalid-path.js`, pero en
+este entorno hay que ir por la via rapida.
+
+## Puertas
+
+`1200/1200` en 62 ficheros, `tsc` limpio, `next lint` sin warnings, `fsck` sin
+quejas, y 508 ficheros en HEAD (los mismos que antes: la reescritura cambia el
+contenido de 44 ficheros, nunca el numero).

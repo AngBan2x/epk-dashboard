@@ -213,18 +213,121 @@ git gc --prune=now --force
 Sin esto, `git fsck --lost-found` todavía encuentra los blobs viejos, y con
 ellos la credencial.
 
-Comprueba que ya no está en **ninguna** parte:
+Comprueba que ya no está en **ninguna** parte, con dos condiciones que se olvidan
+siempre:
 
-```bash
-git log --all --oneline -S 'test-artist@example.invalid'   # debe dar 0 líneas
-git grep -n 'angab06' $(git rev-list --all)      # debe dar 0 líneas
-git fsck --lost-found                            # no debe listar blobs con la cadena
+1. **La aguja no puede estar escrita en el repo.** Si el fichero que documenta el
+   check contiene el término que el check busca, el pickaxe encuentra al propio
+   documento y el resultado no significa nada. Montada en runtime, sí sirve.
+2. **La aguja tiene que ser el dato, no el dominio.** `@gmail.com` da **falsos
+   positivos**: los fixtures de test usan direcciones de gmail reales
+   (`user@`, `duenio@`, `otro@`). Verificar el dominio no verifica a nadie.
+
+```powershell
+# Metadata: donde mas se filtra, y el contenido del doc no la toca.
+git log --all --format='%ae|%ce' | Sort-Object -Unique
+# -> solo test-artist@example.invalid | test-artist@example.invalid
+
+# Residuo acotado: el local-part es la aguja de este repo, asi que se espera
+# EXACTAMENTE lo que introduce la aguja (este doc + scripts/git/purge-history.js).
+# Si aparece en otro sitio, algo se coló.
+git log --all --oneline -S ('angab' + '06')
+git grep -n ('angab' + '06') -- .            # debe dar solo lineas de busqueda
+
+# El path invalido, por si alguien repite el 4.0 mas adelante.
+git log --all --oneline -- '*Zone.Identifier*'   # debe dar 0 lineas
+
+git fsck --lost-found                      # no debe listar blobs con la cadena
+git worktree list                          # <- ver 4.4: puede quedar uno vivo
 ```
+
+> La contrasena de administrador no se nombra aqui en ningun sitio, y no es
+> descuido: **escribirla seria volver a meterla**. El correo entero tampoco, por
+> el mismo motivo. Lo que se puede afirmar sin reintroducir nada es lo de arriba:
+> la metadata es una sola direccion placeholder, y del correo personal solo
+> sobrevive el local-part, en las dos lineas que lo buscan.
 
 GitHub mantiene los commits viejos en su caché aunque reescribas, y puede
 indexarlos de nuevo. Si el repositorio fuera público, lo normal sería pedir a
 que lo pusieran en cola de gc; siendo privado y con las contraseñas ya
 rotadas, el valor que queda es **muros** y el riesgo real es el **correo** (PII).
+
+### 4.4 — Un WORKTREE ENLAZADO también es una puerta trasera
+
+`git log --all` limpio **no basta** para dar la reescritura por buena. Antes del
+`gc` seguían apareciendo 293 commits viejos con `main` y los 61 tags ya limpios.
+
+La causa no era el repositorio: había un **worktree enlazado** de una sesión
+anterior en `%TEMP%/opencode/fase-e-before`, con su `HEAD` en un commit viejo.
+Vive en `.git/worktrees/`, comparte el mismo object store, y `--all` lo recorre
+igual que si fuera una rama.
+
+Es el mismo fallo que los 61 tags y casi el mismo que `refs/original/`: la
+reescritura no consiste en "llegar a 0", sino en **llegar a 0 en todos los sitios
+que la alcanzan**. Un worktree enlazado es uno más, y `prune` **no lo quita si el
+directorio sigue existiendo** en disco.
+
+```bash
+git worktree list                 # <- antes de declarar la historia limpia
+
+# Si el directorio ya no existe, prune solo lo recoge:
+git worktree prune
+
+# Si sigue ahí y no tiene trabajo pendiente, se reapunta en vez de borrarlo:
+# cero borrados, y el commit viejo se queda sin alcance.
+git --git-dir=.git/worktrees/<nombre> \
+    --work-tree=<ruta> update-ref HEAD <commit-nuevo> <commit-viejo>
+
+git log --all --oneline | wc -l   # debe igualar git rev-list --count main
+```
+
+La comparación de la última línea es la que de verdad ata el resultado: si
+`--all` da más commits que `main`, **queda algo alcanzable que nadie ha mirado**.
+
+### 4.5 — Lo que NO mira `git log -S`: mensajes, tagger e índices
+
+`git log --all -S 'needle'` es el check que todo el mundo escribe, y **por
+estructura no puede ver tres cosas**. Cada una de las tres se CUENTÓ como
+resuelta mientras no lo estaba:
+
+| Hueco | Qué lo guarda vivo | Cómo se ve |
+|---|---|---|
+| **Mensaje del commit** | 249 con el correo, 5 con la contrasena | `-S` cuenta ocurrencias en el **diff**, no en el mensaje |
+| **`tagger` del tag anotado** | los 17 lo tenían en su propio objeto | `%ae\|%ce` solo mira commits, no la línea `tagger` de un tag |
+| **Índice de un worktree** | 88 blobs que el `gc` no podaba | `--all` no lo recorre y `fsck` no los lista: **están alcanzables** |
+
+```bash
+# El mensaje: -S no lo ve, --grep sí.
+git log --all --oneline --grep="$TU_AGUJA"          # debe dar 0
+
+# El tagger de los tags anotados: hay que abrir el objeto, no el commit.
+git for-each-ref refs/tags --format='%(objecttype) %(refname:short)' |
+  while read tipo tag; do
+    [ "$tipo" = tag ] && git cat-file tag "refs/tags/$tag"
+  done | grep -c "$TU_AGUJA"                      # debe dar 0
+
+# Y el indice de CADA worktree, que es una raiz de alcanzabilidad mas.
+git worktree list
+```
+
+Al reescribir un tag anotado, **no preserves el tagger a ciegas**: preserva el
+nombre y la fecha, y sanea el email. Y tras re-apuntar el `HEAD` de un worktree
+enlazado, haz `reset --hard` **dentro** de él: si no, su índice sigue pidiendo
+los blobs viejos y el `gc` no puede podarlos.
+
+### 4.6 — El barrido que sí no miente
+
+Por encima de cualquier check puntual, barre **todos** los objetos del store, con
+un control al lado que demuestre que el instrumento funciona:
+
+```powershell
+git cat-file --batch-all-objects --batch | Select-String -SimpleMatch -Pattern $TU_AGUJA
+git cat-file --batch-all-objects --batch | Select-String -SimpleMatch -Pattern 'PressPlay'   # control: >0
+```
+
+El **0 del needle** solo vale si el control da >0. Un check que no se puede ver
+fallar no protege de nada, y un needle escrito en el propio fichero que documenta
+el check se encuentra a sí mismo: móntalo en runtime (`'angab' + '06@...'`).
 
 ### Nota sobre `git filter-branch`
 
