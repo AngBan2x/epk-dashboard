@@ -185,23 +185,32 @@ de comprobación tiene que sembrar `localStorage` **antes** del primer
 
 ### Verificado en navegador
 
-Servidor local en dark real (`<html class="dark">`):
+**En producción** (commit `93d61ee`, `<html class="dark">` real), contra
+`https://epk-dashboard.vercel.app`:
 
-- `/admin/suggestions` → franja `rgb(15, 23, 42)` (slate-900), tarjetas
-  inactivas `rgb(30, 41, 59)` (slate-800), números blancos legibles.
-- `/suggestions` → franja `rgb(15, 23, 42)`.
+| Página | Franja | Tarjeta/pestaña inactiva | Tarjeta activa |
+|---|---|---|---|
+| `/admin/suggestions` | `rgb(15, 23, 42)` | `rgb(30, 41, 59)` (slate-800) | `rgba(80, 7, 36, 0.4)` |
+| `/admin/approvals` | `rgb(15, 23, 42)` | `rgb(15, 23, 42)` (slate-900) | `rgba(80, 7, 36, 0.4)` |
+| `/suggestions` (pública) | `rgb(15, 23, 42)` | — | — |
 
-`/admin/approvals` no se pudo renderizar en local con datos: `next start` contra
-SQLite se muere con la asertación nativa de `better-sqlite3`
+Cero cajas claras en las tres, y sin desbordamiento horizontal a 2048, 1024 y
+390 px. Texto de las cifras `rgb(248, 250, 252)`: legible sobre fondo oscuro.
+
+Antes del arreglo, las cuatro pestañas de `/admin/approvals` salían con fondo
+`rgb(255, 255, 255)` y texto blanco: **inexistentes en la práctica**.
+
+**En local** solo se pudieron comprobar `/admin/suggestions` y `/suggestions`.
+`/admin/approvals` no se renderiza con datos en local porque `next start`
+contra SQLite se muere con la asertación nativa de `better-sqlite3`
 (`node::RemoveEnvironmentCleanupHook`, `(env) != nullptr`), la misma de los
-workers de vitest. Queda pendiente de comprobar en producción, donde se usa
-Turso y no hay `better-sqlite3` en el bundle.
+workers de vitest: al tercer render cae el proceso. Se verificó en producción,
+donde se usa Turso y no hay `better-sqlite3` en el bundle. **Ese camino local no
+es utilizable para QA visual de paneles con datos**; la QA visual de admin tiene
+que ir contra producción.
 
 ## Pendientes
 
-- `/admin/approvals` (franja y pestañas de filtro) pendiente de verificación
-  visual en producción: en local el servidor SQLite-only se cae al tercera
-  navegación, con la asertación nativa de `better-sqlite3`.
 - `scripts/turso-check.ts` tiene el check `suggestions_email_duplicado_en_24h`
   **porque los tests corren contra SQLite, no contra Turso**: si esa capa falla en
   producción, los tests no lo ven.
