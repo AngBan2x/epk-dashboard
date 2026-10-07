@@ -18,7 +18,7 @@ permission:
     "*": "allow"
 ---
 
-# Orchestrator — Nemotron 3 Ultra
+# Orchestrator — space-bunny-free
 
 Eres un orquestador especializado en delegar tareas a subagentes para ejecutar fases completas de desarrollo de forma autónoma.
 
@@ -33,16 +33,31 @@ Eres un orquestador especializado en delegar tareas a subagentes para ejecutar f
 
 ## Subagentes Disponibles
 
+> **La fuente de verdad de los modelos es `opencode.json`.** Esta tabla es un
+> resumen legible; si discrepa del JSON, **gana el JSON**. Los `.md` de
+> `.opencode/agents/` no declaran `model:` a propósito, para que no haya dos
+> sitios que mantener sincronizados.
+
+Quedan **tres** modelos tras la retirada de Nemotron (2026-09-28, por lento):
+
+| Modelo | Contexto | Uso principal |
+|--------|----------|---------------|
+| `opencode/space-bunny-free` | 1M | orquestación, reasoning, APIs, DB, auth, security, tests |
+| `opencode/mimo-v2.6-flash-free` | 200K | builders de UI, y `small_model` para títulos |
+| `opencode/muse-spark-1.3` | 1M | `visual-tester`, deploys, releases, documentación |
+
+Los tres aceptan imágenes, así que ya no hace falta un modelo vision aparte.
+
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `api-builder` | `opencode/mimo-v2.5-free` | Endpoints REST, fixes rutinarios |
-| `auth-builder` | `opencode/nemotron-3-ultra-free` | Autenticación, session, middleware |
-| `dashboard-builder` | `opencode/nemotron-3.5-lightning-free` | UI/Components, páginas |
-| `db-builder` | `opencode/nemotron-3-ultra-free` | Schema DB, migraciones, Turso |
-| `quality-auditor` | `openrouter/gemma-4-31b` | Tests E2E, auditoría |
-| `visual-tester` | `opencode/mimo-v2.5-free` | Screenshots, DOM, a11y |
-| `brand-fixer` | `opencode/mimo-v2.5-free` | Logos, marcas |
-| `security-auditor` | `nvidia/nemotron-3-ultra-550b-a55b:free` | Seguridad |
+| `api-builder` | space-bunny-free | Endpoints REST, fixes rutinarios |
+| `auth-builder` | space-bunny-free | Autenticación, session, middleware |
+| `dashboard-builder` | mimo-v2.6-flash-free | UI/Components, páginas |
+| `db-builder` | space-bunny-free | Schema DB, migraciones, Turso |
+| `quality-auditor` | space-bunny-free | Tests E2E, auditoría |
+| `visual-tester` | muse-spark-1.3 | Screenshots, DOM, a11y |
+| `brand-fixer` | mimo-v2.6-flash-free | Logos, marcas |
+| `security-auditor` | space-bunny-free | Seguridad |
 
 ## Flujo de Ejecución
 

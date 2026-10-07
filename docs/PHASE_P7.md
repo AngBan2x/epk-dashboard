@@ -94,16 +94,35 @@ comprobarlo.** Ahora usa centinelas sintéticos de dominio inválido.
 
 ## Deuda que queda
 
-- **`git filter-repo` NO está instalado** en esta máquina. Y el paso de
-  reescribir el historial sigue pendiente: `docs/ROTACION_CREDENCIALES.md`.
+- **La reescritura del historial ya no está pendiente: se hizo (C9, 2026-10-06).**
+  `git filter-repo` **no se puede usar en Windows** en este repo: aborta con
+  `OSError: [Errno 22] Invalid argument`, y el motivo es P7bis — el
+  `Directrices del Proyecto Final.md:Zone.Identifier` que había en 16 commits es
+  un path inválido en NTFS. La reescritura se hizo con plumbing de git
+  (`fast-export` / `fast-import` / `update-ref`), en cuatro pasadas: path
+  inválido, blobs y metadata, mensajes de commit, y tagger de los tags
+  anotados. Procedimiento y auditorías en `docs/ROTACION_CREDENCIALES.md`.
 - Los 4 scripts `.cjs` (`verify-social-editor`, `verify-tabs-icons`,
   `verify-wave1`, `verify-wave2`) corren con `node` sin `tsx` y **no pueden
   importar un `.ts`**: repiten la lectura del env en 4 líneas. Deuda
   reportada, no resuelta.
 
+## Deuda que dejó C9
+
+- **Unas 178 referencias a SHAs antiguos en la documentación ya no resuelven.**
+  La reescritura cambió el hash de casi todo commit anterior, así que los enlaces
+  del tipo   `commit/abc1234` y las citas `@abc1234` apuntan a objetos que ya no
+  existen. **No se corrigieron a ciegas**: muchas son referencias al
+  *contenido* de un commit, no a su identidad, y varias citan SHAs cortos que
+  colisionarían al reescribir. Queda documentado como limitación conocida.
+- `git config user.email` del repo local quedó en
+  `test-artist@example.invalid` (placeholder válido para no volver a filtrar la
+  identidad real). El **global** del equipo sigue con la dirección real.
+
 ## Verificación
 
-- `tsc` limpio, lint sin avisos, **1146/1146** en 61 ficheros.
+- `tsc` limpio, lint sin avisos, **1146/1146** en 61 ficheros (en el momento de
+  escribir P7). La suite ha seguido creciendo: hoy son **1240 en 66 ficheros**.
 - `git grep -E "<credencial>" -- scripts tests app components lib` → **0** en
   código (las 7 apariciones restantes están en `docs/`, describiendo el problema,
   más el patrón de búsqueda de la guía de rotación).

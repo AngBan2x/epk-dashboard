@@ -5,7 +5,7 @@ description: Ejecuta una fase completa del plan maestro usando orchestrator con 
 
 # Comando: /fase
 
-Ejecuta una fase completa del MASTER_PLAN.md usando orchestrator Nemotron 3 Ultra con subagentes anidados.
+Ejecuta una fase completa del MASTER_PLAN.md usando orchestrator (space-bunny-free) con subagentes anidados.
 
 ## Uso
 ```
@@ -29,7 +29,7 @@ Ejemplos:
 4. Ejecutar quality gates finales
 5. Commit + release
 
-### Nivel 1: Orchestrator (Nemotron 3 Ultra)
+### Nivel 1: Orchestrator (space-bunny-free)
 1. Recibir tareas del agente principal
 2. Analizar dependencias entre tareas
 3. Ejecutar tareas independientes en paralelo
@@ -76,16 +76,16 @@ Orchestrator (Nivel 1):
 
 | Agente | Modelo | Uso | Permission Task |
 |--------|--------|-----|-----------------|
-| `orchestrator` | Nemotron 3 Ultra | Coordinación | `allow` |
+| `orchestrator` | space-bunny-free | Coordinación | `allow` |
 | `api-builder` | MiMo V2.5 | Endpoints REST | `allow` |
-| `auth-builder` | Nemotron 3 Ultra | Auth | `allow` |
-| `dashboard-builder` | Nemotron 3.5 Lightning | UI | `allow` |
-| `db-builder` | Nemotron 3 Ultra | DB | `allow` |
+| `auth-builder` | space-bunny-free | Auth | `allow` |
+| `dashboard-builder` | mimo-v2.6-flash-free | UI | `allow` |
+| `db-builder` | space-bunny-free | DB | `allow` |
 | `quality-auditor` | Gemma 4 31B | Tests | `allow` |
 | `visual-tester` | MiMo V2.5 | Visual QA | `allow` |
 | `brand-fixer` | MiMo V2.5 | Branding | `allow` |
-| `security-auditor` | Nemotron 3 Ultra | Security | `allow` |
-| `release-manager` | Nemotron 3.5 Lightning | Releases | `allow` |
+| `security-auditor` | space-bunny-free | Security | `allow` |
+| `release-manager` | mimo-v2.6-flash-free | Releases | `allow` |
 
 ## Cómo Invocar el Orchestrator
 

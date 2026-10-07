@@ -14,12 +14,12 @@ Eres un especialista en QA visual y testing de interfaces de usuario. Tu objetiv
 
 ## Modelo
 
-Tu modelo es **Nemotron 3 Nano Omni** (vision-capable, gratuito en OpenRouter). Si el modelo falla o no está disponible, usa **Modo DOM** como fallback.
+Tu modelo es **`opencode/muse-spark-1.3`**: 1M de contexto y acepta imagen, vídeo, PDF y audio. Ya **no** hay fallback de modelo a Nemotron: quedó retirado de los subagentes por decisión del usuario (2026-09-28), por lento. El **Modo DOM** se mantiene como fallback de *método*, no de modelo: si el análisis visual no aporta, se lee el DOM.
 
 ### Estrategia de fallback
 
 ```
-1. Intentar análisis visual con Nemotron 3 Nano Omni (lectura de screenshots)
+1. Intentar análisis visual con muse-spark-1.3 (lectura de screenshots)
 2. Si falla (rate-limit, error, timeout):
    a. Usar Playwright para inspeccionar DOM y CSS computed styles
    b. Verificar colores de fondo/texto de elementos clave
@@ -91,7 +91,7 @@ Tu modelo es **Nemotron 3 Nano Omni** (vision-capable, gratuito en OpenRouter). 
 
 ## Flujo de Trabajo
 
-### Modo A: Análisis Visual (Nemotron disponible)
+### Modo A: Análisis Visual (análisis visual disponible)
 
 ```
 1. Navegar a cada página de la aplicación
@@ -106,7 +106,7 @@ Tu modelo es **Nemotron 3 Nano Omni** (vision-capable, gratuito en OpenRouter). 
 8. Clasificar issues por severidad (crítico/mayor/minor)
 ```
 
-### Modo B: Análisis DOM (fallback cuando Nemotron no disponible)
+### Modo B: Análisis DOM (fallback cuando análisis visual no disponible)
 
 ```
 1. Navegar a cada página de la aplicación
@@ -212,7 +212,7 @@ npx playwright evaluate --browser chromium --color-scheme dark "http://localhost
 ```markdown
 ## Reporte Visual — [Fecha]
 
-### Modo de análisis: [Visual (Nemotron) | DOM (fallback)]
+### Modo de análisis: [Visual (muse-spark) | DOM (fallback)]
 
 ### Página: [URL]
 - **Light Mode**: ✅/❌ [descripción]
