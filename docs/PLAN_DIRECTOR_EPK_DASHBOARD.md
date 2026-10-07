@@ -182,6 +182,41 @@ export const renderIf = <T>(condition: boolean, content: React.ReactNode, fallba
 4. **AUDIO/VIDEO:** Verificar URL existe antes de renderizar `<audio src={...}>` o `<iframe src={...}>`
 5. **IMÁGENES:** `onError` handler obligatorio en `<img>` para fallback a placeholder
 
+   ### Por qué el `onError` no es opcional, y por qué no basta un ternario (2026-10-06)
+
+   Esta línea es normativa y tiene dientes: `tests/unit/image-robustness.test.ts`
+   la comprueba en las cuatro vistas que pintan portadas.
+
+   La razón de fondo es que **una URL que existe no es una imagen que carga**.
+   `getCoverImage(x) ? <Image …> : <placeholder>` solo cubre el caso de la URL
+   **vacía**. Una URL que existe y está **muerta** —un 404, un host que no
+   resuelve, un `http://` sin TLS— se acepta igual, y lo que sale es el icono de
+   imagen rota del navegador. Es lo que pasaba con las 9 portadas de la semilla,
+   que apuntaban a `example.com`.
+
+   Y hay una trampa detrás: **un `onError` que solo escribe en una variable de
+   render no vuelve a renderizar.** Por eso la regla no es "pon un `onError`"
+   sino "pasa por `components/CoverImage.tsx`", que tiene `useState`. Cualquier
+   vista que pinte una portada de la base con `<Image>` crudo está incumpliendo
+   esta directiva aunque tenga `onError` en otro sitio.
+
+   ### La miniatura de YouTube no está garantizada
+
+   `hqdefault.jpg` solo existe si el vídeo tiene miniatura de alta calidad; la
+   que sí existe siempre es `default.jpg`. Se comprobó contra los 10 vídeos con
+   `youtube_video_id` del catálogo y los 10 responden 200, así que hoy no se ve.
+   Aun así `VideoShowcase` cae a la portada si la mini falla.
+
+   `ReleaseVideoList` **no** tiene ese `onError` y la razón está escrita en el
+   fichero: es un Server Component por decisión de diseño ("N tarjetas, ninguna
+   necesita estado") y hoy la sección **no se monta**, porque no hay ningún
+   `videoclip` curado (las 28 hijas con vídeo son 11 `live` y 17 `topic_audio`, y
+   `showableVideo` no enseña ninguna). Convertirlo en cliente para una sección
+   invisible sería cambiar una decisión buena a cambio de nada. Si algún día
+   entra un `videoclip` curado sin `hqdefault`, el sitio del arreglo está
+   anotado ahí, y **no** es poner la miniatura de otra pista: sería un dato
+   falso.
+
 ### 5.5 Criterios de Aceptación por Fase
 
 | Fase | Criterio Null-Safety | Verificación |

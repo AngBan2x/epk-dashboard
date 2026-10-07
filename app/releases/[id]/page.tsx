@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CoverImage } from "@/components/CoverImage";
 import { ReleaseActions } from "@/components/ReleaseActions";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import { VideoShowcase } from "@/components/VideoShowcase";
@@ -22,6 +22,9 @@ import {
 import { metricsTooltip } from "@/lib/metrics-source";
 import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
 import { NO_VALUE, ownDurationLabel, showableVideo } from "@/lib/release-page";
+import { buildReleaseLinks, type ReleaseLink } from "@/lib/release-links";
+import { getSocialPlatform } from "@/lib/social-platforms";
+import { SocialPlatformIcon } from "@/components/ArtistSocialLinks";
 import type { Track } from "@/types/music";
 
 interface ReleaseDetailPageProps {
@@ -198,15 +201,27 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             es que se le vea la portada de un vistazo, y para eso basta con la
             portada, no con fondo desenfocado. */}
         <div className="flex flex-col md:flex-row gap-8 mb-8">
+          {/*
+            `CoverImage`, no `<Image>`. El `if (cover)` de fuera solo cubre la
+            URL **vacía**: una URL que existe pero está MUERTA (404, host que no
+            resuelve) se acepta igual y sale el icono de imagen rota del
+            navegador. Es exactamente lo que pasaba con las 9 portadas de la
+            semilla, que apuntaban a `example.com`.
+
+            La diferencia es un `onError` con estado: sin estado no se puede,
+            porque un `onError` que solo escribe en una variable de render no
+            vuelve a renderizar. Por eso el componente existe y por eso las
+            cuatro vistas que pintan portadas **tienen que pasar por él**.
+          */}
           {cover ? (
             <div className="w-full md:w-64 flex-shrink-0">
-              <Image
+              <CoverImage
                 src={cover}
                 alt={safeString(release.title)}
                 width={256}
                 height={256}
-                unoptimized
                 className="w-full aspect-square object-cover rounded-xl shadow-lg"
+                minHeightClassName=""
               />
             </div>
           ) : null}
@@ -314,10 +329,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             </h2>
             <div className="flex flex-wrap gap-3">
               {links.map((link) => (
-                <ExternalLink key={link.key} href={link.href} className={link.className}>
-                  {link.icon}
-                  {link.label}
-                </ExternalLink>
+                <ExternalLink key={link.key} link={link} />
               ))}
             </div>
           </section>
@@ -485,168 +497,28 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
  * diseño anterior era `py-2` con un icono de 20 px, que se quedaba en 36) y el
  * anillo de foco. El icono va `aria-hidden`: el nombre de la plataforma ya lo
  * dice el texto, y un lector de pantalla no necesita oír "Spotify" dos veces.
+ *
+ * El color de marca va en `style` y no en `className`: Tailwind solo genera las
+ * clases que encuentra **literales** en el fuente, así que un `bg-[#1DB954]`
+ * armado por interpolación no existe en la hoja de estilos y el botón salía
+ * sin fondo. El texto y el `d` del icono vienen de `lib/social-platforms.ts`.
  */
-function ExternalLink({
-  href,
-  className,
-  children,
-}: {
-  href: string;
-  className: string;
-  children: React.ReactNode;
-}) {
+function ExternalLink({ link }: { link: ReleaseLink }) {
   return (
     <a
-      href={href}
+      href={link.href}
       target="_blank"
       rel="noopener noreferrer"
-      className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-2 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${className}`}
+      style={{ backgroundColor: link.color }}
+      className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-2 text-white transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
     >
-      {children}
+      <SocialPlatformIcon
+        platform={getSocialPlatform(link.platformKey)!}
+        className="w-5 h-5"
+      />
+      {link.label}
     </a>
   );
-}
-
-const SPOTIFY_ICON = (
-  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-  </svg>
-);
-
-const APPLE_ICON = (
-  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043A5.022 5.022 0 0019.2.25a9.472 9.472 0 00-1.317-.24c-.58-.06-1.16-.08-1.74-.06H7.857c-.58-.02-1.16 0-1.74.06-.46.04-.92.1-1.36.2A5.022 5.022 0 002.426.89C1.308 1.624.564 2.624.246 3.934a9.23 9.23 0 00-.24 2.19c-.06.58-.08 1.16-.06 1.74v10.68c-.02.58 0 1.16.06 1.74.04.46.1.92.24 1.36.318 1.31 1.062 2.31 2.18 3.043a9.472 9.472 0 001.868.64c.44.1.9.16 1.36.2.58.06 1.16.08 1.74.06h8.286c.58.02 1.16 0 1.74-.06.46-.04.92-.1 1.36-.2a5.022 5.022 0 001.868-.64c1.118-.734 1.862-1.734 2.18-3.043.14-.44.2-.9.24-1.36.06-.58.08-1.16.06-1.74V7.864c.02-.58 0-1.16-.06-1.74zM17.994 15.854l-.002-6.48-5.496 3.22v6.08l5.498-2.82z" />
-  </svg>
-);
-
-const YOUTUBE_ICON = (
-  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-  </svg>
-);
-
-const DEEZER_ICON = (
-  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M18.81 4.16v3.19h-4.78V4.16h4.78zm0 4.57v3.19h-4.78V8.73h4.78zm0 4.58v3.19h-4.78v-3.19h4.78zM6.39 4.16v3.19H1.61V4.16h4.78zm0 4.57v3.19H1.61V8.73h4.78zm0 4.58v3.19H1.61v-3.19h4.78zM12.6 9.56v7.93h-4.78V9.56h4.78z" />
-  </svg>
-);
-
-interface ReleaseLink {
-  key: string;
-  href: string;
-  label: string;
-  className: string;
-  icon: React.ReactNode;
-}
-
-/**
- * ## Los enlaces de un lanzamiento, de TODAS las fuentes
- *
- * Hay dos sitios donde vive un enlace a una plataforma, y se llenan por caminos
- * distintos:
- *
- * | Plataforma | Columna "preferida" | La que se leía antes |
- * |---|---|---|
- * | Spotify | `external_links.spotify` | `external_links.spotify` |
- * | Apple Music | `external_links.apple_music` | `external_links.apple_music` |
- * | YouTube | `external_links.youtube` | `external_links.youtube` |
- * | Deezer | `external_links.deezer` | — no salía |
- * | Bandcamp | `external_links.bandcamp` | — no salía |
- *
- * Con **solo** `external_links`, 7 de los 9 singles del catálogo no tenían
- * sección de Enlaces: su Spotify está en `spotify_url`, su Apple en
- * `itunes_track_id` y su vídeo en `youtube_video_id`. La sección se escondía
- * entera porque la condición era `Object.keys(external_links).length > 0`.
- *
- * Las reglas son tres, y las tres importan:
- *
- * 1. **Primero `external_links`, después la columna de la fila.** Es la que
- *    escribe una persona; la otra la rellena un proceso. Si las dos existen, gana
- *    la curada.
- * 2. **`""` es ausencia.** `lib/db.ts` pasa la columna por `safeString`, que
- *    convierte `""` en el string **truthy** `"—"`. Por eso hay que filtrar por
- *    largo y no por "no es null": sin esto, un `external_links.spotify` vacío
- *    pinta un botón que lleva a una página que no existe.
- * 3. **Un enlace por plataforma.** Si `external_links.youtube` y
- *    `youtube_video_id` apuntan al mismo vídeo, sale **un** botón. Con un
- *    `??` por plataforma sale solo, y por eso no hace falta un `Set`.
- */
-function buildReleaseLinks(release: Track): ReleaseLink[] {
-  const external = release.external_links ?? {};
-  const links: ReleaseLink[] = [];
-
-  const usable = (value: unknown): string | null => {
-    if (typeof value !== "string") return null;
-    const trimmed = value.trim();
-    // `—` es el placeholder de `safeString` para una columna vacía.
-    if (trimmed === "" || trimmed === "—" || trimmed === "-") return null;
-    return trimmed;
-  };
-
-  const spotify = usable(external.spotify) ?? usable(release.spotify_url);
-  if (spotify) {
-    links.push({
-      key: "spotify",
-      href: spotify,
-      label: "Spotify",
-      className: "bg-[#1DB954] hover:bg-[#1ed760]",
-      icon: SPOTIFY_ICON,
-    });
-  }
-
-  const apple =
-    usable(external.apple_music) ??
-    (usable(release.itunes_track_id)
-      ? `https://music.apple.com/us/album/${usable(release.itunes_track_id)}`
-      : null);
-  if (apple) {
-    links.push({
-      key: "apple",
-      href: apple,
-      label: "Apple Music",
-      className: "bg-[#FC3C44] hover:bg-[#e0353c]",
-      icon: APPLE_ICON,
-    });
-  }
-
-  const youtube =
-    usable(external.youtube) ??
-    (usable(release.youtube_video_id)
-      ? `https://www.youtube.com/watch?v=${usable(release.youtube_video_id)}`
-      : null);
-  if (youtube) {
-    links.push({
-      key: "youtube",
-      href: youtube,
-      label: "YouTube",
-      className: "bg-[#FF0000] hover:bg-[#cc0000]",
-      icon: YOUTUBE_ICON,
-    });
-  }
-
-  const deezer = usable(external.deezer);
-  if (deezer) {
-    links.push({
-      key: "deezer",
-      href: deezer,
-      label: "Deezer",
-      className: "bg-[#a238ff] hover:bg-[#8f2ee0]",
-      icon: DEEZER_ICON,
-    });
-  }
-
-  const bandcamp = usable(external.bandcamp);
-  if (bandcamp) {
-    links.push({
-      key: "bandcamp",
-      href: bandcamp,
-      label: "Bandcamp",
-      className: "bg-[#629aa9] hover:bg-[#548794]",
-      icon: null,
-    });
-  }
-
-  return links;
 }
 
 const CHEVRON_LEFT = "M15 19l-7-7 7-7";

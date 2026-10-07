@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { CoverImage } from "@/components/CoverImage";
 import { safeString, capitalizeReleaseType, getCoverImage, sumDurations } from "@/lib/null-safe";
 import { imageOptimizationProps } from "@/lib/image-config";
 import type { Track, ArtistProfile, Show, ShowStatus, ReleaseStatus } from "@/types/music";
@@ -875,7 +876,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
                               {getCoverImage(track) ? (
-                                <Image src={getCoverImage(track)!} alt="" width={40} height={40} {...imageOptimizationProps(getCoverImage(track))} className="w-full h-full object-cover" />
+                                <CoverImage src={getCoverImage(track)} alt="" width={40} height={40} className="w-full h-full object-cover" minHeightClassName="" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                               )}
@@ -968,7 +969,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
                               {getCoverImage(release) ? (
-                                <Image src={getCoverImage(release)!} alt="" width={40} height={40} {...imageOptimizationProps(getCoverImage(release))} className="w-full h-full object-cover" />
+                                <CoverImage src={getCoverImage(release)} alt="" width={40} height={40} className="w-full h-full object-cover" minHeightClassName="" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
                               )}

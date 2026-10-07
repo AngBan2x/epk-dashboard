@@ -102,10 +102,35 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
 
   let playButton: React.ReactNode;
   if (!canPlay) {
-    // Sin fuente reproducible: no se pinta un "▶" que no lleva a ningún lado.
+    /**
+     * Sin fuente reproducible: no se pinta un "▶" que no lleva a ningún lado.
+     *
+     * ## Por qué un altavoz tachado y no un círculo con una raya
+     *
+     * Antes era el "ban" de Heroicons: un círculo con una diagonal. A los
+     * `w-4 h-4` de este botón **es indistinguible del icono de imagen rota** del
+     * navegador, y el usuario lo reportó como un SVG roto en la captura del
+     * reproductor sin audio. El símbolo tenía además el problema contrario:
+     * dice "prohibido", cuando lo que pasa es que no hay nada que reproducir.
+     *
+     * Un altavoz con waves apagadas dice lo mismo y no se confunde con nada.
+     * Como el texto `statusText` ya dice "No hay audio disponible", el icono
+     * es decoración: por eso `aria-hidden`.
+     */
     playButton = (
-      <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+      <svg
+        className="w-4 h-4 text-slate-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M11 5L6 9H2v6h4l5 4V5zM22 9l-6 6M16 9l6 6"
+        />
       </svg>
     );
   } else if (isError) {

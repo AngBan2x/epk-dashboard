@@ -58,6 +58,28 @@ export function ReleaseVideoList({
       </p>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {withVideo.map(({ track, video }) => {
+          /**
+           * `hqdefault.jpg` no está **garantizada** por YouTube: solo existe si
+           * el vídeo tiene miniatura de alta calidad. La que sí existe siempre es
+           * `default.jpg`.
+           *
+           * Se comprobó contra los 10 vídeos con `youtube_video_id` del catálogo
+           * y los 10 responden 200 en `hqdefault`, así que hoy no se ve el
+           * problema. Aun así aquí **no** hay `onError` que la sustituyan, y es
+           * deliberado por dos motivos:
+           *
+           * 1. Convertir este componente en cliente para tener estado rompe una
+           *    decisión documentada arriba (N tarjetas, ninguna necesita estado)
+           *    y arrastra un bundle de cliente por pista.
+           * 2. Con los datos de hoy esta sección **no se monta**: los 28 vídeos
+           *    de las hijas son 11 `live` y 17 `topic_audio`, y `showableVideo`
+           *    no enseña ninguno. No hay nada que ver.
+           *
+           * Si algún día entra un `videoclip` curado cuya `hqdefault` dé 404, el
+           * sitio del arreglo es este: o un hijo cliente mínimo que la oculte, o
+           * un `<img>` con `onerror` en línea. Lo que **no** hay que hacer es
+           * poner una miniatura de otra pista, que sería un dato falso.
+           */
           const thumbnail = video.youtubeVideoId
             ? `https://img.youtube.com/vi/${video.youtubeVideoId}/hqdefault.jpg`
             : null;

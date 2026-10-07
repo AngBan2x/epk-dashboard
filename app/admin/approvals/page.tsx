@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback, type ReactNode, type RefObject } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { CoverImage } from '@/components/CoverImage';
 import { capitalizeReleaseType, getCoverImage, sumDurations } from '@/lib/null-safe';
 import { Badge, CountBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -689,13 +689,20 @@ export default function ApprovalsPage() {
                     {revision > 0 && <DetailRow term="Revisión">#{revision}</DetailRow>}
                     {cover && (
                       <DetailRow term="Portada">
-                        <Image
+                        {/*
+                          `CoverImage` y no `<Image>`: el `{cover &&}` de fuera
+                          solo cubre la URL **vacía**. Una portada que existe y
+                          está muerta (404, host caído) se acepta igual, y sale el
+                          icono de imagen rota justo donde el admin está
+                          decidiendo si aprueba el lanzamiento.
+                        */}
+                        <CoverImage
                           src={cover}
                           alt={`Portada de ${data.title || 'sin título'}`}
                           width={600}
                           height={160}
-                          unoptimized
                           className="mt-2 h-40 w-full rounded-lg object-cover"
+                          minHeightClassName="min-h-[160px]"
                         />
                       </DetailRow>
                     )}

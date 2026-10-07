@@ -14,6 +14,10 @@ interface VideoShowcaseProps {
   className?: string;
 }
 
+/** Último recurso si no hay miniatura de YouTube ni portada utilizable. */
+const PLACEHOLDER_THUMB =
+  "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80";
+
 export function VideoShowcase({
   title = "Videoclip Oficial",
   youtubeVideoId,
@@ -22,16 +26,34 @@ export function VideoShowcase({
   className = "",
 }: VideoShowcaseProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  /**
+   * Si la miniatura de YouTube no carga, se cae a la **de la portada**, y no a
+   * un icono de imagen rota.
+   *
+   * ## Por qué hace falta
+   *
+   * `hqdefault.jpg` **no está garantizado**. YouTube solo la sirve si el vídeo
+   * tiene una miniatura de alta calidad subida alguna vez; la que sí existe
+   * siempre es `default.jpg`. Los 10 vídeos del catálogo la tienen, así que hoy
+   * no se ve, pero el primero que no la tenga pinta un rectángulo roto dentro de
+   * una tarjeta que dice "Videoclip Oficial".
+   *
+   * El `onError` es el que convierte una URL muerta en otra cosa: sin estado no
+   * se puede, porque un `onError` que solo escribe en una variable de render no
+   * vuelve a renderizar. Es el mismo motivo por el que existe `CoverImage`.
+   */
+  const [thumbFailed, setThumbFailed] = useState(false);
 
   const hasVideo = Boolean(youtubeVideoId || videoEmbedUrl);
   const resolvedTitle = safeString(title, "Videoclip Oficial");
 
-  // Thumbnail dinámico: si hay YouTube ID obtenemos maxresdefault o hqdefault, sino coverImage o placeholder
-  const thumbnail = youtubeVideoId
-    ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
-    : coverImage && coverImage !== "—"
-    ? coverImage
-    : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80";
+  const fallbackThumb = safeString(coverImage) || PLACEHOLDER_THUMB;
+  const thumbnail =
+    youtubeVideoId && !thumbFailed
+      ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
+      : fallbackThumb;
+  /** True cuando lo que se pinta es el respaldo, no la miniatura del vídeo. */
+  const usingFallback = thumbnail === fallbackThumb;
 
   return (
     <section className={`p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 ${className}`}>
@@ -68,6 +90,11 @@ export function VideoShowcase({
           width={640}
           height={360}
           {...imageOptimizationProps(thumbnail)}
+          onError={() => {
+            // Solo tiene sentido la primera vez: si ya estamos en el respaldo,
+            // volver a marcarlo no arregla nada y crea un ciclo.
+            if (!usingFallback) setThumbFailed(true);
+          }}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
 

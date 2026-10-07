@@ -7,10 +7,27 @@ import { LoginModal } from "@/components/LoginModal";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SearchBar, MobileSearch } from "@/components/SearchBar";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 export function Header() {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+
+  /**
+   * El botón "Iniciar Sesión" no se pinta en las rutas de acceso.
+   *
+   * El botón se dibuja cuando no hay sesión, así que el problema no es que el
+   * header tenga un botón de login: es que en esas dos páginas **la página ya es
+   * el login**, y entonces hay dos controles para la misma acción en la misma
+   * pantalla. El usuario lo reportó como redundante el 2026-10-06.
+   *
+   * Se decide por **ruta** y no por "si hay un formulario en el DOM": eso
+   * dependería de que el JS ya haya corrido, y en el primer pintado el header
+   * puede aparecer antes, que es justo cuando el duplicado se nota.
+   */
+  const isAccessRoute = pathname === "/login" || pathname === "/register";
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -187,7 +204,7 @@ export function Header() {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : isAccessRoute ? null : (
               <button
                 onClick={() => setLoginModalOpen(true)}
                 className="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg transition-colors"
@@ -321,7 +338,7 @@ export function Header() {
                   Cerrar sesión
                 </button>
               </div>
-            ) : (
+            ) : isAccessRoute ? null : (
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
