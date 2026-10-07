@@ -243,7 +243,13 @@ export default function AdminSuggestionsPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <nav
         aria-label="Ruta del panel de administración"
-        className="border-b border-slate-200 bg-white dark:border-slate-800"
+        /**
+         * Mismo patrón a medias que las tarjetas de estadística: `dark:` en el
+         * borde y no en el fondo. En oscuro quedaba una **banda blanca** entre
+         * el header y el degradado morado, que es donde se ve de un vistazo que
+         * la página está a medio pintar.
+         */
+        className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
       >
         <div className="mx-auto max-w-6xl px-4">
           <Link
@@ -295,10 +301,25 @@ export default function AdminSuggestionsPage() {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setFilter(key)}
+                  /**
+                   * ## Por qué la rama inactiva llevaba `dark:border` y no `dark:bg`
+                   *
+                   * Estaba escrito `dark:border-slate-800` a secas, sin el fondo.
+                   * En modo claro no se nota nada, porque `bg-white` es lo que
+                   * quiere la luz; pero en oscuro la tarjeta se quedaba **blanca**
+                   * con el borde oscuro, y el número —que sí tenía
+                   * `dark:text-white`— quedaba **blanco sobre blanco**, invisible.
+                   *
+                   * Se detectó en producción el 2026-10-06 con capturas: cinco
+                   * tarjetas, cuatro blancas en una página oscura.
+                   *
+                   * Las dos ramas necesitan el par completo. La activa ya lo tenía
+                   * (`dark:bg-primary-950/40`); a la inactiva le faltaba la mitad.
+                   */
                   className={`p-4 text-left transition-colors ${FOCUS_RING} ${
                     active
                       ? 'rounded-2xl border border-primary-500 bg-primary-50 dark:bg-primary-950/40 dark:border-primary-500'
-                      : 'rounded-2xl border border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700'
+                      : 'rounded-2xl border border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-800 dark:hover:border-slate-700 dark:hover:bg-slate-700'
                   }`}
                 >
                   <span className="block text-2xl font-bold text-slate-900 dark:text-white">

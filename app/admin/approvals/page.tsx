@@ -373,12 +373,21 @@ export default function ApprovalsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* Ruta de vuelta: mismo lenguaje visual que la barra de pestañas de /admin,
-          que antes no tenía equivalente y dejaba la página sin salida. */}
-      <nav
-        aria-label="Ruta del panel de administración"
-        className="border-b border-slate-200 bg-white dark:border-slate-800"
-      >
+        {/* Ruta de vuelta: mismo lenguaje visual que la barra de pestañas de /admin,
+            que antes no tenía equivalente y dejaba la página sin salida. */}
+        {/**
+         * `dark:` en el borde y no en el fondo: en oscuro la franja se quedaba
+         * **blanca** sobre el fondo de la pagina. Es el mismo fallo que se
+         * corrigio en las tarjetas del buzon (`/admin/suggestions`), y el mismo
+         * className copiado a mano en las dos paginas.
+         *
+         * `tests/unit/dark-mode-pairing.test.ts` lo ata para las tres, porque
+         * arreglar solo esta dejaba `/suggestions` igual de rota.
+         */}
+        <nav
+          aria-label="Ruta del panel de administración"
+          className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        >
         <div className="mx-auto max-w-6xl px-4">
           <Link
             href="/admin"
@@ -464,9 +473,15 @@ export default function ApprovalsPage() {
                     // Cada rama declara el color de borde completo: dos utilitarios
                     // de `border-color` en la misma etiqueta los desempata el orden
                     // del stylesheet, no el orden de las clases.
+                    //
+                    // Y cada rama declara su **fondo** completo, no solo el borde.
+                    // Es la tercera vez que este mismo archivo escribe `dark:` en
+                    // el borde y se olvida en el fondo, y elolvido se ve: en
+                    // oscuro las cuatro pestañas quedaban blancas y su numero
+                    // —`dark:text-white`— blanco sobre blanco.
                     active
                       ? 'rounded-2xl border border-primary-500 bg-primary-50 dark:bg-primary-950/40 dark:border-primary-500'
-                      : 'rounded-2xl border border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700'
+                      : 'rounded-2xl border border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800'
                   }`}
                 >
                   <span className="block text-2xl font-bold text-slate-900 dark:text-white">

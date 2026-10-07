@@ -20,10 +20,20 @@ import { Card, CardContent } from '@/components/ui/Card';
 export default function SuggestionsPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <nav
-        aria-label="Migas de pan"
-        className="border-b border-slate-200 bg-white dark:border-slate-800"
-      >
+        {/**
+         * El mismo `dark:` a medias que las tarjetas del buzon, y por el mismo
+         * motivo: `dark:` en el borde y no en el fondo. En oscuro esta franja se
+         * quedaba **blanca** entre el header y el degradado violeta, que es lo
+         * que hace pensar que la pagina esta a medio pintar.
+         *
+         * Va escrito a mano en tres paginas —esta, `/admin/suggestions` y
+         * `/admin/approvals`— y por eso lo comprueba
+         * `tests/unit/dark-mode-pairing.test.ts`.
+         */}
+        <nav
+          aria-label="Migas de pan"
+          className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        >
         <div className="mx-auto max-w-3xl px-4">
           <Link
             href="/"
