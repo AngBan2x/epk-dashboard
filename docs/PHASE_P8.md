@@ -1,4 +1,4 @@
-# PHASE P8 — Una página por release
+# FASE P8 — Una página por release
 
 **Estado:** COMPLETADA (2026-10-04) — commits `cebc700` y `6baefc2`
 **Reserva cerrada:** el diseño nuevo se revirtió en C1 (2026-10-04). Ver

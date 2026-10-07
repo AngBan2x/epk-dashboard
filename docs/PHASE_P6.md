@@ -1,4 +1,4 @@
-# PHASE P6 — Fixes UI + Roles + Seguridad + A11y (SPEC, pendiente de ejecución)
+# FASE P6 — Fixes UI + Roles + Seguridad + A11y (SPEC, pendiente de ejecución)
 
 **Estado:** planificada (espec aprobada por el usuario el 2026-09-27, pendiente de ejecución por oleadas).
 **Origen:** 13 problemas reportados por el usuario con capturas + 2 barridos de evidencia (accesibilidad/responsive, integridad/seguridad). Todo verificado con archivo:linea antes de planificar.

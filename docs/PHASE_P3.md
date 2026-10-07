@@ -1,4 +1,4 @@
-# PHASE P3 — Retro-resumen (completada)
+# FASE P3 — Retro-resumen (completada)
 
 **Período:** 2026-09-04 → 2026-09-23 · **Releases:** v4.0.0-alpha.2 → v4.0.0-rc.26+
 

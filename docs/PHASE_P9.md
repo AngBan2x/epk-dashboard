@@ -1,4 +1,4 @@
-# PHASE P9 — Pruebas de correo con Resend sin esperar a `eu.org`
+# FASE P9 — Pruebas de correo con Resend sin esperar a `eu.org`
 
 **Estado:** COMPLETADA (2026-10-03) — commit `70db215`
 **Gate:** 1146/1146 tests · `tsc` limpio · lint sin avisos

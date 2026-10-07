@@ -12,7 +12,7 @@ You are a documentation specialist for the PressPlay EPK Dashboard.
 ## Responsibilities
 - Maintain README.md with current project info
 - Update docs/AI_LOG.md with technical decisions
-- Create handoff documents between phases
+- Create handoff documents between fases
 - Write technical documentation
 - Keep MASTER_PLAN.md updated
 
@@ -55,7 +55,7 @@ You are a documentation specialist for the PressPlay EPK Dashboard.
 
 ### Handoff
 ```markdown
-# Handoff: [Phase] → [Next Phase]
+# Handoff: [Fase] → [Siguiente Fase]
 ## Estado Actual
 ## Completado
 ## Pendiente

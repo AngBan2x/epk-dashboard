@@ -1,4 +1,4 @@
-# PHASE P4 — Subscribers + Notifications + Search (SPEC EJECUTABLE)
+# FASE P4 — Subscribers + Notifications + Search (SPEC EJECUTABLE)
 
 **Estado:** COMPLETADA el 2026-09-26 (P4.1-P4.8, cada task verificada en local y en produccion; detalle y lecciones en `docs/AI_LOG.md`)
 **Docs base:** auditoría fase P en `AI_LOG.md`, `MASTER_PLAN.md` P4.1–P4.7

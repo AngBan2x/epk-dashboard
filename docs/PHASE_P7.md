@@ -1,4 +1,4 @@
-# PHASE P7 — Credenciales de test fuera del código
+# FASE P7 — Credenciales de test fuera del código
 
 **Estado:** COMPLETADA (2026-10-03) · commits `cf07930`, `cb2b09e`
 **Alcance:** 41 ficheros modificados (16 scripts, 12 specs de Playwright, helpers, config)

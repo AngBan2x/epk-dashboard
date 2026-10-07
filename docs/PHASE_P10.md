@@ -1,4 +1,4 @@
-# PHASE P10 — Buzón de sugerencias anónimo, solo admin
+# FASE P10 — Buzón de sugerencias anónimo, solo admin
 
 **Estado:** COMPLETADA (2026-10-03) — commits `7ccd8a0`, `db84123`, `035f8d6`
 **Gate:** 1146/1146 tests · `tsc` limpio · lint sin avisos · verificado en producción

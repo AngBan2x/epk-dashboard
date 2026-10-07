@@ -123,7 +123,7 @@ esas dos líneas, y no solo las 125 secciones.
 - v4.0.0-rc.13 — Login Fix + Dashboard Público
 - v4.0.0-rc.14→rc.18 — P3 Batch 3: Fixes + Rediseño + Features
 - rc.19 — Auth Edge Runtime Fix (CRITICAL)
-- rc.20 — Bug Fixes + Phase P Verification
+- rc.20 — Bug Fixes + Fase P Verification
 - rc.21 — Exhaustive Testing + Player Empty State Fix
 - rc.22 — Progress Bar Fix + Seek Clamping + 42/42 Tests Pass
 - RC.23 — Player YouTube Fixes
