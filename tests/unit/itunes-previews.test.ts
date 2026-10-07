@@ -684,11 +684,18 @@ describe("P15 — /releases/[id] muestra la duración sumada de las hijas", () =
     expect(releasePageSource).not.toMatch(/const\s+durationLabel\s*=\s*release\.duration/);
   });
 
-  it("NO imprime la etiqueta ⏱️ con la duración cruda del padre", () => {
+  it("NO imprime la duración cruda del padre, y sí la etiqueta sumada", () => {
     // La aserción mira el JSX, no el fichero entero: un comentario que nombre el
     // arreglo no puede hacer fallar (ni pasar) el test.
-    expect(releasePageSource).not.toMatch(/⏱️\s*\{\s*release\.duration\s*\}/);
-    expect(releasePageSource).toMatch(/⏱️\s*\{\s*durationLabel\s*\}/);
+    //
+    // Y mira `durationLabel` a secas, sin exigir el emoji ⏱️ delante. Antes lo
+    // pedía porque la etiqueta estaba en su propia línea con el emoji; con el
+    // rediseño de P8 la duración vive en la línea de metadatos de la carta, junto
+    // a la fecha y al número de pistas. Exigir el emoji ataba el test a una
+    // decisión de diseño que ya no está, y lo que este bloque protege es otra
+    // cosa: que lo que se pinta sea `durationLabel` y nunca `release.duration`.
+    expect(releasePageSource).not.toMatch(/\{\s*release\.duration\s*\}/);
+    expect(releasePageSource).toMatch(/\{\s*durationLabel\s*\}/);
   });
 
   it("no reintroduce un parser de duración propio en la página", () => {

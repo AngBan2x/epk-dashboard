@@ -139,6 +139,85 @@ diseño de P2 tampoco mostraba nada de eso, así que no se perdió con el revert
 pero estaba perdido desde P8 y **es el mismo síntoma** que motivó la petición del
 usuario.
 
+## El diseño vuelve, pero el esqueleto de la ficha de pista (P8.1, 2026-10-06)
+
+> "Las releases no se ven como antes, que se veían bien antes. Te paso capturas."
+
+### Lo que se decidió, y lo que NO
+
+La petición era recuperar el aspecto, y hay dos formas de confundirse aquí. La
+primera es copiarse las capturas. La segunda es copiar **el diseño nuevo que se
+revirtió en C1**, que ya se probó mal: era una sola columna, y por eso los datos
+secundarios quedaban debajo de veinte pistas y había que scrollar para llegar a
+ellos.
+
+Lo que se hizo es **el esqueleto de `app/track/[id]/page.tsx`**, que es el que las
+capturas muestran y el que nunca se toquesó:
+
+- `max-w-6xl`, no `max-w-4xl`.
+- Migas de pan arriba.
+- Una **carta** con la portada a un lado (`lg:w-72`) y la ficha al otro, con
+  `PageTransition` y `SlideIn`.
+- Una **barra de hechos** al pie de la carta: Pistas, Discos, Duración.
+- **Dos columnas**: contenido en `lg:col-span-2`, barra lateral en el otro tercio.
+
+Y con el mismo criterio de antes, aplicado de forma simétrica:
+
+- La portada a **tamaño de disco**, no de miniatura. La ficha de pista usa
+  `sm:w-56` porque su protagonista es la canción; aquí el protagonista es el
+  disco.
+- Un álbum **no monta reproductor** en la carta. Su fila existe para agrupar y no
+  tiene audio: montarlo era el botón de play que no hace nada.
+- La barra lateral solo monta lo que **hay**: `Discos` no sale si hay uno, y
+  `Enlaces Externos` no sale si no hay ninguno.
+
+### La lógica no se tocó
+
+Cada corrección de P2 sigue donde estaba, y ahora vive en otro sitio del árbol:
+
+| Corrección | Dónde está ahora |
+|---|---|
+| `getReleaseWithTracks` | sigue siendo la fuente |
+| `ownDurationLabel` con el filtro del `"00:00"` | idem, y además en la carta |
+| `trackCount` (un single = 1 pista, no 0) | en la carta y en la barra de hechos |
+| Sección de pistas del single sin hijas | idem, la `listedTracks` no cambió |
+| `getReleaseNeighbours` | idem, ahora en la barra lateral |
+| `—` de las métricas (`value === null`) | idem, con su `sr-only` |
+| `showableVideo` para el `- Topic` | idem |
+| Vídeo/ficha/galería solo si `isTrackRow` | idem |
+
+El reproductor **no es una decisión de la página**: se monta `AudioPlayer` con la
+fila y el componente ya resuelve preview → YouTube → altavoz apagado, porque su
+`canPlay` pregunta "¿suena algo?" y no "¿tiene enlaces?".
+
+### Los dos tests que hubo que tocar, y por qué
+
+1. **`C1 · las cuatro secciones`**: el orden cambia porque enlaces y prensa pasan
+   a la barra lateral, que en el DOM va después de la columna de contenido. Lo
+   que **no** cambió y sigue fijando lo mismo: sección sin dato no se inventa,
+   `aria-labelledby` presente, sección ausente sin pasar por presente.
+2. **`itunes-previews.test.ts`, el check de la duración**: buscaba el literal
+   `⏱️ {durationLabel}` en el fuente. Con el rediseño la duración vive en la línea
+   de metadatos de la carta, junto a la fecha y al número de pistas. El check
+   pedía un emoji, no una invariante; ahora exige lo que protege: que se pinte
+   `durationLabel` y nunca `release.duration`.
+
+Y uno nuevo: hubo que stubejar `IntersectionObserver` en
+`tests/unit/release-page.test.ts`. `SlideIn` anima con `whileInView`, que es
+framer-motion, y framer-motion construye ese observer al montar: sin el stub, los
+**50** tests del fichero salían rojos por una API que jsdom no trae. Va en el
+fichero y no en `setupFiles` global, porque tocar `vitest.config.ts` cambia el
+comportamiento de los otros 66 ficheros.
+
+### Verificado
+
+`The Wall` (álbum, 20 pistas, 2 discos) y `Bohemian Rhapsody` (single) contra el
+build de producción local, en claro y en oscuro, a 2048 / 1024 / 768 / 390 px:
+portada cargada (600×600), reproductor real en el single ("Preview (30s)"),
+métricas de verdad (`2.100.000 streams`, no un cero), `Discos` omitido cuando hay
+uno, y **cero desbordamiento horizontal** en los cuatro anchos. Gates: `tsc` y
+lint limpios, **1244/1244** tests.
+
 **Cerrado en C1-bis** (`5ed5354`, 2026-10-04), que es donde se decidi: los bloques
 de **pista** (videoclip, ficha de producción, galería) vuelven a la página de
 release cuando la fila **es** una pista, y la descarga de dossier y rider —que es

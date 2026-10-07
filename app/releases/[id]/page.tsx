@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CoverImage } from "@/components/CoverImage";
+import { AudioPlayer } from "@/components/AudioPlayer";
+import { PageTransition, SlideIn } from "@/components/MotionWrappers";
 import { ReleaseActions } from "@/components/ReleaseActions";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import { VideoShowcase } from "@/components/VideoShowcase";
@@ -192,302 +194,456 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   /** El vídeo de **esta** fila, si se puede enseñar. `null` en un álbum. */
   const ownVideo = showableVideo(release);
 
+  /**
+   * El reproductor, y por qué decide él solo.
+   *
+   * Un álbum no tiene audio: su fila existe solo para agrupar, y su
+   * `audio_preview_url` está vacía. El reproductor caía en "No hay audio
+   * disponible" con un botón de play que no hace nada, que es exactamente el
+   * fallo que se pidió quitar. Así que solo se monta cuando **esta fila es una
+   * pista** (`isTrackRow`).
+   *
+   * Y dentro de la pista no hay que decidir nada: `AudioPlayer` ya resuelve la
+   * precedencia (preview de iTunes > Spotify/Apple > YouTube) y su `canPlay`
+   * pregunta "¿suena algo?" y no "¿tiene enlaces?", así que un single con solo
+   * YouTube reproduce el vídeo y uno sin ninguna fuente enseña el altavoz
+   * apagado con su texto. Nada de esto se reimplementa aquí: se le pasa la fila
+   * y se deja que decida.
+   */
+  const playableRow = isTrackRow ? release : null;
+
+  /**
+   * La duración de la barra de métricas. Ya viene calculada arriba y con el
+   * filtro del relleno `"00:00"` aplicado (`ownDurationLabel`), así que aquí no
+   * se vuelve a decidir nada: se enseña lo que hay, o un guion si no hay nada.
+   */
+  const heroFacts = [
+    trackCount > 0 ? { label: "Pistas", value: String(trackCount) } : null,
+    discCount > 1 ? { label: "Discos", value: String(discCount) } : null,
+    durationLabel ? { label: "Duración", value: durationLabel } : null,
+  ].filter((f): f is { label: string; value: string } => f !== null);
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <main className="max-w-4xl mx-auto px-4 py-12">
-        {/* ── Cabecera ────────────────────────────────────────────────────────
-            La de siempre: portada a un lado, ficha al otro. Sin degradado, sin
-            velo, sin type-line en mayúsculas. Lo que hace "rico" un lanzamiento
-            es que se le vea la portada de un vistazo, y para eso basta con la
-            portada, no con fondo desenfocado. */}
-        <div className="flex flex-col md:flex-row gap-8 mb-8">
-          {/*
-            `CoverImage`, no `<Image>`. El `if (cover)` de fuera solo cubre la
-            URL **vacía**: una URL que existe pero está MUERTA (404, host que no
-            resuelve) se acepta igual y sale el icono de imagen rota del
-            navegador. Es exactamente lo que pasaba con las 9 portadas de la
-            semilla, que apuntaban a `example.com`.
-
-            La diferencia es un `onError` con estado: sin estado no se puede,
-            porque un `onError` que solo escribe en una variable de render no
-            vuelve a renderizar. Por eso el componente existe y por eso las
-            cuatro vistas que pintan portadas **tienen que pasar por él**.
-          */}
-          {cover ? (
-            <div className="w-full md:w-64 flex-shrink-0">
-              <CoverImage
-                src={cover}
-                alt={safeString(release.title)}
-                width={256}
-                height={256}
-                className="w-full aspect-square object-cover rounded-xl shadow-lg"
-                minHeightClassName=""
-              />
-            </div>
-          ) : null}
-
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2 py-1 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded">
-                {type}
+    <PageTransition>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-32">
+        {/* ── Migas ────────────────────────────────────────────────────────── */}
+        <SlideIn index={0}>
+          <nav
+            className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-4"
+            aria-label="Ruta de navegación"
+          >
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-primary-400"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+                Dashboard
+              </Link>
+              <span className="text-slate-300 dark:text-slate-600">/</span>
+              <span className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                {safeString(release.title)}
               </span>
             </div>
+          </nav>
+        </SlideIn>
 
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-              {safeString(release.title)}
-            </h1>
+        {/* ── Carta: portada, datos, reproductor y barra de hechos ────────────
+            El esqueleto es el de la ficha de pista: una sola caja blanca con la
+            portada a un lado y la ficha al otro. Lo que cambia respecto a
+            aquella —y es deliberado— es que aquí la portada se ve a tamaño de
+            disco y no de miniatura, porque en un lanzamiento la portada ES el
+            producto. */}
+        <SlideIn index={1}>
+          <section className="max-w-6xl mx-auto px-4 sm:px-6 mb-8">
+            <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-slate-700/50 dark:bg-slate-800">
+              <div className="flex flex-col sm:flex-row">
+                {/* Portada. `CoverImage`, no `<Image>`: una URL que existe pero
+                    está MUERTA sale igual con `<Image>` y se ve el icono de
+                    imagen rota del navegador. Era lo que pasaba con las 9
+                    portadas de la semilla, que apuntaban a `example.com`. */}
+                {cover ? (
+                  <div className="flex-shrink-0 sm:w-56 md:w-64 lg:w-72">
+                    <div className="aspect-square sm:aspect-auto sm:h-full">
+                      <CoverImage
+                        src={cover}
+                        alt={safeString(release.title)}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                ) : null}
 
-            <p className="text-lg text-slate-600 dark:text-slate-400 mb-4">
-              {release.artist_name}
-            </p>
+                <div className="flex min-w-0 flex-1 flex-col justify-between p-5 sm:p-6 lg:p-8">
+                  <div>
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="inline-block rounded-full border border-primary-300 bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-800 dark:bg-primary-950 dark:text-primary-300">
+                        {type}
+                      </span>
+                      {/* El padre no tiene duración propia: el seed le pone
+                          "00:00" y mostrarlo leía como un tramo de cero
+                          segundos. Aquí va la duración ya calculada, que para un
+                          álbum es la suma de sus pistas y para un single la suya
+                          con el relleno filtrado. */}
+                      {durationLabel ? (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">
+                          {durationLabel}
+                        </span>
+                      ) : null}
+                    </div>
 
-            <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-400 mb-4">
-              {release.release_date ? (
-                <span>📅 {formatDateES(release.release_date, { month: "long" })}</span>
+                    <h1 className="mb-2 text-2xl font-bold leading-tight text-slate-900 dark:text-slate-100 sm:text-3xl lg:text-4xl">
+                      {safeString(release.title)}
+                    </h1>
+
+                    <p className="mb-1 text-sm text-slate-500 dark:text-slate-400">
+                      {release.artist_name}
+                    </p>
+
+                    {/* Una sola línea de metadatos. La fecha solo si la hay: el
+                        `—` de `safeString` es un relleno, no una fecha. */}
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      {[
+                        release.release_date && release.release_date !== "—"
+                          ? formatDateES(release.release_date, { month: "long" })
+                          : null,
+                        `${trackCount} ${trackCount === 1 ? "pista" : "pistas"}`,
+                        discCount > 1 ? `${discCount} discos` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+
+                    {/*
+                      Las métricas, en la línea de datos y no en un panel propio.
+                      `value === null` se pinta como `—` y se explica con el
+                      mismo `title`: sin texto, un guion suelto parece un bug de
+                      render. Y el texto va también en `sr-only`, porque el
+                      `title` solo existe en hover.
+                    */}
+                    <p
+                      className="mt-2 text-sm text-slate-500 dark:text-slate-400"
+                      title={metricsTitle}
+                      data-testid="release-metrics"
+                    >
+                      {metricsValue} {isMultiTrack ? "reproducciones del lanzamiento" : "streams"}
+                      <span className="sr-only">. {metricsTitle}</span>
+                    </p>
+
+                    {/* Acciones + badge de estado (solo admin o dueño) */}
+                    <div className="mt-3">
+                      <ReleaseActions
+                        releaseId={release.id}
+                        artistName={release.artist_name}
+                        status={release.status}
+                      />
+                    </div>
+                  </div>
+
+                  {playableRow ? (
+                    <div className="mt-5">
+                      <AudioPlayer
+                        src={
+                          playableRow.audio_preview_url &&
+                          playableRow.audio_preview_url !== "—"
+                            ? playableRow.audio_preview_url
+                            : undefined
+                        }
+                        title={playableRow.title}
+                        id={playableRow.id}
+                        artist={playableRow.artist_name}
+                        coverImage={getCoverImage(playableRow) || undefined}
+                        track={{
+                          audio_preview_url:
+                            playableRow.audio_preview_url &&
+                            playableRow.audio_preview_url !== "—"
+                              ? playableRow.audio_preview_url
+                              : null,
+                          spotify_url: playableRow.spotify_url,
+                          apple_music_url: playableRow.external_links?.apple_music ?? null,
+                          youtube_video_id: playableRow.youtube_video_id,
+                          external_links: playableRow.external_links ?? undefined,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Barra de hechos. Los tres datos que un periodista mira primero
+                  de un disco: cuántas pistas, en cuántos discos y cuánto dura.
+                  Se omiten los que no hay dato, en vez de enseñar un "0 discos"
+                  que suena a disco de.formato único cuando lo que pasa es que no
+                  se sabe. */}
+              {heroFacts.length > 0 ? (
+                <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-700">
+                  <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    {heroFacts.map((fact) => (
+                      <div key={fact.label}>
+                        <dt className="text-xs text-slate-500 dark:text-slate-400">
+                          {fact.label}
+                        </dt>
+                        <dd className="text-lg font-bold text-slate-900 dark:text-white">
+                          {fact.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
               ) : null}
-              <span>⏱️ {durationLabel}</span>
-              {/* `trackCount`, no `childTracks.length`: sin hijas, un single
-                  tiene UNA pista. Decir "0 pistas" es afirmar algo falso. */}
-              <span>
-                🎵 {trackCount} {trackCount === 1 ? "pista" : "pistas"}
-                {discCount > 1 ? ` · ${discCount} discos` : ""}
-              </span>
+            </div>
+          </section>
+        </SlideIn>
+
+        {/* ── Dos columnas: contenido arriba, datos de referencia al lado ────
+            La barra lateral es lo que se consulta sin leer: dónde escucharlo,
+            qué descargarse y qué hay al lado en el catálogo. */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+            <div className="space-y-6 lg:space-y-8 lg:col-span-2">
+              {/* ── 1 · Descripción ─────────────────────────────────────── */}
+              {description ? (
+                <section aria-labelledby="release-description">
+                  <h2
+                    id="release-description"
+                    className="mb-4 text-xl font-bold text-slate-900 dark:text-white"
+                  >
+                    Descripción
+                  </h2>
+                  <p className="whitespace-pre-wrap text-slate-600 dark:text-slate-400">
+                    {description}
+                  </p>
+                </section>
+              ) : null}
+
+              {/* ── 2 · Pistas ─────────────────────────────────────────────
+                  Vuelve `ReleaseTrackList`, el componente de antes, con sus
+                  arreglos de a11y (44 px, anillo de foco, etiqueta con número y
+                  título). Las filas NO enlazan a `/track/`: esa ruta es hoy un
+                  301 a esta misma página, así que un enlace ahí sería un enlace
+                  a donde ya estás. */}
+              <section aria-labelledby="release-tracks" data-testid="release-play-section">
+                <h2
+                  id="release-tracks"
+                  className="mb-4 text-xl font-bold text-slate-900 dark:text-white"
+                >
+                  Pistas ({trackCount})
+                </h2>
+                <ReleaseTrackList
+                  tracks={listedTracks}
+                  releaseTitle={safeString(release.title)}
+                  releaseCoverImage={release.cover_image}
+                  releaseYoutubeVideoId={release.youtube_video_id || undefined}
+                />
+              </section>
+
+              {/* ── La ficha de una PISTA: lo que el 301 dejó sin página ───
+                  `/track/[id]` es hoy un 301 para **toda** fila —hija o
+                  cabecera—, así que su ficha solo se renderiza para las
+                  huérfanas. Con eso, el videoclip oficial, la ficha técnica y la
+                  galería de prensa de un single dejaron de tener **ninguna**
+                  página donde estar.
+
+                  Aquí vuelven, y solo cuando la fila **es** una pista
+                  (`isTrackRow`): un álbum no tiene un videoclip oficial propio
+                  ni una única afinación, y enseñar esos datos como si los
+                  tuviera sería la tarjeta vacía que este proyecto ya pagó una
+                  vez (era la rama `isRelease` de `/track/[id]`). */}
+              {isTrackRow && ownVideo ? (
+                <section>
+                  <VideoShowcase
+                    youtubeVideoId={ownVideo.youtubeVideoId}
+                    videoEmbedUrl={ownVideo.videoEmbedUrl}
+                    title="Videoclip Oficial"
+                    coverImage={cover}
+                  />
+                </section>
+              ) : null}
+
+              {/* ── Y los del ÁLBUM, que son de sus hijas ──────────────────
+                  Un álbum no tiene un vídeo propio: sus vídeos son los de sus
+                  pistas. Y aquí hay una regla que antes no existía en ninguna
+                  parte de la UI: `video_kind` (RC.33, Ola 4) **no lo leía
+                  nadie**. Con la sección por scope, se lee, y su regla es la de
+                  `showableVideo`: un `- Topic` autogenerado o un directo **no**
+                  son el videoclip de la pista.
+
+                  Con los datos de hoy la sección **no se monta**: las 28 hijas
+                  con vídeo son 11 `live` y 17 `topic_audio`, y no hay ningún
+                  `videoclip` curado. Está para cuando lo haya, y para que la
+                  exclusión esté testeada en vez de depender de la memoria. */}
+              {!isTrackRow ? (
+                <ReleaseVideoList
+                  tracks={childTracks}
+                  releaseTitle={safeString(release.title)}
+                />
+              ) : null}
+
+              {isTrackRow && hasProductionDetails(release.production_details) ? (
+                <section>
+                  <ProductionDetailsWrapper
+                    details={release.production_details}
+                    trackId={release.id}
+                    artistName={release.artist_name}
+                  />
+                </section>
+              ) : null}
+
+              {isTrackRow && release.gallery_images && release.gallery_images.length > 0 ? (
+                <section>
+                  <ImageGalleryWrapper
+                    images={release.gallery_images}
+                    title="Galería de Prensa"
+                    trackId={release.id}
+                    artistName={release.artist_name}
+                  />
+                </section>
+              ) : null}
+
+              {/* ── 3 · Letra ────────────────────────────────────────────── */}
+              {release.lyrics ? (
+                <section aria-labelledby="release-lyrics">
+                  <h2
+                    id="release-lyrics"
+                    className="mb-4 text-xl font-bold text-slate-900 dark:text-white"
+                  >
+                    Letra
+                  </h2>
+                  <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="whitespace-pre-wrap font-mono text-sm text-slate-600 dark:text-slate-400">
+                      {release.lyrics}
+                    </p>
+                  </div>
+                </section>
+              ) : null}
             </div>
 
-            {/*
-              Las métricas, en la línea de datos y no en un panel propio.
-              `value === null` se pinta como `—` y se explica con el mismo
-              `title` que el diseño nuevo usaba: sin texto, un guion suelto
-              parece un bug de render. Y el texto va también en `sr-only`,
-              porque el `title` solo existe en hover.
-            */}
-            <p
-              className="mb-4 text-sm text-slate-500 dark:text-slate-400"
-              title={metricsTitle}
-              data-testid="release-metrics"
-            >
-              {metricsValue} {isMultiTrack ? "reproducciones del lanzamiento" : "streams"}
-              <span className="sr-only">. {metricsTitle}</span>
-            </p>
+            {/* ── Barra lateral ──────────────────────────────────────────── */}
+            <aside className="space-y-6 lg:space-y-8">
+              {/* ── Enlaces ─────────────────────────────────────────────────
+                  `links` es la unión de todas las fuentes, no solo de
+                  `external_links`. Antes se leía únicamente `external_links`, y
+                  para 7 de los 9 singles del catálogo esa columna está vacía: su
+                  Spotify y su Apple Music viven en `spotify_url` e
+                  `itunes_track_id`, y su vídeo en `youtube_video_id`. El
+                  resultado era una sección de Enlaces que **no salía**, con el
+                  single lleno de enlaces en la base de datos. */}
+              {links.length > 0 ? (
+                <section
+                  aria-labelledby="release-links"
+                  className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700/50 dark:bg-slate-800"
+                >
+                  <h2
+                    id="release-links"
+                    className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100"
+                  >
+                    Enlaces Externos
+                  </h2>
+                  <div className="flex flex-col gap-2">
+                    {links.map((link) => (
+                      <ExternalLink key={link.key} link={link} />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
-            {/* Acciones + badge de estado (solo admin o dueño) */}
-            <ReleaseActions
-              releaseId={release.id}
-              artistName={release.artist_name}
-              status={release.status}
-            />
+              {/* ── Ficha técnica para prensa ─────────────────────────────────
+                Esto NO es de la pista: es **del artista**, y es la mitad del
+                motivo por el que existe un EPK. `dossier` y `rider` exigen
+                `artist_id` en servidor (`lib/export-bundle.ts` responde 400 sin
+                él), así que sin este bloque no había forma de bajar nada desde
+                una ficha de lanzamiento: la única otra página que montaba
+                `CatalogDownloadButton` con alcance de artista era `/track/[id]`,
+                que es un 301.
+
+                Sin artista en la tabla `artists` degrada solo: `artistId` va a
+                `null`, el componente **no monta** las dos filas que lo exigen (en
+                vez de deshabilitarlas) y el catálogo sigue funcionando. */}
+              <section
+                aria-labelledby="release-press"
+                className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700/50 dark:bg-slate-800"
+              >
+                <h2
+                  id="release-press"
+                  className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100"
+                >
+                  Ficha técnica para prensa
+                </h2>
+                <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                  {artist ? (
+                    <>
+                      Descarga el catálogo de{" "}
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        {safeString(artist.name)}
+                      </span>
+                      : dossier de prensa, rider técnico y fichas de cada lanzamiento
+                      aprobado, con métricas y enlaces.
+                    </>
+                  ) : (
+                    <>
+                      Descarga el catálogo público de PressPlay con métricas, enlaces y
+                      detalles de producción de cada lanzamiento aprobado. El dossier y el
+                      rider son por artista y todavía no hay ficha de artista para{" "}
+                      {safeString(release.artist_name)}.
+                    </>
+                  )}
+                </p>
+                <CatalogDownloadButton
+                  artistId={artist?.id ?? null}
+                  artistName={
+                    artist ? safeString(artist.name) : safeString(release.artist_name, "PressPlay")
+                  }
+                />
+              </section>
+
+              {/* ── Anterior / siguiente, SOBRE LANZAMIENTOS ─────────────────
+                Los vecinos llegan de `getReleaseNeighbours`, que usa el catálogo
+                del ARTISTA. No usan `getAllTracks()`: ese array mezcla las
+                cabeceras con todas sus hijas, así que el "siguiente" de un
+                álbum era su primer corte — y ese corte, desde P2, redirige a la
+                página del propio álbum. Un enlace que vuelve al sitio del que
+                saliste no es navegación. */}
+              {neighbours.previous || neighbours.next ? (
+                <nav
+                  aria-label="Otros lanzamientos del artista"
+                  className="flex items-stretch justify-between gap-3"
+                >
+                  {neighbours.previous ? (
+                    <NeighbourLink
+                      href={`/releases/${neighbours.previous.id}`}
+                      direction="previous"
+                      title={safeString(neighbours.previous.title)}
+                    />
+                  ) : (
+                    <span />
+                  )}
+                  {neighbours.next ? (
+                    <NeighbourLink
+                      href={`/releases/${neighbours.next.id}`}
+                      direction="next"
+                      title={safeString(neighbours.next.title)}
+                    />
+                  ) : (
+                    <span />
+                  )}
+                </nav>
+              ) : null}
+            </aside>
           </div>
         </div>
-
-        {/* ── 1 · Descripción ───────────────────────────────────────────────── */}
-        {description ? (
-          <section className="mb-8" aria-labelledby="release-description">
-            <h2
-              id="release-description"
-              className="text-xl font-bold text-slate-900 dark:text-white mb-4"
-            >
-              Descripción
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{description}</p>
-          </section>
-        ) : null}
-
-        {/* ── 2 · Pistas ─────────────────────────────────────────────────────
-            Vuelve `ReleaseTrackList`, el componente de antes, con sus arreglos
-            de a11y (44 px, anillo de foco, etiqueta con número y título). Las
-            filas NO enlazan a `/track/`: esa ruta es hoy un 301 a esta misma
-            página, así que un enlace ahí sería un enlace a donde ya estás. */}
-        <section
-          className="mb-8"
-          aria-labelledby="release-tracks"
-          data-testid="release-play-section"
-        >
-          <h2 id="release-tracks" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-            Pistas ({trackCount})
-          </h2>
-          <ReleaseTrackList
-            tracks={listedTracks}
-            releaseTitle={safeString(release.title)}
-            releaseCoverImage={release.cover_image}
-            releaseYoutubeVideoId={release.youtube_video_id || undefined}
-          />
-        </section>
-
-        {/* ── 3 · Enlaces ──────────────────────────────────────────────────── */}
-        {/*
-          `links` es la unión de todas las fuentes, no solo de
-          `external_links`. Antes se leía únicamente `external_links`, y para 7 de
-          los 9 singles del catálogo esa columna está vacía: su Spotify y su Apple
-          Music viven en `spotify_url` e `itunes_track_id`, y su vídeo en
-          `youtube_video_id`. El resultado era una sección de Enlaces que **no
-          salía**, con el single lleno de enlaces en la base de datos.
-        */}
-        {links.length > 0 ? (
-          <section className="mb-8" aria-labelledby="release-links">
-            <h2 id="release-links" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-              Enlaces
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {links.map((link) => (
-                <ExternalLink key={link.key} link={link} />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* ── 4 · Letra ─────────────────────────────────────────────────────── */}
-        {release.lyrics ? (
-          <section className="mb-8" aria-labelledby="release-lyrics">
-            <h2 id="release-lyrics" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-              Letra
-            </h2>
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
-              <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-mono text-sm">
-                {release.lyrics}
-              </p>
-            </div>
-          </section>
-        ) : null}
-
-        {/* ── La ficha de una PISTA: lo que el 301 dejó sin página ─────────── */}
-        {/*
-          `/track/[id]` es hoy un 301 para **toda** fila —hija o cabecera—, así que
-          su ficha solo se renderiza para las huérfanas. Con eso, el videoclip
-          oficial, la ficha técnica y la galería de prensa de un single dejaron de
-          tener **ninguna** página donde estar: no estaban en la de release y la
-          otra es un redirect.
-
-          Aquí vuelven, y solo cuando la fila **es** una pista (`isTrackRow`): un
-          álbum no tiene un videoclip oficial propio ni una única afinación, y
-          enseñar esos datos como si los tuviera sería la tarjeta vacía que este
-          proyecto ya pagó una vez (era la rama `isRelease` de `/track/[id]`).
-        */}
-        {isTrackRow && ownVideo ? (
-          <section className="mb-8">
-            <VideoShowcase
-              youtubeVideoId={ownVideo.youtubeVideoId}
-              videoEmbedUrl={ownVideo.videoEmbedUrl}
-              title="Videoclip Oficial"
-              coverImage={cover}
-            />
-          </section>
-        ) : null}
-
-        {/* ── Y los del ÁLBUM, que son de sus hijas ─────────────────────────── */}
-        {/*
-          Un álbum no tiene un vídeo propio: sus vídeos son los de sus pistas. Y
-          aquí hay una regla que antes no existía en ninguna parte de la UI:
-          `video_kind` (RC.33, Ola 4) **no lo leía nadie**. Con la sección por
-          scoped, se lee, y su regla es la de `showableVideo`: un `- Topic`
-          autogenerado o un directo **no** son el videoclip de la pista.
-
-          Con los datos de hoy la sección **no se monta**: las 28 hijas con vídeo
-          son 11 `live` y 17 `topic_audio`, y no hay ningún `videoclip` curado.
-          Está para cuando lo haya, y para que la exclusión esté testeada en vez
-          de depender de la memoria.
-        */}
-        {!isTrackRow ? <ReleaseVideoList tracks={childTracks} releaseTitle={safeString(release.title)} /> : null}
-
-        {isTrackRow && hasProductionDetails(release.production_details) ? (
-          <section className="mb-8">
-            <ProductionDetailsWrapper
-              details={release.production_details}
-              trackId={release.id}
-              artistName={release.artist_name}
-            />
-          </section>
-        ) : null}
-        {isTrackRow && release.gallery_images && release.gallery_images.length > 0 ? (
-          <section className="mb-8">
-            <ImageGalleryWrapper
-              images={release.gallery_images}
-              title="Galería de Prensa"
-              trackId={release.id}
-              artistName={release.artist_name}
-            />
-          </section>
-        ) : null}
-
-        {/* ── Ficha técnica para prensa ─────────────────────────────────────── */}
-        {/*
-          Esto NO es de la pista: es **del artista**, y es la mitad del motivo por
-          el que existe un EPK. `dossier` y `rider` exigen `artist_id` en servidor
-          (`lib/export-bundle.ts` responde 400 sin él), así que sin este bloque no
-          había forma de bajar nada desde una ficha de lanzamiento: la única otra
-          página que montaba `CatalogDownloadButton` con alcance de artista era
-          `/track/[id]`, que es un 301.
-
-          Sin artista en la tabla `artists` degrada solo: `artistId` va a `null`, el
-          componente **no monta** las dos filas que lo exigen (en vez de
-          deshabilitarlas) y el catálogo sigue funcionando.
-        */}
-        <section className="mb-8" aria-labelledby="release-press">
-          <h2 id="release-press" className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-            Ficha técnica para prensa
-          </h2>
-          <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-            {artist ? (
-              <>
-                Descarga el catálogo de{" "}
-                <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {safeString(artist.name)}
-                </span>
-                : dossier de prensa, rider técnico y fichas de cada lanzamiento
-                aprobado, con métricas y enlaces.
-              </>
-            ) : (
-              <>
-                Descarga el catálogo público de PressPlay con métricas, enlaces y
-                detalles de producción de cada lanzamiento aprobado. El dossier y el
-                rider son por artista y todavía no hay ficha de artista para{" "}
-                {safeString(release.artist_name)}.
-              </>
-            )}
-          </p>
-          <CatalogDownloadButton
-            artistId={artist?.id ?? null}
-            artistName={
-              artist ? safeString(artist.name) : safeString(release.artist_name, "PressPlay")
-            }
-          />
-        </section>
-
-        {/* ── Anterior / siguiente, SOBRE LANZAMIENTOS ────────────────────── */}
-        {/*
-          Los vecinos llegan de `getReleaseNeighbours`, que usa el catálogo del
-          ARTISTA. No usan `getAllTracks()`: ese array mezcla las cabeceras con
-          todas sus hijas, así que el "siguiente" de un álbum era su primer
-          corte — y ese corte, desde P2, redirige a la página del propio álbum.
-          Un enlace que vuelve al sitio del que saliste no es navegación.
-        */}
-        {neighbours.previous || neighbours.next ? (
-          <nav
-            aria-label="Otros lanzamientos del artista"
-            className="mt-8 flex items-stretch justify-between gap-3"
-          >
-            {neighbours.previous ? (
-              <NeighbourLink
-                href={`/releases/${neighbours.previous.id}`}
-                direction="previous"
-                title={safeString(neighbours.previous.title)}
-              />
-            ) : (
-              <span />
-            )}
-            {neighbours.next ? (
-              <NeighbourLink
-                href={`/releases/${neighbours.next.id}`}
-                direction="next"
-                title={safeString(neighbours.next.title)}
-              />
-            ) : (
-              <span />
-            )}
-          </nav>
-        ) : null}
-      </main>
-    </div>
+      </div>
+    </PageTransition>
   );
+
 }
 
 /**

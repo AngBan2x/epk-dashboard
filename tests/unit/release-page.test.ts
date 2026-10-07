@@ -108,6 +108,51 @@ vi.mock("next/image", () => ({
     createElement("img", { alt: alt ?? "", src: typeof src === "string" ? src : "/cover.jpg" }),
 }));
 
+/**
+ * ## Por qué hay un stub de `IntersectionObserver` en este fichero
+ *
+ * La página usa `PageTransition` y `SlideIn` (`components/MotionWrappers.tsx`), y
+ * `SlideIn` anima con `whileInView`. Eso es framer-motion, y framer-motion
+ * **construye un `IntersectionObserver` al montar**: jsdom no trae ese API, así
+ * que sin este stub la página entera revienta con
+ * `ReferenceError: IntersectionObserver is not defined` y los 50 tests de este
+ * fichero salen rojos por un motivo que no tiene nada que ver con lo que
+ * comprueban.
+ *
+ * El stub dice "todo es visible": al observar un elemento dispara el callback de
+ * inmediato con `isIntersecting: true`, así que el contenido está en su estado
+ * final desde el primer render. Para lo que estos tests miran —encabezados,
+ * `aria-labelledby`, hrefs, áreas táctiles— es exactamente lo que se quiere: se
+ * prueba el DOM final, no la animación.
+ *
+ * Va aquí y no en un `setupFiles` global a propósito: tocar `vitest.config.ts`
+ * cambia el comportamiento de los otros 66 ficheros, y este es un hueco de jsdom
+ * que solo aparece al renderizar componentes de cliente. Si otro test empieza a
+ * renderizar `MotionWrappers`, se sube a `setupFiles` entonces, y con un motivo.
+ */
+type IoCallback = (entries: Array<{ target: Element; isIntersecting: boolean }>) => void;
+
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  globalThis.IntersectionObserver = class {
+    readonly root = null;
+    readonly rootMargin = "";
+    readonly thresholds: readonly number[] = [0];
+
+    constructor(private readonly callback: IoCallback) {}
+
+    /** Dispara el callback ya resuelto: para estos tests, "visible" es el estado final. */
+    observe(target: Element) {
+      this.callback([{ target, isIntersecting: true }]);
+    }
+
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof globalThis.IntersectionObserver;
+}
+
 import ReleaseDetailPage from "@/app/releases/[id]/page";
 import { getArtistByName } from "@/lib/db";
 import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
@@ -520,8 +565,27 @@ describe("P2 · un id que no existe", () => {
  * test que un día se rompe solo y nadie sabe qué protegía.
  */
 describe("C1 · la página de release tiene las cuatro secciones", () => {
-  /** Las cuatro, en el orden del diseño acordado. */
-  const SECTIONS = ["Descripción", "Pistas", "Enlaces", "Letra"] as const;
+  /**
+   * Las cuatro, **en el orden del esqueleto nuevo**.
+   *
+   * ## Por qué cambió esta lista
+   *
+   * El diseño de C1 era una columna: descripción, pistas, enlaces, letra, y
+   * prensa al final. El rediseño (P8) mueve la página al esqueleto de la ficha de
+   * pista —dos columnas, `lg:col-span-2` para el contenido y barra lateral para
+   * lo que se consulta sin leer—, y eso cambia el orden:
+   *
+   * - **Enlaces** pasa a la barra lateral y se llama "Enlaces Externos", el mismo
+   *   nombre que usa la ficha de pista. Coincidir el nombre es lo que permite
+   *   leer las dos vistas como la misma plantilla.
+   * - **Prensa** también va a la barra lateral, y en DOM va **después** de
+   *   enlaces, no después de las cuatro secciones.
+   *
+   * Lo que NO cambia, y por eso los tests de abajo siguen siendo los mismos: una
+   * sección sin dato no se inventa, cada una queda atada a su encabezado con
+   * `aria-labelledby`, y una sección ausente no puede pasar por presente.
+   */
+  const SECTIONS = ["Descripción", "Pistas", "Enlaces Externos", "Letra"] as const;
 
   /**
    * La quinta sección, y no es una más: la de **descargas para prensa**, que
@@ -531,7 +595,7 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
    *
    * Se nombra aquí y no en el bloque 7 porque este test es el que ata el
    * **esqueleto completo** de la página: si mañana aparece una sexta sección sin
-   * que nadie laanuncia, esta lista la ve.
+   * que nadie la anuncie, esta lista la ve.
    */
   const PRESS = "Ficha técnica para prensa";
 
@@ -569,9 +633,13 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
     }
   });
 
-  it("y en el orden del diseño: descripción, pistas, enlaces, letra, y prensa", async () => {
+  it("y en el orden del esqueleto: descripción, pistas, letra, y enlaces en la barra lateral", async () => {
+    // El orden real en DOM. "Enlaces Externos" y "Ficha técnica para prensa" van
+    // en la barra lateral, que en el HTML va **después** de la columna de
+    // contenido, así que "Enlaces" queda entre "Pistas" y "Letra" en vez de
+    // después de "Letra".
     await renderFullRelease();
-    expect(headings()).toEqual([...SECTIONS, PRESS]);
+    expect(headings()).toEqual(["Descripción", "Pistas", "Letra", "Enlaces Externos", PRESS]);
   });
 
   it("las tres secciones de datos quedan enlazadas a su encabezado", async () => {
@@ -611,7 +679,7 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
     );
     const rendered = headings();
     expect(rendered).not.toContain("Letra");
-    expect(rendered).not.toContain("Enlaces");
+    expect(rendered).not.toContain("Enlaces Externos");
     expect(rendered).toEqual(["Descripción", "Pistas", PRESS]);
   });
 
@@ -622,6 +690,74 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
     await renderPage({ id: "rel-nodesc", description: null, lyrics: null }, [{ id: "c1" }]);
     expect(headings()).not.toContain("Descripción");
     expect(bodyText()).not.toContain("Descripción del álbum");
+  });
+
+  /**
+   * ## Lo que el rediseño de P8 introduce, y por qué necesita su propio test
+   *
+   * Los tests de arriba comprueban que las secciones siguen ahí. Estos dos
+   * comprueban cosas que **antes no existían** en esta página, y que por eso
+   * nadie está mirando:
+   *
+   * 1. **El reproductor está en la carta**, junto a la portada. Antes no había
+   *    reproductor en la página: solo la lista de pistas, en la que un single
+   *    tiene su única fila.
+   * 2. **La barra lateral existe y es un `<aside>`**, no un `<div>`. No es
+   *    cosmético: un lector de pantalla anuncia la complemento del contenido, y
+   *    esto dice "lo que viene es referencia", que es lo que es.
+   */
+  describe("el esqueleto de dos columnas", () => {
+    it("el single trae reproductor en la carta, con su título", async () => {
+      await renderPage({ id: "rel-hero", title: "Cancion con audio" }, []);
+      const carta = document.querySelector("section");
+      expect(carta?.textContent ?? "").toContain("Cancion con audio");
+      // `AudioPlayer` sin fuente reproducible dice "No hay audio disponible":
+      // ese texto es la prueba de que el componente se montó, porque la página
+      // no lo escribe por su cuenta.
+      expect(bodyText()).toMatch(/No hay audio disponible|▶/);
+    });
+
+    it("los enlaces y la prensa van en un <aside>, y las secciones de lectura no", async () => {
+      await renderFullRelease();
+      const aside = document.querySelector("aside");
+      expect(aside).not.toBeNull();
+      // Las dos cosas que se consultan sin leer están dentro del aside...
+      expect(aside?.textContent ?? "").toContain("Enlaces Externos");
+      expect(aside?.textContent ?? "").toContain(PRESS);
+      // ...y la lista de pistas, que se lee, no.
+      expect(aside?.textContent ?? "").not.toContain("Aguante");
+      expect(document.querySelector("aside section[aria-labelledby='release-tracks']")).toBeNull();
+    });
+
+    it("un álbum NO monta reproductor en la carta: no tiene audio propio", async () => {
+      // La fila padre existe solo para agrupar; su `audio_preview_url` está
+      // vacía. Montar el reproductor aquí era el botón de play que no hace nada.
+      await renderPage({ id: "rel-album-sin-audio" }, [{ id: "c1", title: "Aguante" }]);
+      expect(bodyText()).not.toContain("No hay audio disponible");
+    });
+
+    it("la carta enseña la portada, la ficha y los hechos, en ese orden", async () => {
+      // El orden es el de la ficha de pista: imagen, texto, y luego la barra de
+      // hechos al pie de la caja. Es lo que da la lectura de "portada a un lado,
+      // ficha al otro" que buscaba el rediseño.
+      //
+      // La portada hay que darla: `baseTrack` no trae `cover_image`, y sin ella
+      // `getCoverImage` cae a la miniatura de YouTube —que sin `youtube_video_id`
+      // también es `null`— así que la caja se pinta sin imagen y el orden que se
+      // quiere comprobar no existe.
+      await renderPage(
+        { id: "rel-orden", title: "Orden de la carta", cover_image: "https://img.test/portada.jpg" },
+        [{ id: "c1" }]
+      );
+      const carta = document.querySelector("section");
+      const html = carta?.innerHTML ?? "";
+      const img = html.indexOf("<img");
+      const h1 = html.indexOf("<h1");
+      const dl = html.indexOf("<dl");
+      expect(img).toBeGreaterThanOrEqual(0);
+      expect(h1).toBeGreaterThan(img);
+      expect(dl).toBeGreaterThan(h1);
+    });
   });
 });
 
