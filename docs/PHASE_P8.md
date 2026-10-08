@@ -209,14 +209,65 @@ framer-motion, y framer-motion construye ese observer al montar: sin el stub, lo
 fichero y no en `setupFiles` global, porque tocar `vitest.config.ts` cambia el
 comportamiento de los otros 66 ficheros.
 
+### Los seis detalles que salieron de mirar las capturas (P8.2, 2026-10-06)
+
+El usuario revisó capturas y pidió seis cambios. Cuatro eran fallos; dos eran
+decisiones de diseño. Lo que sigue es lo que había que ver para **saber** cuál de
+las dos cosas era cada uno, porque ninguno era evidente en el código.
+
+| # | Qué pasó | Cómo se comprobó |
+|---|---|---|
+| 1 | El badge decía **"Single"** sobre una carta con "2 pistas" | `Tour de France` (Kraftwerk) tiene `release_type = 'Single'` y 2 hijas |
+| 2 | El tercio derecho quedaba vacío al recorrer 20 pistas | midiendo `aside.top` a cinco posiciones de scroll |
+| 3 | El icono "sin audio" de las filas parecía **un SVG roto** | a `w-4 h-4` el `ban` de Heroicons es indistinguible del icono de imagen rota del navegador |
+| 4 | La misma portada salía a 288×288 en una ficha y a 288×354 en otra | `sm:h-full` hace que la caja tome la altura del texto de al lado |
+| 5 | "Duraciones faltantes" | **no faltaba ninguna**: 83 de 83 filas con valor, cero `"00:00"`. Lo que pasaba es que salía **duplicada**, badge y barra de hechos |
+| 6 | El botón del catálogo iba a `/artists`, el de todo el mundo | no había forma de llegar a la lista de lanzamientos de ese artista |
+
+El 5 es el que más tiempo costó y el más barato: con los datos de hoy la segunda
+copia de la duración **no era un respaldo para un dato ausente**, porque no hay
+ningún ausente. Se quitó de la cabecera y se quedó en la barra de hechos.
+
+El 1 y el 3 son el mismo patrón de P10 otra vez: **algo que no estaba escrito en
+ninguna parte**. El 1 se resolvió con un helper (`releaseTypeLabel`) que se usa en
+las tres superficies donde sale el tipo —ficha, `EPKCard` y lista de lanzamientos—
+porque arreglar solo la primera dejaba la tarjeta diciendo "Single" a dos clics de
+la ficha diciendo "EP". El 3 con un icono compartido, porque hacía falta en dos
+sitios y dos copias del mismo símbolo divergen.
+
+Y una conclusión del 2 que no era un bug: el *sticky* parecía no funcionar medido
+a `scrollY=1400`, donde `aside.top = -27`. Mirando los estilos estaba todo bien
+(`position: sticky`, `top: 24px`, `align-self: flex-start`, sin `overflow` en la
+cadena). La explicación es que a 1400 px la **rejilla de dos columnas ya había
+terminado** —1500 px de alto—, y un elemento `sticky` no sale de su contenedor.
+Medido a 600, 900 y 1200 px se queda clavado en 24. Un test que comprobara "no se
+suelta en un punto de scroll" habría dado un falso positivo.
+
 ### Verificado
 
-`The Wall` (álbum, 20 pistas, 2 discos) y `Bohemian Rhapsody` (single) contra el
-build de producción local, en claro y en oscuro, a 2048 / 1024 / 768 / 390 px:
-portada cargada (600×600), reproductor real en el single ("Preview (30s)"),
-métricas de verdad (`2.100.000 streams`, no un cero), `Discos` omitido cuando hay
-uno, y **cero desbordamiento horizontal** en los cuatro anchos. Gates: `tsc` y
-lint limpios, **1244/1244** tests.
+`The Wall` (álbum, 20 pistas, 2 discos), `Tour de France` (EP, 2 pistas sin
+audio), `Bohemian Rhapsody` (single con preview) y `Se Va` (single **sin** preview
+pero con YouTube) contra el build de producción local, en claro y en oscuro, a
+2048 / 1024 / 768 / 390 px:
+
+- Portada cargada y **exactamente** 288×288 en las cuatro fichas.
+- El single sin preview monta **"Reproducir • YouTube"**, que es la decisión de
+  F7 cumplida sin tocar código: `AudioPlayer` ya resuelve preview → YouTube →
+  altavoz apagado.
+- `2.100.000 streams` en el single y `—` en el álbum: nunca un cero inventado.
+- `Discos` no sale cuando hay uno.
+- Cero desbordamiento horizontal en los cuatro anchos.
+
+Los seis ajustes, comprobados uno a uno **revirtiendo el arreglo**: 4 tests rojos
+(sin sticky, sin ancla, con `sm:h-full`, con el badge a "Single") y verdes al
+restaurar. Gates: `tsc` y lint limpios, **1256/1256** tests.
+
+Un aviso sobre las capturas: la primera vez que se miró la portada de
+`Tour de France` salió **negra**, y no era un fallo. La URL del CDN de iTunes
+devuelve un **302** y la imagen tardaba ~5 s; a los 2,6 s `img.complete` seguía
+en `false`. Un retrato hecho sin esperar da esa falsa alarma.
+
+
 
 **Cerrado en C1-bis** (`5ed5354`, 2026-10-04), que es donde se decidi: los bloques
 de **pista** (videoclip, ficha de producción, galería) vuelven a la página de
