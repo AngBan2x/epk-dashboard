@@ -5,7 +5,7 @@ import Link from "next/link";
 import { EPKCard } from "@/components/EPKCard";
 import { ReleaseTrackList, buildReleaseQueue } from "@/components/ReleaseTrackList";
 import { LoginModal } from "@/components/LoginModal";
-import { capitalizeReleaseType } from "@/lib/null-safe";
+import { releaseTypeLabel } from "@/lib/release-page";
 import type { ActiveTrack } from "@/context/AudioPlayerContext";
 import type { ArtistCatalogGroup } from "@/lib/db";
 import type { Track } from "@/types/music";
@@ -200,7 +200,7 @@ export function ArtistTracksSection({
                         {release.title}
                       </span>
                       <span className="block text-xs text-slate-500 dark:text-slate-400">
-                        {capitalizeReleaseType(release.release_type || "single")} ·{" "}
+                        {releaseTypeLabel(release.release_type, tracks.length > 0)} ·{" "}
                         {tracks.length} {tracks.length === 1 ? "pista" : "pistas"}
                       </span>
                     </span>

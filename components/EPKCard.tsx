@@ -10,9 +10,9 @@ import {
   formatNumber,
   formatDateES,
   diffDaysUTC,
-  capitalizeReleaseType,
   getCoverImage,
 } from "@/lib/null-safe";
+import { releaseTypeLabel } from "@/lib/release-page";
 import { imageOptimizationProps } from "@/lib/image-config";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useState, useEffect } from "react";
@@ -407,8 +407,18 @@ export function EPKCard({
         {/* Metadata: Release type, Duration, Release Date, ISRC */}
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-2">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-white">
-            {capitalizeReleaseType(track.release_type)}
-          </span>
+            {/*
+              El tipo sale del MISMO helper que el badge de la ficha de
+              release, y por el motivo mismo: `Tour de France` (Kraftwerk) tiene
+              `release_type = 'Single'` y 2 hijas, asi que aqui ponia "Single"
+              sobre una tarjeta que decia "2 pistas", y en la ficha, a dos
+              clics, la misma fila decia "EP".
+
+              Dos etiquetas distintas para la misma fila es el mismo bug que
+              reporto el usuario, repartido en dos paginas. El helper vive en
+              `lib/release-page.ts`.
+            */}
+            {releaseTypeLabel(track.release_type, (childrenTracks?.length ?? 0) > 0)}          </span>
           <span>·</span>
           <span className="inline-flex items-center gap-1">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>

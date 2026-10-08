@@ -56,6 +56,38 @@ describe("el icono de no-hay-audio", () => {
   });
 });
 
+describe("la etiqueta del tipo no puede decir dos cosas distintas", () => {
+  /**
+   * La fila de *Tour de France* (Kraftwerk) tiene `release_type = 'Single'` y 2
+   * hijas. Con `capitalizeReleaseType` a secas, la tarjeta del catálogo decía
+   * "Single" sobre "2 pistas" y la ficha de release decía otra cosa. Dos
+   * etiquetas para la misma fila, en dos páginas: es el mismo bug que reportó el
+   * usuario, solo que repartido.
+   */
+  const SIN_HELPER = /capitalizeReleaseType\(\s*(track|release)\.release_type/;
+
+  it("ni la ficha, ni la tarjeta, ni la lista de lanzamientos lo calculan por su cuenta", () => {
+    for (const f of [
+      "app/releases/[id]/page.tsx",
+      "components/EPKCard.tsx",
+      "components/ArtistTracksSection.tsx",
+    ]) {
+      const src = leer(...f.split("/"));
+      expect(src, f).not.toMatch(SIN_HELPER);
+    }
+  });
+
+  it("las tres usan el helper, que sabe que un single es una pista", () => {
+    for (const f of [
+      "app/releases/[id]/page.tsx",
+      "components/EPKCard.tsx",
+      "components/ArtistTracksSection.tsx",
+    ]) {
+      expect(leer(...f.split("/")), f).toContain("releaseTypeLabel");
+    }
+  });
+});
+
 describe("el botón del catálogo lleva al artista", () => {
   const ACCIONES = "components/ReleaseActions.tsx";
 
