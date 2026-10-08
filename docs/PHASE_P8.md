@@ -267,6 +267,34 @@ Un aviso sobre las capturas: la primera vez que se miró la portada de
 devuelve un **302** y la imagen tardaba ~5 s; a los 2,6 s `img.complete` seguía
 en `false`. Un retrato hecho sin esperar da esa falsa alarma.
 
+### Verificado en producción (commit `c4d59f8`)
+
+Las cuatro fichas, en claro y en oscuro, a 1280 y 390 px, contra
+`https://epk-dashboard.vercel.app`:
+
+| Ficha | Portada | Badge | Duración | Barra lateral |
+|---|---|---|---|---|
+| `The Wall` (20 pistas) | 288×288, cargada | Álbum | `61:06`, una vez | sticky |
+| `Tour de France` (2 sin audio) | 288×288, cargada | **EP** | `7:28`, una vez | sticky |
+| `Se Va` (sin preview) | 288×288, cargada | Single | `3:57`, una vez | sticky |
+| `Bohemian Rhapsody` a 390 px | 356×356, cargada | Single | `5:55`, una vez | sticky |
+
+Cero desbordamiento horizontal en las cuatro. El botón lleva a
+`/artists/<id>#lanzamientos` y al seguirlo la sección queda a **96 px** del borde
+con las tarjetas ya a la vista (`scrollY=1028`), que es lo que se pidió: saltar
+hasta allí, no aterrizar arriba.
+
+Las dos filas sin audio de *Tour de France* llevan el altavoz apagado y su
+`aria-label` "sin audio disponible", y *Se Va* monta "Reproducir • YouTube": F7
+resuelto sin tocar `AudioPlayer`.
+
+**Nota sobre `EPKCard.tsx`**: su diff sale con ~1190 líneas de ruido de CR para
+22 reales. No es del cambio: `core.autocrlf=true` sin `.gitattributes`, y el blob
+guardado está en CRLF mientras el fichero en el repo es LF puro (584 líneas, 0
+CRLF). Git normaliza la copia del working tree y no el blob, así que cada línea se
+ve distinta. Es deuda de repo y requiere normalizar por separado.
+
+
 
 
 **Cerrado en C1-bis** (`5ed5354`, 2026-10-04), que es donde se decidi: los bloques
