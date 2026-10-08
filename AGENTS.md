@@ -338,7 +338,7 @@ Con `reserved: 20000` la compactación salta al **90% del modelo de 200K** (mimo
 | Server | Tipo | Utilidad |
 |--------|------|----------|
 | filesystem | Local | Operaciones de archivos |
-| playwright | Local | Automatización navegador — **necesita Chrome real**: busca `chrome.exe` en `%LOCALAPPDATA%\Google\Chrome\Application/`, que aquí no está. Con `npx playwright install chrome` funciona. Mientras tanto, usar `chromium.launch()` del paquete de Playwright, que sí está instalado. Para **renderizar** un PDF hace falta `headless: false` (en headless descarga el PDF en vez de pintarlo) |
+| playwright | Local | Automatización navegador — **necesita Chrome real**: busca `chrome.exe` en `%LOCALAPPDATA%\Google\Chrome\Application/`, que aquí no está. `npx playwright install chrome` **falla sin permisos de Administrador** (MSI: *Requires elevated permissions*), así que no es una vía: usa `chromium.launch()` del paquete `@playwright/test`, que ya está instalado y funciona (patrón en `scripts/img-dom.ts`, `scripts/image-check.ts`). Para **renderizar** un PDF hace falta `headless: false` (en headless descarga el PDF en vez de pintarlo). **Al esperar una imagen, `complete && naturalWidth > 0`, no solo `naturalWidth > 0`**: el tamaño intrínseco se conoce tras la cabecera y `complete` solo cuando el fichero entero ha descargado. Ver `docs/PHASE_P3.md` |
 | context7 | Remoto | Docs de frameworks |
 | gh_grep | Remoto | Buscar código en GitHub |
 | git | Local | Operaciones git |
