@@ -688,14 +688,18 @@ describe("P15 — /releases/[id] muestra la duración sumada de las hijas", () =
     // La aserción mira el JSX, no el fichero entero: un comentario que nombre el
     // arreglo no puede hacer fallar (ni pasar) el test.
     //
-    // Y mira `durationLabel` a secas, sin exigir el emoji ⏱️ delante. Antes lo
-    // pedía porque la etiqueta estaba en su propia línea con el emoji; con el
-    // rediseño de P8 la duración vive en la línea de metadatos de la carta, junto
-    // a la fecha y al número de pistas. Exigir el emoji ataba el test a una
-    // decisión de diseño que ya no está, y lo que este bloque protege es otra
-    // cosa: que lo que se pinta sea `durationLabel` y nunca `release.duration`.
+    // Y ya no exige el emoji ⏱️, ni que `durationLabel` aparezca entre llaves. Ese
+    // check ataba el test a dos decisiones de diseño que han cambiado por buenas
+    // razones: la etiqueta estaba en su propia línea con el emoji, y luego la
+    // duración pasó a la barra de hechos de la carta, que la compone como dato y
+    // la pinta con `{fact.value}`. Lo que este bloque protege es otra cosa, y
+    // sigue siendo verdad: **lo que se pinta es `durationLabel` y nunca
+    // `release.duration`**. Lo behavioural lo comprueba `release-page.test.ts`
+    // ("un álbum enseña la suma en la cabecera y en la lista").
     expect(releasePageSource).not.toMatch(/\{\s*release\.duration\s*\}/);
-    expect(releasePageSource).toMatch(/\{\s*durationLabel\s*\}/);
+    // La duración tiene que entrar en la barra de hechos desde `durationLabel`: es
+    // el único camino que lleva al `<dd>` de "Duración".
+    expect(releasePageSource).toMatch(/label:\s*"Duración",\s*value:\s*durationLabel/);
   });
 
   it("no reintroduce un parser de duración propio en la página", () => {

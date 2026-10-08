@@ -23,7 +23,7 @@ import {
 } from "@/lib/null-safe";
 import { metricsTooltip } from "@/lib/metrics-source";
 import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
-import { NO_VALUE, ownDurationLabel, showableVideo } from "@/lib/release-page";
+import { NO_VALUE, ownDurationLabel, releaseTypeLabel, showableVideo } from "@/lib/release-page";
 import { buildReleaseLinks, type ReleaseLink } from "@/lib/release-links";
 import { getSocialPlatform } from "@/lib/social-platforms";
 import { SocialPlatformIcon } from "@/components/ArtistSocialLinks";
@@ -74,9 +74,14 @@ export async function generateMetadata({ params }: ReleaseDetailPageProps): Prom
   const data = await getReleaseWithTracks(params.id);
   if (!data) return { title: "Release no encontrado" };
 
-  const { release, trackCount, isMultiTrack, durationLabel } = data;
+  const { release, trackCount, isMultiTrack, durationLabel, tracks: metaChildren } = data;
   const cover = getCoverImage(release);
-  const type = capitalizeReleaseType(release.release_type);
+  /**
+   * El MISMO helper que el badge, y no `capitalizeReleaseType`: si el badge dice
+   * "EP" y la meta description dice "Single", el buscador sigue anunciando la
+   * contradicción que se acaba de quitar de la carta.
+   */
+  const type = releaseTypeLabel(release.release_type, metaChildren.length > 0);
 
   /**
    * Un álbum no tiene duración ni streams propios, así que la descripción
@@ -157,7 +162,16 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   const artist = await getArtistByName(release.artist_name);
 
   const cover = getCoverImage(release);
-  const type = capitalizeReleaseType(release.release_type);
+
+  /**
+   * El tipo sale de un helper y no de `capitalizeReleaseType` porque las dos
+   * reglas no coinciden en los datos: `Tour de France` (Kraftwerk) tiene
+   * `release_type = 'Single'` y **2 hijas**, y el badge decía "Single" sobre una
+   * carta que decía "2 pistas". Un single es una pista; si hay hijas, no es un
+   * single. El helper vive en `lib/release-page.ts` porque `generateMetadata` lo
+   * usa también — y por eso el buscador deja de anunciar lo mismo.
+   */
+  const type = releaseTypeLabel(release.release_type, childTracks.length > 0);
   const metricsTitle = metricsTooltip(metrics);
   const metricsValue = metrics.value === null ? NO_VALUE : formatNumber(metrics.value);
 
@@ -271,9 +285,25 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                     está MUERTA sale igual con `<Image>` y se ve el icono de
                     imagen rota del navegador. Era lo que pasaba con las 9
                     portadas de la semilla, que apuntaban a `example.com`. */}
+                {/* Portada, **siempre** 1:1.
+                `CoverImage`, no `<Image>`: una URL que existe pero está MUERTA sale
+                igual con `<Image>` y se ve el icono de imagen rota del navegador.
+                Era lo que pasaba con las 9 portadas de la semilla, que apuntaban a
+                `example.com`.
+
+                El cuadrado es fijo y no `sm:h-full` a propósito. Con `h-full` la caja
+                toma la altura de la fila, que depende de cuánto texto hay al lado: la
+                misma portada salía a 288×288 en *Bohemian Rhapsody* y a 288×354 en
+                otra ficha, y dos lanzamientos con la misma carátula no se veían
+                igual. Un 1:1 declarado es el mismo siempre.
+
+                El fondo del marco es para cuando la "portada" no existe y
+                `getCoverImage` cae a la miniatura de YouTube, que es 16:9:
+                `object-cover` la recorta a cuadrado y, sin fondo, el recorte deja
+                un borde negro pegado al hueco. */}
                 {cover ? (
-                  <div className="flex-shrink-0 sm:w-56 md:w-64 lg:w-72">
-                    <div className="aspect-square sm:aspect-auto sm:h-full">
+                  <div className="flex-shrink-0 w-full sm:w-56 md:w-64 lg:w-72">
+                    <div className="aspect-square bg-slate-100 dark:bg-slate-900">
                       <CoverImage
                         src={cover}
                         alt={safeString(release.title)}
@@ -289,16 +319,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                       <span className="inline-block rounded-full border border-primary-300 bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-800 dark:bg-primary-950 dark:text-primary-300">
                         {type}
                       </span>
-                      {/* El padre no tiene duración propia: el seed le pone
-                          "00:00" y mostrarlo leía como un tramo de cero
-                          segundos. Aquí va la duración ya calculada, que para un
-                          álbum es la suma de sus pistas y para un single la suya
-                          con el relleno filtrado. */}
-                      {durationLabel ? (
-                        <span className="text-xs text-slate-400 dark:text-slate-500">
-                          {durationLabel}
-                        </span>
-                      ) : null}
                     </div>
 
                     <h1 className="mb-2 text-2xl font-bold leading-tight text-slate-900 dark:text-slate-100 sm:text-3xl lg:text-4xl">
@@ -344,6 +364,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                       <ReleaseActions
                         releaseId={release.id}
                         artistName={release.artist_name}
+                        artistId={artist?.id ?? null}
                         status={release.status}
                       />
                     </div>
@@ -527,8 +548,18 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               ) : null}
             </div>
 
-            {/* ── Barra lateral ──────────────────────────────────────────── */}
-            <aside className="space-y-6 lg:space-y-8">
+            {/* ── Barra lateral ────────────────────────────────────────────
+                `sticky` con `self-start`, porque la rejilla estira sus hijos por
+                defecto: un elemento estirado ocupa toda la altura de la columna y no
+                tiene nada que fijar. `self-start` lo deja a su altura natural.
+
+                El motivo es el hueco. En *The Wall* —20 pistas, más de mil píxeles
+                de scroll— la barra lateral acababa a los 400 y el tercio derecho se
+                quedaba vacío el resto. Sticky no borra ese hueco al final de la
+                página, pero los enlaces, la prensa y el anterior/siguiente quedan a
+                la vista mientras se recorre la lista, que es justo cuando se
+                necesitan. */}
+            <aside className="space-y-6 lg:space-y-8 lg:sticky lg:top-6 lg:self-start">
               {/* ── Enlaces ─────────────────────────────────────────────────
                   `links` es la unión de todas las fuentes, no solo de
                   `external_links`. Antes se leía únicamente `external_links`, y

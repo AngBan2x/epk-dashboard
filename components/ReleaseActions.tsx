@@ -13,6 +13,16 @@ interface ReleaseActionsProps {
    */
   artistName?: string;
   /**
+   * `id` del artista en `artists`, cuando la ficha lo resolvió.
+   *
+   * Es lo que permite que el botón del catálogo lleve **a este artista** en vez de
+   * al catálogo entero. El identificador solo existe en servidor —la columna vive
+   * en `artists` y `tracks` se relaciona con ella por NOMBRE—, así que lo pasa la
+   * página y aquí no se puede deducir. Si no llega, el botón cae a `/artists`: es
+   * preferible mostrar el catálogo entero a llevar a un artista equivocado.
+   */
+  artistId?: string | null;
+  /**
    * Estado de moderación. Solo se pinta si el visitante es admin o el dueño:
    * un badge "Pendiente" o "Borrador" sobre contenido que todavía no se ha
    * publicado es información de la cola de revisión, no del catálogo.
@@ -54,7 +64,7 @@ const STATUS_CLASSES: Record<string, string> = {
  * `artist` que manipule el DOM desde aquí no gana nada. Lo que cambia es que
  * el botón ya no se le ofrece a quien no puede usarlo.
  */
-export function ReleaseActions({ releaseId, artistName, status }: ReleaseActionsProps) {
+export function ReleaseActions({ releaseId, artistName, artistId, status }: ReleaseActionsProps) {
   const { user, loading, hasRole } = useAuth();
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
 
@@ -106,14 +116,26 @@ export function ReleaseActions({ releaseId, artistName, status }: ReleaseActions
     // del Header o el dashboard del suscriptor, no esta ficha.
     return (
       <div className="flex flex-wrap gap-3">
+        {/*
+          Este botón lleva **al catálogo de este artista**, no al catálogo entero,
+          y cae ya en su lista de lanzamientos.
+
+          Antes iba a `/artists`, que es el catálogo de todo el mundo: desde una
+          ficha de *The Wall* había que volver a buscar a Pink Floyd entre todos los
+          artistas, o pinchar en un nombre que solo esta página conoce.
+
+          El ancla `#lanzamientos` la pone `components/ArtistTracksSection.tsx`. Con
+          ella el navegador se desplaza solo hasta la lista, que es lo que se viene
+          a ver; sin ella se aterriza en la bio y hay que bajar a mano.
+        */}
         <Link
-          href="/artists"
+          href={artistId ? `/artists/${artistId}#lanzamientos` : "/artists"}
           className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
           </svg>
-          Explorar el catálogo
+          {artistId ? "Ver su catálogo" : "Explorar el catálogo"}
         </Link>
 
         <Link

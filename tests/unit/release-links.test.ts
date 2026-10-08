@@ -151,15 +151,34 @@ describe("el icono de 'sin audio' no se confunde con una imagen rota", () => {
     path.resolve(process.cwd(), "components", "AudioPlayer.tsx"),
     "utf8",
   );
+  /**
+   * El icono se movió a su propio fichero porque **hacía falta en dos sitios**: el
+   * reproductor y el botón de cada fila de `ReleaseTrackList`. El `ban` de
+   * Heroicons seguía en las filas, y es el que el usuario reportó como "un SVG
+   * roto" en *Tour de France*. Un icono, un sitio — ver
+   * `tests/unit/no-audio-y-enlace-al-artista.test.ts`, que ata que no vuelva a
+   * duplicarse.
+   */
+  const icono = readFileSync(
+    path.resolve(process.cwd(), "components", "icons", "MutedSpeakerIcon.tsx"),
+    "utf8",
+  );
 
-  it("el ban-circle de Heroicons no esta", () => {
+  it("el ban-circle de Heroicons no esta en ninguno de los dos sitios", () => {
     // Un círculo con una diagonal a 16 px es indistinguible del icono de imagen
     // rota del navegador. El usuario lo reportó como "un SVG roto".
-    expect(player).not.toContain("M18.364 18.364A9 9 0 005.636 5.636");
+    const ban = "M18.364 18.364A9 9 0 005.636 5.636";
+    expect(player).not.toContain(ban);
+    expect(icono).not.toContain(ban);
+    expect(
+      readFileSync(path.resolve(process.cwd(), "components", "ReleaseTrackList.tsx"), "utf8"),
+    ).not.toContain(ban);
   });
 
   it("en su lugar hay un altavoz, y con aria-hidden", () => {
-    expect(player).toContain("M11 5L6 9H2v6h4l5 4V5z");
-    expect(player).toContain("aria-hidden");
+    expect(icono).toContain("M11 5L6 9H2v6h4l5 4V5z");
+    expect(icono).toContain("aria-hidden");
+    // Y el reproductor lo usa, no lo vuelve a escribir.
+    expect(player).toContain("MutedSpeakerIcon");
   });
 });

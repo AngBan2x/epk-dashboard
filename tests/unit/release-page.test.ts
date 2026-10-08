@@ -758,6 +758,73 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
       expect(h1).toBeGreaterThan(img);
       expect(dl).toBeGreaterThan(h1);
     });
+
+    /**
+     * La portada es **1:1 declarado**, no "lo que dé la fila".
+     *
+     * Con `sm:h-full` la caja tomaba la altura de la columna de texto, que depende
+     * de cuánto texto hay al lado: la misma portada salía a 288×288 en una ficha y a
+     * 288×354 en otra, y dos lanzamientos con la misma carátula no se veían igual.
+     */
+    it("la portada es 1:1 siempre, no la altura de la fila", async () => {
+      await renderPage(
+        { id: "rel-cuadrada", title: "Cuadrada", cover_image: "https://img.test/p.jpg" },
+        [{ id: "c1" }]
+      );
+      const marco = document.querySelector("section img")?.parentElement;
+      expect(marco?.className).toContain("aspect-square");
+      // `sm:h-full` es lo que rompía el cuadrado; no debe volver.
+      expect(marco?.className).not.toContain("h-full");
+    });
+
+    it("la barra lateral se queda pegada al scroll", async () => {
+      // Sin `self-start` el sticky no hace nada: la rejilla estira sus hijos y un
+      // elemento estirado ocupa toda la altura de la columna, sin nada que fijar.
+      await renderFullRelease();
+      const aside = document.querySelector("aside");
+      expect(aside?.className).toContain("lg:sticky");
+      expect(aside?.className).toContain("lg:self-start");
+    });
+
+    it("la duración sale UNA vez, en la barra de hechos", async () => {
+      // Salía dos: junto al badge de tipo y en "Duración". Con datos de hoy no
+      // además sobraba: el 100% de las fichas tiene duración, así que la segunda
+      // copia no era un respaldo para un dato ausente.
+      await renderPage(
+        { id: "rel-una-duracion", title: "Una duracion", duration: "3:57" },
+        []
+      );
+      const carta = document.querySelector("section")?.textContent ?? "";
+      const ocurrencias = carta.match(/\d+:\d{2}/g) ?? [];
+      expect(ocurrencias).toHaveLength(1);
+    });
+
+    it("el badge no dice «Single» sobre una ficha con varias pistas", async () => {
+      // `Tour de France` (Kraftwerk) tiene `release_type = 'Single'` y 2 hijas. El
+      // badge decía "Single" sobre una carta que decía "2 pistas".
+      await renderPage({ id: "rel-badge", title: "Tour de France", release_type: "single" }, [
+        { id: "c1", title: "Version Francaise" },
+        { id: "c2", title: "Version Alemana" },
+      ]);
+      const carta = document.querySelector("section")?.textContent ?? "";
+      expect(carta).not.toContain("Single");
+      expect(carta).toContain("EP");
+    });
+
+    it("un álbum conserva su tipo", async () => {
+      await renderPage({ id: "rel-album-badge", release_type: "album" }, [{ id: "c1" }]);
+      expect(document.querySelector("section")?.textContent ?? "").toContain("Album");
+    });
+
+    it("y un single sin hijas sigue diciendo Single", async () => {
+      // En su propio `it` y no en el del álbum a propósito: `renderPage` monta
+      // sobre el mismo `document.body` y solo limpia en `afterEach`, así que dos
+      // renders en el mismo test se apilan y `querySelector("section")` devuelve
+      // el primero. Aquí se vería "Album" y el test passería por la razón
+      // equivocada.
+      await renderPage({ id: "rel-single-badge", release_type: "single" }, []);
+      expect(document.querySelector("section")?.textContent ?? "").toContain("Single");
+    });
   });
 });
 

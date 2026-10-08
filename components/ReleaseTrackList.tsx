@@ -1,5 +1,6 @@
 "use client";
 
+import { MutedSpeakerIcon } from "@/components/icons/MutedSpeakerIcon";
 import { useMemo } from "react";
 import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
 import {
@@ -222,10 +223,13 @@ export function ReleaseTrackList({
               }
             >
               {!playable ? (
-                /* Sin fuente: el icono tachado, no un play que no hace nada. */
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 011.636 5.636m12.728 12.728L5.636 5.636" />
-                </svg>
+                /* Sin fuente: altavoz apagado, no un play que no hace nada. El `ban`
+                   de Heroicons, a `w-4 h-4`, es indistinguible del icono de imagen
+                   rota del navegador — y lo reportó el usuario como "un SVG roto" en
+                   las filas sin audio de *Tour de France*. El icono vive en
+                   `components/icons/MutedSpeakerIcon.tsx` porque el mismo ya se
+                   puso en `AudioPlayer`, y dos copias del mismo icono divergen. */
+                <MutedSpeakerIcon />
               ) : isLoading ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

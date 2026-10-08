@@ -1,4 +1,4 @@
-import { sumDurations } from "@/lib/null-safe";
+import { capitalizeReleaseType, sumDurations } from "@/lib/null-safe";
 import { tracklistDurationLabel } from "@/lib/audio-priority";
 import {
   resolveAlbumMetrics,
@@ -214,4 +214,35 @@ export function releaseShape(release: Track, children: readonly Track[]): Releas
     durationLabel: releaseDurationLabel(release, children),
     metrics: releaseMetrics(release, children),
   };
+}
+
+/**
+ * ## El tipo de un lanzamiento, cuando la columna y la página no coinciden
+ *
+ * `release_type` es lo que el autor escribió al crear la fila. El resto de la
+ * página razona por **hijas**. Con datos de hoy las dos reglas se contradicen en
+ * `Tour de France` (Kraftwerk): `release_type = 'Single'` con **2 hijas**, así que
+ * el badge decía "Single" sobre una carta que anunciaba "2 pistas".
+ *
+ * Un single es, por definición, **una** pista. Si la fila tiene hijas, no puede
+ * ser un single, diga lo que diga la columna. Y el contenedor que menos afirma es
+ * "EP": un disco con varias pistas del mismo tema. Un álbum con hijas conserva su
+ * tipo, porque ahí sí es correcto.
+ *
+ * No se arregla reescribiendo la columna en Turso: la fila es válida en su
+ * contexto —es un single con una versión alternativa— y cambiar el catálogo para
+ * tapar un problema de presentación esconde el dato. Se arregla en la etiqueta,
+ * que es donde estaba el error.
+ *
+ * Vive aquí y no en la página porque se usa en **dos** sitios: el badge y la
+ * descripción de `generateMetadata`. Con una copia en cada uno, el buscador
+ * seguiría anunciando "Single · 2 pistas" mientras la página ya no lo dice.
+ */
+export function releaseTypeLabel(
+  releaseType: string | null | undefined,
+  hasChildren: boolean,
+): string {
+  const base = capitalizeReleaseType(releaseType ?? "");
+  if (!hasChildren) return base;
+  return /^single$/i.test(base.trim()) ? "EP" : base;
 }

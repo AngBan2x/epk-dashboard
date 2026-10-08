@@ -110,7 +110,15 @@ export function ArtistTracksSection({
   if (groups.length === 0) return null;
 
   return (
-    <section className="mt-8">
+  /**
+   * El `id` del `<section>` es un ancla de verdad, no decora÷ión: el botón del
+   * catálogo de una ficha de release enlaza a `/artists/<id>#lanzamientos` para que se
+   * caiga aquí en vez de arriba (ver `components/ReleaseActions.tsx`).
+   *
+   * El `scroll-mt` va con í porque sin él el encabezado queda pegado al borde de
+   * arriba y el navegador deja la lista justo debajo de donde empezaría a mirar.
+   */
+    <section id="lanzamientos" className="mt-8 scroll-mt-24">
       <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Lanzamientos</h2>
       {/* `items-start`: sin eso, una celda con 10 pistas estira a todas las
           de su fila y las EPKCard sueltas quedan flotando en el vacío. */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { MutedSpeakerIcon } from "@/components/icons/MutedSpeakerIcon";
 import { useRef, useState, useContext, useEffect } from "react";
 import { safeString } from "@/lib/null-safe";
 import { AudioPlayerContext, type ActiveTrack } from "@/context/AudioPlayerContext";
@@ -105,34 +106,12 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
     /**
      * Sin fuente reproducible: no se pinta un "▶" que no lleva a ningún lado.
      *
-     * ## Por qué un altavoz tachado y no un círculo con una raya
-     *
-     * Antes era el "ban" de Heroicons: un círculo con una diagonal. A los
-     * `w-4 h-4` de este botón **es indistinguible del icono de imagen rota** del
-     * navegador, y el usuario lo reportó como un SVG roto en la captura del
-     * reproductor sin audio. El símbolo tenía además el problema contrario:
-     * dice "prohibido", cuando lo que pasa es que no hay nada que reproducir.
-     *
-     * Un altavoz con waves apagadas dice lo mismo y no se confunde con nada.
-     * Como el texto `statusText` ya dice "No hay audio disponible", el icono
-     * es decoración: por eso `aria-hidden`.
+     * El icono (altavoz apagado, y **no** el "ban" de Heroicons) vive en
+     * `components/icons/MutedSpeakerIcon.tsx`, con el porqué de por qué no es un
+     * círculo con una raya. Vive ahí porque el mismo icono hacía falta también en
+     * las filas de `ReleaseTrackList`, y dos copias del mismo icono divergen.
      */
-    playButton = (
-      <svg
-        className="w-4 h-4 text-slate-400"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M11 5L6 9H2v6h4l5 4V5zM22 9l-6 6M16 9l6 6"
-        />
-      </svg>
-    );
+    playButton = <MutedSpeakerIcon className="w-4 h-4 text-slate-400" />;
   } else if (isError) {
     // P3.34: Error state
     playButton = (
