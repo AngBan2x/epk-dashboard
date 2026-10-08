@@ -168,20 +168,35 @@ test.describe("P4.5: Aprobaciones QA", () => {
     expect(draft.status()).toBe(201);
     const release = await draft.json();
 
+    // Un no-admin NO puede decidir sobre sí mismo, pero la respuesta **no** es
+    // 403: el estado pedido se IGNORA y se conserva el vigente.
+    //
+    // Este test pedía 403 y estaba obsoleto. Ese 403 era el diseño que se
+    // sustituyó a propósito (`resolveSubmitStatus`, `lib/db.ts`, y su unit en
+    // `tests/unit/release-edit-contract.test.ts`): con las 83 filas de
+    // producción en `approved`, el formulario de edición reenvía el estado
+    // vigente y **ningún artista podía guardar ningún release**. Nunca.
+    //
+    // Lo que se comprueba aquí es que el estado NO cambia, no solo el código: un
+    // 200 a secas pasaría igual si el `approved` se hubiera aplicado de verdad.
+    // Por eso se lee el cuerpo, que devuelve el estado efectivo y `statusIgnored`.
     const selfApprove = await artist.request.put(`${BASE_URL}/api/releases`, {
       data: { id: release.id, status: "approved" },
     });
-    expect(selfApprove.status()).toBe(403);
+    expect(selfApprove.status()).toBe(200);
+    expect(await selfApprove.json()).toMatchObject({ status: "draft", statusIgnored: true });
 
     const selfReject = await artist.request.put(`${BASE_URL}/api/releases`, {
       data: { id: release.id, status: "rejected" },
     });
-    expect(selfReject.status()).toBe(403);
+    expect(selfReject.status()).toBe(200);
+    expect(await selfReject.json()).toMatchObject({ status: "draft", statusIgnored: true });
 
     const submit = await artist.request.put(`${BASE_URL}/api/releases`, {
       data: { id: release.id, status: "pending" },
     });
     expect(submit.status()).toBe(200);
+    expect(await submit.json()).toMatchObject({ status: "pending" });
 
     const admin = await browser.newContext();
     await loginAs(admin.request, ADMIN_EMAIL, ADMIN_PASSWORD);
