@@ -94,59 +94,154 @@ const CURATED: Record<string, Curated> = {
   // Los 5 del catalogo influyente, que estaban en NULL y no aparecian en
   // ningun script. Salieron de `artist-image-candidates.ts`, pasaron el
   // verificador HTTP y se miraron uno a uno antes de escribirse.
+  //
+  // **Los 5 tienen ya las dos imagenes.** Pink Floyd, Radiohead y Kraftwerk
+  // entraron con `profile: null` y el motivo era el mismo en los tres: en
+  // Commons no hay retrato de grupo de una banda, hay escenario. Ese motivo
+  // sigue siendo cierto, pero la conclusion que se habia sacado —dejar el
+  // avatar vacio y que pusiese el degradado— ya no: la peticion es que ningun
+  // artista se quede sin imagen, y un avatar con una foto real de la banda es
+  // mejor que un circulo de degradado. Asi que en los tres se eligio la foto de
+  // escenario **menos mala**, mirando las candidatas una a una.
+  //
+  // Lo que no se hizo, y conviene tener escrito para no volver a proponerlo: se
+  // descarto usar el logotipo SVG de la banda que hay en Commons. Un wordmark
+  // al lado de los otros nueve artistas, que si tienen fotografia, rompe la
+  // serie visual del catalogo.
   // ------------------------------------------------------------------
 
   "Pink Floyd": {
-    // Sin avatar: Commons no tiene un retrato de grupo utilizable de Pink Floyd,
-    // solo fotos de escenario lejanas. Un avatar degraduate en circulo se veria
-    // como una mancha, asi que se deja NULL y el degradado hace de avatar.
-    profile: null,
+    // Sin retrato de grupo en Commons: las cuatro candidatas que pasan el
+    // verificador son de Live 8. Se descargaron las cuatro y se miraron.
+    //
+    // Las dos de 2048x1536 dejan a la banda diminuta en una franja baja, con la
+    // proyeccion luminosa del fondo ocupando el encuadre: en un circulo de 80 px
+    // sale luz morada y ningun cuerpo. La de 1753x890 es lejana tambien.
+    //
+    // Esta es la unica que aguanta el recorte, y por un motivo concreto: 2048x896
+    // es 2,29:1, de manera que al pasar a circulo se recorta **a lo ancho**, no a
+    // lo alto. Se conservan las cuatro figuras y el muro rojo iluminado, y el
+    // centro del circulo cae sobre Mason y Waters, que es lo que queda de verdad
+    // dentro del radio. No es un retrato y no pretende serlo: es una foto de la
+    // banda tocando, y aun asi es mas legible que el degradado.
+    profile:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/London%2C_Live_8%2C_Pink_Floyd_%28cropped%29.jpg/1280px-London%2C_Live_8%2C_Pink_Floyd_%28cropped%29.jpg",
     banner:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Pink_Floyd_at_Live_8%2C_London.jpg/1280px-Pink_Floyd_at_Live_8%2C_London.jpg",
-    creditos: "Jon Lean, CC BY-SA 2.0 - Live 8, Londres, 2005",
+    creditos:
+      "Dave Bushe, CC BY 2.0 - Live 8, Londres (perfil) / Jon Lean, CC BY-SA 2.0 - Live 8, Londres (banner)",
   },
   Radiohead: {
-    // Sin avatar, mismo motivo: no hay retrato, hay escenario.
-    profile: null,
+    // Mismo caso que Pink Floyd, y aqui hay mas donde elegir: Commons tiene seis
+    // tomas del Uber Arena de 2025 y todas son la banda en el escenario.
+    //
+    // Se eligio la 01 porque es la que mejor aguanta el recorte en circulo de las
+    // seis: es 3:2, asi que al pasar a cuadrado se recorta a lo ancho y el centro
+    // se queda con Thom Yorke de frente y con la cara visible, con los dos
+    // companeros a los lados. En las demas —las numeradas 02, 09, 13, 26 y 32— las
+    // figuras salen mas pequenas o de perfil, y a 80 px no se distinguen.
+    //
+    // Aqui si que hay una foto de una persona, no del grupo: es una banda con voz
+    // principal y el avatar lo representa, que es como se representa a casi
+    // cualquier banda rock en un cartel.
+    profile:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/2025_Radiohead_live_concert_at_Uber_Arena%2C_Berlin_01.jpg/1280px-2025_Radiohead_live_concert_at_Uber_Arena%2C_Berlin_01.jpg",
     banner:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2025_Radiohead_live_concert_at_Uber_Arena%2C_Berlin_07.jpg/1280px-2025_Radiohead_live_concert_at_Uber_Arena%2C_Berlin_07.jpg",
     creditos: "Raph_PH, CC BY 4.0 - Uber Arena, Berlin, 2025",
   },
   // ------------------------------------------------------------------
-  // Björk y David Bowie NO están en esta tabla, y antes sí.
+  // **Björk entra** (2026-10-06), y solo con el perfil.
   //
-  // Tenían candidatas que pasaban el verificador HTTP, pero el usuario decidió
-  // dejarlos fuera, y el script seguía proponiéndolos: un `--apply` cualquiera
-  // habría escrito justo lo que se había rechazado. Un dry-run que propone lo
-  // que no se quiere es peor que no tener dry-run, porque enseña a no leerlo.
+  // El veredicto sobre Björk ya estaba escrito más abajo en este mismo bloque,
+  // y era el contrario que el de Bowie: la candidata
+  // https://upload.wikimedia.org/wikipedia/commons/9/98/Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_e
+  // es 1000×1416, vertical, **centrada y ocupando el encuadre**, así que en el
+  // recorte circular del avatar funciona: se ve la cara y el tocado naranja. Es
+  // una foto de escenario con grano, pero el contraste es real.
   //
-  // **David Bowie — confirmado que no funciona.**
-  // https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/David_Bowie_Live_1974.jpg/1280px-David_Bowie_Live_1974.jpg
-  // 1280x1280, Bowie en el tercio derecho y el 40% izquierdo negro puro. Un
-  // recorte circular centrado —que es como se pinta el avatar— sale negro con
-  // una franja de traje blanco. Como banner tampoco: es cuadrada.
+  // El **banner sigue en NULL**, y por lo que ya decía el comentario: no hay
+  // panorámica decente. La única ("Björk live Paris 2023") sale casi negra con
+  // la artista diminuta al fondo, y eso de fondo es peor que el degradado que
+  // pone `ArtistHero`.
   //
-  // **Björk — el veredicto es el contrario, y por eso queda anotado.**
-  // https://upload.wikimedia.org/wikipedia/commons/9/98/Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg
-  // 1000x1416, portrait, **centrada y ocupando el encuadre**: en círculo funciona,
-  // con la cara y el tocado naranja. Es una foto de escenario con grano, pero el
-  // contraste es real. Su banner sí que no hay: la única panorámica decente
-  // (Björk live Paris 2023) sale casi negra con la artista diminuta al fondo.
+  // El nombre del fichero se ha vuelto a sacar de `artist-image-candidates.ts`,
+  // no de memoria: la primera versión de esta entrada.endswith `..._1_electrum_
+  // %28Unsplash%29.jpg`, inventada al completar el comentario que estaba
+  // truncado, y daba **404**. El dry-run lo cazó antes de escribir nada, que es
+  // justo para lo que está. El correcto es `..._1_edit.jpg`.
   //
-  // Si se cambia de idea, es una entrada de 4 líneas y un dry-run:
-  //   "Björk": {
-  //     profile: "https://upload.wikimedia.org/wikipedia/commons/9/98/Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg",
-  //     banner: null,
-  //     creditos: "Rlef89, CC BY-SA 2.0 - Cirque en Chantier, 2013",
-  //   },
+  // Bowie sigue fuera por su motivo, que es el del principio del bloque.
+  "Björk": {
+    profile:
+      "https://upload.wikimedia.org/wikipedia/commons/9/98/Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg",
+    // Banner: el "live Paris 2023" que motivaba dejar esto en NULL está
+    // **descartado a propósito**: la mitad izquierda es negro puro y la artista
+    // sale diminuta al fondo. Con el degradado de `ArtistHero` encima quedaba un
+    // rectángulo negro; con esta foto, un escenario real.
+    //
+    // 2538x1692 panorámica, muy bien expuesta, con público y lasers. Björk es la
+    // figura blanca del centro. Es foto de concierto y ella no es la
+    // protagonista del encuadre —para eso está el avatar—, pero como franja
+    // panorámica funciona, y es lo que se buscaba: que ningún artista se quede
+    // sin imagen.
+    banner:
+      "https://upload.wikimedia.org/wikipedia/commons/c/c9/Bj%C3%B6rk_-_Volta_Tour_a_Verona_-_2712755835.jpg",
+    creditos: "Rlef89, CC BY-SA 2.0 (perfil) / ecodallaluna, CC BY-SA 2.0 (banner)",
+  },
   // ------------------------------------------------------------------
+  // **David Bowie entra entero** (2026-10-06), con las dos imágenes.
+  //
+  // Estaba fuera porque la candidata de entonces era inútil, y el motivo sigue
+  // siendo cierto **para esa foto**: `David_Bowie_Live_1974.jpg` es 1280x1280
+  // con Bowie en el tercio derecho y el 40% izquierdo negro puro, así que el
+  // recorte circular centrado salía negro con una franja de traje blanco.
+  //
+  // El error no era "no hay foto de Bowie": era que se miró **una** candidata y
+  // se descartó **al artista**. Las de abajo se eligieron mirando las fotos, no
+  // por la puntuación del verificador —que ya había aceptado la mala con 75—.
+  //
+  // `artist-image-candidates.ts` las propose como aceptadas; lo que faltaba era
+  // el criterio de encuadre, y ese no es automático.
+  // ------------------------------------------------------------------
+  "David Bowie": {
+    // 1043x1033, retrato de estudio en B/N, **cuadrado**, sujeto centrado y
+    // fondo de degradado limpio. La cara cae a 0,35 del centro en un eje de 1,0,
+    // así que queda dentro del radio 0,5 del círculo: entra cabeza y torso, que
+    // es lo que se busca en un avatar de 80 px.
+    profile:
+      "https://upload.wikimedia.org/wikipedia/commons/a/a2/David_Bowie_-_1983_Let%27s_Dance_Promo_003.jpg",
+    // 1280x720, que es **exactamente** la proporción de la franja del hero
+    // (`h-48 md:h-64` a ancho completo): no hay recorte que perder. Bowie a la
+    // izquierda con la caña, Dick Cavett a la derecha, bien expuesta.
+    banner:
+      "https://upload.wikimedia.org/wikipedia/commons/2/2b/David_Bowie_and_Dick_Cavett_%22The_Dick_Cavett_Show%22_%281974_ABC_press_photo%29.jpg",
+    creditos: "Greg Gorman / EMI America, dominio publico (perfil) · ABC Television, dominio publico (banner)",
+  },
   Kraftwerk: {
-    // Sin avatar: la foto buena de grupo es panoramica y a 850 px de ancho, y las
-    // caras quedan diminutas al recortar en circulo.
-    profile: null,
+    // El verificador propuso seis, y dos se descartaron sin llegar a mirar la
+    // foto entera: `Stefan Pfaffe Kraftwerk live.jpg` y `Kraftwerk live.jpg`
+    // (Roskilde, 2013) son retratos de **una persona concreta** —Stefan Pfaffe y
+    // Ralf Huetter—, por mucho que el titulo diga "Kraftwerk". Poner a un miembro
+    // suelto para representar a la banda es justo lo que el bloque de Bowie mas
+    // abajo explica que no hay que hacer, asi que no.
+    //
+    // De las que si son la banda, `Kraftwerk on stage.jpg` se cae sola: los dos
+    // musicos estan en los extremos y el centro del encuadre es **pared teal
+    // vacia**, que es justo lo que ocupa el circulo. Y la de Stockholm (dominio
+    // publico, 850 px) tiene el cartel verde "COMPUTERWORLD" ocupando las dos
+    // terceras partes, con la banda enana debajo.
+    //
+    // La que gana es la de Genoa 2023: las cuatro figuras con mono rojo y, detras,
+    // el "MACHINE" blanco sobre negro. Al recortar a cuadrado el centro cae
+    // sobre la tipografia, que a 80 px es lo mas legible de las seis y hace de
+    // marca reconocible aunque el resto no se distinga.
+    profile:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Kraftwerk_-_Live_at_Arena_Del_Mare%2C_Genoa_%28July_8th%2C_2023%29_-_9464.jpg/1280px-Kraftwerk_-_Live_at_Arena_Del_Mare%2C_Genoa_%28July_8th%2C_2023%29_-_9464.jpg",
     banner:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Kraftwerk_live_07.09.1981_Nakano_Sun_Plaza_Tokyo.jpg/1280px-Kraftwerk_live_07.09.1981_Nakano_Sun_Plaza_Tokyo.jpg",
-    creditos: "CC BY 2.5 - Nakano Sun Plaza, Tokio, 1981",
+    creditos:
+      "Luca Dell'Orto, CC BY-SA 4.0 - Genoa, 2023 (perfil) / CC BY 2.5 - Nakano Sun Plaza, Tokio, 1981 (banner)",
   },
 };
 

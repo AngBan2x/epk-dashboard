@@ -402,27 +402,30 @@ describe("cobertura del catalogo", () => {
 });
 
 /**
- * C5 — el script de aplicación no debe proponer lo que el usuario rechazó.
+ * C5 — ningún artista se queda sin imagen, y lo que se rechazó sigue escrito.
  *
- * El fallo que motivó esto: Björk y David Bowie tenían candidatas que pasaban el
- * verificador HTTP y **seguían en la tabla**, después de que se decidiera
- * dejarlos fuera. El dry-run proponía 4 escrituras (2 perfiles + el banner de
- * Bowie) que nadie quería, y `--apply` las habría hecho sin preguntar.
+ * **Este bloque cambió de opinión el 2026-10-08, y el cambio es a propósito.**
+ * Antes afirmaba lo contrario: que Björk y David Bowie NO tuvieran entrada en la
+ * tabla, y que Pink Floyd, Radiohead y Kraftwerk tuvieran `profile: null`.
  *
- * Con estas dos fotos miradas una a una:
+ * Los dos hechos que motivaron aquella decisión siguen siendo ciertos: en Commons
+ * no hay retrato de grupo de una banda, y la candidata de Bowie de 1974 sale
+ * negra en el recorte circular. Lo que cambió fue la conclusión. Decir "no hay
+ * foto buena, déjalo en NULL" confundía **calidad** con **ausencia**: un avatar
+ * con una foto real de escenario es más útil que un círculo de degradado, y la
+ * petición era que ningún artista se quedara sin imagen. Así que las bandas
+ * entraron con la mejor foto de escenario y Bowie con otra candidata.
  *
- *   Bowie — confirmado que no funciona. 1280x1280, el 40% izquierdo negro puro
- *           y el sujeto en el tercio derecho: el recorte circular centrado
- *           (como se pinta el avatar) sale negro con una franja de traje.
- *   Björk — sí funcionaría. 1000x1416, portrait, centrada y ocupando el
- *           encuadre. Se queda fuera por decisión del usuario, no por calidad,
- *           y por eso el script lo anota con la URL y el motivo.
+ * Lo que este bloque protege ahora:
  *
- * El resto del catálogo sí se queda como estaba: `thumb.wikimedia.org` es un
- * alias que funciona, así que canonicalizarlo a `upload.wikimedia.org` es
- * cosmético y no se ha escrito.
+ *   1. Ningún artista de la tabla tiene un campo en `null`. Si alguien vuelve a
+ *      vaciar un avatar, el test lo dice.
+ *   2. Las candidatas que se descartaron siguen nombradas en el script, con el
+ *      motivo. Perder el motivo obliga a volver a buscarlas y a volver a mirarlas.
+ *   3. Que el avatar de las bandas es una foto de escenario está escrito, para
+ *      que nadie lo lea como un descuido y lo "arregle" poniendo un logo.
  */
-describe("C5 — la tabla curada no revivida lo que se rechazo", () => {
+describe("C5 — la tabla curada cubre a todo el catálogo y recuerda los descartes", () => {
   const SCRIPT = fs.readFileSync(path.resolve(process.cwd(), "scripts/apply-artist-images.ts"), "utf8");
   /** El fuente SIN comentarios: la tabla vive entre `const CURATED` y `type Campo`. */
   const CODIGO = sinComentarios(SCRIPT);
@@ -433,32 +436,40 @@ describe("C5 — la tabla curada no revivida lo que se rechazo", () => {
     return CODIGO.slice(CODIGO.indexOf("const CURATED"), CODIGO.indexOf("type Campo"));
   }
 
-  it("Björk y David Bowie NO tienen entrada en la tabla", () => {
+  it("ningún artista de la tabla se queda un campo en null", () => {
     const tabla = tablaCurada();
-    // Se busca la clave como elemento del objeto ("Nombre": {), no la mención.
-    expect(tabla).not.toMatch(/"Björk":\s*\{/);
-    expect(tabla).not.toMatch(/"David Bowie":\s*\{/);
+    expect(tabla).not.toMatch(/(profile|banner):\s*null/);
+    // 11 artistas curados por 2 campos. Angel Bandres (la cuenta del proprietario
+    // del catálogo) no entra en la tabla: su foto no viene de Commons.
+    expect(tabla.match(/profile:/g)).toHaveLength(11);
+    expect(tabla.match(/banner:/g)).toHaveLength(11);
   });
 
-  it("pero el motivo y la URL quedan escritos, para no perder el trabajo", () => {
-    // Si alguien las quita sin dejar rastro, la decisión se pierde y el
-    // siguiente tiene que volver a buscar la foto y a mirarla.
-    expect(SCRIPT).toContain("Bj%C3%B6rk_performing_at_Cirque_en_Chantier_1_edit.jpg");
-    expect(SCRIPT).toContain("David_Bowie_Live_1974.jpg");
-    expect(SCRIPT).toContain("centrada y ocupando el encuadre");
-  });
-
-  it("los tres que sí están en la tabla siguen sin avatar, a propósito", () => {
-    // Pink Floyd, Radiohead y Kraftwerk: no hay retrato de grupo utilizable en
-    // Commons, solo fotos de escenario. El degradado de ArtistHero hace de
-    // avatar, que es mejor que un recorte malo.
+  it("y los tres que antes iban sin avatar están dentro", () => {
+    // La clave puede ir con comillas ("Pink Floyd") o sin ellas (Radiohead):
+    // en JavaScript las dos formas son claves válidas y la tabla usa las dos.
+    const tabla = tablaCurada();
     for (const nombre of ["Pink Floyd", "Radiohead", "Kraftwerk"]) {
-      // La clave puede ir con comillas ("Pink Floyd") o sin ellas (Radiohead):
-      // en JavaScript las dos formas son claves válidas y la tabla usa las dos.
       const patron = new RegExp(`"?${nombre}"?:\\s*\\{[\\s\\S]*?\\n  \\}`);
-      const bloque = tablaCurada().match(patron);
+      const bloque = tabla.match(patron);
       expect(bloque, nombre).not.toBeNull();
-      expect(bloque?.[0]).toMatch(/profile:\s*null/);
+      expect(bloque?.[0], nombre).toMatch(/profile:\s*\n?\s*"https:/);
     }
+  });
+
+  it("las candidatas descartadas siguen escritas, con el motivo", () => {
+    // Si alguien las quita sin dejar rastro, se pierde el trabajo: la decisión
+    // desaparece y el siguiente tiene que volver a buscar la foto y a mirarla.
+    expect(SCRIPT).toContain("David_Bowie_Live_1974.jpg");
+    expect(SCRIPT).toContain("Stefan Pfaffe Kraftwerk live.jpg");
+    expect(SCRIPT).toContain("Kraftwerk on stage.jpg");
+    expect(SCRIPT).toContain("logotipo SVG");
+  });
+
+  it("y que el avatar de las bandas es de escena a propósito, no por descuido", () => {
+    // Sin esta nota, el verificador automático (que ya acepta con 75 una foto
+    // inservible) invitaba a "arreglarlo" con el logotipo, y eso rompía la
+    // serie visual del catálogo.
+    expect(SCRIPT).toContain("escenario");
   });
 });
