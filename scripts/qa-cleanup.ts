@@ -8,7 +8,8 @@
  * Patrones QA detectados:
  * - users: email contiene @qa.test, @e2e.test, @test.local, nombre empieza con "QA " o "E2E "
  * - artists: name/slug contiene "-qa-", "-e2e-", "-test-", "QA ", "E2E ", "Test "
- * - tracks: title contiene "[QA]", "[E2E]", "[TEST]", artist_name coincide con artista QA
+ * - tracks: title empieza por "QA " o "E2E ", o contiene "[QA]", "[E2E]", "[TEST]", o su
+ *   artist_name coincide con un artista QA
  * - shows: venue_name contiene "[QA]", "[E2E]", "[TEST]", artist_id coincide con artista QA
  * - notifications: title/message contiene "[QA]", "[E2E]", "[TEST]"
  * - subscriptions: artist_id/subscriber_id coincide con QA
@@ -43,6 +44,8 @@ const QA_USER_EMAIL_PATTERNS = ["@qa.test", "@e2e.test", "@test.local", "@exampl
 const QA_USER_NAME_PREFIXES = ["QA ", "E2E ", "Test "];
 const QA_ARTIST_PATTERNS = ["-qa-", "-e2e-", "-test-", "QA ", "E2E ", "Test ", "SEED"];
 const QA_TRACK_PATTERNS = ["[QA]", "[E2E]", "[TEST]", "[SEED]"];
+/** Prefijos con los que los specs nombran sus releases: `QA P45 Draft 1791…`. */
+const QA_TRACK_TITLE_PREFIXES = ["QA ", "E2E "];
 const QA_SHOW_PATTERNS = ["[QA]", "[E2E]", "[TEST]", "[SEED]"];
 const QA_NOTIFICATION_PATTERNS = ["[QA]", "[E2E]", "[TEST]"];
 
@@ -231,6 +234,12 @@ function isQATrack(track: Track, qaArtistNames: Set<string>): boolean {
   const artistName = track.artist_name;
 
   if (QA_TRACK_PATTERNS.some((p) => title.includes(p))) return true;
+  // **Prefijo** `QA `, no solo `[QA]`. Los specs de E2E crean títulos como
+  // "QA P45 Draft 1791474488372" y "QA P45 UI Revision …", sin corchetes, así que
+  // con los patrones de este script pasaban desapercibidos: el dry-run informed
+  // "Tracks QA detectados: 0" con dos filas QA*P45* en producción. Es el mismo
+  // criterio que ya se usa para los nombres de usuario (`QA_USER_NAME_PREFIXES`).
+  if (QA_TRACK_TITLE_PREFIXES.some((p) => title.startsWith(p))) return true;
   if (qaArtistNames.has(artistName)) return true;
   return false;
 }
