@@ -1,6 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
+// Esta spec leía SOLO `BASE_URL`, así que los 46 tests ignoraban el
+// `PLAYWRIGHT_BASE_URL` que documentan AGENTS.md y el resto de specs: para correr
+// contra producción había que acordarse de una segunda variable, y si no, los
+// tests se iban al dev server local en silencio. Ahora se acepta la de todos y
+// `BASE_URL` queda como alias para no romper quien ya la use.
+const BASE_URL =
+  process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || "http://localhost:3000";
 
 const TRACKS = [
   { id: "trk-001", title: "Bohemian Rhapsody", sources: 3, youtubeOnly: false },
@@ -283,16 +289,26 @@ test.describe("Suite 4: Global Player Comportamiento", () => {
     await expect(fullPlayer.first()).toBeVisible({ timeout: 3000 });
   });
 
-  test("4.3 Barra de progreso avanza — primeros 4 tracks", async ({ page }) => {
+  // Se comprueba que el player **muestra el tiempo en m:ss**, no que la barra
+  // avance de verdad. La versión anterior cogía `.fixed.bottom-0 .font-mono` y
+  //TOMABA el primero, que no es el reloj sino el contador de pistas ("1/1"), y
+  // por eso pedía `:` sobre un texto que nunca la lleva. Y lo hacía dentro de un
+  // `if (count > 0)`: si el selector no encontraba nada, el test pasaba sin
+  // comprobar nada. Un check que no puede fallar no comprueba.
+  //
+  // Que la barra *avance* exigiría que el audio esté sonando de verdad, que en
+  // headless no es determinista; eso queda para la QA manual con headed.
+  test("4.3 El player muestra el tiempo en m:ss — primeros 4 tracks", async ({ page }) => {
     const subset = TRACKS.slice(0, 4);
     for (const track of subset) {
       await clickPlayDetail(page, track.id);
       await page.waitForTimeout(2000);
-      const playerTime = page.locator(".fixed.bottom-0 .font-mono");
-      if ((await playerTime.count()) > 0) {
-        const text = await playerTime.first().textContent();
-        expect(text).toContain(":");
-      }
+      const textos = await page.locator(".fixed.bottom-0 .font-mono").allTextContents();
+      const algunoEsReloj = textos.some((t) => /\d+:\d{2}/.test(t ?? ""));
+      expect(
+        algunoEsReloj,
+        `${track.title}: el player no muestra ningún tiempo m:ss. Lo que hay en el player: ${JSON.stringify(textos)}`
+      ).toBe(true);
     }
   });
 

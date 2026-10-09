@@ -1,20 +1,33 @@
 import { test, expect } from "@playwright/test";
 
+/**
+ * Las dos rutas de esta lista ya no son las que eran cuando se escribió el spec:
+ *
+ *   - `/` es la **landing pública**, no una redirección a `/dashboard`. El spec
+ *     hacía `pageDef.path === "/" ? "/dashboard" : ...` y por eso el test "home"
+ *     fallaba esperando una redirección que no ocurre.
+ *   - `/track/<id>` es un **shim de 301** a `/releases/<id>` desde P8. Un single
+ *     ES fila de `tracks` y cabecera de release con el mismo id, así que las dos
+ *     fichas que se recorren aquí terminan en `/releases/`.
+ *
+ * Se guarda la ruta "pedida" y la "final": son distintas por diseño, y por eso
+ * el `toHaveURL` compara contra la segunda.
+ */
 const PAGES = [
-  { path: "/", name: "home" },
-  { path: "/dashboard", name: "dashboard" },
-  { path: "/login", name: "login" },
-  { path: "/register", name: "register" },
-  { path: "/artists", name: "artists" },
-  { path: "/track/trk-001", name: "track-detail" },
-  { path: "/track/trk-002", name: "track-detail-2" },
+  { path: "/", final: "/", name: "home" },
+  { path: "/dashboard", final: "/dashboard", name: "dashboard" },
+  { path: "/login", final: "/login", name: "login" },
+  { path: "/register", final: "/register", name: "register" },
+  { path: "/artists", final: "/artists", name: "artists" },
+  { path: "/track/trk-001", final: "/releases/trk-001", name: "track-detail" },
+  { path: "/track/trk-002", final: "/releases/trk-002", name: "track-detail-2" },
 ];
 
 test.describe("N3: Explore all pages - Light Mode", () => {
   for (const pageDef of PAGES) {
     test(`${pageDef.name} loads correctly`, async ({ page }) => {
       await page.goto(pageDef.path, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(new RegExp(pageDef.path === "/" ? "/dashboard" : pageDef.path));
+      await expect(page).toHaveURL(new RegExp(`${pageDef.final}$`));
 
       // Screenshot
       await page.screenshot({
@@ -41,7 +54,7 @@ test.describe("N3: Explore all pages - Dark Mode", () => {
   for (const pageDef of PAGES) {
     test(`${pageDef.name} dark mode`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: "dark" });
-      await page.goto(pageDef.path === "/" ? "/dashboard" : pageDef.path, {
+      await page.goto(pageDef.path, {
         waitUntil: "domcontentloaded",
       });
 
@@ -63,7 +76,7 @@ test.describe("N3: Explore all pages - Mobile", () => {
   for (const pageDef of PAGES) {
     test(`${pageDef.name} mobile`, async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 });
-      await page.goto(pageDef.path === "/" ? "/dashboard" : pageDef.path, {
+      await page.goto(pageDef.path, {
         waitUntil: "domcontentloaded",
       });
 
