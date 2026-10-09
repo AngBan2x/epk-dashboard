@@ -77,9 +77,12 @@ test.describe("F9 Multimedia & Catálogo Expandido", () => {
     await anon.close();
   });
 
+  // El cierre traga sus errores a proposito: si una asercion ya fallo, un
+  // "Target page, context or browser has been closed" en el `finally` tapaba
+  // justo el mensaje que dice que fallo.
   async function paginaAutenticada(browser: Browser): Promise<{ page: Page; cerrar: () => Promise<void> }> {
     const ctx = await browser.newContext({ storageState: sesion });
-    return { page: await ctx.newPage(), cerrar: () => ctx.close() };
+    return { page: await ctx.newPage(), cerrar: () => ctx.close().catch(() => {}) };
   }
 
   test("el catálogo autenticado pinta tarjetas y cada una lleva a su ficha", async ({ browser }) => {
@@ -133,17 +136,43 @@ test.describe("F9 Multimedia & Catálogo Expandido", () => {
     try {
       await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
 
-      const enlace = page.locator("a[href^='/track/']").first();
-      await expect(enlace).toBeVisible({ timeout: ESPERA_CATALOGO });
-      const idTrack = (await enlace.getAttribute("href"))!.split("/").pop()!;
+      const enlaces = page.locator("a[href^='/track/']");
+      await expect(enlaces.first()).toBeVisible({ timeout: ESPERA_CATALOGO });
+      const hrefs = Array.from(
+        new Set(
+          await enlaces
+            .evaluateAll((as) => as.map((a) => a.getAttribute("href")).filter((h): h is string => !!h))
+        )
+      );
 
-      await page.goto(`/track/${idTrack}`, { waitUntil: "domcontentloaded" });
+      // Se buscan enlaces **vivos** antes de navegar, y se navega una sola vez.
+      //
+      // Dos motivos, ambos medidos. Uno: el listado del dashboard se sirve desde
+      // una réplica que va retrasada (AGENTS.md), así que tras un `qa-cleanup`
+      // puede ofrecer un `/track/<id>` de una fila que ya no existe; con ese 404
+      // no hay redirección que comprobar. Y por probarlos navigating se iba la
+      // cuenta de tiempo del test entero (acababa en "Test ended").
+      let vivo: string | null = null;
+      for (const href of hrefs.slice(0, 5)) {
+        const r = await page.request.get(href, { timeout: 20_000 });
+        if (r.status() < 400) {
+          vivo = href;
+          break;
+        }
+      }
+      expect(
+        vivo,
+        `Ninguno de los ${Math.min(hrefs.length, 5)} enlaces /track/ del dashboard responde bien: el listado apunta a filas que ya no existen`
+      ).not.toBeNull();
 
+      const idTrack = vivo!.split("/").pop()!;
+      const respuesta = await page.goto(vivo!, { waitUntil: "domcontentloaded" });
+      expect(respuesta?.status()).toBeLessThan(400);
       // Un single es fila de `tracks` Y cabecera de release con el mismo id, así
       // que el shim tiene que acabar en `/releases/` conservando ese id. Este es
       // el invariante de P8, que el spec viejo miraba al revés.
-      await expect(page).toHaveURL(new RegExp(`/releases/${idTrack}$`));
-      await expect(page.locator("h1")).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/releases/${idTrack}$`), { timeout: ESPERA_CATALOGO });
+      await expect(page.locator("h1")).toBeVisible({ timeout: ESPERA_CATALOGO });
     } finally {
       await cerrar();
     }
