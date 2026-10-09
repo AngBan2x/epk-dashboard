@@ -159,11 +159,15 @@ test.describe("P4.3: Notificaciones in-app QA", () => {
     await expect(bell).toBeVisible({ timeout: 60_000 });
     await bell.click();
     await expect(authedPage.getByRole("dialog")).toBeVisible({ timeout: 30_000 });
-    // 45 -> 90 s. El esqueleto `.animate-pulse` se retira cuando llegan los datos,
-    // y con la suite entera corriendo contra producción (43 min seguidos) no
-    // llegaban a tiempo: se quedaba 2 elementos y el test caía. No es un margen
-    // para tapar nada: si los datos no llegan, sigue fallando igual.
-    await expect(authedPage.locator(".animate-pulse")).toHaveCount(0, { timeout: 90_000 });
+    // El esqueleto se busca **dentro del panel**, no en toda la página.
+    //
+    // `.animate-pulse` lo usan varios componentes (`NotificationBell`, pero
+    // también `ThemeToggle` y una insignia de `EPKCard`), así que contar la
+    // clase en el documento entero convertía este test en un detector de
+    // cualquier elemento que pulsara en la página: fallaba con 2 o 3 elementos
+    // que no tenían nada que ver con las notificaciones. Lo que hay que comprobar
+    // es que el panel deje de mostrar SUS filas de carga.
+    await expect(authedPage.getByRole("dialog").locator(".animate-pulse")).toHaveCount(0, { timeout: 60_000 });
     await authedPage.screenshot({ path: "tests/screenshots/notifications/e2e-bell-panel.png", fullPage: false });
 
     await authedPage.keyboard.press("Escape");
@@ -171,11 +175,10 @@ test.describe("P4.3: Notificaciones in-app QA", () => {
 
     await authedPage.goto(`${BASE_URL}/notifications`, { waitUntil: "domcontentloaded" });
     await expect(authedPage.getByRole("heading", { name: "Notificaciones" })).toBeVisible({ timeout: 60_000 });
-    // 45 -> 90 s. El esqueleto `.animate-pulse` se retira cuando llegan los datos,
-    // y con la suite entera corriendo contra producción (43 min seguidos) no
-    // llegaban a tiempo: se quedaba 2 elementos y el test caía. No es un margen
-    // para tapar nada: si los datos no llegan, sigue fallando igual.
-    await expect(authedPage.locator(".animate-pulse")).toHaveCount(0, { timeout: 90_000 });
+    // Igual que en el panel: acotado a `main`, que es donde vive la lista. El
+    // encabezado y la cabecera ya están, así que lo que queda pulsando dentro
+    // sería el esqueleto de la lista.
+    await expect(authedPage.locator("main").locator(".animate-pulse")).toHaveCount(0, { timeout: 60_000 });
     await authedPage.screenshot({ path: "tests/screenshots/notifications/e2e-page.png", fullPage: true });
 
     await authedPage.goto(`${BASE_URL}/account`, { waitUntil: "domcontentloaded" });

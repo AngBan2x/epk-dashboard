@@ -391,7 +391,13 @@ export function NotificationBell() {
   if (!user) return null;
 
   const visibleItems = items.slice(0, PANEL_LIMIT);
-  const showSkeleton = loading && items.length === 0 && !error;
+  // El esqueleto además exige que haya alguien. Sin sesión, `load()` ni siquiera
+  // se llama (el `useEffect` hace `if (authLoading || !user) return`), así que
+  // `loading` se queda en su `true` inicial para siempre y `error` nunca se
+  // pone: el panel mostraba un "cargando" eterno a un visitante que no puede
+  // tener notificaciones. Lo detectó el E2E de notificaciones al encontrar dos
+  // `.animate-pulse` que no se retiraban nunca.
+  const showSkeleton = loading && items.length === 0 && !error && !!user;
 
   return (
     <div ref={containerRef} className="relative">
