@@ -48,4 +48,10 @@ export default defineConfig({
         timeout: 120000,
       },
   timeout: 60000,
+  // 5 s es el valor por defecto de Playwright y contra Turso, donde una lectura
+  // tarda 1,5-2 s, es justo: en la suite completa (44 min seguidos de carga) el
+// test "login page has proper form structure" falló por 5 s mientras en
+  // solitario pasaba. Las aserciones de esta suite miran páginas que dependen de
+  // la base de datos, así que el margen tiene que contar eso.
+  expect: { timeout: 15_000 },
 });
