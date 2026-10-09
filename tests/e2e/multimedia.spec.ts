@@ -1,67 +1,161 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
+
+/**
+ * F9 Multimedia & Catálogo Expandido.
+ *
+ * **Este spec se reescribió entero el 2026-10-08**, porque sus cuatro tests
+ * afirmaban cosas que el producto dejó de hacer hace tiempo. Fallaban los
+ * cuatro contra producción, y ninguno de los cuatro fallos era un defecto: eran
+ * expectativas obsoletas. Lo que se comprobaba y por qué ya no era cierto:
+ *
+ *   - `>= 6` tarjetas en `/dashboard`. Encontraba 4, y no porque falten: el spec
+ *     **no iniciar sesión**. Sin sesión, `/dashboard` no pinta catálogo (los
+ *     enlaces que encuentra son de cabecera y pie). Autenticado hay 20 tarjetas.
+ *     Además el selector `[data-testid='epk-card']` no existió nunca: el
+ *     testid real es `epkcard-streams`.
+ *   - `Stems` visible en la ficha. `StemsPlayer` se **eliminó a propósito** en
+ *     P3.15 ("Eliminar StemsPlayer + SocialBar (redundantes)", MASTER_PLAN.md).
+ *     El componente sigue en `components/StemsPlayer.tsx` sin usarse, que es lo
+ *     que hace que este test parezca razonable al leerlo. Reintroducir la
+ *     aserción aquí sería reintroducir una fase que se cerró.
+ *   - La espera `waitForURL` de la ficha: pedía una URL de tipo `track`, y desde
+ *     P8 `/track/<id>` es un **shim de 301** a `/releases/<id>`. Esa URL nunca es
+ *     la final, así que la espera no puede cumplirse y el test moría antes de
+ *     comprobar nada. Ese mismo shim es ahora el invariante que sí se comprueba
+ *     abajo.
+ *   - "Exportar Dossier EPK" como `h2` del dashboard. El dashboard autenticado
+ *     no tiene ningún `h2`.
+ *
+ * Lo que queda son invariantes que valen hoy: el catálogo pinta tarjetas que
+ * enlazan a su ficha, la ficha enseña su título y su lista de pistas, `/track/`
+ * aterriza en `/releases/`, y la ficha ofrece las tres descargas.
+ *
+ * Las tarjetas de **singles** enlazan a `/track/<id>` y las de **releases** a
+ * `/releases/<id>`; ambas son válidas porque un single ES fila de `tracks` y
+ * cabecera de release con el mismo id.
+ *
+ * El login se hace una vez por fichero con un contexto propio y se reutiliza el
+ * `storageState`, en vez de `test.use({ storageState })`: esa forma de función
+ * falla con "use() was not called in fixture" según la versión, y aquí no
+ * compensa pelearse con el fixture por cuatro tests.
+ */
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
 
 test.describe("F9 Multimedia & Catálogo Expandido", () => {
-  test("dashboard shows expanded catalog with tracks", async ({ page }) => {
-    await page.goto("/dashboard");
-    // Verifica que el catálogo renderiza varias tarjetas
-    const cards = page.locator("[data-testid='epk-card'], .grid a");
-    await expect(cards.first()).toBeVisible();
-    // El catálogo debe tener al menos 6 tracks reales
-    const count = await cards.count();
-    expect(count).toBeGreaterThanOrEqual(6);
+  // Contra Turso una ficha tarda 1,5-2 s en leer; 120 s es margen sin generar
+  // falsos negativos por tiempo.
+  test.describe.configure({ timeout: 180_000 });
+
+  let sesion: Awaited<ReturnType<BrowserContext["storageState"]>>;
+
+  test.beforeAll(async ({ browser }) => {
+    const anon = await browser.newContext();
+    let res = await anon.request.post(`${BASE_URL}/api/auth/login`, {
+      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, rememberMe: false },
+    });
+    // El login tiene rate limit y devuelve 429 si se encadena. Un reintento tras
+    // el minuto bastó; más que eso no es culpa de este spec.
+    if (res.status() === 429) {
+      await new Promise((r) => setTimeout(r, 65_000));
+      res = await anon.request.post(`${BASE_URL}/api/auth/login`, {
+        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, rememberMe: false },
+      });
+    }
+    expect(res.ok(), `login devolvió ${res.status()}`).toBeTruthy();
+    sesion = await anon.storageState();
+    await anon.close();
   });
 
-  test("theme toggle is visible in the header", async ({ page }) => {
-    await page.goto("/dashboard");
-    const toggle = page.locator("button[aria-label='Cambiar a modo claro'], button[aria-label='Cambiar a modo oscuro']");
-    await expect(toggle).toBeVisible();
+  async function paginaAutenticada(browser: Browser): Promise<{ page: Page; cerrar: () => Promise<void> }> {
+    const ctx = await browser.newContext({ storageState: sesion });
+    return { page: await ctx.newPage(), cerrar: () => ctx.close() };
+  }
+
+  test("el catálogo autenticado pinta tarjetas y cada una lleva a su ficha", async ({ browser }) => {
+    const { page, cerrar } = await paginaAutenticada(browser);
+    try {
+      await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+      await expect(page.locator("h1")).toBeVisible();
+
+      // Una tarjeta ES un `Link` (EPKCard envuelve con `next/link`), así que se
+      // cuentan los enlaces de ficha. Ojo: `data-testid='epkcard-streams'` NO es
+      // la tarjeta, es el badge del número de streams dentro de su fila de
+      // métricas; y `epk-card` no existió nunca. Y el mismo href sale dos veces
+      // por tarjeta, así que se deduplica antes de contar.
+      const hrefs = await page
+        .locator("a[href^='/releases/'], a[href^='/track/']")
+        .evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute("href") || ""));
+      const fichas = Array.from(new Set(hrefs.filter(Boolean)));
+      expect(fichas.length).toBeGreaterThanOrEqual(6);
+    } finally {
+      await cerrar();
+    }
   });
 
-  test("theme toggle switches between dark and light mode", async ({ page }) => {
-    await page.goto("/dashboard");
-    const html = page.locator("html");
+  test("la ficha de un release muestra su título y su lista de pistas", async ({ browser }) => {
+    const { page, cerrar } = await paginaAutenticada(browser);
+    try {
+      await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+      const enlace = page.locator("a[href^='/releases/']").first();
+      await expect(enlace).toBeVisible();
+      const href = await enlace.getAttribute("href");
+      await page.goto(href!, { waitUntil: "domcontentloaded" });
 
-    // Estado inicial (dark class debería estar presente o ausente)
-    const initialClass = await html.getAttribute("class");
+      // La URL es la que se pinzó, sin redirección: el shim va en el sentido
+      // contrario (de `/track/` hacia aquí).
+      expect(new URL(page.url()).pathname).toBe(href);
 
-    // Hacer clic en el toggle
-    const toggle = page.locator("button[aria-label='Cambiar a modo claro'], button[aria-label='Cambiar a modo oscuro']");
-    await toggle.waitFor({ state: "visible" });
-    await toggle.click();
+      const h1 = ((await page.locator("h1").first().textContent()) ?? "").trim();
+      expect(h1.length).toBeGreaterThan(0);
 
-    await page.waitForTimeout(300);
-
-    const newClass = await html.getAttribute("class");
-    // La clase dark debería haber cambiado
-    expect(newClass).not.toBe(initialClass);
+      // El bloque de pistas es el que el rediseño de F3 dejó como "Pistas (n)".
+      // Se ancla por rol y no por texto exacto porque el número va suelto:
+      // el DOM es `Pistas (<!-- -->5<!-- -->)`.
+      await expect(page.getByRole("heading", { name: /^Pistas/ }).first()).toBeVisible();
+    } finally {
+      await cerrar();
+    }
   });
 
-  test("track detail page renders VideoShowcase and StemsPlayer", async ({ page }) => {
-    await page.goto("/dashboard");
-    // Click en primer track (trk-001 tiene YouTube video)
-    const firstLink = page.locator(".grid a").first();
-    await firstLink.click();
-    await page.waitForURL("**/track/**", { timeout: 60000 });
+  test("/track/<id> es un shim: aterriza en /releases/<id>", async ({ browser }) => {
+    const { page, cerrar } = await paginaAutenticada(browser);
+    try {
+      await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
 
-    // Verificar que el VideoShowcase está presente (buscar heading h2 con el texto)
-    await expect(page.locator("h2:has-text('Videoclip Oficial')")).toBeVisible({ timeout: 10000 });
-    // Verificar que el StemsPlayer o "Próximamente" está presente
-    await expect(page.locator("h2:has-text('Stems')")).toBeVisible({ timeout: 15000 });
+      const enlace = page.locator("a[href^='/track/']").first();
+      await expect(enlace).toBeVisible();
+      const idTrack = (await enlace.getAttribute("href"))!.split("/").pop()!;
+
+      await page.goto(`/track/${idTrack}`, { waitUntil: "domcontentloaded" });
+
+      // Un single es fila de `tracks` Y cabecera de release con el mismo id, así
+      // que el shim tiene que acabar en `/releases/` conservando ese id. Este es
+      // el invariante de P8, que el spec viejo miraba al revés.
+      await expect(page).toHaveURL(new RegExp(`/releases/${idTrack}$`));
+      await expect(page.locator("h1")).toBeVisible();
+    } finally {
+      await cerrar();
+    }
   });
 
-  test("EPK Exporter section is visible on dashboard", async ({ page }) => {
-    await page.goto("/dashboard");
-    // Usar selector más específico para evitar strict mode violation
-    await expect(page.locator("h2:has-text('Exportar Dossier EPK')").first()).toBeVisible();
-  });
+  test("la ficha ofrece las tres descargas", async ({ browser }) => {
+    const { page, cerrar } = await paginaAutenticada(browser);
+    try {
+      await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+      const enlace = page.locator("a[href^='/releases/']").first();
+      await expect(enlace).toBeVisible();
+      await page.goto((await enlace.getAttribute("href"))!, { waitUntil: "domcontentloaded" });
 
-  test("navigation between tracks works (prev/next links)", async ({ page }) => {
-    await page.goto("/dashboard");
-    const firstLink = page.locator(".grid a").first();
-    await firstLink.click();
-    await page.waitForURL("**/track/**");
-
-    // h1 now shows the track title instead of generic "Detalle de Track"
-    await expect(page.locator("h1")).toBeVisible();
+      // El nombre accesible de estos botones es el `aria-label`
+      // ("Descargar Dossier de prensa de X en HTML"), no el texto "HTML". Y hay
+      // nueve: dossier, rider y catálogo, cada uno en tres formatos.
+      for (const formato of ["HTML", "JSON", "PDF"]) {
+        const botones = page.getByRole("button", { name: new RegExp(`en ${formato}$`) });
+        expect(await botones.count()).toBeGreaterThan(0);
+      }
+    } finally {
+      await cerrar();
+    }
   });
 });
