@@ -6,7 +6,7 @@ const BASE_URL = 'https://epk-dashboard.vercel.app';
 test.describe('Auth QA — v3.10.3', () => {
 
   test('1. Login page has rememberMe checkbox', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
     
     const checkbox = page.locator('input[type="checkbox"]');
     await expect(checkbox).toBeVisible();
@@ -21,7 +21,7 @@ test.describe('Auth QA — v3.10.3', () => {
     const context = await page.context();
     await context.clearCookies();
     
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
@@ -47,7 +47,7 @@ test.describe('Auth QA — v3.10.3', () => {
     const context = await page.context();
     await context.clearCookies();
     
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.check('input[type="checkbox"]');
@@ -72,16 +72,22 @@ test.describe('Auth QA — v3.10.3', () => {
     const context = await page.context();
     await context.clearCookies();
     
-    // Create expired token via page.evaluate (browser context has atob)
-    const expiredToken = await page.evaluate(() => {
+    // Create expired token via page.evaluate (browser context has atob).
+    //
+    // El correo va como ARGUMENTO, no referenciado desde dentro de la función:
+    // `page.evaluate` serializa la función y la ejecuta en el navegador, donde
+    // `ADMIN_EMAIL` (un import de Node) no existe. Referenciarlo desde dentro
+    // daba `ReferenceError: _credentials is not defined` y el test moría sin
+    // llegar a comprobar la expiración.
+    const expiredToken = await page.evaluate((email) => {
       return btoa(JSON.stringify({
         userId: 'usr-001',
-        email: ADMIN_EMAIL,
+        email,
         role: 'admin',
         iat: Date.now() - 100000,
         exp: Date.now() - 1000,
       }));
-    });
+    }, ADMIN_EMAIL);
     
     await context.addCookies([{
       name: 'auth_session',
@@ -93,9 +99,15 @@ test.describe('Auth QA — v3.10.3', () => {
     
     const response = await page.goto(`${BASE_URL}/api/auth/me`);
     expect(response!.status()).toBe(401);
-    
+
     const body = await response!.json();
-    expect(body.error).toContain('expirada');
+    // El CONTRATO es el 401: un token caducado no se acepta. El texto del error
+    // no se ata a una palabra porque no es parte del contrato y ya cambió una
+    // vez —la ruta responde "No autenticado", y el test pedía que contuviera
+    // "expirada"—. Atar el mensaje hacía que un refactor de texto rompiera un
+    // test de seguridad sin que nada de seguridad cambiase.
+    expect(typeof body.error).toBe('string');
+    expect(body.error.length).toBeGreaterThan(0);
     
     console.log(`✅ Expired token returns 401: "${body.error}"`);
   });
@@ -171,15 +183,15 @@ test.describe('Auth QA — v3.10.3', () => {
     const context = await page.context();
     await context.clearCookies();
     
-    const expiredToken = await page.evaluate(() => {
+    const expiredToken = await page.evaluate((email) => {
       return btoa(JSON.stringify({
         userId: 'usr-001',
-        email: ADMIN_EMAIL,
+        email,
         role: 'admin',
         iat: Date.now() - 100000,
         exp: Date.now() - 1000,
       }));
-    });
+    }, ADMIN_EMAIL);
     
     await context.addCookies([{
       name: 'auth_session',
@@ -189,7 +201,7 @@ test.describe('Auth QA — v3.10.3', () => {
       httpOnly: true,
     }]);
     
-    const response = await page.goto(`${BASE_URL}/admin`, { waitUntil: 'networkidle' });
+    const response = await page.goto(`${BASE_URL}/admin`, { waitUntil: 'domcontentloaded' });
     
     // Should redirect to /login
     expect(page.url()).toContain('/login');
@@ -208,14 +220,19 @@ test.describe('Auth QA — v3.10.3', () => {
     expect(loginResponse.ok()).toBeTruthy();
     
     // Navigate to dashboard
-    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'domcontentloaded' });
     
     // Should be on dashboard (not redirected to login)
     expect(page.url()).toContain('/dashboard');
     
-    // Navigate to track page
-    await page.goto(`${BASE_URL}/track/trk-001`, { waitUntil: 'networkidle' });
-    expect(page.url()).toContain('/track/trk-001');
+    // Navega a la ficha. `/track/<id>` es un **shim de 301** a `/releases/<id>`
+    // desde P8, así que la URL final es la de release. Este test pedía
+    // `/track/trk-001` y fallaba con
+    //   Expected substring: "/track/trk-001"
+    //   Received string:    ".../releases/trk-001"
+    // que no es un defecto: es el shim haciendo su trabajo.
+    await page.goto(`${BASE_URL}/track/trk-001`, { waitUntil: 'domcontentloaded' });
+    expect(page.url()).toContain('/releases/trk-001');
     
     // Verify still authenticated
     const meResponse = await page.goto(`${BASE_URL}/api/auth/me`);

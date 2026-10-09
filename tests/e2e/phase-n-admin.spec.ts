@@ -4,7 +4,7 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 test.describe("N4: Admin Flow", () => {
   test("admin can login and access admin panel", async ({ page }) => {
     // Go to login
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
 
     // Fill login form
     await page.fill('input[type="email"]', ADMIN_EMAIL);
@@ -52,14 +52,14 @@ test.describe("N4: Admin Flow", () => {
 
   test("admin can view tracks tab", async ({ page }) => {
     // Login as admin
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
     // Go to admin
-    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.goto("/admin", { waitUntil: "domcontentloaded" });
 
     // Click tracks tab
     const tracksTab = page.locator("button", { hasText: "Tracks" });
@@ -79,14 +79,14 @@ test.describe("N4: Admin Flow", () => {
 
   test("admin can view artists tab", async ({ page }) => {
     // Login as admin
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
     // Go to admin
-    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.goto("/admin", { waitUntil: "domcontentloaded" });
 
     // Click artists tab
     const artistsTab = page.locator("button", { hasText: "Artistas" });
@@ -101,14 +101,14 @@ test.describe("N4: Admin Flow", () => {
 
   test("admin can view shows tab", async ({ page }) => {
     // Login as admin
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
     // Go to admin
-    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.goto("/admin", { waitUntil: "domcontentloaded" });
 
     // Click shows tab
     const showsTab = page.locator("button", { hasText: "Shows" });
@@ -123,14 +123,14 @@ test.describe("N4: Admin Flow", () => {
 
   test("admin can view notifications tab", async ({ page }) => {
     // Login as admin
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
     // Go to admin
-    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.goto("/admin", { waitUntil: "domcontentloaded" });
 
     // Click notifications tab
     const notificationsTab = page.locator("button", { hasText: "Notificaciones" });
@@ -147,14 +147,14 @@ test.describe("N4: Admin Flow", () => {
     await page.emulateMedia({ colorScheme: "dark" });
 
     // Login as admin
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL("**/dashboard", { timeout: 10000 });
 
     // Go to admin
-    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.goto("/admin", { waitUntil: "domcontentloaded" });
 
     // Screenshot admin panel dark mode
     await page.screenshot({
@@ -165,7 +165,7 @@ test.describe("N4: Admin Flow", () => {
 
   test("non-admin cannot access admin panel", async ({ page }) => {
     // Try to access admin without login
-    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.goto("/admin", { waitUntil: "domcontentloaded" });
 
     // Should redirect to login
     await expect(page).toHaveURL(/\/login/);

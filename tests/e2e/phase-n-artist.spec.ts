@@ -4,7 +4,7 @@ import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./credentials";
 test.describe("N5: Artist Flow", () => {
   test("artist can login and access dashboard", async ({ page }) => {
     // Go to login
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
 
     // Fill login form with test artist
     await page.fill('input[type="email"]', ARTIST_EMAIL);
@@ -28,7 +28,7 @@ test.describe("N5: Artist Flow", () => {
 
   test("artist can view their tracks", async ({ page }) => {
     // Login as artist
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
@@ -47,7 +47,7 @@ test.describe("N5: Artist Flow", () => {
 
   test("artist can view BioSection", async ({ page }) => {
     // Login as artist
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
@@ -67,7 +67,7 @@ test.describe("N5: Artist Flow", () => {
 
   test("artist can view Shows & Booking", async ({ page }) => {
     // Login as artist
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
@@ -89,7 +89,7 @@ test.describe("N5: Artist Flow", () => {
     await page.emulateMedia({ colorScheme: "dark" });
 
     // Login as artist
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
@@ -106,7 +106,7 @@ test.describe("N5: Artist Flow", () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     // Login as artist
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');

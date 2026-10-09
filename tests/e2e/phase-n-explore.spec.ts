@@ -13,7 +13,7 @@ const PAGES = [
 test.describe("N3: Explore all pages - Light Mode", () => {
   for (const pageDef of PAGES) {
     test(`${pageDef.name} loads correctly`, async ({ page }) => {
-      await page.goto(pageDef.path, { waitUntil: "networkidle" });
+      await page.goto(pageDef.path, { waitUntil: "domcontentloaded" });
       await expect(page).toHaveURL(new RegExp(pageDef.path === "/" ? "/dashboard" : pageDef.path));
 
       // Screenshot
@@ -31,7 +31,7 @@ test.describe("N3: Explore all pages - Light Mode", () => {
       page.on("console", (msg) => {
         if (msg.type() === "error") errors.push(msg.text());
       });
-      await page.reload({ waitUntil: "networkidle" });
+      await page.reload({ waitUntil: "domcontentloaded" });
       console.log(`[${pageDef.name}] Console errors:`, errors.length);
     });
   }
@@ -42,7 +42,7 @@ test.describe("N3: Explore all pages - Dark Mode", () => {
     test(`${pageDef.name} dark mode`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: "dark" });
       await page.goto(pageDef.path === "/" ? "/dashboard" : pageDef.path, {
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded",
       });
 
       await page.screenshot({
@@ -64,7 +64,7 @@ test.describe("N3: Explore all pages - Mobile", () => {
     test(`${pageDef.name} mobile`, async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.goto(pageDef.path === "/" ? "/dashboard" : pageDef.path, {
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded",
       });
 
       await page.screenshot({
@@ -77,7 +77,7 @@ test.describe("N3: Explore all pages - Mobile", () => {
 
 test.describe("N3: DOM Structure & Accessibility", () => {
   test("dashboard has proper heading hierarchy", async ({ page }) => {
-    await page.goto("/dashboard", { waitUntil: "networkidle" });
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     
     // Wait for loading to finish - the dashboard loads data async
     await page.waitForFunction(() => {
@@ -98,7 +98,7 @@ test.describe("N3: DOM Structure & Accessibility", () => {
   });
 
   test("login page has proper form structure", async ({ page }) => {
-    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
 
     const emailInput = page.locator('input[type="email"]');
     await expect(emailInput).toBeVisible();
@@ -111,7 +111,7 @@ test.describe("N3: DOM Structure & Accessibility", () => {
   });
 
   test("register page has proper form structure", async ({ page }) => {
-    await page.goto("/register", { waitUntil: "networkidle" });
+    await page.goto("/register", { waitUntil: "domcontentloaded" });
 
     const nameInput = page.locator('input#name');
     await expect(nameInput).toBeVisible();
@@ -124,14 +124,14 @@ test.describe("N3: DOM Structure & Accessibility", () => {
   });
 
   test("artists page loads", async ({ page }) => {
-    await page.goto("/artists", { waitUntil: "networkidle" });
+    await page.goto("/artists", { waitUntil: "domcontentloaded" });
 
     const content = await page.content();
     expect(content.length).toBeGreaterThan(100);
   });
 
   test("track detail page loads", async ({ page }) => {
-    await page.goto("/track/trk-001", { waitUntil: "networkidle" });
+    await page.goto("/track/trk-001", { waitUntil: "domcontentloaded" });
 
     const content = await page.content();
     expect(content.length).toBeGreaterThan(100);

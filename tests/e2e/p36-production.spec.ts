@@ -4,7 +4,7 @@ const BASE_URL = 'https://epk-dashboard.vercel.app';
 
 test.describe('P3.6 + P3.3 Production E2E Tests', () => {
   test('Shows page - GET /shows returns 200 with title and filter controls', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/shows`, { waitUntil: 'networkidle' });
+    const response = await page.goto(`${BASE_URL}/shows`, { waitUntil: 'domcontentloaded' });
     expect(response?.status()).toBe(200);
 
     // Check for "Shows & Events" title
@@ -13,8 +13,11 @@ test.describe('P3.6 + P3.3 Production E2E Tests', () => {
     // Check for filter controls
     // Search input has placeholder "Venue o ciudad"
     await expect(page.locator('input[placeholder="Venue o ciudad"]')).toBeVisible();
-    // Status dropdown
-    await expect(page.locator('select')).toBeVisible();
+    // Status dropdown.
+    // Un `select` a secas ya no vale: la página tiene dos (estado y "Ordenar
+    // por") y Playwright lanza strict mode violation en cuanto encuentra más de
+    // uno. Se ancla por etiqueta, que es lo que el usuario ve.
+    await expect(page.getByLabel('Estado')).toBeVisible();
     // Future only checkbox
     await expect(page.locator('input[type="checkbox"]').first()).toBeVisible();
   });
@@ -50,7 +53,7 @@ test.describe('P3.6 + P3.3 Production E2E Tests', () => {
   });
 
   test('Dashboard page - GET /dashboard returns 200 (has ShowForm integrated)', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
+    const response = await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'domcontentloaded' });
     expect(response?.status()).toBe(200);
 
     // Check that page loads (may redirect to login if not authenticated)
@@ -59,7 +62,7 @@ test.describe('P3.6 + P3.3 Production E2E Tests', () => {
   });
 
   test('Admin page - GET /admin returns 200 (has ShowForm integrated)', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/admin`, { waitUntil: 'networkidle' });
+    const response = await page.goto(`${BASE_URL}/admin`, { waitUntil: 'domcontentloaded' });
     expect(response?.status()).toBe(200);
 
     // Check that page loads (may redirect to login if not authenticated)
