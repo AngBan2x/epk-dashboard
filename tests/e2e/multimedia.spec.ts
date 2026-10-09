@@ -42,6 +42,16 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
  */
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
 
+/**
+ * El catálogo del dashboard se pinta después de leer de Turso, que tarda 1,5-2 s
+ * por consulta. Con la suite entera corriendo (43 min seguidos contra producción)
+ * 15 s no scraping de llegadas: este spec falló una vez con
+ * "element(s) not found" sobre `a[href^='/releases/']`, que sí aparece en cuanto
+ * la página carga. Es margen para contenido que depende de la base de datos, no
+ * para tapar una aserción.
+ */
+const ESPERA_CATALOGO = 60_000;
+
 test.describe("F9 Multimedia & Catálogo Expandido", () => {
   // Contra Turso una ficha tarda 1,5-2 s en leer; 120 s es margen sin generar
   // falsos negativos por tiempo.
@@ -98,7 +108,7 @@ test.describe("F9 Multimedia & Catálogo Expandido", () => {
     try {
       await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
       const enlace = page.locator("a[href^='/releases/']").first();
-      await expect(enlace).toBeVisible();
+      await expect(enlace).toBeVisible({ timeout: ESPERA_CATALOGO });
       const href = await enlace.getAttribute("href");
       await page.goto(href!, { waitUntil: "domcontentloaded" });
 
@@ -124,7 +134,7 @@ test.describe("F9 Multimedia & Catálogo Expandido", () => {
       await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
 
       const enlace = page.locator("a[href^='/track/']").first();
-      await expect(enlace).toBeVisible();
+      await expect(enlace).toBeVisible({ timeout: ESPERA_CATALOGO });
       const idTrack = (await enlace.getAttribute("href"))!.split("/").pop()!;
 
       await page.goto(`/track/${idTrack}`, { waitUntil: "domcontentloaded" });
@@ -144,7 +154,7 @@ test.describe("F9 Multimedia & Catálogo Expandido", () => {
     try {
       await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
       const enlace = page.locator("a[href^='/releases/']").first();
-      await expect(enlace).toBeVisible();
+      await expect(enlace).toBeVisible({ timeout: ESPERA_CATALOGO });
       await page.goto((await enlace.getAttribute("href"))!, { waitUntil: "domcontentloaded" });
 
       // El nombre accesible de estos botones es el `aria-label`

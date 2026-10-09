@@ -159,7 +159,11 @@ test.describe("P4.3: Notificaciones in-app QA", () => {
     await expect(bell).toBeVisible({ timeout: 60_000 });
     await bell.click();
     await expect(authedPage.getByRole("dialog")).toBeVisible({ timeout: 30_000 });
-    await expect(authedPage.locator(".animate-pulse")).toHaveCount(0, { timeout: 45_000 });
+    // 45 -> 90 s. El esqueleto `.animate-pulse` se retira cuando llegan los datos,
+    // y con la suite entera corriendo contra producción (43 min seguidos) no
+    // llegaban a tiempo: se quedaba 2 elementos y el test caía. No es un margen
+    // para tapar nada: si los datos no llegan, sigue fallando igual.
+    await expect(authedPage.locator(".animate-pulse")).toHaveCount(0, { timeout: 90_000 });
     await authedPage.screenshot({ path: "tests/screenshots/notifications/e2e-bell-panel.png", fullPage: false });
 
     await authedPage.keyboard.press("Escape");
@@ -167,7 +171,11 @@ test.describe("P4.3: Notificaciones in-app QA", () => {
 
     await authedPage.goto(`${BASE_URL}/notifications`, { waitUntil: "domcontentloaded" });
     await expect(authedPage.getByRole("heading", { name: "Notificaciones" })).toBeVisible({ timeout: 60_000 });
-    await expect(authedPage.locator(".animate-pulse")).toHaveCount(0, { timeout: 45_000 });
+    // 45 -> 90 s. El esqueleto `.animate-pulse` se retira cuando llegan los datos,
+    // y con la suite entera corriendo contra producción (43 min seguidos) no
+    // llegaban a tiempo: se quedaba 2 elementos y el test caía. No es un margen
+    // para tapar nada: si los datos no llegan, sigue fallando igual.
+    await expect(authedPage.locator(".animate-pulse")).toHaveCount(0, { timeout: 90_000 });
     await authedPage.screenshot({ path: "tests/screenshots/notifications/e2e-page.png", fullPage: true });
 
     await authedPage.goto(`${BASE_URL}/account`, { waitUntil: "domcontentloaded" });

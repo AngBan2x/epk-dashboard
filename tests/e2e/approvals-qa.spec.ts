@@ -235,7 +235,10 @@ test.describe("P4.5: Aprobaciones QA", () => {
       await expect(page.getByRole("heading", { name: /Panel de Administración/ })).toBeVisible({ timeout: 60_000 });
       await page.getByRole("button", { name: /Releases/ }).first().click();
       await page.waitForTimeout(3000);
-      await expect(page.getByRole("button", { name: /Revisi/ }).first()).toBeVisible({ timeout: 30_000 });
+      // 30 -> 60 s: la pestaña del panel admin se pinta después de leer de Turso, y
+  // con la suite entera corriendo contra producción (43 min seguidos) 30 s no
+  // llegaban. No tapa nada: si la pestaña no aparece, sigue fallando.
+  await expect(page.getByRole("button", { name: /Revisi/ }).first()).toBeVisible({ timeout: 60_000 });
       await page.screenshot({ path: "tests/screenshots/approvals/admin-releases.png", fullPage: false });
 
       await page.getByRole("link", { name: /Envíos/ }).first().click();
