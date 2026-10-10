@@ -14,7 +14,7 @@ import {
 } from "@/lib/null-safe";
 import { releaseTypeLabel } from "@/lib/release-page";
 import { imageOptimizationProps } from "@/lib/image-config";
-import { AudioPlayer } from "@/components/AudioPlayer";
+import { AudioPlayer } from "@/components/AudioPlayer"; import { buildReleaseQueue } from "@/components/ReleaseTrackList";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
@@ -479,57 +479,7 @@ export function EPKCard({
           tarjeta solo llama a `playQueue` con el array que le pasó quien tiene
           las hijas.
         */}
-        {isReleaseParent ? (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            {hasQueue && audio && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => audio.playQueue(queue as ActiveTrack[], 0)}
-                  aria-label={`Reproducir ${playableRows.length} ${playableRows.length === 1 ? "pista" : "pistas"} de ${title}`}
-                  className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-800"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </button>
-                <p className="min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Reproducir &bull; {playableRows.length}{" "}
-                  {playableRows.length === 1 ? "pista" : "pistas"}
-                </p>
-              </>
-            )}
-            {/*
-              Hay hijas pero ninguna entra en la cola. En producción son
-              2 de los 9 álbumes ("Heroes", "Vulnicura Strings"): sin esta
-              frase el bloque se queda vacío y se lee como tarjeta rota en vez
-              de como "a este disco todavía no le han puesto audio".
-
-              La condición mira `playableRows` y no `hasQueue` a propósito:
-              `hasQueue` también es false cuando no hay contexto de audio, y
-              entonces la frase sería mentira. Con las dos condiciones
-              independientes, los dos casos no pueden solaparse: si hay botón no
-              hay frase, y si hay frase no hay botón.
-
-              Sin número a propósito: "Ninguna de sus pistas tiene" es
-              gramatical con 1 y con N.
-            */}
-            {playableRows.length === 0 && (
-              <p className="text-xs leading-snug text-slate-400 dark:text-slate-500">
-                Ninguna de sus pistas tiene audio disponible
-              </p>
-            )}
-          </div>
-        ) : (
-          <AudioPlayer
-            id={track.id}
-            src={track.audio_preview_url}
-            title={track.title}
-            artist={track.artist_name || undefined}
-            coverImage={coverImage || undefined}
-            track={track}
-          />
-        )}
+        <AudioPlayer           id={track.id}           src={track.audio_preview_url}           title={track.title}           artist={track.artist_name || undefined}           coverImage={coverImage || undefined}           track={track}           queue={isReleaseParent ? (queue || buildReleaseQueue(childrenTracks || [], coverImage || undefined, track.youtube_video_id || undefined)) : undefined}         />
 
         {/*
           Stats footer. RC.33 · Ola 3: `streams` y `saves` traen "—" cuando no

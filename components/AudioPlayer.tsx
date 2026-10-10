@@ -9,6 +9,8 @@ import {
   hasPlayableSource,
   isUsableAudioUrl,
   resolvePlaybackTimeline,
+  getPlayableAudioSource,
+  isPlayableAudioSource,
   type AudioSourceType,
 } from "@/lib/audio-priority";
 
@@ -261,7 +263,7 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
           <div className="flex-1 min-w-0">
             <p className={`text-xs truncate ${canPlay ? "text-slate-600 dark:text-slate-300" : "text-slate-400"}`}>
               {statusText}
-              {canPlay && primarySource && ` • ${primarySource.label}`}
+              {canPlay && (() => { const playableSource = track ? getPlayableAudioSource(track) : null; const label = isYouTubeMode ? "YouTube" : (playableSource?.label ?? primarySource?.label ?? "Audio"); return ` • ${label}`; })()}
             </p>
             {segmentWarning && (
               <p className="text-[11px] text-amber-700 dark:text-amber-400">
