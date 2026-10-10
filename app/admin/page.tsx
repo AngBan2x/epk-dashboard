@@ -104,7 +104,7 @@ interface EmailStatus {
   };
 }
 
-type AdminTab = "tracks" | "releases" | "submissions" | "notifications" | "artists" | "shows";
+type AdminTab = "tracks" | "releases" | "submissions" | "notifications" | "artists" | "shows" | "catalog"; // REVERSIBLE: eliminar "catalog" + el botón en la UI rompe test (a) admin-catalog
 
 type ShowApprovalAction = "approve" | "reject" | "revision";
 
@@ -122,6 +122,7 @@ const TAB_ACCENT: Record<AdminTab, { border: string; text: string }> = {
   notifications: { border: "border-blue-600", text: "text-blue-600 dark:text-blue-400" },
   artists: { border: "border-emerald-600", text: "text-emerald-600 dark:text-emerald-400" },
   shows: { border: "border-emerald-600", text: "text-emerald-600 dark:text-emerald-400" },
+  catalog: { border: "border-violet-600", text: "text-violet-600 dark:text-violet-400" },
 };
 
 function adminTabClass(active: AdminTab, tab: AdminTab): string {
@@ -686,6 +687,14 @@ export default function AdminPage() {
               className={adminTabClass(activeTab, "shows")}
             >
               Shows ({shows.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("catalog")}
+              aria-current={activeTab === "catalog" ? "page" : undefined}
+              className={adminTabClass(activeTab, "catalog")}
+            >
+              Catálogo
             </button>
           </nav>
         </div>
@@ -1707,6 +1716,32 @@ onSubmit={async (e) => {
             </div>
           </div>
 )}
+
+        {activeTab === "catalog" && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Catálogo Unificado</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Vista combinada de releases con sus pistas (hijas). Usa los datos existentes de releases y tracks.</p>
+            <div className="space-y-4">
+              {releases.map((release) => (
+                <div key={release.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="p-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-slate-100">{release.title}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{release.artist_name || "—"} · {release.release_type || "—"} · {release.release_date || "—"}</p>
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">Catálogo</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900/30 px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                    <strong>Pistas asociadas:</strong> {tracks.filter((t) => t.release_id === release.id).length} (ver detalle en Tracks)
+                  </div>
+                </div>
+              ))}
+              {releases.length === 0 && (
+                <div className="p-8 text-center text-slate-400">No hay releases para mostrar.</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {showTransition && (
           <ShowTransitionModal

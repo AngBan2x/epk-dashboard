@@ -226,3 +226,21 @@ Ese `4` de la cuarta fila del reproductor es el que más cuesta de ver a ojo:
 `buildReleaseQueue` filtrando las hijas mudas y el contador "2 pistas" sobre una
 cola de 3. Los tests lo pasan **sin** la prop `queue` a propósito, para que no
 puedan pasar igual con la construcción rota.
+
+---
+
+## P11 — Admin: Catálogo unificado + editables + imagen de artistas (2026-10-10)
+
+### Qué se hizo
+- **Pestaña `catalog`** añadida a `AdminTab` (`app/admin/page.tsx:107`, `TAB_ACCENT` actualizado) con botón en la UI (`:691-696`). Muestra los releases como filas expandibles con tipo, título, artista, fecha y pistas asociadas (cuenta de `tracks` con `release_id`).
+- **Editables en `PUT /api/admin/releases`** (`app/api/admin/releases/route.ts`): `release_type` y `external_links` aceptados en `body` y actualizados en SQL dinámicamente (`:192-209`). El `dbBatch` mantiene la transacción atómica con cascada de hijos (`buildChildStatusCascade`).
+- **Reutilización de `ImageUploader`**: `components/ImageUploader.tsx` ya soporta `kind=profile|banner` + `artistId`. El endpoint `POST /api/upload/image` (`route.ts`) protege con `user_id` (línea 173) o `admin`; los 5 artistas sin `user_id` (Björk, Bowie, Kraftwerk, Pink Floyd, Radiohead) no pueden subir imagen sin ser admin — es la regla actual. El componente `ImageUploader` está disponible; la integración en el formulario de artistas queda pendiente de la UI (`artistForm` hoy no incluye uploader), pero el componente y el endpoint están verificados y protegidos.
+- **Tests nuevos** (`tests/unit/admin-catalog.test.ts`): cubre (a) pestaña existe, (b) tipo editable persiste, (c) external_links persiste, (d) artista sin `user_id` no puede subir imagen sin admin. Cada test tiene referencia al archivo que protege (ver `REVERSIBLE` en comentarios del archivo editado).
+- **`docs/modelos gratuitos disponibles.txt`** (`384b48f`) intacto; verificado con `git show`.
+- **Datos Turso**: 0 nuevos cambios; solo cambios de código (`app/admin/page.tsx`, `route.ts`, `tests/unit/admin-catalog.test.ts`, `docs/PHASE_P3.md`).
+- **Referencias a arreglos**: `releaseTypeLabel` (3 arreglos documentados en `docs/PHASE_P3.md`: cambio de criterio a `Single` con comentario actualizado; `tests/unit/release-page.test.ts` actualizado; 5 previews de audio confirmados idempotentes en Turso con SELECT).
+- **NO tocado**: `AudioPlayer.tsx`, `LyricsModal` (ya borrado), `StemsPlayer` (ya borrado), `docs/modelos gratuitos disponibles.txt`.
+
+### Deudas conocidas (P11)
+- Integración del `ImageUploader` en el formulario de edición de artistas (`AdminPage`) pendiente; el endpoint y componente funcionan, pero la UI no los conecta aún.
+- Ningún artista sin `user_id` subió imagen en esta fase; el componente está disponible para uso de admin o para artistas con cuenta vinculada.

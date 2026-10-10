@@ -170,7 +170,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, status, admin_notes } = body;
+    const { id, status, admin_notes, release_type, external_links } = body;
 
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
@@ -195,12 +195,30 @@ export async function PUT(req: NextRequest) {
     // hijas nacen en `draft` (`POST /api/releases`) y todo lo público filtra por
     // estado. La regla vive en `buildChildStatusCascade` (`lib/db.ts`); aquí solo
     // se aplica y se verifica.
+    const updates: string[] = []; // REVERSIBLE: eliminar esta construcción dinámica y volver al UPDATE fijo rompe los arreglos de release_type/external_links (tests b y c admin-catalog)
+    const paramsBatch: (string | null | number)[] = [];
+    if (status !== undefined) {
+      updates.push("status = ?");
+      paramsBatch.push(status);
+    }
+    if (release_type !== undefined) {
+      updates.push("release_type = ?");
+      paramsBatch.push(release_type);
+    }
+    if (external_links !== undefined) {
+      updates.push("external_links = ?");
+      paramsBatch.push(typeof external_links === "string" ? external_links : JSON.stringify(external_links ?? null));
+    }
+    updates.push("admin_notes = ?", "updated_at = ?");
+    paramsBatch.push(admin_notes ?? null, now);
+    paramsBatch.push(id);
+
     await dbBatch([
       {
-        sql: "UPDATE tracks SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?",
-        params: [status, admin_notes ?? null, now, id],
+        sql: `UPDATE tracks SET ${updates.join(", ")} WHERE id = ?`,
+        params: paramsBatch,
       },
-      buildChildStatusCascade(id, status, now),
+      buildChildStatusCascade(id, status ?? oldStatus, now),
     ]);
 
     // Verificación posterior, no promesa: si las hijas NO se sincronizaron, el
