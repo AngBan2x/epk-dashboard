@@ -44,6 +44,34 @@ Decisión usuario (2026-09-23): A+B ejecutados, C queda aquí documentado.
   `.opencode/agents/` no declaran `model:` a propósito, para que no haya dos
   sitios que mantener sincronizados.
 
+## C12. `cleanup-shows.yml` — PENDIENTE de configurar en GitHub
+
+La ruta `DELETE /api/shows/cleanup` existía desde antes y **nada la invocaba**:
+sin cron, los shows pasados no se limpiaban nunca. El workflow
+`.github/workflows/cleanup-shows.yml` (cron diario 06:17 UTC + `workflow_dispatch`)
+la llama y falla si devuelve otra cosa que `200`.
+
+**Autenticación: no se inventó ningún mecanismo.** La ruta está detrás de
+`requireAdmin`, así que el workflow hace `POST /api/auth/login` con las mismas
+credenciales de test que ya usan los 12 specs de Playwright y reutiliza la cookie
+`auth_session`. No hay secreto nuevo que crear más allá de los que ya existen.
+
+Lo que hay que poner en **Settings → Secrets and variables → Actions**:
+
+| Nombre | Tipo | Estado |
+|---|---|---|
+| `TEST_ADMIN_PASSWORD` | Secret | **Falta crearlo.** Sin default en el repo, a propósito (`scripts/lib/credentials.ts`) |
+| `TEST_ADMIN_EMAIL` | Secret | Opcional: el default del código es `admin@epk.local` |
+| `NEXT_PUBLIC_APP_URL` | **Variable** de repositorio (no secreto) | Opcional; si falta, el workflow usa `https://epk-dashboard.vercel.app` |
+
+Mientras `TEST_ADMIN_PASSWORD` no exista, **el primer paso del workflow falla a
+deliberado** con un `::error::` que dice cuál falta. Es preferible a un fallo
+tarde y críptico al llamar a la API.
+
+⚠️ **Los cron de GitHub se desactivan solos a los 60 días sin actividad** en el
+repositorio. Si el workflow deja de correr solo, se reactiva desde la pestaña
+*Actions*; no es un fallo del YAML.
+
 ## sqlite MCP: por qué `database-query` tampoco es una salida (2026-10-06)
 
 El custom tool `database-query` **no funciona**: el binario de `better-sqlite3`

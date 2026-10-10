@@ -31,6 +31,7 @@ import {
 } from "../lib/db";
 import type { ArtistProfile, Track } from "@/types/music";
 import { sumDurations } from "@/lib/null-safe";
+import type { ReleaseTypeValue } from "@/lib/release-type";
 import { randomUUID } from "crypto";
 
 export interface SeedArtist {
@@ -45,7 +46,18 @@ export interface SeedArtist {
 export interface SeedRelease {
   artistName: string;
   title: string;
-  releaseType: "Album" | "EP" | "Single";
+  /**
+   * **Minúscula, y por un motivo concreto**: `getTracksByReleaseType()`
+   * (`lib/db.ts`) filtra con `WHERE release_type = ?`, y en SQLite eso
+   * distingue mayúsculas. Con `Single` y `single` conviviendo en la tabla,
+   * filtrar por `'single'` devolvía 8 de 21 singles. La capitalización la
+   * devuelve `capitalizeReleaseType()` para la UI, así que el origen puede ser
+   * uniforme sin que la pantalla cambie. Ver `lib/release-type.ts`.
+   *
+   * *Vulnicura Strings* va en `ep` por decisión del propietario del catálogo,
+   * no porque el disco (12 pistas, versiones con cuerdas) lo sea.
+   */
+  releaseType: ReleaseTypeValue;
   releaseDate: string;
   coverImage: string;
   tracks: SeedTrack[];
@@ -125,7 +137,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "Pink Floyd",
     title: "The Dark Side of the Moon",
-    releaseType: "Album",
+    releaseType: "album",
     releaseDate: "1973-03-01",
     coverImage: "https://images.unsplash.com/photo-1471478331149-c72f17e33c73?w=600&q=80",
     tracks: [
@@ -144,7 +156,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "Pink Floyd",
     title: "The Wall",
-    releaseType: "Album",
+    releaseType: "album",
     releaseDate: "1979-11-30",
     coverImage: "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=600&q=80",
     tracks: [
@@ -175,7 +187,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "Radiohead",
     title: "OK Computer",
-    releaseType: "Album",
+    releaseType: "album",
     releaseDate: "1997-05-21",
     coverImage: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=600&q=80",
     tracks: [
@@ -196,7 +208,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "Radiohead",
     title: "Kid A",
-    releaseType: "Album",
+    releaseType: "album",
     releaseDate: "2000-10-02",
     coverImage: "https://images.unsplash.com/photo-1524650359799-842906ca1c06?w=600&q=80",
     tracks: [
@@ -212,11 +224,12 @@ export const SEED_RELEASES: SeedRelease[] = [
       { title: "Motion Picture Soundtrack", duration: "7:01", trackNumber: 10, discNumber: 1, startTime: 2577, endTime: 2998 },
     ],
   },
-  // Björk - 1 álbum
+  // Björk - 1 EP (decisión de catálogo, no descripción del disco: el original
+  // son las versiones con cuerdas de un álbum de 12 pistas; aquí solo se siembran 5)
   {
     artistName: "Björk",
     title: "Vulnicura Strings",
-    releaseType: "Album",
+    releaseType: "ep",
     releaseDate: "2016-11-04",
     coverImage: "https://images.unsplash.com/photo-1521337581100-8ca9a73a5f79?w=600&q=80",
     tracks: [
@@ -231,7 +244,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "David Bowie",
     title: "Heroes",
-    releaseType: "Single",
+    releaseType: "single",
     releaseDate: "1977-09-23",
     coverImage: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80",
     tracks: [
@@ -260,7 +273,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "David Bowie",
     title: "Ashes to Ashes",
-    releaseType: "Single",
+    releaseType: "single",
     releaseDate: "1980-08-01",
     coverImage: "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=600&q=80",
     tracks: [
@@ -290,7 +303,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "Kraftwerk",
     title: "The Model / Computer Love",
-    releaseType: "Single",
+    releaseType: "single",
     releaseDate: "1981-12-04",
     coverImage: "https://images.unsplash.com/photo-1487180144351-b8472da7d491?w=600&q=80",
     tracks: [
@@ -319,7 +332,7 @@ export const SEED_RELEASES: SeedRelease[] = [
   {
     artistName: "Kraftwerk",
     title: "Tour de France",
-    releaseType: "Single",
+    releaseType: "single",
     releaseDate: "1983-06-01",
     coverImage: "https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?w=600&q=80",
     tracks: [
@@ -436,8 +449,8 @@ Options:
 Crea catálogo determinista multi-track:
 - Pink Floyd → 2 álbumes (The Dark Side of the Moon, The Wall, este de 2 discos)
 - Radiohead → 2 álbumes (OK Computer, Kid A)
-- Björk → 1 álbum (Vulnicura Strings, versiones con cuerdas; de las 12 pistas del
-  disco original este archivo siembra 5)
+- Björk → 1 EP (Vulnicura Strings; es una decisión de catálogo, no la descripción
+  del disco: el original tiene 12 pistas y este archivo siembra 5)
 - David Bowie y Kraftwerk → 4 singles con lados B (is_double_single, sides_b)
 
 Total: 5 artistas, 9 releases, 65 pistas hijas (+ 9 filas padre = 74 en la web).

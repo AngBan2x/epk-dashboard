@@ -1,0 +1,100 @@
+# Limpieza diaria de shows pasados.
+#
+# `app/api/shows/cleanup/route.ts` existía desde antes y NADA lo invocaba: sin
+# cron, los shows pasados se acumulaban para siempre. Este workflow es ese
+# invocador.
+#
+# ── Autenticación: NO hay un mecanismo nuevo ──────────────────────────────────
+#
+# La ruta está detrás de `requireAdmin` (`lib/webhook-auth.ts`), o sea que hace
+# falta una sesión de admin. Este workflow **no inventa un secreto de cron**: usa
+# el login que ya existe (`POST /api/auth/login`) con las mismas credenciales de
+# test que ya usan los 12 specs de Playwright (`scripts/lib/credentials.ts`:
+# `TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD`), y reutiliza la cookie
+# `auth_session` que devuelve. Cero código de auth nuevo, cero secretos nuevos
+# que inventar.
+#
+# Secretos que hay que tener en el repositorio (Settings → Secrets):
+#   TEST_ADMIN_EMAIL       (default en el repo: admin@epk.local)
+#   TEST_ADMIN_PASSWORD    (SIN default: nunca en el repo)
+#   NEXT_PUBLIC_APP_URL    -> variable de repositorio, NO secreto
+# Ver `docs/CONFIG_TODO.md` (C12).
+#
+# ⚠️ Los cron de GitHub **se desactivan solos tras 60 días sin actividad** en el
+# repositorio. Si esto deja de correr solos, es eso y no el workflow.
+
+name: Cleanup Shows
+
+on:
+  schedule:
+    # 06:17 UTC a diario. Minuto 17 a propósito: los cron que caen en :00 se
+    # ejecutan todos a la vez y el de GitHub se retrasa de forma famosa.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cleanup-shows
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comprobar que hay credenciales configuradas
+        env:
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+        run: |
+          if [ -z "${TEST_ADMIN_PASSWORD:-}" ]; then
+            echo "::error::Falta el secreto TEST_ADMIN_PASSWORD. Sin él este workflow no puede autenticarse (ver docs/CONFIG_TODO.md, C12)."
+            exit 1
+          fi
+
+      - name: Login de admin y borrado de los shows de más de 48 h
+        env:
+          BASE_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          base="${BASE_URL:-https://epk-dashboard.vercel.app}"
+          echo "Base: $base"
+
+          jar="$(mktemp)"
+          trap 'rm -f "$jar"' EXIT
+
+          login_code="$(curl -sS -o /tmp/login.json -w '%{http_code}' \
+            -c "$jar" \
+            -X POST "$base/api/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg e "$TEST_ADMIN_EMAIL" --arg p "$TEST_ADMIN_PASSWORD" '{email:$e,password:$p}')")"
+
+          if [ "$login_code" != "200" ]; then
+            echo "::error::Login fallido (HTTP $login_code): $(cat /tmp/login.json)"
+            exit 1
+          fi
+
+          cleanup_code="$(curl -sS -o /tmp/cleanup.json -w '%{http_code}' \
+            -b "$jar" \
+            -X DELETE "$base/api/shows/cleanup")"
+
+          echo "Respuesta: $(cat /tmp/cleanup.json)"
+
+          if [ "$cleanup_code" != "200" ]; then
+            echo "::error::DELETE /api/shows/cleanup devolvió HTTP $cleanup_code"
+            exit 1
+          fi
+
+          # La ruta devuelve 200 con `deleted`, así que un 200 con un cuerpo que
+          # no lo tiene significa que se deployed otra cosa.
+          if ! jq -e '.deleted | type == "number"' /tmp/cleanup.json >/dev/null; then
+            echo "::error::La respuesta no tiene 'deleted': $(cat /tmp/cleanup.json)"
+            exit 1
+          fi

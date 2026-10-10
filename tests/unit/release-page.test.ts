@@ -799,16 +799,29 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
       expect(ocurrencias).toHaveLength(1);
     });
 
-    it("el badge no dice «Single» sobre una ficha con varias pistas", async () => {
-      // `Tour de France` (Kraftwerk) tiene `release_type = 'Single'` y 2 hijas. El
-      // badge decía "Single" sobre una carta que decía "2 pistas".
+    it("el badge dice «Single» aunque la ficha tenga varias pistas", async () => {
+      // `Tour de France` (Kraftwerk) tiene `release_type = 'single'` y 2 hijas.
+      //
+      // Antes esto exigía "EP": el commit 2376240 razona que "un single es, por
+      // definición, una pista" y que la columna mintió. El propietario del
+      // catálogo decidió lo contrario: es un single con una versión alternativa
+      // por idioma, no un extended play. La etiqueta dice lo que dice la columna
+      // y el número de pistas ya va al lado — "2 pistas" es un dato, "EP" era
+      // una interpretación.
+      //
+      // Lo que NO vuelve es el bug que 2376240 vino a cerrar: dos etiquetas
+      // distintas para la misma fila según la página. Las tres superficies
+      // (ficha, catálogo y lista) tienen que decir Single; lo ata
+      // `tests/unit/no-audio-y-enlace-al-artista.test.ts`.
       await renderPage({ id: "rel-badge", title: "Tour de France", release_type: "single" }, [
         { id: "c1", title: "Version Francaise" },
         { id: "c2", title: "Version Alemana" },
       ]);
       const carta = document.querySelector("section")?.textContent ?? "";
-      expect(carta).not.toContain("Single");
-      expect(carta).toContain("EP");
+      expect(carta).toContain("Single");
+      expect(carta).not.toContain("EP");
+      // Y el dato de las 2 pistas sigue estando: la etiqueta no lo sustituye.
+      expect(carta).toContain("2 pistas");
     });
 
     it("un álbum conserva su tipo", async () => {

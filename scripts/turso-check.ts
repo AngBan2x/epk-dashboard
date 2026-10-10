@@ -55,6 +55,19 @@ async function main() {
   // volver a romper.
   // ------------------------------------------------------------------
   console.log("\n--- Integridad del catálogo semilla ---");
+  // Estos checks **solo imprimen un número**, y hasta ahora cada uno se leía con
+  // una convención distinta: para unos un 0 era lo bueno y para otros lo bueno
+  // era el número de filas. Un check que no dice cuál de las dos cosas es no
+  // interpretable, y ya ha pasado: `seed_vulnicura_como_EP` se leía como "no
+  // debe haber EP" cuando su sentido real pasó a ser "las 6 filas DEBEN ser ep".
+  // Con un 0 en ambos casos, el que se equivocaba no tenía forma de enterarse.
+  console.log(
+    "  (esperado 0: seed_padres_duracion_cero, seed_errata_ashe_to_ashes,\n" +
+      "              seed_titulos_con_comillas, seed_huerfanas,\n" +
+      "              tracks_release_type_con_mayusculas)"
+  );
+  console.log("  (esperado 6: seed_vulnicura_como_EP = el padre de Vulnicura + sus 5 hijas)");
+  console.log("  (los demás: recuento informativo, sin valor esperado)");
   const SEED_ARTISTS = [
     "Pink Floyd",
     "Radiohead",
@@ -90,12 +103,35 @@ async function main() {
     // P7 erratas: la hija con la errata y las comillas literales en los títulos.
     ["seed_errata_ashe_to_ashes", `SELECT COUNT(*) c FROM tracks WHERE title = 'Ashe to Ashes'`, false],
     ["seed_titulos_con_comillas", `SELECT COUNT(*) c FROM tracks WHERE title LIKE '"%'`, false],
-    // P7 flag: Vulnicura Strings es un álbum, no un EP (padre + 5 hijas).
+    // P7 → decisión de catálogo: *Vulnicura Strings* se marca `ep` (el
+    // propietario del catálogo lo decidió así, aunque el disco sea un álbum de
+    // 12 pistas). Este check **cambió de signo** con esa decisión.
+    //
+    // Antes afirmaba `release_type = 'EP'` sobre el padre y sus 5 hijas, es
+    // decir: "NO debe haber EP ahí", y un 0 era el resultado bueno. Ese `=`
+    // compara TEXT y en SQLite **distingue mayúsculas**, así que en cuanto
+    // `scripts/normalize-release-type.ts` dejó la columna en minúsculas el check
+    // seguía sacando 0 — pero ya no comparaba contra nada real: un `album` y un
+    // `EP` darían la misma respuesta. Verde por el motivo equivocado, que es
+    // justo el fallo que este repo ya tiene escrito ("un check que siempre
+    // pasa no protege de nada").
+    //
+    // Ahora es AFIRMATIVO y case-insensitive: se espera **6** (el padre
+    // `rel-869486ab` + sus 5 hijas). Con `lower(release_type) = 'ep'`, un 0 sí
+    // significa algo: alguien volvió a escribir `Album`.
     [
       "seed_vulnicura_como_EP",
       `SELECT COUNT(*) c FROM tracks
         WHERE (title = 'Vulnicura Strings' OR release_id IN (SELECT id FROM tracks WHERE title = 'Vulnicura Strings' AND release_id IS NULL))
-          AND release_type = 'EP'`,
+          AND lower(release_type) = 'ep'`,
+      false,
+    ],
+    // El mismonormalizado, para todo el catálogo: cualquier `release_type` con
+    // mayúsculas rompe `getTracksByReleaseType()`, que compara exacto.
+    [
+      "tracks_release_type_con_mayusculas",
+      `SELECT COUNT(*) c FROM tracks
+        WHERE release_type IS NOT NULL AND release_type <> lower(release_type)`,
       false,
     ],
     // P1: cuántas portadas del seed siguen siendo las fotos genéricas de Unsplash.

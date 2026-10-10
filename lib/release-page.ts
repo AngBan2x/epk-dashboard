@@ -217,32 +217,34 @@ export function releaseShape(release: Track, children: readonly Track[]): Releas
 }
 
 /**
- * ## El tipo de un lanzamiento, cuando la columna y la página no coinciden
+ * ## El tipo de un lanzamiento es el que escribió el autor, siempre
  *
- * `release_type` es lo que el autor escribió al crear la fila. El resto de la
- * página razona por **hijas**. Con datos de hoy las dos reglas se contradicen en
- * `Tour de France` (Kraftwerk): `release_type = 'Single'` con **2 hijas**, así que
- * el badge decía "Single" sobre una carta que anunciaba "2 pistas".
+ * Antes esta función hacía algo más: si la fila tenía hijas y la columna decía
+ * `single`, devolvía `"EP"`. El razonamiento era que "un single es, por
+ * definición, una pista" y que un lanzamiento con dos pistas no podía ser
+ * single. Eso entró en `2376240` y dejó a `Tour de France` (Kraftwerk) etiquetada
+ * como EP en ficha, catálogo y lista de lanzamientos — coherente, pero **falso**:
+ * es un single con una versión alternativa por idioma, no un extended play.
  *
- * Un single es, por definición, **una** pista. Si la fila tiene hijas, no puede
- * ser un single, diga lo que diga la columna. Y el contenedor que menos afirma es
- * "EP": un disco con varias pistas del mismo tema. Un álbum con hijas conserva su
- * tipo, porque ahí sí es correcto.
+ * El propietario del catálogo decidió lo contrario: la etiqueta dice lo que dice
+ * la columna, y el número de pistas ya aparece al lado en todas las superficies.
+ * "2 pistas" es un dato; "EP" era una interpretación, y las interpretaciones no
+ * cambian el catálogo, lo esconde.
  *
- * No se arregla reescribiendo la columna en Turso: la fila es válida en su
- * contexto —es un single con una versión alternativa— y cambiar el catálogo para
- * tapar un problema de presentación esconde el dato. Se arregla en la etiqueta,
- * que es donde estaba el error.
+ * **Lo que NO vuelve:** el bug original de `2376240` no era la palabra, eran las
+ * **dos etiquetas distintas para la misma fila** (la ficha decía una cosa y la
+ * tarjeta otra). Eso se arregló sacando el cálculo a este helper y usándolo en
+ * las tres superficies, y sigue arreglado: ahora las tres dicen "Single · 2
+ * pistas", que es lo que tiene que pasar.
  *
  * Vive aquí y no en la página porque se usa en **dos** sitios: el badge y la
  * descripción de `generateMetadata`. Con una copia en cada uno, el buscador
- * seguiría anunciando "Single · 2 pistas" mientras la página ya no lo dice.
+ * seguiría anunciando una cosa mientras la página dice otra — que es exactamente
+ * el bug que `2376240` vino a cerrar.
  */
 export function releaseTypeLabel(
   releaseType: string | null | undefined,
-  hasChildren: boolean,
+  _hasChildren: boolean,
 ): string {
-  const base = capitalizeReleaseType(releaseType ?? "");
-  if (!hasChildren) return base;
-  return /^single$/i.test(base.trim()) ? "EP" : base;
+  return capitalizeReleaseType(releaseType ?? "");
 }

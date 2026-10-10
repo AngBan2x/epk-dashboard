@@ -10,6 +10,7 @@ import {
   type SeedParentRow,
 } from "@/scripts/seed-influential-catalog";
 import { parseDurationToSeconds, sumDurations } from "@/lib/null-safe";
+import { RELEASE_TYPE_VALUES } from "@/lib/release-type";
 
 /**
  * Integridad del catálogo semilla de `scripts/seed-influential-catalog.ts`
@@ -65,20 +66,64 @@ describe("P7 — erratas del seed", () => {
   });
 });
 
+/**
+ * `release_type` de Vulnicura Strings y la normalización de la columna.
+ *
+ * El valor es **`ep`**, y por decisión del propietario del catálogo: el disco
+ * son las versiones con cuerdas de un álbum de 12 pistas, así que `album` sería
+ * más fiel. Este bloque ya no afirma lo contrario —antes decía "es Album y no
+ * EP"— porque ese texto describía el disco en vez de registrar la decisión, y
+ * una descripción que se contradice con el dato es una descripción que nadie
+ * sabe cuál de las dos vale.
+ */
 describe("P7 — release_type de Vulnicura Strings", () => {
-  it('es "Album" y no "EP"', () => {
-    // `rel-869486ab` en producción decía EP. Son las versiones con cuerdas de
-    // un álbum de 12 pistas, no un EP.
+  it('es "ep", y lo es por decisión de catálogo', () => {
     const sr = release("Björk", "Vulnicura Strings");
     expect(sr).toBeDefined();
-    expect(sr!.releaseType).toBe("Album");
+    expect(sr!.releaseType).toBe("ep");
   });
 
-  it("el release_type se propaga a las hijas, así que ninguna queda en EP", () => {
-    // El seed copia `sr.releaseType` a cada hija: por eso el `release_type='EP'`
-    // de producción estaba en 6 filas (el padre más sus 5 hijas) y no en una.
-    const ep = SEED_RELEASES.filter((r) => r.releaseType === "EP");
-    expect(ep).toEqual([]);
+  it("el release_type se propaga a las hijas, así que Vulnicura son 6 filas", () => {
+    // El seed copia `sr.releaseType` a cada hija: por eso el valor está en 6
+    // filas (el padre más sus 5 hijas) y no en una. Un valor por hija
+    // distinto dejaría el álbum con etiqueta de EP y cinco pistas sueltas.
+    const vulnicura = release("Björk", "Vulnicura Strings")!;
+    expect(vulnicura.tracks).toHaveLength(5);
+    const enEp = vulnicura.tracks.filter((t) => (t as { releaseType?: string }).releaseType === "ep");
+    // Las hijas no llevan `releaseType` propio: lo heredan al escribirse.
+    expect(enEp).toEqual([]);
+  });
+});
+
+/**
+ * La columna entera en minúsculas, en el ORIGEN.
+ *
+ * `getTracksByReleaseType()` (`lib/db.ts`) filtra con `WHERE release_type = ?`
+ * y en SQLite eso distingue mayúsculas, así que `Single` y `single` conviviendo
+ * hacían que pedir `'single'` devolviera 8 de 21 singles. La normalización de
+ * las filas vive en `scripts/normalize-release-type.ts`; esto ata el **origen**,
+ * que es lo que impediría que una re-siembra reintrodujera la mezcla.
+ */
+describe("normalización de release_type en el seed", () => {
+  it("ningún releaseType del seed lleva mayúsculas", () => {
+    const conMayusculas = SEED_RELEASES.filter((r) => r.releaseType !== r.releaseType.toLowerCase());
+    expect(conMayusculas.map((r) => `${r.artistName} — ${r.title}`)).toEqual([]);
+  });
+
+  it("todos los releaseType son valores del vocabulario canónico", () => {
+    for (const r of SEED_RELEASES) {
+      expect(RELEASE_TYPE_VALUES).toContain(r.releaseType);
+    }
+  });
+
+  it("y el origen ya declara `ep` en minúsculas, no `EP`", () => {
+    // Si alguien revierte esto a `EP`, el guard de `scripts/turso-check.ts`
+    // (`lower(release_type) = 'ep'`) seguirá en verde contra las filas ya
+    // normalizadas, y una re-siembra volvería a dejar la columna mezclada sin
+    // que nada se entere.
+    const sr = release("Björk", "Vulnicura Strings")!;
+    expect(sr.releaseType).not.toBe("EP");
+    expect(sr.releaseType).toBe("ep");
   });
 });
 

@@ -63,6 +63,13 @@ describe("la etiqueta del tipo no puede decir dos cosas distintas", () => {
    * "Single" sobre "2 pistas" y la ficha de release decía otra cosa. Dos
    * etiquetas para la misma fila, en dos páginas: es el mismo bug que reportó el
    * usuario, solo que repartido.
+   *
+   * Lo que se arregló entonces fue la **incoherencia**, no la palabra: las tres
+   * superficies pasaron a calcular la etiqueta en el mismo helper. Después el
+   * propietario del catálogo invirtió *qué* dice ese helper (la etiqueta refleja
+   * la columna: "Single · 2 pistas", no "EP"), pero el invariante de este bloque
+   * sigue siendo el mismo y por el mismo motivo: si un sitio vuelve a calcularlo
+   * por su cuenta, las tres dejan de decir lo mismo otra vez.
    */
   const SIN_HELPER = /capitalizeReleaseType\(\s*(track|release)\.release_type/;
 
@@ -77,7 +84,7 @@ describe("la etiqueta del tipo no puede decir dos cosas distintas", () => {
     }
   });
 
-  it("las tres usan el helper, que sabe que un single es una pista", () => {
+  it("las tres usan el helper, que hoy devuelve lo que dice la columna", () => {
     for (const f of [
       "app/releases/[id]/page.tsx",
       "components/EPKCard.tsx",
@@ -85,6 +92,13 @@ describe("la etiqueta del tipo no puede decir dos cosas distintas", () => {
     ]) {
       expect(leer(...f.split("/")), f).toContain("releaseTypeLabel");
     }
+  });
+
+  it("el helper ya no inventa un EP sobre un single con hijas", () => {
+    // El guard de que no vuelva a hacerlo: la decisión está en `lib/release-page.ts`
+    // y el motivo de por qué se invirtió está en el propio comentario de arriba.
+    const helper = leer("lib/release-page.ts");
+    expect(helper).not.toMatch(/\?\s*"EP"\s*:\s*base/);
   });
 });
 

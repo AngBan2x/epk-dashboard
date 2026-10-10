@@ -18,11 +18,18 @@
  *     padre y en su hija. Se busquen con comillas porque el título correcto
  *     ("Heroes") es un prefijo suyo: buscar por el valor ya corregido
  *     encontraría la fila buena y no la mala.
- *  3. `release_type` de *Vulnicura Strings*: `EP` -> `Album`. Es un álbum de 12
- *     pistas (versiones con cuerdas), no un EP. El flag vive en el padre Y en
- *     sus 5 hijas, y cada fila se pinta como tarjeta propia, así que se
- *     corrigen las 6: dejarlas en `EP` daría un álbum con etiqueta de EP y
- *     cinco pistas sueltas marcadas como EP.
+ *  3. `release_type` de *Vulnicura Strings* y de sus 5 hijas: queda en `ep`.
+ *     Esto ya **no** es una descripción del disco —son las versiones con
+ *     cuerdas de un álbum de 12 pistas, así que `album` sería más fiel— sino una
+ *     decisión del propietario del catálogo. Por eso el valor es `ep` y no
+ *     `Album`: `scripts/normalize-release-type.ts` deja toda la columna en
+ *     minúsculas porque `getTracksByReleaseType()` compara `WHERE release_type = ?`
+ *     **exacto**, y volver a escribir `Album` aquí reintroduciría la mezcla que
+ *     ese script acaba de arreglar. El `WHERE` es `lower(...) <> 'ep'` por el
+ *     mismo motivo: tiene que reconocer el valor bueno con cualquier
+ *     capitalización, o el arreglo no sería idempotente. El flag vive en el
+ *     padre Y en sus 5 hijas, y cada fila se pinta como tarjeta propia, así que
+ *     se corrigen las 6.
  *  4. La duración de los 9 padres, que quedó en "00:00" hardcodeada y se
  *     propagó a los 3 formatos de export. Es la suma de las duraciones de sus
  *     hijas, en `M:SS` con `sumDurations()` de `lib/null-safe.ts` —el contrato
@@ -82,8 +89,14 @@ const ASHES_TITLE_WRONG = "Ashe to Ashes";
 const ASHES_TITLE_RIGHT = "Ashes to Ashes";
 
 const VULNICURA_TITLE = "Vulnicura Strings";
-const VULNICURA_TYPE_WRONG = "EP";
-const VULNICURA_TYPE_RIGHT = "Album";
+/**
+ * Decisión de CATÁLOGO, no descripción del disco. Ver el punto 3 de la cabecera.
+ *
+ * Antes aquí ponía `EP` -> `Album`, y ese arreglo ya no se puede aplicar: la
+ * decisión es `ep`, y `Album` es una de las formas que la normalización acaba de
+ * eliminar de la columna.
+ */
+const VULNICURA_TYPE_RIGHT = "ep";
 
 interface Row {
   id: string;
@@ -226,20 +239,26 @@ async function main() {
   });
 
   // ------------------------------------------------------------------
-  // 3. Vulnicura Strings: EP -> Album en el padre y en sus 5 hijas.
+  // 3. Vulnicura Strings: el padre y sus 5 hijas quedan en `ep`.
+  //    Decisión de catálogo, no descripción del disco (cabecera, punto 3).
+  //    El `WHERE` reconoce cualquier capitalización: si no, el arreglo no sería
+  //    idempotente y volver a aplicarlo "arreglaría" filas ya correctas
+  //    escribiendo mayúsculas encima.
   // ------------------------------------------------------------------
   const vulnicura = parents.find((p) => p.title === VULNICURA_TITLE);
   if (vulnicura) {
     fixes.push({
-      label: `release_type ${VULNICURA_TYPE_WRONG} -> ${VULNICURA_TYPE_RIGHT} (padre + hijas de ${vulnicura.id})`,
+      label: `release_type de ${vulnicura.id} (padre + hijas) -> "${VULNICURA_TYPE_RIGHT}"`,
       sql: `UPDATE tracks
                SET release_type = ?
-             WHERE release_type = ?
+             WHERE lower(COALESCE(release_type, '')) <> ?
                AND (id = ? OR release_id = ?)`,
-      args: [VULNICURA_TYPE_RIGHT, VULNICURA_TYPE_WRONG, vulnicura.id, vulnicura.id],
+      args: [VULNICURA_TYPE_RIGHT, VULNICURA_TYPE_RIGHT, vulnicura.id, vulnicura.id],
       expected: 6,
-      countSql: `SELECT COUNT(*) c FROM tracks WHERE release_type = ? AND (id = ? OR release_id = ?)`,
-      countArgs: [VULNICURA_TYPE_WRONG, vulnicura.id, vulnicura.id],
+      countSql: `SELECT COUNT(*) c FROM tracks
+                  WHERE lower(COALESCE(release_type, '')) <> ?
+                    AND (id = ? OR release_id = ?)`,
+      countArgs: [VULNICURA_TYPE_RIGHT, vulnicura.id, vulnicura.id],
     });
   } else {
     console.log(`\n⚠️  No se encuentra el release ${VULNICURA_TITLE}: se omite el flag.`);
