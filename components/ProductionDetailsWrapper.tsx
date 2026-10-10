@@ -9,6 +9,7 @@ interface ProductionDetailsWrapperProps {
   className?: string;
   trackId: string;
   artistName: string;
+  headingId?: string;
 }
 
 export function ProductionDetailsWrapper({
@@ -16,6 +17,7 @@ export function ProductionDetailsWrapper({
   className,
   trackId,
   artistName,
+  headingId,
 }: ProductionDetailsWrapperProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [currentDetails, setCurrentDetails] = useState(details);
@@ -38,6 +40,7 @@ export function ProductionDetailsWrapper({
       className={className}
       isOwner={isOwner}
       trackId={trackId}
+      headingId={headingId}
       onDetailsUpdated={(updated) => setCurrentDetails(updated)}
     />
   );

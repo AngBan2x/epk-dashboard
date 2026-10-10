@@ -1,6 +1,7 @@
 "use client";
 
 import { MutedSpeakerIcon } from "@/components/icons/MutedSpeakerIcon";
+import { TrackLyrics } from "@/components/TrackLyrics";
 import { useMemo } from "react";
 import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
 import {
@@ -10,7 +11,7 @@ import {
   type AudioSourceType,
 } from "@/lib/audio-priority";
 import { safeString } from "@/lib/null-safe";
-import { releaseRowDurationLabel } from "@/lib/release-page";
+import { hasTrackLyrics, releaseRowDurationLabel } from "@/lib/release-page";
 import type { Track } from "@/types/music";
 
 interface ReleaseTrackListProps {
@@ -24,6 +25,16 @@ interface ReleaseTrackListProps {
   releaseTitle: string;
   releaseCoverImage?: string;
   releaseYoutubeVideoId?: string;
+  /**
+   * Cada fila lleva su letra, desplegable bajo la pista.
+   *
+   * Va **opt-in** y no por defecto porque esta lista también se monta en la ficha
+   * del artista (`components/ArtistTracksSection.tsx`), donde es el resumen de un
+   * disco dentro de una tarjeta que ya enlaza a su página: allí la letra sería
+   * una repetición de lo que hay un clic más abajo. La ficha del release es la
+   * que se lee entera, y es la que la necesita.
+   */
+  withLyrics?: boolean;
 }
 
 /**
@@ -119,6 +130,7 @@ export function ReleaseTrackList({
   releaseTitle,
   releaseCoverImage,
   releaseYoutubeVideoId,
+  withLyrics = false,
 }: ReleaseTrackListProps) {
   const globalPlayer = useAudioPlayer();
   const allTracks = queueTracks ?? tracks;
@@ -188,135 +200,158 @@ export function ReleaseTrackList({
         return (
           <div
             key={track.id}
-            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+            /* La caja del borde es la de AFUERA y no la de la fila: el desplegable
+               de la letra va debajo de la fila y dentro de la misma caja, y con
+               el borde en la fila los dos se separarían y el panel quedaría fuera. */
+            className={`rounded-lg border transition-colors ${
               isCurrentTrack
                 ? "bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800"
                 : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
           >
-            {/* Track number (M0: per disc) */}
-            <span className="text-sm font-medium text-slate-500 dark:text-slate-400 w-6 text-center">
-              {trackNumber}
-            </span>
-
-            {/* Play button */}
-            <button
-              onClick={() => handlePlayTrack(track)}
-              disabled={isLoading || !playable}
-              title={
-                playable
-                  ? undefined
-                  : "Esta pista no tiene audio propio y el lanzamiento no tiene vídeo: no hay nada que reproducir"
-              }
-              className={`p-2.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
-                isPlaying
-                  ? "bg-primary-500 text-white"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-600"
-              } ${isLoading || !playable ? "opacity-50 cursor-not-allowed" : ""}`}
-              /* Sin el título, "Reproducir" repetido en cada fila no dice nada: un
-                 lector de pantalla anuncia once botones idénticos. Con el número
-                 y el título, el usuario sabe cuál va a pulsar. */
-              aria-label={
-                playable
-                  ? `${isPlaying ? "Pausar" : "Reproducir"} ${trackNumber}: ${track.title}`
-                  : `${track.title}: sin audio disponible`
-              }
-            >
-              {!playable ? (
-                /* Sin fuente: altavoz apagado, no un play que no hace nada. El `ban`
-                   de Heroicons, a `w-4 h-4`, es indistinguible del icono de imagen
-                   rota del navegador — y lo reportó el usuario como "un SVG roto" en
-                   las filas sin audio de *Tour de France*. El icono vive en
-                   `components/icons/MutedSpeakerIcon.tsx` porque el mismo ya se
-                   puso en `AudioPlayer`, y dos copias del mismo icono divergen. */
-                <MutedSpeakerIcon />
-              ) : isLoading ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : isPlaying ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
-                </svg>
-              )}
-            </button>
-
-            {/* Track info */}
-            <div className="flex-1 min-w-0">
-              {/* `truncate` corta en una sola linea, asi que sin `title` el
-                  nombre largo ("Todo vue…") era irrecuperable. Mismo fallo de
-                  a11y que se corrigio en el h3 de EPKCard. */}
-              <p
-                className={`text-sm font-medium truncate ${
-                  isCurrentTrack
-                    ? "text-primary-700 dark:text-primary-300"
-                    : "text-slate-900 dark:text-slate-100"
-                }`}
-                title={track.title}
-              >
-                {track.title}
-              </p>
-              <p
-                className="text-xs text-slate-500 dark:text-slate-400 truncate"
-                title={safeString(track.artist_name, "")}
-              >
-                {track.artist_name}
-              </p>
-            </div>
-
-            {/* Duración de la pista (RC.32, tarea 5).
-                Antes ganaba la rama de timestamps:
-                  {track.start_time || track.end_time
-                    ? `${formatTime(start)} — ${formatTime(end)}`
-                    : track.duration ? track.duration : null}
-                así que las 55 pistas con `end_time > 30` pintaban un rango de
-                capítulo y la rama de `track.duration` — la duración real — era
-                inalcanzable para ellas.
-                `start_time` NO se borra: es el fallback de ordenación del catálogo
-                (`lib/db.ts`, `ORDER BY COALESCE(track_number,999), start_time`).
-                Aquí solo se desprioriza para mostrar, y si no hay duración real
-                el rango se conserva como último recurso y se marca como lo que es. */}
-            <div className="text-right">
-              {(() => {
-                const label = tracklistDurationLabel(track);
-                /**
-                 * El filtro del relleno NO vive aquí: vive en
-                 * `releaseRowDurationLabel` (`lib/release-page.ts`), que devuelve
-                 * `""` cuando la duración parsea a cero segundos. `"00:00"` es lo
-                 * que escribe el seed cuando no se sabe la duración, y pintarlo
-                 * en la fila mientras la cabecera dice `—` son dos números
-                 * distintos para la misma canción en la misma pantalla. El
-                 * rango de capítulo se conserva tal cual: es un dato, aunque no
-                 * sea la duración, y `label` ya lo marca como tal en el `title`.
-                 */
-                const text = releaseRowDurationLabel(track);
-                if (!text) return null;
-                return (
-                  <span
-                    className={`text-xs font-mono ${
-                      label.isChapterRange
-                        ? "text-slate-400 dark:text-slate-500"
-                        : "text-slate-500 dark:text-slate-400"
-                    }`}
-                    title={label.warning || track.duration || undefined}
-                  >
-                    {text}
-                  </span>
-                );
-              })()}
-            </div>
-
-            {/* Error indicator */}
-            {isError && (
-              <span className="text-xs text-red-500" title={globalPlayer?.error || ""}>
-                ⚠️
+            <div className="flex items-center gap-3 p-3">
+              {/* Track number (M0: per disc) */}
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400 w-6 text-center">
+                {trackNumber}
               </span>
-            )}
+
+              {/* Play button */}
+              <button
+                onClick={() => handlePlayTrack(track)}
+                disabled={isLoading || !playable}
+                title={
+                  playable
+                    ? undefined
+                    : "Esta pista no tiene audio propio y el lanzamiento no tiene vídeo: no hay nada que reproducir"
+                }
+                className={`p-2.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                  isPlaying
+                    ? "bg-primary-500 text-white"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-600"
+                } ${isLoading || !playable ? "opacity-50 cursor-not-allowed" : ""}`}
+                /* Sin el título, "Reproducir" repetido en cada fila no dice nada: un
+                   lector de pantalla anuncia once botones idénticos. Con el número
+                   y el título, el usuario sabe cuál va a pulsar. */
+                aria-label={
+                  playable
+                    ? `${isPlaying ? "Pausar" : "Reproducir"} ${trackNumber}: ${track.title}`
+                    : `${track.title}: sin audio disponible`
+                }
+              >
+                {!playable ? (
+                  /* Sin fuente: altavoz apagado, no un play que no hace nada. El `ban`
+                     de Heroicons, a `w-4 h-4`, es indistinguible del icono de imagen
+                     rota del navegador — y lo reportó el usuario como "un SVG roto" en
+                     las filas sin audio de *Tour de France*. El icono vive en
+                     `components/icons/MutedSpeakerIcon.tsx` porque el mismo ya se
+                     puso en `AudioPlayer`, y dos copias del mismo icono divergen. */
+                  <MutedSpeakerIcon />
+                ) : isLoading ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : isPlaying ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Track info */}
+              <div className="flex-1 min-w-0">
+                {/* `truncate` corta en una sola linea, asi que sin `title` el
+                    nombre largo ("Todo vue…") era irrecuperable. Mismo fallo de
+                    a11y que se corrigio en el h3 de EPKCard. */}
+                <p
+                  className={`text-sm font-medium truncate ${
+                    isCurrentTrack
+                      ? "text-primary-700 dark:text-primary-300"
+                      : "text-slate-900 dark:text-slate-100"
+                  }`}
+                  title={track.title}
+                >
+                  {track.title}
+                </p>
+                <p
+                  className="text-xs text-slate-500 dark:text-slate-400 truncate"
+                  title={safeString(track.artist_name, "")}
+                >
+                  {track.artist_name}
+                </p>
+              </div>
+
+              {/* Duración de la pista (RC.32, tarea 5).
+                  Antes ganaba la rama de timestamps:
+                    {track.start_time || track.end_time
+                      ? `${formatTime(start)} — ${formatTime(end)}`
+                      : track.duration ? track.duration : null}
+                  así que las 55 pistas con `end_time > 30` pintaban un rango de
+                  capítulo y la rama de `track.duration` — la duración real — era
+                  inalcanzable para ellas.
+                  `start_time` NO se borra: es el fallback de ordenación del catálogo
+                  (`lib/db.ts`, `ORDER BY COALESCE(track_number,999), start_time`).
+                  Aquí solo se desprioriza para mostrar, y si no hay duración real
+                  el rango se conserva como último recurso y se marca como lo que es. */}
+              <div className="text-right">
+                {(() => {
+                  const label = tracklistDurationLabel(track);
+                  /**
+                   * El filtro del relleno NO vive aquí: vive en
+                   * `releaseRowDurationLabel` (`lib/release-page.ts`), que devuelve
+                   * `""` cuando la duración parsea a cero segundos. `"00:00"` es lo
+                   * que escribe el seed cuando no se sabe la duración, y pintarlo
+                   * en la fila mientras la cabecera dice `—` son dos números
+                   * distintos para la misma canción en la misma pantalla. El
+                   * rango de capítulo se conserva tal cual: es un dato, aunque no
+                   * sea la duración, y `label` ya lo marca como tal en el `title`.
+                   */
+                  const text = releaseRowDurationLabel(track);
+                  if (!text) return null;
+                  return (
+                    <span
+                      className={`text-xs font-mono ${
+                        label.isChapterRange
+                          ? "text-slate-400 dark:text-slate-500"
+                          : "text-slate-500 dark:text-slate-400"
+                      }`}
+                      title={label.warning || track.duration || undefined}
+                    >
+                      {text}
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {/* Error indicator */}
+              {isError && (
+                <span className="text-xs text-red-500" title={globalPlayer?.error || ""}>
+                  ⚠️
+                </span>
+              )}
+            </div>
+
+            {/* La letra de ESTA pista. El botón solo se monta si la hay: un
+                control que se abre sobre un guion es el peor resultado posible,
+                porque parece que funciona. `hasTrackLyrics` filtra también el
+                placeholder "—" que `safeString` deja en las columnas vacías. */}
+            {withLyrics && hasTrackLyrics(track.lyrics) ? (
+              <div className="border-t border-slate-200 px-3 pb-3 pt-1 dark:border-slate-700">
+                <TrackLyrics
+                  panelId={`letra-panel-${track.id}`}
+                  label={`Ver la letra de ${safeString(track.title, "la pista")}`}
+                  expandedLabel="Ocultar la letra"
+                >
+                  <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                    {track.lyrics}
+                  </pre>
+                </TrackLyrics>
+              </div>
+            ) : null}
           </div>
         );
           })}

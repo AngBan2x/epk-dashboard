@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createElement } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "fs";
+import path from "path";
 
 /**
  * P2 · Ola 10 — la página de un lanzamiento.
@@ -46,7 +48,10 @@ import { cleanup, render, screen } from "@testing-library/react";
  * `isMultiTrack` → 5 rojos.
  */
 
-const { mockPlayQueue } = vi.hoisted(() => ({ mockPlayQueue: vi.fn() }));
+const { mockPlayQueue, mockGetReleaseNeighbours } = vi.hoisted(() => ({
+  mockPlayQueue: vi.fn(),
+  mockGetReleaseNeighbours: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   notFound: () => {
@@ -59,9 +64,22 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/releases",
 }));
 
+/**
+ * `getReleaseNeighbours` **ya no existe** en `lib/releases.ts`: el bloque de
+ * anterior/siguiente se quitó entero por petición del propietario.
+ *
+ * El doble se queda aquí, y se queda devolviendo vecinos **de verdad**, por un
+ * motivo muy concreto: es lo que hace que el test que comprueba que la
+ * navegación NO aparece pueda ponerse rojo. Si el doble no existiera, o
+ * devolviera `{previous: null, next: null}`, reponer el bloque volvería a
+ * pintarlo vacío y el test seguiría en verde — es decir, protegería nada.
+ *
+ * La fábrica de `vi.mock` puede exportar más de lo que el módulo real exporta:
+ * nadie importa este símbolo, así que no hay nada que compilar contra él.
+ */
 vi.mock("@/lib/releases", () => ({
   getReleaseWithTracks: vi.fn(),
-  getReleaseNeighbours: vi.fn(),
+  getReleaseNeighbours: mockGetReleaseNeighbours,
   resolveTrackRoute: vi.fn(),
 }));
 
@@ -155,7 +173,7 @@ if (typeof globalThis.IntersectionObserver === "undefined") {
 
 import ReleaseDetailPage from "@/app/releases/[id]/page";
 import { getArtistByName } from "@/lib/db";
-import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
+import { getReleaseWithTracks } from "@/lib/releases";
 import { NO_VALUE, releaseDurationLabel, releaseMetrics, releaseShape } from "@/lib/release-page";
 import type { Metrics, Track } from "@/types/music";
 
@@ -224,7 +242,15 @@ async function renderPage(release: ReleaseFixture, children: Partial<Track>[]) {
     tracks: kids,
     ...releaseShape(rel, kids),
   });
-  vi.mocked(getReleaseNeighbours).mockResolvedValue({ previous: null, next: null });
+  /**
+   * Vecinos reales a propósito: la página ya no los pide, pero si alguien repone
+   * el bloque los va a encontrar aquí y lo pintará, que es justo lo que el test
+   * de "no hay navegación" tiene que detectar.
+   */
+  mockGetReleaseNeighbours.mockResolvedValue({
+    previous: { ...baseTrack, id: "vecino-anterior", title: "Lanzamiento anterior" },
+    next: { ...baseTrack, id: "vecino-siguiente", title: "Lanzamiento siguiente" },
+  });
   vi.mocked(getArtistByName).mockResolvedValue({
     id: "art-1",
     name: rel.artist_name,
@@ -234,6 +260,10 @@ async function renderPage(release: ReleaseFixture, children: Partial<Track>[]) {
 }
 
 const bodyText = () => document.body.textContent ?? "";
+
+/** Lee un fichero del repo. Para los checks que son de código y no de DOM. */
+const leer = (...partes: string[]) =>
+  readFileSync(path.resolve(process.cwd(), ...partes), "utf8");
 
 /**
  * Los encabezados `<h2>` de la página, en orden de documento y tal cual.
@@ -533,21 +563,30 @@ describe("P2 · un id que no existe", () => {
   });
 });
 
-/* ── 6. C1 · las cuatro secciones del diseño acordado ─────────────────────── */
-
 /**
  * ## Por qué este bloque existe
  *
- * El diseño de P2 tenía **tres** secciones y el acordado tiene **cuatro**:
- * Descripción, Pistas, Enlaces y Letra. Un revert de maquetación es
- * exactamente el sitio donde se cuela una sección sin avisar: el fichero
- * compila igual de bien con tres, nadie lo nota en el diff, y la sección que
- * falta es la que un periodista venía a buscar.
+ * Un revert de maquetación es exactamente el sitio donde se cuela una sección
+ * sin avisar: el fichero compila igual de bien con tres, nadie lo nota en el
+ * diff, y la sección que falta es la que un periodista venía a buscar.
  *
- * Por eso el test no mira "que se vea algo": mira **las cuatro, con su
- * encabezado y en su orden**. Y el fixture se da con las cuatro fuentes de
- * datos puestas a la vez, que es el caso en el que una sección puede quedarse
- * vacía sin que nadie se entere.
+ * Por eso el test no mira "que se vea algo": mira **todas, con su encabezado y
+ * en su orden**. Y el fixture se da con las cuatro fuentes de datos puestas a la
+ * vez, que es el caso en el que una sección puede quedarse vacía sin que nadie
+ * se entere.
+ *
+ * ## Y por qué ahora hay DOS listas
+ *
+ * Porque la letra dejó de ser una sección del lanzamiento y pasó a ser un dato
+ * de la pista: en un álbum va **dentro de cada fila** de `ReleaseTrackList`, y
+ * solo un single —donde la fila ES la canción— la monta como sección propia,
+ * debajo del listado. Un álbum con una "Letra" de nivel superior estaría
+ * afirmando que el disco entero tiene un texto, que es el dato de la cabecera y
+ * no el de ninguna canción.
+ *
+ * Las dos listas se comprueban por separado porque fallan por motivos
+ * distintos: si se mezclaran, perder la letra del single y perder la letra por
+ * pista se parecerían demasiado.
  *
  * Para que el test pueda FALLAR, hay dos comprobaciones más que no son
  * decorativas:
@@ -559,14 +598,14 @@ describe("P2 · un id que no existe", () => {
  *
  * ⚠️ **Los encabezados se leen de los `<section aria-labelledby>`, no de todos
  * los `<h2>` de la página**, y el motivo es concreto: los bloques de ficha que
- * se montan en el bloque 7 (`VideoShowcase`, `ProductionDetails`) traen su
- * PROPIO `<h2>` dentro. Con `querySelectorAll("h2")` este guard empezaría a
- * contar cabeceras de terceros, y un test que cuenta cosas que no controla es un
- * test que un día se rompe solo y nadie sabe qué protegía.
+ * se montan en el bloque 7 (`VideoShowcase`) traen su PROPIO `<h2>` dentro. Con
+ * `querySelectorAll("h2")` este guard empezaría a contar cabeceras de terceros, y
+ * un test que cuenta cosas que no controla es un test que un día se rompe solo y
+ * nadie sabe qué protegía.
  */
-describe("C1 · la página de release tiene las cuatro secciones", () => {
+describe("C1 · la página de release tiene todas sus secciones", () => {
   /**
-   * Las cuatro, **en el orden del esqueleto nuevo**.
+   * Las de un **álbum**, en el orden del esqueleto.
    *
    * ## Por qué cambió esta lista
    *
@@ -580,18 +619,26 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
    *   leer las dos vistas como la misma plantilla.
    * - **Prensa** también va a la barra lateral, y en DOM va **después** de
    *   enlaces, no después de las cuatro secciones.
+   * - **Letra** desaparece de aquí, porque en un álbum es un dato de cada pista.
    *
    * Lo que NO cambia, y por eso los tests de abajo siguen siendo los mismos: una
    * sección sin dato no se inventa, cada una queda atada a su encabezado con
    * `aria-labelledby`, y una sección ausente no puede pasar por presente.
    */
-  const SECTIONS = ["Descripción", "Pistas", "Enlaces Externos", "Letra"] as const;
+  const SECTIONS_ALBUM = ["Descripción", "Pistas", "Enlaces Externos"] as const;
+
+  /**
+   * Las de un **single**: las de antes, más `Letra`. La fila es la canción, así
+   * que su letra es una sección más, y va entre Pistas y la barra lateral porque
+   * es donde la monta la página.
+   */
+  const SECTIONS_SINGLE = ["Descripción", "Pistas", "Letra", "Enlaces Externos"] as const;
 
   /**
    * La quinta sección, y no es una más: la de **descargas para prensa**, que
    * `/track/[id]` montaba con alcance de artista y que al quedar en 301 se quedó
    * sin ninguna página donde estar (ver el bloque 7). Va **después** de las
-   * cuatro, para que el orden acordado no se mezcle con ella.
+   * secciones, para que el orden acordado no se mezcle con ella.
    *
    * Se nombra aquí y no en el bloque 7 porque este test es el que ata el
    * **esqueleto completo** de la página: si mañana aparece una sexta sección sin
@@ -599,21 +646,41 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
    */
   const PRESS = "Ficha técnica para prensa";
 
+  /**
+   * Un álbum con las cuatro fuentes de datos puestas a la vez. La letra va en la
+   * **hija**: es donde vive ahora la letra de un disco, y ponerla en la cabecera
+   * sería justamente lo que este bloque comprueba que ya no se hace.
+   */
   async function renderFullRelease() {
     await renderPage(
       {
         id: "rel-full",
         title: "Cancion suelta",
         description: "Una cancion con los cuatro bloques de datos.",
-        lyrics: "Primera linea de la letra.\nSegunda linea.",
+        lyrics: "Letra de la cabecera, que un album no debe enseñar.",
         external_links: {
           spotify: "https://open.spotify.test/album/rel-full",
           apple_music: "https://music.apple.test/album/rel-full",
           youtube: "https://youtube.test/watch?v=rel-full",
         },
       },
-      [{ id: "c1", title: "Aguante" }]
+      [{ id: "c1", title: "Aguante", lyrics: "Primera linea de la letra.\nSegunda linea." }]
     );
+  }
+
+  /** El single equivalente: misma ficha, pero sin hijas. */
+  async function renderFullSingle() {
+    await renderPage({
+      id: "rel-full-single",
+      title: "Cancion suelta",
+      description: "Una cancion con los cuatro bloques de datos.",
+      lyrics: "Primera linea de la letra.\nSegunda linea.",
+      external_links: {
+        spotify: "https://open.spotify.test/track/rel-full-single",
+        apple_music: "https://music.apple.test/album/rel-full-single",
+        youtube: "https://youtube.test/watch?v=rel-full-single",
+      },
+    }, []);
   }
 
   /**
@@ -625,35 +692,55 @@ describe("C1 · la página de release tiene las cuatro secciones", () => {
    */
   const sectionHeadings = headings;
 
-  it("con descripción, pistas, enlaces y letra salen las CUATRO", async () => {
+  it("con descripción, pistas, enlaces y letra por pista salen TODAS", async () => {
     await renderFullRelease();
     const rendered = headings();
-    for (const section of SECTIONS) {
+    for (const section of SECTIONS_ALBUM) {
       expect(rendered).toContain(section);
     }
+    // Y la letra existe: una por pista, dentro del listado.
+    expect(screen.getAllByRole("button", { name: /Ver la letra de/ })).toHaveLength(1);
   });
 
-  it("y en el orden del esqueleto: descripción, pistas, letra, y enlaces en la barra lateral", async () => {
+  it("un álbum NO monta una sección de Letra de nivel superior", async () => {
+    // La letra de un disco es la de cada corte, no la de la cabecera. Si vuelve
+    // la sección, la página estaría afirmando que el álbum entero tiene un texto.
+    await renderFullRelease();
+    expect(headings()).not.toContain("Letra");
+    expect(bodyText()).not.toContain("Letra de la cabecera");
+  });
+
+  it("y en el orden del esqueleto: descripción, pistas, y enlaces en la barra lateral", async () => {
     // El orden real en DOM. "Enlaces Externos" y "Ficha técnica para prensa" van
     // en la barra lateral, que en el HTML va **después** de la columna de
-    // contenido, así que "Enlaces" queda entre "Pistas" y "Letra" en vez de
-    // después de "Letra".
+    // contenido, así que "Enlaces" queda después de "Pistas".
     await renderFullRelease();
-    expect(headings()).toEqual(["Descripción", "Pistas", "Letra", "Enlaces Externos", PRESS]);
+    expect(headings()).toEqual([...SECTIONS_ALBUM, PRESS]);
   });
 
-  it("las tres secciones de datos quedan enlazadas a su encabezado", async () => {
+  it("un single sí monta la Letra, y va entre Pistas y la barra lateral", async () => {
+    await renderFullSingle();
+    expect(headings()).toEqual([...SECTIONS_SINGLE, PRESS]);
+  });
+
+  it("las secciones de datos quedan enlazadas a su encabezado", async () => {
     // Sin `aria-labelledby`, un lector de pantalla anuncia cuatro bloques
     // ("region", "region") sin decir de qué son. Y el revert las dejó sin
     // enlazar: el diseño rico usaba un helper con el `id` puesto a mano.
     await renderFullRelease();
-    for (const id of ["release-description", "release-tracks", "release-links", "release-lyrics"]) {
+    for (const id of ["release-description", "release-tracks", "release-links"]) {
       const section = document.querySelector(`section[aria-labelledby="${id}"]`);
       expect(section).not.toBeNull();
       const heading = document.getElementById(id);
       expect(heading?.tagName).toBe("H2");
       expect(heading?.textContent?.trim()).not.toBe("");
     }
+
+    // Y la del single, que es la única que puede tener.
+    await renderFullSingle();
+    const lyrics = document.querySelector('section[aria-labelledby="release-lyrics"]');
+    expect(lyrics).not.toBeNull();
+    expect(document.getElementById("release-lyrics")?.tagName).toBe("H2");
   });
 
   it("la sección de pistas se monta aunque el lanzamiento no tenga hijas", async () => {
@@ -1123,5 +1210,226 @@ describe("C1-ter · un - Topic no es el videoclip de la pista", () => {
   it("un álbum sin ningún vídeo de pista no monta la sección", async () => {
     await renderPage({ id: "rel-album" }, [{ id: "c1" }, { id: "c2" }]);
     expect(headings()).not.toContain("Videoclips oficiales");
+  });
+});
+
+/* ── 9. La ficha de release, tres arreglos ────────────────────────────────── */
+
+/**
+ * ## Qué protege este bloque
+ *
+ * Tres cambios que el usuario pidió sobre la ficha de release y que, por
+ * caminos distintos, son la clase de cambio que no rompe nada al compilar:
+ *
+ * 1. **Anterior / siguiente fuera**, no escondido. Es lo que hace que este
+ *    bloque mire el **DOM renderizado**: un `not.toContain` sobre el fuente
+ *    pasaría en verde con el bloque a medio borrar, y un borrado de JSX es
+ *    exactamente donde eso pasa. El doble de `@/lib/releases` devuelve
+ *    vecinos reales (ver arriba), así que reponer el bloque lo vuelve a pintar
+ *    y el test cae.
+ * 2. **La ficha de producción, en la barra lateral.** Antes vivía en la columna
+ *    de contenido, que es para lo que se lee. Aquí se comprueba que sale **una
+ *    sola vez** y que está dentro del `<aside>`.
+ * 3. **La letra, por pista.** En un álbum cada corte lleva la suya, desplegable
+ *    bajo su fila; en un single es una sección debajo del listado. Y una pista
+ *    sin letra **no** monta botón.
+ *
+ * Y el bloque de a11y va en el mismo sitio porque las tres cosas que se
+ * comprueban —`aria-expanded`, `aria-controls`, foco— se rompen sin ruido.
+ */
+describe("ficha de release · anterior/siguiente fuera", () => {
+  it("no hay ninguna navegación entre lanzamientos, aunque haya vecinos", async () => {
+    // El doble devuelve `previous` y `next` reales, así que esto no es "no hay
+    // datos": es "no se pintan". Si el bloque volviera, saldría.
+    await renderPage(
+      { id: "rel-sin-vecinos", spotify_url: "https://open.spotify.test/track/x" },
+      [{ id: "c1" }]
+    );
+    expect(document.querySelector('nav[aria-label="Otros lanzamientos del artista"]')).toBeNull();
+    expect(document.querySelector('a[rel="prev"], a[rel="next"]')).toBeNull();
+    expect(bodyText()).not.toContain("Siguiente");
+    expect(bodyText()).not.toContain("Anterior");
+  });
+
+  it("ni siquiera en un single, donde antes solo salía una de las dos flechas", async () => {
+    // El caso donde el bloque se montaba a medias: con un solo vecino, el
+    // `<span />` de relleno dejaba una flecha suelta. Ahora no hay ninguna.
+    await renderPage({ id: "rel-vecino-unico", spotify_url: "https://open.spotify.test/track/y" }, []);
+    expect(document.querySelector("aside nav")).toBeNull();
+  });
+
+  it("y la función que los traía ya no existe: no queda código muerto", () => {
+    // Un `export` que nadie importa compila igual de bien y no lo detecta ni el
+    // lint. Se mira el fichero, como en `stems-dead-code.test.ts`.
+    const src = readFileSync(path.resolve(process.cwd(), "lib", "releases.ts"), "utf8");
+    expect(src).not.toContain("getReleaseNeighbours");
+    expect(src).not.toContain("ReleaseNeighbours");
+  });
+});
+
+describe("ficha de release · la producción vive en la barra lateral", () => {
+  /** Un single con ficha, la misma de C1-bis. */
+  const conFicha = {
+    id: "rel-prod",
+    title: "Bohemian Rhapsody",
+    spotify_url: "https://open.spotify.test/track/7tFiy",
+    production_details: {
+      daw: "EMI Studios (16-track tape)",
+      guitars: "Brian May Red Special",
+      effects_chain: "Deacy Amp + AC30 + Univibe",
+      tuning: "Standard E",
+      key: "B" + "\u266d" + " Major",
+    },
+  } as ReleaseFixture;
+
+  it("sale UNA vez, y dentro del <aside>", async () => {
+    await renderPage(conFicha, []);
+    const secciones = screen.getAllByTestId("release-production");
+    expect(secciones).toHaveLength(1);
+    expect(secciones[0].closest("aside")).not.toBeNull();
+    // Y el texto sale una vez también: si alguien la deja en las dos columnas,
+    // el recuento del texto lo ve aunque el testid no.
+    expect(bodyText().match(/Ficha de Producci/gi) ?? []).toHaveLength(1);
+  });
+
+  it("y NO está en la columna de contenido", async () => {
+    await renderPage(conFicha, []);
+    // Se busca por el TEXTO y no por el `data-testid`: un revert que dejara la
+    // ficha en la columna principal se llevaría el testid por delante, y una
+    // comprobación que busca algo que el propio revert borró pasa en verde.
+    const encabezado = Array.from(document.querySelectorAll("h3")).find(
+      (h) => h.textContent?.trim() === "Ficha de Producción"
+    );
+    expect(encabezado).toBeDefined();
+
+    const columna = screen
+      .getByTestId("release-play-section")
+      .closest('[class*="col-span-2"]');
+    expect(columna).not.toBeNull();
+    expect(columna?.contains(encabezado as Node)).toBe(false);
+    expect(encabezado?.closest("aside")).not.toBeNull();
+  });
+
+  it("va DEBAJO de Enlaces Externos, que es lo que se pidió", async () => {
+    await renderPage(conFicha, []);
+    const aside = document.querySelector("aside");
+    const ids = Array.from(aside?.querySelectorAll("section[aria-labelledby]") ?? []).map((s) =>
+      s.getAttribute("aria-labelledby")
+    );
+    expect(ids).toEqual(["release-links", "release-production", "release-press"]);
+  });
+
+  it("un álbum sigue sin montarla: no tiene una afinación única", async () => {
+    await renderPage({ ...conFicha, id: "rel-prod-album" }, [{ id: "c1" }, { id: "c2" }]);
+    expect(screen.queryAllByTestId("release-production")).toHaveLength(0);
+  });
+});
+
+describe("ficha de release · la letra es un dato de la pista", () => {
+  const conLetras = [
+    { id: "c1", title: "Aguante", lyrics: "Letra uno" },
+    { id: "c2", title: "Medianoche", lyrics: "Letra dos" },
+  ];
+
+  it("un álbum da un desplegable POR PISTA, con el nombre de su canción", async () => {
+    await renderPage({ id: "rel-album-letras" }, conLetras);
+    const botones = screen.getAllByRole("button", { name: /Ver la letra de/ });
+    expect(botones).toHaveLength(2);
+    // Sin el título, un lector de pantalla anuncia dos botones idénticos.
+    expect(botones.map((b) => b.textContent)).toEqual([
+      "Ver la letra de Aguante",
+      "Ver la letra de Medianoche",
+    ]);
+  });
+
+  it("el botón abre SU letra y solo la suya", async () => {
+    await renderPage({ id: "rel-album-abrir" }, conLetras);
+    const [primero, segundo] = screen.getAllByRole("button", { name: /Ver la letra de/ });
+
+    const panelPrimero = document.getElementById(
+      primero.getAttribute("aria-controls") ?? ""
+    ) as HTMLElement;
+    expect(panelPrimero.hidden).toBe(true);
+
+    fireEvent.click(primero);
+    expect(primero.getAttribute("aria-expanded")).toBe("true");
+    expect(panelPrimero.hidden).toBe(false);
+    expect(panelPrimero.textContent).toContain("Letra uno");
+
+    // Son dos controles INDEPENDIENTES: abrir la segunda no abre la primera de
+    // golpe, porque cada panel pertenece a su fila y no hay un estado global que
+    // closingue las demás.
+    const panelSegundo = document.getElementById(
+      segundo.getAttribute("aria-controls") ?? ""
+    ) as HTMLElement;
+    expect(panelSegundo.hidden).toBe(true);
+
+    fireEvent.click(segundo);
+    expect(segundo.getAttribute("aria-expanded")).toBe("true");
+    expect(panelSegundo.hidden).toBe(false);
+    expect(panelSegundo.textContent).toContain("Letra dos");
+    // Y cada panel sigue enseñando la suya, no la de la otra.
+    expect(panelPrimero.textContent).toContain("Letra uno");
+    expect(panelPrimero.textContent).not.toContain("Letra dos");
+  });
+
+  it("el control es un botón real, con foco visible y área táctil", async () => {
+    await renderPage({ id: "rel-album-a11y" }, conLetras);
+    const boton = screen.getAllByRole("button", { name: /Ver la letra de/ })[0];
+    // Un `<div onClick>` no se announces como botón ni responde al Enter.
+    expect(boton.tagName).toBe("BUTTON");
+    expect(boton.getAttribute("type")).toBe("button");
+    expect(boton.className).toContain("focus-visible:ring");
+    // 44 px, el mismo mínimo que el play de la fila.
+    expect(boton.className).toContain("min-h-[44px]");
+  });
+
+  it("una pista SIN letra no monta un botón que no abre nada", async () => {
+    // El `—` es lo que deja `safeString` en una columna vacía, y es truthy: un
+    // `lyrics != null` pintaría el botón sobre un guion.
+    await renderPage({ id: "rel-album-sin-letras" }, [
+      { id: "c1", title: "Aguante", lyrics: null },
+      { id: "c2", title: "Medianoche", lyrics: "\u2014" },
+      { id: "c3", title: "Coda", lyrics: "   " },
+    ]);
+    expect(screen.queryAllByRole("button", { name: /Ver la letra de/ })).toHaveLength(0);
+  });
+
+  it("un single monta la letra DEBAJO del listado, no dentro de la fila", async () => {
+    await renderPage({ id: "rel-single-letra", title: "Cancion", lyrics: "Mi letra" }, []);
+    // La sección existe y es la carta, no el botón de una fila.
+    expect(headings()).toContain("Letra");
+    expect(screen.queryAllByRole("button", { name: /Ver la letra de/ })).toHaveLength(0);
+    // Y va después de las pistas en el DOM: se comprueba la posición, no que
+    // "esté cerca", porque "estar en la página" no es lo que se pidió.
+    const pistas = screen.getByTestId("release-play-section");
+    const letra = document.querySelector('section[aria-labelledby="release-lyrics"]');
+    expect(letra).not.toBeNull();
+    expect(
+      pistas.compareDocumentPosition(letra as Node) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("un single sin letra NO monta la sección: no hay tarjeta vacía", async () => {
+    await renderPage({ id: "rel-single-sin-letra", lyrics: null }, []);
+    expect(headings()).not.toContain("Letra");
+    expect(bodyText()).not.toContain("Letra no disponible");
+    expect(bodyText()).not.toContain("Expandir");
+  });
+
+  it("un instrumental sí se anuncia, porque es un dato y no una ausencia", async () => {
+    // Sin letra no es lo mismo que sin canción: aquí SÍ se monta la carta, y
+    // por eso el filtro no puede ser solo "¿hay texto?".
+    await renderPage({ id: "rel-instrumental", lyrics: null, is_instrumental: true }, []);
+    expect(headings()).toContain("Letra");
+    expect(bodyText()).toContain("Instrumental");
+  });
+
+  it("y el filtro de la letra es UNO solo, no dos copias", () => {
+    // La fila del álbum y la carta del single deciden con el mismo helper. Dos
+    // copias divergirían en silencio: una escondería el placeholder y la otra no.
+    expect(leer("components", "ReleaseTrackList.tsx")).toContain("hasTrackLyrics");
+    expect(leer("components", "LyricsSection.tsx")).toContain("hasTrackLyrics");
+    expect(leer("lib", "release-page.ts")).toContain("export function hasTrackLyrics");
   });
 });

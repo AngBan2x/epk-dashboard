@@ -7,6 +7,7 @@ import { PageTransition, SlideIn } from "@/components/MotionWrappers";
 import { ReleaseActions } from "@/components/ReleaseActions";
 import { ReleaseTrackList } from "@/components/ReleaseTrackList";
 import { VideoShowcase } from "@/components/VideoShowcase";
+import { LyricsSectionWrapper } from "@/components/LyricsSectionWrapper";
 import { ReleaseVideoList } from "@/components/ReleaseVideoList";
 import { ProductionDetailsWrapper } from "@/components/ProductionDetailsWrapper";
 import { ImageGalleryWrapper } from "@/components/ImageGalleryWrapper";
@@ -22,8 +23,8 @@ import {
   sumDurations,
 } from "@/lib/null-safe";
 import { metricsTooltip } from "@/lib/metrics-source";
-import { getReleaseNeighbours, getReleaseWithTracks } from "@/lib/releases";
-import { NO_VALUE, ownDurationLabel, releaseTypeLabel, showableVideo } from "@/lib/release-page";
+import { getReleaseWithTracks } from "@/lib/releases";
+import { NO_VALUE, ownDurationLabel, releaseTypeLabel, showableVideo, hasTrackLyrics } from "@/lib/release-page";
 import { buildReleaseLinks, type ReleaseLink } from "@/lib/release-links";
 import { getSocialPlatform } from "@/lib/social-platforms";
 import { SocialPlatformIcon } from "@/components/ArtistSocialLinks";
@@ -148,16 +149,13 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   const totalDuration = sumDurations(childTracks.map((t) => t.duration));
   const durationLabel = (isMultiTrack ? totalDuration?.label : null) ?? ownDurationLabel(release);
 
-  const neighbours = await getReleaseNeighbours(release);
-
   /**
    * El artista, para el bloque de descargas de prensa.
    *
-   * `getReleaseNeighbours` ya lo busca por dentro para el catálogo, así que esto
-   * no introduce una fuente de datos nueva: es la **misma** fila de `artists`,
-   * leída por su nombre. Lo que hace falta es el `id`, porque `dossier` y
-   * `rider` lo exigen en servidor (`lib/export-bundle.ts` responde 400 sin él) y
-   * son las dos secciones por las que un periodista viene aquí.
+   * Es la misma fila de `artists`, leída por su nombre (`release.artist_name`).
+   * Lo que hace falta es el `id`, porque `dossier` y `rider` lo exigen en
+   * servidor (`lib/export-bundle.ts` responde 400 sin él) y son las dos
+   * secciones por las que un periodista viene a esta página.
    */
   const artist = await getArtistByName(release.artist_name);
 
@@ -464,6 +462,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                   releaseTitle={safeString(release.title)}
                   releaseCoverImage={release.cover_image}
                   releaseYoutubeVideoId={release.youtube_video_id || undefined}
+                  withLyrics={!isTrackRow}
                 />
               </section>
 
@@ -509,16 +508,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                 />
               ) : null}
 
-              {isTrackRow && hasProductionDetails(release.production_details) ? (
-                <section>
-                  <ProductionDetailsWrapper
-                    details={release.production_details}
-                    trackId={release.id}
-                    artistName={release.artist_name}
-                  />
-                </section>
-              ) : null}
-
               {isTrackRow && release.gallery_images && release.gallery_images.length > 0 ? (
                 <section>
                   <ImageGalleryWrapper
@@ -531,20 +520,14 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               ) : null}
 
               {/* ── 3 · Letra ────────────────────────────────────────────── */}
-              {release.lyrics ? (
-                <section aria-labelledby="release-lyrics">
-                  <h2
-                    id="release-lyrics"
-                    className="mb-4 text-xl font-bold text-slate-900 dark:text-white"
-                  >
-                    Letra
-                  </h2>
-                  <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-                    <p className="whitespace-pre-wrap font-mono text-sm text-slate-600 dark:text-slate-400">
-                      {release.lyrics}
-                    </p>
-                  </div>
-                </section>
+              {isTrackRow && (hasTrackLyrics(release.lyrics) || release.is_instrumental === true) ? (
+                <LyricsSectionWrapper
+                  lyrics={release.lyrics}
+                  isInstrumental={release.is_instrumental === true}
+                  trackId={release.id}
+                  artistName={release.artist_name}
+                  headingId="release-lyrics"
+                />
               ) : null}
             </div>
 
@@ -584,6 +567,25 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                       <ExternalLink key={link.key} link={link} />
                     ))}
                   </div>
+                </section>
+              ) : null}
+
+              {/* ── Ficha de producción ─────────────────────────────────────
+                Metadato del lanzamiento, en la barra lateral, debajo de los
+                enlaces. Una sola vez (`ProductionDetailsWrapper`) y solo
+                cuando la fila es una pista (`isTrackRow`). */}
+              {isTrackRow && hasProductionDetails(release.production_details) ? (
+                <section
+                  aria-labelledby="release-production"
+                  data-testid="release-production"
+                  className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700/50 dark:bg-slate-800"
+                >
+                  <ProductionDetailsWrapper
+                    details={release.production_details}
+                    trackId={release.id}
+                    artistName={release.artist_name}
+                    headingId="release-production"
+                  />
                 </section>
               ) : null}
 
@@ -636,38 +638,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                 />
               </section>
 
-              {/* ── Anterior / siguiente, SOBRE LANZAMIENTOS ─────────────────
-                Los vecinos llegan de `getReleaseNeighbours`, que usa el catálogo
-                del ARTISTA. No usan `getAllTracks()`: ese array mezcla las
-                cabeceras con todas sus hijas, así que el "siguiente" de un
-                álbum era su primer corte — y ese corte, desde P2, redirige a la
-                página del propio álbum. Un enlace que vuelve al sitio del que
-                saliste no es navegación. */}
-              {neighbours.previous || neighbours.next ? (
-                <nav
-                  aria-label="Otros lanzamientos del artista"
-                  className="flex items-stretch justify-between gap-3"
-                >
-                  {neighbours.previous ? (
-                    <NeighbourLink
-                      href={`/releases/${neighbours.previous.id}`}
-                      direction="previous"
-                      title={safeString(neighbours.previous.title)}
-                    />
-                  ) : (
-                    <span />
-                  )}
-                  {neighbours.next ? (
-                    <NeighbourLink
-                      href={`/releases/${neighbours.next.id}`}
-                      direction="next"
-                      title={safeString(neighbours.next.title)}
-                    />
-                  ) : (
-                    <span />
-                  )}
-                </nav>
-              ) : null}
             </aside>
           </div>
         </div>
@@ -708,47 +678,3 @@ function ExternalLink({ link }: { link: ReleaseLink }) {
   );
 }
 
-const CHEVRON_LEFT = "M15 19l-7-7 7-7";
-const CHEVRON_RIGHT = "M9 5l7 7-7 7";
-
-function NeighbourLink({
-  href,
-  direction,
-  title,
-}: {
-  href: string;
-  direction: "previous" | "next";
-  title: string;
-}) {
-  const isNext = direction === "next";
-  return (
-    <Link
-      href={href}
-      rel={isNext ? "next" : "prev"}
-      className={`group flex min-w-0 max-w-[48%] items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition-colors hover:border-primary-400 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-primary-600 dark:hover:text-primary-300 dark:focus-visible:ring-offset-slate-950 ${
-        isNext ? "flex-row-reverse text-right" : ""
-      }`}
-    >
-      <svg
-        className={`h-4 w-4 shrink-0 transition-transform ${
-          isNext ? "group-hover:translate-x-0.5" : "group-hover:-translate-x-0.5"
-        }`}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-        aria-hidden="true"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d={isNext ? CHEVRON_RIGHT : CHEVRON_LEFT} />
-      </svg>
-      <span className="min-w-0">
-        <span className="block text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
-          {isNext ? "Siguiente" : "Anterior"}
-        </span>
-        <span className="block truncate" title={title}>
-          {title}
-        </span>
-      </span>
-    </Link>
-  );
-}

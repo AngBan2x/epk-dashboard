@@ -17,6 +17,12 @@ interface ProductionDetailsProps {
   className?: string;
   isOwner?: boolean;
   trackId?: string;
+  /**
+   * `id` del `<h3>`. Quien lo monta dentro de una `<section>` de la barra
+   * lateral lo pasa para poder enlazarla con `aria-labelledby`: una región sin
+   * nombre accesible no se anuncia como región, y esta es metadato, no lectura.
+   */
+  headingId?: string;
   onDetailsUpdated?: (details: ProductionDetailsType) => void;
 }
 
@@ -25,6 +31,7 @@ export function ProductionDetails({
   className,
   isOwner = false,
   trackId,
+  headingId,
   onDetailsUpdated,
 }: ProductionDetailsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -122,7 +129,7 @@ export function ProductionDetails({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-100">
+          <h3 id={headingId} className="font-semibold text-lg text-slate-900 dark:text-slate-100">
             Ficha de Producción
           </h3>
           {isOwner && !isEditing && (

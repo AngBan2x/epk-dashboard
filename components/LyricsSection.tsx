@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { TrackLyrics } from "@/components/TrackLyrics";
 import { safeString } from "@/lib/null-safe";
+import { hasTrackLyrics } from "@/lib/release-page";
 import { cn } from "@/lib/utils";
 
 interface LyricsSectionProps {
@@ -11,6 +13,13 @@ interface LyricsSectionProps {
   trackId: string;
   isOwner: boolean;
   className?: string;
+  /**
+   * `id` del `<h2>` de la carta. Quien la monta en su propia `<section>` lo
+   * pasa para poder enlazarla con `aria-labelledby`: un `section` sin nombre
+   * accesible no se anuncia como región, y esta es la sección que un lector de
+   * pantalla tiene que poder saltar.
+   */
+  headingId?: string;
   onLyricsUpdated?: (lyrics: string | null, isInstrumental: boolean) => void;
 }
 
@@ -20,16 +29,22 @@ export function LyricsSection({
   trackId,
   isOwner,
   className,
+  headingId,
   onLyricsUpdated,
 }: LyricsSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editLyrics, setEditLyrics] = useState(lyrics || "");
   const [editInstrumental, setEditInstrumental] = useState(isInstrumental);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasLyrics = lyrics != null && lyrics.length > 0;
+  /**
+   * El `—` de `safeString` también cuenta como "no hay letra". Lo decide
+   * `hasTrackLyrics` (`lib/release-page.ts`), que es el mismo filtro que aplica
+   * la fila de un álbum: si aquí se aceptara el placeholder y allí no, la misma
+   * columna daría dos comportamientos según la página.
+   */
+  const hasLyrics = hasTrackLyrics(lyrics);
 
   const handleSave = async () => {
     setSaving(true);
@@ -69,12 +84,16 @@ export function LyricsSection({
         "bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800",
         className
       )}
+      aria-labelledby={headingId}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span>🎵</span> Letra
+          {/* Sin emoji delante: el `<h2>` es el texto que anuncia el lector de
+              pantalla, y un adorno pegado al texto se lee como parte del nombre
+              de la sección. */}
+          <h2 id={headingId} className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            Letra
           </h2>
           {isInstrumental && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
@@ -85,30 +104,16 @@ export function LyricsSection({
         <div className="flex items-center gap-2">
           {isOwner && !isEditing && (
             <button
+              type="button"
               onClick={() => setIsEditing(true)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-600"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
               </svg>
               Editar
             </button>
           )}
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-600"
-          >
-            {isExpanded ? "Contraer" : "Expandir"}
-            <svg
-              className={cn("w-3.5 h-3.5 transition-transform", isExpanded && "rotate-180")}
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -176,44 +181,42 @@ export function LyricsSection({
         )}
       </AnimatePresence>
 
-      {/* Display Mode */}
-      <AnimatePresence>
-        {isExpanded && !isEditing && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="max-h-96 overflow-y-auto rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 p-4">
-              {isInstrumental ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-4">
-                  Track instrumental — sin letra
-                </p>
-              ) : hasLyrics ? (
-                <pre className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300 font-sans leading-relaxed">
-                  {lyrics}
-                </pre>
-              ) : (
-                <p className="text-sm text-slate-400 dark:text-slate-500 italic text-center py-4">
-                  Letra no disponible
-                </p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Collapsed preview */}
-      {!isExpanded && !isEditing && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {isInstrumental
-            ? "Track instrumental"
-            : hasLyrics
-            ? `Preview: ${safeString(lyrics).slice(0, 120)}${(lyrics?.length ?? 0) > 120 ? "..." : ""}`
-            : "Letra no disponible"}
-        </p>
-      )}
+      {/* El desplegable. NO se pinta mientras se edita: en ese estado lo que
+          hay que ver es el formulario, y un botón de "Expandir" al lado no
+          hace nada visible. */}
+      {!isEditing ? (
+        <TrackLyrics
+          panelId={`letra-panel-${trackId}`}
+          label="Expandir"
+          expandedLabel="Contraer"
+          className="mt-4"
+          collapsedNote={(
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {isInstrumental
+                ? "Track instrumental"
+                : hasLyrics
+                ? `Preview: ${safeString(lyrics).slice(0, 120)}${(lyrics?.length ?? 0) > 120 ? "..." : ""}`
+                : "Letra no disponible"}
+            </p>
+          )}
+        >
+          <div className="max-h-96 overflow-y-auto rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 p-4">
+            {isInstrumental ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-4">
+                Track instrumental — sin letra
+              </p>
+            ) : hasLyrics ? (
+              <pre className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300 font-sans leading-relaxed">
+                {lyrics}
+              </pre>
+            ) : (
+              <p className="text-sm text-slate-400 dark:text-slate-500 italic text-center py-4">
+                Letra no disponible
+              </p>
+            )}
+          </div>
+        </TrackLyrics>
+      ) : null}
     </section>
   );
 }

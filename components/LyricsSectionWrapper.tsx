@@ -8,6 +8,8 @@ interface LyricsSectionWrapperProps {
   isInstrumental?: boolean;
   trackId: string;
   artistName: string;
+  /** Se reenvía tal cual: la carta se enlaza a su encabezado con él. */
+  headingId?: string;
 }
 
 export function LyricsSectionWrapper({
@@ -15,6 +17,7 @@ export function LyricsSectionWrapper({
   isInstrumental = false,
   trackId,
   artistName,
+  headingId,
 }: LyricsSectionWrapperProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [currentLyrics, setCurrentLyrics] = useState(lyrics);
@@ -38,6 +41,7 @@ export function LyricsSectionWrapper({
       isInstrumental={currentInstrumental}
       trackId={trackId}
       isOwner={isOwner}
+      headingId={headingId}
       onLyricsUpdated={(newLyrics, newInstrumental) => {
         setCurrentLyrics(newLyrics);
         setCurrentInstrumental(newInstrumental);

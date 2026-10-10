@@ -162,37 +162,3 @@ export async function resolveTrackRoute(id: string): Promise<TrackRoute> {
   return { kind: "release", href: `/releases/${parentId}` };
 }
 
-export interface ReleaseNeighbours {
-  previous: Track | null;
-  next: Track | null;
-}
-
-/**
- * ## Anterior / siguiente, y sobre qué
- *
- * Sobre **releases**, nunca sobre hijas. `getAllTracks()` (que es lo que usa
- * `/track/[id]`) devuelve las 18 cabeceras y todas las hijas en un solo array,
- * así que el contador avanzaba por una pista de un álbum: el "siguiente" de un
- * álbum era su primer corte, y ese corte ahora redirige a la página del
- * propio álbum. Un enlace de navegación que vuelve al sitio del que saliste no
- * es navegación.
- *
- * El orden es el de `getArtistCatalog` (`release_date DESC`), que ya agrupa por
- * lanzamiento y solo trae aprobados — así que el vecino de un borrador es el
- * release aprobado más cercano del mismo artista, no una hija.
- */
-export async function getReleaseNeighbours(release: Track): Promise<ReleaseNeighbours> {
-  const empty: ReleaseNeighbours = { previous: null, next: null };
-
-  const artist = await getArtistByName(release.artist_name);
-  if (!artist) return empty;
-
-  const groups = await getArtistCatalog(artist.id);
-  const index = groups.findIndex((group) => group.release.id === release.id);
-  if (index === -1) return empty;
-
-  return {
-    previous: index > 0 ? groups[index - 1].release : null,
-    next: index < groups.length - 1 ? groups[index + 1].release : null,
-  };
-}

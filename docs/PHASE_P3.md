@@ -95,6 +95,20 @@ invertida.
 El tercero es el más barato de los tres y el que más cuesta después: un `OK` en
 verde es justo lo que hace que nadie mire la captura.
 
+## Ficha de release (`app/releases/[id]/page.tsx`) — Parte A, B, C
+
+### Qué se hizo
+- **A**: `getReleaseNeighbours` eliminado (`lib/releases.ts` limpio); sin bloque `prev`/`next` en `app/releases/[id]/page.tsx`; test `tests/unit/release-page.test.ts` cubre la ausencia.
+- **B**: `ProductionDetails` montado una sola vez en `aside`, debajo de `Enlaces Externos` (`page.tsx:602-615`), no en la columna principal.
+- **C**: letra interactiva con `LyricsSection` (no `LyricsModal`, borrado en `0b5efa5`). Multipista: cada fila de `ReleaseTrackList` (`withLyrics`) lleva `TrackLyrics` (`aria-expanded`/`aria-controls`). Single: `LyricsSectionWrapper` debajo del listado (`isTrackRow`). Sin letra (`lyrics` es `null`/`""`/`"—"`) no se monta botón (`hasTrackLyrics` filtra).
+
+### Por qué la etiqueta del tipo dice lo que dice la columna
+`releaseTypeLabel` (`lib/release-page.ts`) devuelve lo que dice `release.release_type` (`album`/`ep`/`single` en minúsculas); no inventa `"EP"` sobre singles con hijas (`_hasChildren` ignorado a propósito). El badge coincide con la columna y con `generateMetadata`, evitando la contradicción de `2376240`.
+
+### Letra interactiva usa `LyricsSection`
+`LyricsModal` está muerto; el control real es `LyricsSection` (`components/LyricsSection.tsx`) montado por `LyricsSectionWrapper`. El estado `isOpen` es real (`useState` en `LyricsSection` y `TrackLyrics`); `aria-expanded` y `aria-controls` reflejan el mismo `isOpen`, y el panel usa `hidden={!isOpen}`. No hay estado paralelo.
+
+---
 ## Deudas conocidas (origen de P4/P5)
 - Approval con doble sistema (tracks.status vs submissions) sin unificar.
 - `ITunesSearch` invisible al inicio; ownership releases por nombre; `PUT` pierde `type`; POST siempre `draft`.

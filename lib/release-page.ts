@@ -156,6 +156,31 @@ export function releaseRowDurationLabel(track: Track): string {
 }
 
 /**
+ * ## Si esta fila tiene letra que enseñar
+ *
+ * La pregunta no es "¿`lyrics` es truthy?" sino "¿hay algo que abrir?", y la
+ * diferencia la marca `safeString` (`lib/null-safe.ts`): una columna vacía llega
+ * como el string **truthy** `"—"`, no como `""`. Un `lyrics != null` pintaría un
+ * botón de "ver letra" sobre las pistas cuya letra nadie escribió, y ese botón
+ * se abriría sobre un guion: exactamente el control que no hace nada que este
+ * repo ya pagó con el play de una pista sin audio.
+ *
+ * Por eso `NO_VALUE` se compara aquí y no en quien llama, y por eso devuelve
+ * tipo **guard**: quien pinta recibe el `string` ya estrecho y no necesita un
+ * cast para leerlo.
+ *
+ * Vive en este módulo y no en el componente por la razón de siempre: la decisión
+ * la toman la fila de un álbum (`components/ReleaseTrackList.tsx`) y la del
+ * propio single (`app/releases/[id]/page.tsx`), y dos copias divergirían en
+ * silencio: una enseñaría el guion y la otra lo escondería.
+ */
+export function hasTrackLyrics(lyrics: string | null | undefined): lyrics is string {
+  if (typeof lyrics !== "string") return false;
+  const trimmed = lyrics.trim();
+  return trimmed !== "" && trimmed !== NO_VALUE;
+}
+
+/**
  * ## El vídeo de una fila, y si se puede enseñar como el videoclip de la pista
  *
  * `tracks.video_kind` (RC.33, Ola 4) tiene tres valores y **solo uno** es el
