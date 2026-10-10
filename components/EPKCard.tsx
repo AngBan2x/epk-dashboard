@@ -14,11 +14,11 @@ import {
 } from "@/lib/null-safe";
 import { releaseTypeLabel } from "@/lib/release-page";
 import { imageOptimizationProps } from "@/lib/image-config";
-import { AudioPlayer } from "@/components/AudioPlayer"; import { buildReleaseQueue } from "@/components/ReleaseTrackList";
-import { useState, useEffect } from "react";
+import { AudioPlayer } from "@/components/AudioPlayer";
+import { buildReleaseQueue } from "@/components/ReleaseTrackList";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useAudioPlayer, type ActiveTrack } from "@/context/AudioPlayerContext";
-import { isQueueItemPlayable } from "@/lib/audio-priority";
 import { sumDurations } from "@/lib/null-safe";
 import type { YouTubeStatPair } from "@/lib/youtube";
 import {
@@ -192,30 +192,38 @@ export function EPKCard({
   })();
 
   /**
-   * P2: fila padre de un lanzamiento (álbum/EP) = NO reproducible por sí misma.
+   * P2: fila padre de un lanzamiento (álbum/EP). Solo sirve paraarle a
+   * `AudioPlayer` que **tiene hijas**, que es lo que decide si, cuando nada
+   * suena, se pinta un botón apagado o directamente la frase honesta (ver el
+   * prop `hasChildren`).
    *
-   * Antes se montaba `<AudioPlayer>` con los datos del padre, que no tiene
-   * audio propio: `lib/db.ts` convierte el `audio_preview_url` vacío en el
-   * string **truthy** `"—"`, así que un `if (url)` no lo filtra y el botón
-   * quedaba activo sin hacer nada. Peor aún cuando el padre sí trae
-   * `youtube_video_id`: `hasPlayableSource` devuelve `true` (YouTube sí es
-   * fuente reproducible) y el botón "sonaba" un vídeo que no es la pista.
-   *
-   * Aquí la fila padre no se reproduce: se reproduce **la cola** de sus hijas,
-   * que es lo que el usuario pidió (cola completa con avance automático). El
-   * botón de la tarjeta queda deshabilitado y su etiqueta dice la verdad.
+   * Lo que ya **no** se decide aquí es si el botón funciona: eso lo decide
+   * `AudioPlayer` contando las pistas reproducibles de la cola. Preguntarlo
+   * también en la tarjeta era tener la misma respuesta escrita dos veces, y fue
+   * justo como la tarjeta acabó diciendo "no hay audio" con una cola llena.
    */
   const isReleaseParent = Array.isArray(childrenTracks) && childrenTracks.length > 0;
+
+  const coverImage = getCoverImage(track);
+
   /**
-   * `isQueueItemPlayable` (no `hasPlayableSource`) porque lo que hay que
-   * contar son los ítems de la COLA, y esa es exactamente la misma predicate
-   * que usa `createQueue` para elegir por dónde empezar. Preguntar por otra
-   * cosa ("¿esta fila suena?") daría un número distinto al que el reproductor
-   * va a poder seguir, y volvería a aparecer un "3 pistas" que al pulsar se
-   * salta a otra.
+   * La cola del lanzamiento, en la **misma fuente de verdad** que la ficha de
+   * release: `buildReleaseQueue` (`components/ReleaseTrackList.tsx:75-113`).
+   * Dos copias de esta construcción —una aquí y otra en `ReleaseTrackList`—
+   * acabarían divergiendo: la tarjeta diría "4 pistas" y la lista pondría 3.
+   *
+   * Se calcula con `useMemo` **siempre**, no solo dentro de la rama del álbum:
+   * un hook dentro de un `&&` se salta en cuanto la condición cambia, y eso es
+   * la forma más directa de romper las reglas de hooks sin que salte ningún
+   * aviso. Además está antes de cualquier `return` de este componente.
+   *
+   * `coverImage` se calcula justo arriba y no más abajo a propósito: si viviera
+   * debajo de este `useMemo`, se leería en TDZ y reventaría en el primer render.
    */
-  const playableRows = queue?.filter(isQueueItemPlayable) ?? [];
-  const hasQueue = isReleaseParent && playableRows.length > 0;
+  const playerQueue = useMemo<ActiveTrack[]>(
+    () => buildReleaseQueue(childrenTracks ?? [], coverImage || undefined, track.youtube_video_id || undefined),
+    [childrenTracks, coverImage, track.youtube_video_id]
+  );
 
   useEffect(() => {
     // Fetch initial like count and user's liked state
@@ -271,7 +279,6 @@ export function EPKCard({
     }
   };
 
-  const coverImage = getCoverImage(track);
   // La portada es la superficie clicable de la tarjeta, pero SOLO si hay ficha
   // a la que ir. Sin `detailHref` sigue siendo una imagen y no un enlace falso.
   const coverLink = detailHref ? (
@@ -345,11 +352,11 @@ export function EPKCard({
         </button>
         {/*
           Badge "Nuevo", y el único que queda sobre la portada. El de
-          "Multipista" se fue en RC.33 (ver `hasQueue`): repetía en texto lo que
-          el botón de cola ya dice —"Reproducir • 12 pistas"—, no tenía etiqueta
-          accesible, y la condición que lo traía (`isReleaseParent ||
-          track.release_id`) metía en la misma etiqueta cosas distintas, que es
-          un lanzamiento con hijas y una fila hija suelta.
+          "Multipista" se fue en RC.33: repetía en texto lo que el botón de
+          cola ya dice —"Reproducir • 12 pistas"—, no tenía etiqueta accesible, y
+          la condición que lo traía (`isReleaseParent || track.release_id`) metía
+          en la misma etiqueta cosas distintas, que es un lanzamiento con hijas
+          y una fila hija suelta.
 
           Se simplificó el contenedor: al quedar un solo badge no hace falta la
           columna ni el `max-w-[70%]`, así que el `<span>` positioning se hace
@@ -418,7 +425,8 @@ export function EPKCard({
               reporto el usuario, repartido en dos paginas. El helper vive en
               `lib/release-page.ts`.
             */}
-            {releaseTypeLabel(track.release_type, (childrenTracks?.length ?? 0) > 0)}          </span>
+            {releaseTypeLabel(track.release_type, (childrenTracks?.length ?? 0) > 0)}
+          </span>
           <span>·</span>
           <span className="inline-flex items-center gap-1">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -445,8 +453,8 @@ export function EPKCard({
         </div>
 
         {/*
-          P2 / RC.33 — fila padre de un lanzamiento: **un solo control**, y es
-          el que funciona.
+          P2 / RC.33 / RC.35 — fila padre de un lanzamiento: **un solo control**,
+          y es el que funciona.
 
           Antes este bloque pintaba DOS controles contradictorios: un botón
           `disabled` con un círculo tachado y el texto "Este lanzamiento no
@@ -456,30 +464,39 @@ export function EPKCard({
           que existe, el tachado— y además era mentira: el lanzamiento sí
           suena, desde sus hijas.
 
-          Ahora:
-          - Si hay cola reproducible, el control es un play circular real, con
-            el mismo lenguaje visual que el de `AudioPlayer` (40px, `rounded-full`,
-            `bg-primary-600`, triángulo `M8 5v14l11-7z`). El texto va **al lado,
-            como etiqueta legible**, no como enlace disfrazado.
-          - Si hay hijas pero ninguna es reproducible, no se pinta NINGÚN
-            control: solo la frase honesta. Un botón apagado ahí sería ruido
-            igual de vacío.
+          Ahora no hay dos controles, y tampoco una rama que los decida: hay un
+          `<AudioPlayer>`, que es el único sitio donde se decide qué pintar, y
+          la tarjeta solo le pasa los datos:
 
-          La etiqueta es `Reproducir • <fuente>`, y es el **mismo patrón que
-          escribe `AudioPlayer`** en una pista suelta (línea 260: `{statusText} •
-          {primarySource.label}` → "Reproducir • Preview (30s)", "Reproducir •
-          YouTube"). Aquí `<fuente>` son las N hijas. La palabra "Escuchar" se
-          retiró porque era una **tercera** manera de nombrar la misma acción:
-          con "Reproducir", "Escuchar N pistas" y "▶" conviviendo en la misma
-          tarjeta, el visitante no sabía si eran el mismo control. El `aria-label`
-          del botón sigue siendo "Reproducir N pistas de <título>", porque ahí sí
-          cuenta quién reproduce y qué.
+          - `queue` = la cola del lanzamiento, o `undefined` si esta fila no es
+            cabecera. El `AudioPlayer` cuenta cuántas de esas pistas suenan y
+            solo entonces pinta botón. Que la decisión viva **ahí** y no aquí es
+            lo que arregló el commit `4592bd3`: aquí se pintaba el reproductor
+            siempre, y como el decidía por la fila cabecera (que no tiene audio
+            propio) le salía "No hay audio disponible" sobre *OK Computer*.
+          - `hasChildren` = "esta fila tiene hijas". Es lo único que distingue
+            el álbum sin audio (frase honesta, sin botón) de una pista suelta
+            sin audio (botón apagado con altavoz).
+
+          La etiqueta la escribe `AudioPlayer`, con el patrón único de la casa
+          `Reproducir • <fuente>`: `<fuente>` es "Preview (30s)" o "YouTube" en
+          una pista, y "N pistas" en un lanzamiento. El `aria-label` del botón es
+          "Reproducir N pistas de <título>", porque en una rejilla de doce
+          botones "Reproducir" a secas no dice nada.
 
           El estado de la cola no vive aquí: vive en `useAudioPlayer()`, y esta
-          tarjeta solo llama a `playQueue` con el array que le pasó quien tiene
-          las hijas.
+          tarjeta solo le pasa el array que le dio quien tiene las hijas.
         */}
-        <AudioPlayer           id={track.id}           src={track.audio_preview_url}           title={track.title}           artist={track.artist_name || undefined}           coverImage={coverImage || undefined}           track={track}           queue={isReleaseParent ? (queue || buildReleaseQueue(childrenTracks || [], coverImage || undefined, track.youtube_video_id || undefined)) : undefined}         />
+        <AudioPlayer
+          id={track.id}
+          src={track.audio_preview_url}
+          title={track.title}
+          artist={track.artist_name || undefined}
+          coverImage={coverImage || undefined}
+          track={track}
+          queue={isReleaseParent ? queue || playerQueue : undefined}
+          hasChildren={isReleaseParent}
+        />
 
         {/*
           Stats footer. RC.33 · Ola 3: `streams` y `saves` traen "—" cuando no

@@ -7,12 +7,29 @@ import { AudioPlayerContext, type ActiveTrack } from "@/context/AudioPlayerConte
 import {
   getAudioSources,
   hasPlayableSource,
+  isQueueItemPlayable,
   isUsableAudioUrl,
+  resolvePlayingLabel,
   resolvePlaybackTimeline,
-  getPlayableAudioSource,
-  isPlayableAudioSource,
   type AudioSourceType,
 } from "@/lib/audio-priority";
+
+/**
+ * El reproductor **no** lleva botón cuando le dicen que hay pistas pero ninguna
+ * suena. Son dos frases distintas y no un `else`, porque son dos problemas que
+ * se arreglan en sitios distintos: `NO_AUDIO_TEXT` es el de una fila que no
+ * tiene preview ni vídeo (se arregla en el formulario de release), y
+ * `NO_CHILDREN_TEXT` es el de un lanzamiento cuyas hijas no tienen fuente (se
+ * arregla subiendo pistas). Juntas en un texto único, el visitante no sabe
+ * cuál de las dos cosas arreglar.
+ *
+ * Sin punto final y con mayúscula inicial a propósito: es el string literal que
+ * comprueban `tests/unit/no-audio-y-enlace-al-artista.test.ts` y
+ * `tests/unit/epkcard-audio-control.test.ts`, y se lee pegado al resto de la
+ * tarjeta.
+ */
+export const NO_AUDIO_TEXT = "No hay audio disponible";
+export const NO_CHILDREN_TEXT = "Ninguna de sus pistas tiene audio disponible";
 
 interface AudioPlayerProps {
   src: string | undefined;
@@ -35,12 +52,32 @@ interface AudioPlayerProps {
    */
   queue?: ActiveTrack[];
   queueStartIndex?: number;
+  /**
+   * Esta tarjeta es la fila **cabecera** de un lanzamiento y tiene hijas.
+   *
+   * Es el único dato que separa los dos casos de "no suena", que si no se
+   * confunden:
+   *
+   * - Una pista suelta sin preview ni vídeo (`hasChildren` falso): botón
+   *   apagado con altavoz y "No hay audio disponible". Botón porque el problema
+   *   es **esta** fila y el control explica por qué.
+   * - Un álbum cuyas hijas no tienen fuente: **ningún** botón y "Ninguna de sus
+   *   pistas tiene audio disponible". Aquí un botón apagado sería ruido igual de
+   *   vacío —dice "no hay audio" sobre un disco que sí tiene pistas— y además
+   *   daría a entender que arreglarlo es cosa del botón.
+   *
+   * Es un prop y no una rama en `EPKCard` porque el markup del control (icono
+   * de play, altavoz, `disabled`, `aria-disabled`, texto de estado) es uno solo:
+   * duplicarlo en la tarjeta es exactamente cómo dos copias del mismo icono
+   * acabaron divergiendo antes (ver el comentario de `MutedSpeakerIcon`).
+   */
+  hasChildren?: boolean;
 }
 
 // Debounce map: track IDs that have already been counted in this session
 const countedStreams = new Set<string>();
 
-export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, queueStartIndex = 0 }: AudioPlayerProps) {
+export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, queueStartIndex = 0, hasChildren = false }: AudioPlayerProps) {
   const localAudioRef = useRef<HTMLAudioElement>(null);
   const [localPlaying, setLocalPlaying] = useState(false);
   const globalPlayer = useContext(AudioPlayerContext);
@@ -53,10 +90,49 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
 
   const resolvedId = id || src || track?.youtube_video_id || "unknown";
 
-  // ¿Suena algo? No "¿tiene links?": una pista con solo Spotify/Apple Music
-  // tiene `embedUrl` pero nadie lo renderiza, así que su play sería un botón
-  // que no hace nada (que es justo el bug que se pidió eliminar).
-  const canPlay = track ? hasPlayableSource(track) : isUsableAudioUrl(src);
+  /**
+   * Cuántas pistas de la cola suenan de verdad.
+   *
+   * `isQueueItemPlayable` y no `queue.length`: quien llama puede no haber
+   * filtrado las hijas mudas, y decir "4 pistas" sobre una cola que solo
+   * reproduce 2 es la misma mentira que un botón que no hace nada — con el
+   * agravante de que al pulsar el contador "2/4" no cuadra con lo que suena.
+   */
+  const playableQueueCount = queue?.filter(isQueueItemPlayable).length ?? 0;
+  /** ¿Lo que va a sonar es la cola (álbum) y no esta fila? */
+  const playsQueue = playableQueueCount > 0;
+
+  /**
+   * ¿Suena algo? Y "algo" tiene que incluir **la cola**.
+   *
+   * Aquí estaba el bug que tumbó 6 tests: la pregunta se hacía solo sobre
+   * `track`, y para un álbum esa es la fila **cabecera**, que por definición no
+   * tiene audio propio (su `audio_preview_url` es el `"—"` truthy de
+   * `lib/db.ts`). Salía `false` con una cola llena de pistas reproducibles, así
+   * que la tarjeta de *OK Computer* pintaba "No hay audio disponible" sobre un
+   * disco que sí suena. El reproductor ignoraba la cola al decidir si podía
+   * sonar.
+   *
+   * El orden no es caprichoso: la cola manda cuando viene informada, y `track`/
+   * `src` siguen mandando cuando no viene — que es el caso single, y el que
+   * localizan los 20 specs E2E por `button[aria-label="Reproducir"]`.
+   */
+  const canPlay = playsQueue || (track ? hasPlayableSource(track) : isUsableAudioUrl(src));
+
+  /**
+   * Un lanzamiento sin ninguna hija reproducible: aquí **no** se pinta botón.
+   * La alternativa (un botón apagado) es la que montó el commit `4592bd3`, y es
+   * justo lo que prohíbe `tests/unit/epkcard-audio-control.test.ts`.
+   */
+  const silentQueue = hasChildren && !canPlay;
+
+  /**
+   * `pista`/`pistas` compartido por el `aria-label` y por el texto visible, para
+   * que no puedan decir números distintos. El singular no es decorativo: hay un
+   * test con `(?!s)` en contra, porque "1 pistas" fue lo que salió al principio.
+   */
+  const queueCountLabel =
+    playableQueueCount === 1 ? "1 pista" : `${playableQueueCount} pistas`;
 
   /**
    * `isYouTube` solo cuando NO hay preview: una pista con preview **y**
@@ -94,8 +170,21 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
 
   // Determine if this track is the current global track — prefer id comparison to avoid
   // YouTube-only tracks colliding on shared audioUrl "—"
+  //
+  // La fila **cabecera** de un lanzamiento no aparece nunca en su propia cola:
+  // lo que suena es una hija, con otro `id`. Comparando solo ids, la tarjeta
+  // del álbum se quedaba en "Reproducir" mientras su cola sonaba, y el segundo
+  // clic no pausaba: volvía a llamar a `playQueue` y **reiniciaba el disco desde
+  // la pista 1**. Por eso, con cola, basta con que la pista en curso sea *una*
+  // de las de la cola.
+  const isQueueTrackActive =
+    playsQueue && globalPlayer?.activeTrack != null
+      ? queue?.some((item) => item.id === globalPlayer.activeTrack?.id) ?? false
+      : false;
+
   const isCurrentGlobal = globalPlayer
-    ? (Boolean(id)
+    ? isQueueTrackActive ||
+      (Boolean(id)
         ? globalPlayer.activeTrack?.id === id
         : globalPlayer.activeTrack?.audioUrl === src)
     : false;
@@ -216,12 +305,44 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
   };
 
   const statusText = !canPlay
-    ? "No hay audio disponible"
+    ? silentQueue
+      ? NO_CHILDREN_TEXT
+      : NO_AUDIO_TEXT
     : globalIsLoading && isCurrentGlobal
       ? "Cargando..."
       : isPlaying
         ? "Reproduciendo..."
         : "Reproducir";
+
+  /**
+   * El patrón único de la casa: `{acción} • {fuente}`.
+   *
+   * Para un single la fuente es `resolvePlayingLabel`, que dice lo que **suena**
+   * (preview o YouTube) y no lo que tiene más prioridad — una pista con Spotify
+   * + YouTube se anunciaba como "Spotify" mientras sonaba el vídeo.
+   *
+   * Para un álbum la "fuente" son sus N pistas reproducibles, y por eso el
+   * separador es el mismo: el visitante no tiene que aprender dos vocabularios
+   * para el mismo botón.
+   */
+  const sourceSuffix = canPlay
+    ? ` • ${playsQueue ? queueCountLabel : resolvePlayingLabel(track, isYouTubeMode)}`
+    : "";
+
+  /**
+   * El `aria-label` cambia **solo** en el caso de la cola.
+   *
+   * En un single se queda en "Reproducir"/"Pausar" a propósito: es lo que
+   * localizan 20 tests E2E (`audio-player-stress.spec.ts`,
+   * `audio-playback.spec.ts`) con el selector exacto
+   * `button[aria-label="Reproducir"]`. En un álbum el nombre corto sería
+   * inútil —doce botones "Reproducir" en una rejilla— así que ahí sí dice
+   * cuántas pistas y de qué lanzamiento.
+   */
+  const actionLabel = isPlaying ? "Pausar" : "Reproducir";
+  const buttonAriaLabel = playsQueue
+    ? `${actionLabel} ${queueCountLabel} de ${safeString(title, "este lanzamiento")}`
+    : actionLabel;
 
   /**
    * Aviso de segmento, cuando los `start_time`/`end_time` del catálogo no son
@@ -232,19 +353,28 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
   return (
     <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
       <div className="flex items-center gap-3">
-        {/* El `aria-label` se mantiene en "Reproducir"/"Pausar" a propósito: es lo
-            que localizan 20 tests E2E (`audio-player-stress.spec.ts`,
-            `audio-playback.spec.ts`). El estado vacío se comunica con `disabled`,
-            `aria-disabled` y el texto visible, no robando el nombre accesible. */}
-        <button
-          onClick={togglePlay}
-          disabled={!canPlay}
-          aria-disabled={!canPlay}
-          className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-primary-600"
-          aria-label={isPlaying ? "Pausar" : "Reproducir"}
-        >
-          {playButton}
-        </button>
+        {/*
+          El botón se **omite entero** cuando el lanzamiento tiene pistas pero
+          ninguna suena (`silentQueue`). Ponerlo apagado era lo que hacía el
+          commit `4592bd3`: un control que no hace nada y una etiqueta que dice
+          "no hay audio" sobre un disco que sí tiene pistas. El texto de abajo
+          dice la verdad sola.
+
+          En el resto de casos el botón va siempre, incluso sin fuente: ahí sí
+          explica el motivo (`MutedSpeakerIcon` + "No hay audio disponible"), y
+          su `aria-label` corto es lo que localizan los 20 specs E2E.
+        */}
+        {!silentQueue && (
+          <button
+            onClick={togglePlay}
+            disabled={!canPlay}
+            aria-disabled={!canPlay}
+            className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-primary-600"
+            aria-label={buttonAriaLabel}
+          >
+            {playButton}
+          </button>
+        )}
 
         <div className="flex-1 min-w-0">
           {/* Local Audio Element (solo sin reproductor global: el global es quien
@@ -261,9 +391,12 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
 
           {/* Audio Info */}
           <div className="flex-1 min-w-0">
-            <p className={`text-xs truncate ${canPlay ? "text-slate-600 dark:text-slate-300" : "text-slate-400"}`}>
+            <p
+              className={`text-xs truncate ${canPlay ? "text-slate-600 dark:text-slate-300" : "text-slate-400"}`}
+              data-testid="audio-player-status"
+            >
               {statusText}
-              {canPlay && (() => { const playableSource = track ? getPlayableAudioSource(track) : null; const label = isYouTubeMode ? "YouTube" : (playableSource?.label ?? primarySource?.label ?? "Audio"); return ` • ${label}`; })()}
+              {sourceSuffix}
             </p>
             {segmentWarning && (
               <p className="text-[11px] text-amber-700 dark:text-amber-400">
@@ -272,7 +405,6 @@ export function AudioPlayer({ src, title, id, artist, coverImage, track, queue, 
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

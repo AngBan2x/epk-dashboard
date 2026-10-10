@@ -182,6 +182,43 @@ export function getPlayableAudioSource(track: TrackAudioInfo | null | undefined)
 }
 
 /**
+ * Etiqueta honesta de lo que **realmente suena** (no de lo que tiene más
+ * prioridad).
+ *
+ * El bug que arregla: el reproductor escribía `primarySource.label`, y
+ * `primarySource` es `getAudioSources(track)[0]`, o sea la fuente de **mayor
+ * prioridad**. Con una pista que trae Spotify (90) + `youtube_video_id` (50) y
+ * sin preview, la cabecera decía "Spotify" mientras lo que sonaba era el vídeo
+ * — y Spotify no suena nunca (`isPlayableAudioSource` lo dice). El usuario lo
+ * reportó como "me pone Spotify y lo que suena es otra cosa".
+ *
+ * ## Por qué sale de `getPlayableAudioSource` y no de `getAudioSources`
+ *
+ * Porque tiene que ser **la misma predicate** que decide si hay botón. Si la
+ * etiqueta y el botón se apoyaran en dos filtros distintos, volvería a existir
+ * el caso "hay botón y la etiqueta describe otro medio", que es exactamente el
+ * bug. Aquí, o la función devuelve la fuente que el reproductor va a montar, o
+ * devuelve el genérico y ya no se está prometiendo nada en concreto.
+ *
+ * `isYouTubeMode` es el respaldo para cuando **no hay fila** que consultar (el
+ * reproductor recibió solo `src` + un `ActiveTrack` con `videoId`): entonces el
+ * `videoId` vive en la cola, no en la fila del catálogo.
+ *
+ * Vive aquí y no en el componente porque este módulo es puro a propósito
+ * (sin React, sin DOM): así se testea en `environment: "node"`, que es como
+ * corren casi todos los tests de `tests/unit/`.
+ */
+export function resolvePlayingLabel(
+  track: TrackAudioInfo | null | undefined,
+  isYouTubeMode = false,
+): string {
+  const playable = getPlayableAudioSource(track);
+  if (playable) return playable.label;
+  if (isYouTubeMode) return 'YouTube';
+  return 'Audio';
+}
+
+/**
  * CONTRATO PÚBLICO (D2 → tarjetas): desde una fila de catálogo, ¿hay algo que
  * pulsar? No pregunta "¿tiene links?", pregunta "¿suena algo?".
  */

@@ -112,3 +112,103 @@ verde es justo lo que hace que nadie mire la captura.
   el lightbox, que es lo que piden esas licencias. Y los tres avatares de banda son
   fotos de escenario, no retratos: es una decisión documentada, pero es lo primero
   que conviene revisar si mañana entran bandas nuevas.
+
+---
+
+## RC.35 · Consolidar el reproductor en `AudioPlayer` (y por qué el commit se rompió)
+
+El commit `4592bd3` quitó `StemsPlayer` y `LyricsModal` y dejó **un solo**
+reproductor. La decisión era correcta; la implementación no. Este es el
+registro de lo que estaba roto y de las dos decisiones que no son obvias.
+
+### Qué se consolidó
+
+`StemsPlayer` y `LyricsModal` se borraron, y las filas de `ReleaseTrackList` y
+la tarjeta de `EPKCard` pasan a hablar con el mismo `AudioPlayer` y el mismo
+`AudioPlayerContext`. La cola de un lanzamiento se construye con
+`buildReleaseQueue` (`components/ReleaseTrackList.tsx:75-113`) en los dos sitios:
+una sola fuente de verdad, porque dos copias de esa construcción acaban
+divergiendo y la tarjeta dice "4 pistas" mientras la lista pone 3.
+
+### Por qué el álbum sin audio no lleva botón
+
+**Un álbum cuyas hijas no tienen fuente no pinta NINGÚN control**, solo la
+frase *"Ninguna de sus pistas tiene audio disponible"*.
+
+La asimetría con la fila suelta no es capricho: son dos problemas que se
+arreglan en sitios distintos.
+
+| Caso | Qué se pinta | Por qué |
+|------|--------------|---------|
+| Fila suelta sin preview ni vídeo | Botón **apagado** con altavoz + "No hay audio disponible" | El problema es **esta fila**; el control explica qué le pasa |
+| Lanzamiento con hijas, ninguna reproducible | **Ningún botón** + "Ninguna de sus pistas tiene audio disponible" | No hay fila que explicar: hay pistas que subir |
+
+Un botón apagado en el segundo caso diría "no hay audio" sobre un disco que sí
+tiene pistas, y además daría a entender que arreglarlo es cosa del botón. El
+dato que separa los dos casos es `hasChildren`, y se pasa como prop en vez de
+ramificar en `EPKCard`: el markup del control es uno solo, y duplicarlo en la
+tarjeta es exactamente cómo dos copias del mismo icono acabaron divergiendo
+antes (ver el comentario de `MutedSpeakerIcon`).
+
+### El bug de fondo: `canPlay` ignoraba la cola
+
+`canPlay` se preguntaba **solo** sobre `track`. Para un álbum, `track` es la
+fila **cabecera**, que por definición no tiene audio propio —su
+`audio_preview_url` es el `"—"` truthy que deja `lib/db.ts`—, así que salía
+`false` con la cola llena de pistas reproducibles. Resultado: la tarjeta de
+*OK Computer* pintaba "No hay audio disponible" sobre un disco que sí suena.
+Tumbó 6 tests que ya existían.
+
+La regla que sale de ahí: **lo que va a sonar es la cola o la fila, y hay que
+preguntarlo a la cola**. Ahora es
+`playsQueue || (track ? hasPlayableSource(track) : isUsableAudioUrl(src))`, y el
+orden importa: la cola manda cuando viene informada, y `track`/`src` siguen
+mandando cuando no — que es el caso single, y el que localizan los 20 specs E2E
+con el selector exacto `button[aria-label="Reproducir"]`. Por eso el
+`aria-label` largo ("Reproducir 2 pistas de OK Computer") **solo** se usa en el
+caso de la cola.
+
+### Dos bugs más que salieron al arreglar el primero
+
+**Pausa que reiniciaba el disco.** La fila cabecera no aparece nunca en su
+propia cola: lo que suena es una hija, con otro `id`. Comparando solo ids, la
+tarjeta del álbum se quedaba en "Reproducir" mientras su cola sonaba, y el
+segundo clic no pausaba: volvía a llamar a `playQueue` y **reiniciaba el álbum
+desde la pista 1**. Ahora, con cola, basta con que la pista en curso sea *una*
+de las de la cola.
+
+**Etiqueta de fuente que mentía.** Una pista con Spotify (prioridad 90) +
+`youtube_video_id` (50) y sin preview se anunciaba como "Spotify" mientras
+sonaba el vídeo — Spotify no suena nunca. `resolvePlayingLabel` sale de
+`getPlayableAudioSource`, o sea de la **misma predicate** que decide si hay
+botón, para que la etiqueta y el botón no puedan discrepar. Vive en
+`lib/audio-priority.ts` y no en el componente porque ese módulo es puro a
+propósito: así se testea sin DOM.
+
+### Por qué los tests verifican el fallo al revertir
+
+Los tres ficheros que este commit añadió —
+`release-player-unified`, `epk-card-unified` y `stems-dead-code` — tenían **9
+tests que eran literalmente `expect(true).toBe(true)`**. No comprobaban nada.
+Son exactamente la razón por la que el commit parecía verde mientras seis tests
+de verdad estaban en rojo, y por la que un reintroducir `StemsPlayer` con un
+import y sin montarlo en ninguna vista no habría roto la build.
+
+Un test que no falla al revertir su arreglo no protege de nada. Por eso los 25
+que hay ahora se escribieron mirando lo que rompen, y se comprobaron uno a uno
+revirtiendo el arreglo:
+
+| Se revierte | Se ponen rojos |
+|------------|---------------|
+| `canPlay` vuelve a ignorar la cola | 12 tests (4 de cada fichero) |
+| Se vuelve a pintar el botón con la cola muda | 2 (los dos "ningún botón") |
+| `resolvePlayingLabel` vuelve a `primarySource.label` | 2 (los dos de Spotify) |
+| Se quita la detección de "la pista en curso es de mi cola" | 1 (el de pausa) |
+| `EPKCard` deja de construir la cola y solo reenvía `queue` | 4 (los que no le pasan `queue`) |
+| Se recrea `components/StemsPlayer.tsx` | 1 (`stems-dead-code`) |
+| Alguien importa `LyricsModal` en cualquier sitio | 1 (`stems-dead-code`) |
+
+Ese `4` de la cuarta fila del reproductor es el que más cuesta de ver a ojo:
+`buildReleaseQueue` filtrando las hijas mudas y el contador "2 pistas" sobre una
+cola de 3. Los tests lo pasan **sin** la prop `queue` a propósito, para que no
+puedan pasar igual con la construcción rota.
