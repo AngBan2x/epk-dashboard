@@ -435,3 +435,37 @@ este entorno hay que ir por la via rapida.
 `1200/1200` en 62 ficheros, `tsc` limpio, `next lint` sin warnings, `fsck` sin
 quejas, y 508 ficheros en HEAD (los mismos que antes: la reescritura cambia el
 contenido de 44 ficheros, nunca el numero).
+
+---
+
+## P12 — Auditoría post-rc.35: las puertas que no fallan (2026-10-10, en curso)
+
+**Qué era.** Cuatro auditorías en paralelo —reproductor de audio, API de admin,
+scripts de datos y CI, documentación— sobre el estado tras `v4.0.0-rc.35`.
+Encontraron ~60 hallazgos; se ejecutan los que rompen algo observable o dejan
+una puerta abierta. El detalle completo, el alcance, lo que queda fuera y el
+motivo de cada exclusión están en [`PHASE_P12.md`](./PHASE_P12.md), que **se
+escribió antes de tocar código** (paso 1 del Flujo Obligatorio).
+
+**Lo que se encontró, en una línea.** Las puertas no podían fallar:
+`scripts/turso-check.ts` salía con código 0 pase lo que pase, `admin-catalog.test.ts`
+tenía cuatro tests tautológicos (uno `expect(true).toBe(true)`), y por eso un
+test roto llegó a producción en `main` sin que nadie lo viera.
+
+**Dos de las afirmaciones más graves resultaron falsas** al verificarlas contra
+el código — el corte de 30 s en YouTube es intencionado, y una auditoría situaba
+`capitalizeReleaseType` en un fichero que no lo tenía. Se documentan en
+`PHASE_P12.md` porque son la razón de que un hallazgo sin verificar sea peor que
+ninguno.
+
+**Lo que se hizo en esta entrada.** Solo documentación, que es lo que el paso 1
+del Flujo pide antes de implementar: `PHASE_P12.md` nuevo, `PHASE_P11.md`
+extraído de `PHASE_P3.md` (llevaba una ronda completa sin figurar en el índice),
+filas P11/P12 y rc.34/rc.35/rc.36 en `docs/PHASES.md`.
+
+**Lo que queda.** Las quince filas de la tabla "Lo pendiente" de `PHASE_P12.md`,
+y después los pasos 5 y 7 del Flujo Obligatorio (pruebas en producción y
+release `v4.0.0-rc.36`), bloqueados por las seis variables `TEST_*`.
+
+**Puertas.** Pendientes de esta entrada.
+

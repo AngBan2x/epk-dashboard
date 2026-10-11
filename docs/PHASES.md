@@ -29,9 +29,11 @@ decisiones ya tomadas.
 | Fase | Documento | Estado |
 |---|---|---|
 | P7 | [`PHASE_P7.md`](./PHASE_P7.md) — credenciales de test fuera del código | completada |
-| P8 | [`PHASE_P8.md`](./PHASE_P8.md) — una página por release | completada; el diseño se revirtió en C1, se restauró en C1-bis y se **redisañó** en F3 (2026-10-08): migas, hero con facts y sidebar sticky, verificado en producción |
+| P8 | [`PHASE_P8.md`](./PHASE_P8.md) — una página por release | completada; el diseño se revirtió en C1, se restauró en C1-bis y se **redisañó** en P8.1/P8.2 (2026-10-06/08): migas, hero con facts y sidebar sticky, verificado en producción |
 | P9 | [`PHASE_P9.md`](./PHASE_P9.md) — pruebas de correo sin `eu.org` | completada |
 | P10 | [`PHASE_P10.md`](./PHASE_P10.md) — buzón de sugerencias anónimo | completada |
+| P11 | [`PHASE_P11.md`](./PHASE_P11.md) — admin: catálogo unificado, `release_type`/`external_links` editables | completada con deuda declarada; salió de `PHASE_P3.md` en P12 |
+| P12 | [`PHASE_P12.md`](./PHASE_P12.md) — auditoría post-rc.35: las puertas que no fallan | **en curso**; bloqueada en los pasos 5 y 7 del Flujo Obligatorio |
 
 ## Los RC (numeración aparte)
 
@@ -43,9 +45,13 @@ Los RC **no** son fases P. Son iteraciones de estabilización:
 | [`PLAN_RC32.md`](./PLAN_RC32.md) | contrato de edición, audio, aprobaciones, catálogo real |
 | [`PLAN_RC31.md`](./PLAN_RC31.md) | los 15 problemas + el flujo de promoción |
 | [`PLAN_RC29_RC31.md`](./PLAN_RC29_RC31.md) | Blob, descargas de prensa, UI |
+| *sin plan propio* | **rc.34** — F6: las 12 parejas de imagen del catálogo, más la reescritura de la suite E2E (`cdfbedb` … `152f232`) |
+| *sin plan propio* | **rc.35** — consolidación del reproductor en `AudioPlayer` (`4592bd3`), borrado de `StemsPlayer`/`LyricsModal` |
+| *sin plan propio* | **rc.36** — P12: las puertas que no fallan. Pendiente de los pasos 5 y 7 |
 
 Los detalles históricos de cada iteración están en [`AI_LOG.md`](./AI_LOG.md)
-(379 KB — ver C7 del handoff para el plan de troceado).
+(20 KB — es el índice; el texto troceado por época está en
+[`ai-log/`](./ai-log/), C7).
 
 ## Documentos transversales
 
