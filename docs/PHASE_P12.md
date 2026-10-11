@@ -632,3 +632,19 @@ ficheros**. `AGENTS.md` y `README.md` llevan ya la cifra buena; la intermedia
 entre commits, que es justo lo que el test nuevo evita.
 - `turso-check.ts`: 83 tracks, 9 padres, 65 hijas, 0 huerfanas, sin fallos
 - Sin `pnpm build` ni E2E de produccion: pendiente de credenciales
+### pnpm build
+
+pnpm build en 1b948f: **exit 0, compilado, 35 rutas**. 	sc y 
+ext lint
+limbios, itest 1578/1578 en 79 ficheros.
+
+El build imprime varios *"Dynamic server usage: Route /api/... couldn't be
+rendered statically"* durante *Generating static pages*. **No son fallos**: son
+rutas de API que leen equest.cookies o equest.url y Next las salta del
+prerender avisando. El codigo de salida es 0 y la tabla de rutas sale entera.
+Se deja escrito porque el log parece un error y el siguiente que lo lea sin
+esto va a buscar un fallo que no esta.
+
+Con esto, la parte local del ciclo del Flujo Obligatorio queda cerrada. La parte
+de produccion (paso 5) y 4.0.0-rc.36 (paso 7) siguen bloqueados por las
+seis credenciales TEST_*.
