@@ -133,9 +133,25 @@ describe("Tarea 1 — la cascada entra en la MISMA transacción que el padre", (
     // Antes eran dos escrituras sueltas: el `dbRun` del padre y nada más. Con la
     // cascada en su propia llamada, un fallo entre las dos deja el padre aprobado
     // con las hijas en borrador, que es el estado roto que esto arregla.
+    //
+    // El UPDATE del padre se comprueba por su forma, no por un literal de
+    // columnas: `268b573` lo volvió dinámico para poder editar `release_type` y
+    // `external_links` desde el admin, así que atar `status = ?` comprobaba una
+    // cadena que ya no existe. Lo que protege este test es que **las dos
+    // escrituras estén en el mismo `dbBatch`**, y eso no depende de qué columnas
+    // se toquen.
     const call = slice(ADMIN_RELEASES, "await dbBatch([", "]);", 400);
-    expect(call).toMatch(/UPDATE tracks SET status = \?/);
+    expect(call).toMatch(/UPDATE tracks SET \$\{updates\.join/);
     expect(call).toMatch(/buildChildStatusCascade\(/);
+  });
+
+  it("el UPDATE del padre se arma con parámetros, no con los valores del body", () => {
+    // El `SET` es dinámico porque el **nombre** de la columna se decide en el
+    // código; el **valor** tiene que ir con `?`. Si alguien interpola el valor,
+    // la construcción dinámica pasa de ser una comodidad a ser una inyección.
+    const Updates = slice(ADMIN_RELEASES, "const updates: string[] = [];", "await dbBatch([", 1200);
+    expect(Updates).not.toMatch(/updates\.push\(`[^`]*\$\{/);
+    expect(Updates).toMatch(/paramsBatch\.push/);
   });
 
   it("la ruta de admin ya no escribe el estado del padre fuera de la transacción", () => {

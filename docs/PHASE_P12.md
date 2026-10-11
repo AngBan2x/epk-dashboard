@@ -152,7 +152,7 @@ completa") no se cumple.
 
 | # | Qué | Estado |
 |---|---|---|
-| 0 | Arreglar el test de cascada rojo | pendiente |
+| 0 | Arreglar el test de cascada rojo | **hecho** |
 | 1 | `turso-check.ts` con aserciones y exit code | pendiente |
 | 2 | `admin-catalog.test.ts` con ejecución real | pendiente |
 | 3 | Meta-test que falla ante asertaciones tautológicas | pendiente |
@@ -259,4 +259,45 @@ que no lo introduce ni lo empeora.
 va literal, y la regla de no pushear nada con la puerta en rojo se acaba de
 escribir: hacerlo sería exactamente el fallo que motivó la fase. El push va con
 la Fase 1, que arregla el test.
+
+### Fase 1 — el test de cascada, que estaba rojo en producción
+
+`tests/unit/release-approval-cascade.test.ts:132-139` ataba el literal
+`UPDATE tracks SET status = ?`, que `268b573` dejó de producir al volver dinámica
+la sentencia del padre.
+
+**Lo que se cambió, y por qué no era solo un literal.** Ese literal era un
+*proxy* de lo que el test protege: que el `UPDATE` del padre y la cascada entren
+en la **misma** transacción. Ese invariante —no la lista de columnas— es el de
+RC.32 Tarea 1, y sigue siendo el que se comprueba, ahora por la forma
+(`UPDATE tracks SET ${updates.join`) en vez de por una cadena de columnas.
+
+Se añadió además un segundo test: el `SET` es dinámico porque el **nombre** de la
+columna se decide en el código, pero el **valor** tiene que ir con `?`. Si
+alguien interpola el valor, la construcción dinámica pasa de ser una comodidad a
+ser una inyección. Es el mismo riesgo de la fila 7.
+
+**Disciplina de reversión, ejecutada y no asumida.** Se sacó la cascada fuera
+del `dbBatch` —el estado roto original— y el test **se puso rojo** (1 failed /
+38 passed). Restaurado: 39/39. Un test que no falla al revertir no protege de
+nada, que es la razón de existir de esta fase.
+
+```
+npx tsc --noEmit     → exit 0
+npx next lint        → ✔ No ESLint warnings or errors
+npx vitest run       → Test Files 73 passed (73)
+                       Tests      1357 passed (1357)
+```
+
+**Producción sale verde con este push.**
+
+### Un hallazgo lateral, sin arreglar
+
+`route.ts:179` valida `status` contra cinco valores y devuelve 400 si no es
+uno de ellos. Al llegar a esa línea, `status !== undefined` en `:200` **siempre es
+cierto**: el condicional está muerto y `status = ?` se empuja siempre. No es un
+bug —comportamiento correcto por el camino de todos modos— pero es un condicional
+que aparenta proteger algo que ya está protegido tres líneas más arriba. Se anota
+para la fila 8, que toca ese mismo bloque.
+
 
