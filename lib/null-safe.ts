@@ -154,11 +154,32 @@ export const isDefined = <T>(v: T | null | undefined): v is T =>
 export const coalesce = <T>(...values: (T | null | undefined)[]): T | undefined =>
   values.find(isDefined);
 
+/**
+ * `release_type` en la forma en que se **muestra**.
+ *
+ * Esto es de presentación, y solo de presentación: el valor canónico que se
+ * guarda en la columna es minúscula (`lib/release-type.ts`). La función existe
+ * para que la tabla pueda ser uniforme y la pantalla no.
+ *
+ * ## Por qué `Album` y no `Álbum` (P12, fila 5)
+ *
+ * Devolvía `"Álbum"`, con tilde. Eso no era una variante de presentación de
+ * `album`: era **otra cadena**, y una que no está en el vocabulario canónico.
+ * El daño era doble, porque `app/releases/[id]/edit/page.tsx` la usaba para
+ * **escribir**: cada guardado del artista metía `"Álbum"` en la columna,
+ * `WHERE release_type = 'album'` no volvía a encontrar la fila, y ningún check
+ * lo detectaba — `tracks_release_type_con_mayusculas` compara contra `lower()`,
+ * y el `lower()` de SQLite es ASCII, así que una tilde lo atraviesa sin
+ * enterarse.
+ *
+ * Que el tipo se vea como lo escribe un humano es una decisión de copy, no del
+ * dominio: en el resto del admin y del catálogo sale en castellano llano.
+ */
 export const capitalizeReleaseType = (type: string): string => {
   const lower = type.toLowerCase();
   if (lower === "single") return "Single";
   if (lower === "ep") return "EP";
-  if (lower === "album") return "Álbum";
+  if (lower === "album") return "Album";
   return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 };
 

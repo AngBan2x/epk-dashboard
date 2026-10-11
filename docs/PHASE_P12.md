@@ -157,8 +157,8 @@ completa") no se cumple.
 | 2 | `admin-catalog.test.ts` con ejecución real | **hecho** |
 | 3 | Meta-test que falla ante asertaciones tautológicas | **hecho** |
 | 4 | `fase-naming.test.ts`: derivar la lista de ficheros | **hecho** |
-| 5 | `release_type`: `"Álbum"`, `edit/page.tsx:377`, `lib/db.ts:3127`, `admin/page.tsx:178` | pendiente |
-| 6 | `lib/release-type.ts`: conectar de verdad o borrar | pendiente |
+| 5 | `release_type`: `"Álbum"`, `edit/page.tsx:377`, `lib/db.ts:3127`, `admin/page.tsx:178` | **hecho** |
+| 6 | `lib/release-type.ts`: conectar de verdad o borrar | **hecho** |
 | 7 | Allowlist de columnas en `lib/db.ts:3290` y `:3505` | pendiente |
 | 8 | `admin_notes` condicional + `admin/page.tsx:1146` con helper | pendiente |
 | 9 | `buildReleaseQueue` sin `fallbackVideoId` (cada hija su vídeo) | pendiente |
@@ -379,6 +379,68 @@ npx vitest run       → Test Files 73 passed (73)
 **El número de tests subió de 1357 a 1519 y la cifra de `AGENTS.md` está
 todavía más lejos de la real.** Anotado para la fila 12: cuando se corrija, la
 cifra hay que medirla el día del gate, no copiarla de aquí.
+
+### Fase 3 · P12.2-A · La normalización de `release_type` deja de ser reversible
+
+Cuatro escritores, un solo fallo de fondo: **se usaba un helper de presentación
+para escribir**. `capitalizeReleaseType()` está pensado para *mostrar*
+(`lib/release-type.ts` lo dice: "de modo que la tabla puede ser uniforme y la
+pantalla no"), y `app/releases/[id]/edit/page.tsx` lo usaba justo para guardar.
+
+Peor: esa función devolvía `"Álbum"` **con tilde**. No era una variante de
+`album`, era otra cadena, y una fuera del vocabulario canónico. El daño era
+invisible porque `tracks_release_type_con_mayusculas` compara contra `lower()`, y
+el `lower()` de SQLite es ASCII: una tilde lo atraviesa sin que el check se entere.
+
+| Fichero | Antes | Ahora |
+|---|---|---|
+| `lib/null-safe.ts:182` | `"Álbum"` | `"Album"` |
+| `app/releases/[id]/edit/page.tsx:377` | `capitalizeReleaseType(form.type)` | `form.type` |
+| `lib/db.ts:3127` | `data.release_type \|\| "Single"` | `\|\| DEFAULT_RELEASE_TYPE` |
+| `app/admin/page.tsx:178` | `"Single"` | `"single"` |
+
+**Fila 6 resuelta por el camino corto:** conectar `lib/release-type.ts` era
+importar `DEFAULT_RELEASE_TYPE` en `lib/db.ts`, que es lo que hacía falta para la
+tercera fila. El módulo deja de ser decorativo —llevaba una ronda siendo la
+"fuente de verdad" que nadie consultaba— sin borrar nada.
+
+**`tests/unit/release-type-escritores.test.ts`, nuevo.** Barre `app/`, `lib/` y
+`components/` buscando cualquier `release_type: "Single"`, y ata las cuatro
+correcciones por separado.
+
+Dos cosas que solo aparecieron al escribirlo:
+
+- **El barrido encontró seis ficheros que no había revisado.** Cuatro son
+  proyecciones de lectura (`safeString(head.release_type)` y compañía: copian lo
+  que haya, no escriben) y dos son esquemas Zod que aceptan cualquier cadena. El
+  test obliga a mirarlos antes de darlos por buenos, y ahora están en la lista
+  con lo que son.
+- **Uno de los tests documenta una deuda con una aserción negativa explícita:**
+  `release_type` no se valida contra `RELEASE_TYPE_VALUES` en ningún sitio —
+ni en el PUT del admin, ni en `lib/validations.ts`, ni en el portal de envíos—
+mientras que `status` sí se valida contra cinco valores (`route.ts:179`). Quien
+lo escriba desde la UI no lo va a hacer, pero una llamada directa sí. Igual que
+en `admin-catalog.test.ts`, está escrito para que la deuda se vea donde se
+decide el código y haya que cambiar el test a propósito cuando se arregle.
+
+**Disciplina de reversión, las cuatro ejecutadas:**
+
+| Revertido | Resultado |
+|---|---|
+| `capitalizeReleaseType` → `"Álbum"` | 1 failed |
+| `edit/page.tsx` → capitaliza al guardar | 1 failed |
+| `createTrack` → `"Single"` | 1 failed |
+| `admin/page.tsx` → `"Single"` | **2 failed** (la aserción explícita y la del barrido) |
+
+```
+npx tsc --noEmit     → exit 0
+npx next lint        → ✔ No ESLint warnings or errors
+npx vitest run       → Test Files 75 passed (75)
+                       Tests      1530 passed (1530)
+```
+
+**1530.** Otra vez la cifra real, para cuando se corrija `AGENTS.md`.
+
 
 
 ### Un hallazgo lateral, sin arreglar

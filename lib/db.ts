@@ -52,6 +52,7 @@ import { toShowStatus } from "@/lib/show-status";
 // RC.33 · Ola 4. `parseVideoKind` es pura y no trae nada de la red: importarla
 // aquí no abre `lib/youtube.ts` al resto del módulo.
 import { parseVideoKind } from "@/lib/youtube";
+import { DEFAULT_RELEASE_TYPE } from "@/lib/release-type";
 import {
   SEARCH_GROUP_LIMIT,
   hitMatches,
@@ -3124,7 +3125,14 @@ export async function createTrack(data: {
     id: data.id,
     title: data.title,
     artist_name: data.artist_name || "Artista EPK",
-    release_type: data.release_type || "Single",
+    // El valor canónico de `release_type` es minúscula (`lib/release-type.ts`),
+    // no por gusto sino porque `getTracksByReleaseType()` filtra con
+    // `WHERE release_type = ?` y en SQLite esa comparación distingue
+    // mayúsculas: pedir `'single'` devolvía 8 de 21 singles. Este default era
+    // `"Single"` en mayúscula, que es exactamente la mezcla que
+    // `scripts/normalize-release-type.ts` vino a borrar — y que volvía cada vez
+    // que se creaba una pista sin tipo explícito.
+    release_type: data.release_type || DEFAULT_RELEASE_TYPE,
     release_date: data.release_date || "",
     duration: data.duration || "00:00",
     cover_image: data.cover_image || "",

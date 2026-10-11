@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { PageTransition } from "@/components/MotionWrappers";
 import { useAuth } from "@/context/AuthContext";
 import { extractYouTubeId, getYouTubeThumbnail, fetchYouTubeVideo } from "@/lib/youtube";
-import { capitalizeReleaseType } from "@/lib/null-safe";
+import { safeString, formatNumber, getCoverImage, sumDurations } from "@/lib/null-safe";
 import {
   PRODUCTION_FIELDS,
   PRODUCTION_INPUT_CLASS,
@@ -364,8 +364,17 @@ export default function EditReleasePage() {
    *
    * `type` viaja como `release_type` (su columna): el selector de Single/EP/
    * Álbum mandaba `type`, que no está en la allowlist del PUT, así que era otro
-   * control muerto. `capitalizeReleaseType` deja el valor en la forma que usa el
-   * resto del catálogo ("Single", "EP", "Album").
+   * control muerto.
+   *
+   * Viaja **en minúsculas** (`lib/release-type.ts`): el valor canónico de la
+   * columna es minúscula porque `getTracksByReleaseType()` filtra con
+   * `WHERE release_type = ?` y en SQLite eso distingue mayúsculas. Antes aquí se
+   * llamaba a `capitalizeReleaseType()`, que es un helper **de presentación**
+   * (`lib/null-safe.ts`): capitalizar al guardar deshacía la normalización de
+   * `scripts/normalize-release-type.ts` con cada guardado del artista, y además
+   * escribía `"Álbum"` con tilde, un valor que no está en el vocabulario
+   * canónico y que ningún check detectaba. Es el fallo que P12AUDITA encontró.
+   * La capitalización se hace al **mostrar**, no al guardar.
    */
   const buildPayload = (submitState: "save" | "request") => {
     const videoId = extractYouTubeId(form.youtube_url);
@@ -374,7 +383,7 @@ export default function EditReleasePage() {
       id: releaseId,
       status: submitState === "request" ? "pending" : "draft",
       title: form.title,
-      release_type: capitalizeReleaseType(form.type),
+      release_type: form.type,
       artist_name: form.artist_name,
       release_date: form.release_date,
       cover_image: form.cover_image,

@@ -175,7 +175,11 @@ export default function AdminPage() {
   //
   const [formData, setFormData] = useState({
     title: "",
-    release_type: "Single",
+    // Minúscula: es el valor canónico de la columna (`lib/release-type.ts`). Este
+    // estado era `"Single"`, y como alimenta el PUT de admin escribía mayúscula
+    // en cada alta — la mezcla que `scripts/normalize-release-type.ts` vino a
+    // borrar. Al mostrar se capitaliza, no al guardar.
+    release_type: "single",
     release_date: "",
     duration: "",
     cover_image: "",
