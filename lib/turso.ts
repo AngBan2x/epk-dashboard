@@ -997,10 +997,11 @@ export async function getTursoTrackCount(): Promise<number> {
 // `getTursoClientSync() !== null` de `@/lib/db`, que es el criterio de las ocho
 // rutas ya migradas.
 //
-// NOTA sobre los 83 guards `if (isTursoConfigured()) return;` que hay en los
-// tests: importan la de `@/lib/db`, no esta, y bajo vitest NUNCA saltan, porque
-// `vitest.config.ts:7-8` hace `delete process.env.TURSO_DATABASE_URL` y
-// `delete process.env.TURSO_AUTH_TOKEN` antes de que se cargue ningún módulo.
+// NOTA sobre los 93 guards `if (isTursoEnabled()) {` de `lib/db.ts` que hay en
+// los tests: importan el predicado de `@/lib/db`, no el de este módulo, y bajo
+// vitest NUNCA saltan, porque `vitest.config.ts:7-8` hace
+// `delete process.env.TURSO_DATABASE_URL` y
+// `delete process.env.TURSO_AUTH_TOKEN` antes de que se evalúe nada.
 // Con el env ausente, `isTursoEnabled()` es falso y el guard no salta: el test
 // corre contra SQLite local. Lo que protege Turso en los tests son esas dos
 // líneas, no los guards. NO las borres de `vitest.config.ts` creyendo que los

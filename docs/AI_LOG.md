@@ -191,12 +191,36 @@ copiadas literales en el índice para que la comprobación las incluya también.
 
 | Fichero | Líneas |
 |---|---|
-| `ai-log/01-f0-f9.md` | 526 |
-| `ai-log/02-refactor-fases-a-l.md` | 1.128 |
-| `ai-log/03-hotfixes-y-sesiones.md` | 202 |
-| `ai-log/04-v4-alpha-beta.md` | 2.331 |
-| `ai-log/05-rc10-rc28.md` | 1.433 |
-| `ai-log/06-tranches-a-hoy.md` | 1.622 |
+| `ai-log/01-f0-f9.md` | 531 |
+| `ai-log/02-refactor-fases-a-l.md` | 1.133 |
+| `ai-log/03-hotfixes-y-sesiones.md` | 207 |
+| `ai-log/04-v4-alpha-beta.md` | 2.336 |
+| `ai-log/05-rc10-rc28.md` | 1.438 |
+| `ai-log/06-tranches-a-hoy.md` | 1.628 |
+
+**P12: los seis recuentos estaban mal por exactamente +5, y ya está explained.**
+La tabla de arriba decía 526, 1.128, 202, 2.331, 1.433 y 1.622. Medidos, son
+**cinco líneas más** en cada fichero, sin excepción — y la causa es la misma en
+los seis: C7 añadió a cada uno un encabezado de cinco líneas
+
+> Extraído de `docs/AI_LOG.md` por C7 (2026-10-05): un fichero por época, …
+
+que la tabla nunca mayoró. No es un error de criterio al dividir: el corte
+posicional dividió bien, y luego cada trozo creció lo mismo. El cálculo era
+correcto para el momento en que se escribió.
+
+**Y cómo se mide, porque es donde se cuela el error.** `Get-Content |
+Measure-Object -Line` **no cuenta las líneas vacías**: da 437 en vez de 531 en
+`01-f0-f9.md`, y un número que parece bueno y no lo es. Lo que cuenta líneas de
+verdad es el recuento de saltos de línea del fichero:
+
+    (Get-Content f.md | Measure-Object -Line).Lines   # MAL: solo no vacías
+    [regex]::Matches([IO.File]::ReadAllText(f), "`n").Count   # BIEN: todas
+
+Medir así dio los números de la tabla. La primera vez que se revisó esto se
+usó el método malo, y parecía que los seis descuadres eran distintos (36, 89,
+191, 269, 433, 486) y que por tanto el patrón "+5 en todos" era falso. Era el
+método el que estaba mal, no la hipótesis: son +5 en los seis.
 
 **El reparto es por corte posicional, no por patrón.** El primer intento usó regex
 sobre el título y salió mal: 69 secciones en un fichero y otro vacío. `^(rc\.)` se

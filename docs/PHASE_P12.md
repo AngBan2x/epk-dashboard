@@ -109,6 +109,16 @@ Hay ya dos rutas con allowlist de columnas (`app/api/releases/route.ts:724` y
   falla ruidosamente a propósito (`:54-57`), **la URL faltante falla
   destructivamente en silencio**, en una operación que es un `DELETE` real.
 
+**Resuelto en la fila 11 (`d073d31`), y el primero resulto ser peor de lo que
+decia.** `sync-data.yml` no fallaba solo por el nombre del script: el script
+sincroniza `tracks` con `INSERT OR REPLACE` (que es DELETE + INSERT) y con una
+lista de columnas que omite `status`, `release_id`, `start_time`, `end_time`,
+`external_links`, `disc_number`, `track_number` y mas. Resincronizar devolvia el
+catalogo entero a `pending` y sin padre. Se borro el workflow en vez de
+arreglarlo: arreglarlo lo convertia en un job destructivo en vez de uno roto.
+`cleanup-shows.yml` perdio el default a produccion y ahora falla con un
+`::error::` que dice que crear la variable es un paso de un minuto.
+
 ### La documentación affirmationa cosas falsas
 
 14 bugs de contenido, todos verificados. Los dos más dañinos:
@@ -116,6 +126,15 @@ Hay ya dos rutas con allowlist de columnas (`app/api/releases/route.ts:724` y
 - `AGENTS.md:12` dice *"1146 tests (Vitest, 61 archivos)"*. La cifra real es
   **~1334 tests en 73 ficheros**. Aparece **tres veces** en las dos primeras
   filas de la tabla de comandos, que es lo primero que se lee.
+  **Resuelto:** ahora `AGENTS.md:12` y `AGENTS.md:13` dicen **1578 tests en 79
+  ficheros**, y `README.md` también. La cifra lleva el commit donde se midió
+  (`d073d31`), para que la próxima auditoría sepa si está vigente o caducada sin
+  tener que fiarse de que alguien la actualizó. Los `1146` que quedan en
+  `docs/PHASE_P7.md`, `P8`, `P9`, `P10`, `HANDOFF_FASE_P.md` y
+  `docs/ai-log/` **no se tocan a propósito**: describen lo que valía en su
+  fecha, y un registro histórico que se actualiza deja de ser un registro.
+  `tests/unit/cifras-de-la-documentacion.test.ts` ata las cifras vivas para que
+  no vuelvan a pudrirse en silencio.
 - `AGENTS.md:76` dice *"los 83 guards `if (isTursoConfigured()) return;`"*.
   Ese patrón tiene **0 ocurrencias**. Lo que existe son **93**
   `if (isTursoEnabled())` en `lib/db.ts`. El mismo error está duplicado en
@@ -606,5 +625,10 @@ verde: se anota para que no se tome como metodo.
 - `tsc --noEmit`: limpio
 - `next lint`: limpio
 - `vitest run --no-file-parallelism`: **1563 / 1563 en 78 ficheros** (antes 1549 / 77)
+
+Tras añadir `tests/unit/cifras-de-la-documentacion.test.ts`: **1578 / 1578 en 79
+ficheros**. `AGENTS.md` y `README.md` llevan ya la cifra buena; la intermedia
+(1563) queda en este documento como registro de que la cifra también caduca
+entre commits, que es justo lo que el test nuevo evita.
 - `turso-check.ts`: 83 tracks, 9 padres, 65 hijas, 0 huerfanas, sin fallos
 - Sin `pnpm build` ni E2E de produccion: pendiente de credenciales
