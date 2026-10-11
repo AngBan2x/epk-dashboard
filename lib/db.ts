@@ -3265,6 +3265,78 @@ if (isTursoEnabled()) {
   return track as Track;
 }
 
+/**
+ * Columnas que `updateTrack` puede escribir (P12, fila 7).
+ *
+ * ## Por qué una lista, y por qué aquí
+ *
+ * `updateTrack` construye el `SET` con `Object.keys(updates)`: el **nombre** de la
+ * columna sale de las claves del objeto. La firma de TypeScript acota esas claves
+ * en tiempo de compilación, pero el objeto viene de `req.json()` sin validar, y
+ * en runtime no hay nada que lo ate. Un body con una clave como
+ * `"title = (SELECT …) --"` producía `UPDATE tracks SET title = (SELECT …) -- = ?`,
+ * que es SQL arbitrario.
+ *
+ * ## Por qué en la capa de datos y no en la ruta
+ *
+ * Porque es la frontera. Dos rutas ya tenían allowlist propia
+ * (`app/api/tracks/[id]/route.ts:97` y `app/api/releases/route.ts:724`) y una no
+ * la tenía (`app/api/tracks/route.ts:175`, que pasa el body entero): la
+ * divergencia existía porque la validación estaba en el sitio que se olvidó de
+ * ponerla. Aquí no hay sitio que se pueda olvidar.
+ *
+ * ## Qué hace con una clave desconocida
+ *
+ * La **descarta**, y por debajo del todo lo que el llamador pidió. Silenciar la
+ * clave evita la inyección; descartarla en silencio además evita el peor
+ * resultado, que es devolver 200 y que quien lo llama crea que guardó algo que
+ * no se guardó. Por eso hay un `console.warn`: el caller legítimo se equivoca, y
+ * eso tiene que verse.
+ *
+ * La lista y el tipo de la firma están separados a propósito. Si el tipo se
+ * derivara de aquí, añadir una columnasería un cambio de una línea y nadie la
+ * leería; tenerlos separados hace que la lista se pueda revisar.
+ */
+const TRACK_UPDATABLE_COLUMNS = new Set([
+  "title",
+  "artist_name",
+  "release_type",
+  "release_date",
+  "duration",
+  "cover_image",
+  "audio_preview_url",
+  "spotify_url",
+  "youtube_video_id",
+  "itunes_track_id",
+  "metrics",
+  "production_details",
+  "lyrics",
+  "stems_urls",
+  "video_embed_url",
+  "gallery_images",
+  "is_instrumental",
+  "track_number",
+  "video_kind",
+  "status",
+  // Columnas que también escribe `ALLOWED_COLUMNS` en `app/api/releases/route.ts`
+  // (`:724`) y que el type no declaraba en la firma de `updateTrack`. Se nombran
+  // aquí para que las dos allowlists no puedan separarse: el test
+  // `allowlist-de-columnas.test.ts` compara ambas contra `RawTrackRow`.
+  "description",
+  "disc_number",
+  "is_double_single",
+  "sides_b",
+  "composers",
+  "streams",
+  "external_links",
+  // Campos del catálogo semilla que la ficha de release edita. No estaban en la
+  // lista: `edit/page.tsx` los mandaba y `updateTrack` los escribía, así que
+  // ahora se nombran en vez de colarse.
+  "isrc",
+  "start_time",
+  "end_time",
+]);
+
 export async function updateTrack(id: string, updates: Partial<{
   title: string;
   artist_name: string;
@@ -3292,7 +3364,17 @@ export async function updateTrack(id: string, updates: Partial<{
   const existing = await getTrackById(id);
   if (!existing) return null;
 
-  const fields = Object.keys(updates).filter((k) => k !== "id");
+  // Allowlist: solo se escribe lo que está en `TRACK_UPDATABLE_COLUMNS`. Una
+  // clave fuera de la lista no se cuela en el `SET` (que es donde se convertiría
+  // en SQL), pero tampoco se pierde en silencio — ver la nota de la constante.
+  const pedidas = Object.keys(updates).filter((k) => k !== "id");
+  const fields = pedidas.filter((k) => TRACK_UPDATABLE_COLUMNS.has(k));
+  const descartadas = pedidas.filter((k) => !TRACK_UPDATABLE_COLUMNS.has(k));
+  if (descartadas.length > 0) {
+    console.warn(
+      `[updateTrack] claves ignoradas por no ser columnas de tracks: ${descartadas.join(", ")}`
+    );
+  }
   if (fields.length === 0) return existing;
 
   const setClause = fields.map((k) => `${k} = ?`).join(", ");
@@ -3414,6 +3496,39 @@ export { getTursoClientSync as getTurso };
 
 // ─── Dossiers (P3 Batch 2 Hotfix) ──────────────────────────────────────────
 
+/**
+ * Columnas que `upsertDossier` puede escribir (P12, fila 7). Mismo motivo y mismo
+ * criterio que `TRACK_UPDATABLE_COLUMNS`: el nombre de la columna salía de las
+ * claves del objeto, y `DossierData` es una interfaz — que no existe en runtime
+ * y no ata nada. Las tres que se escriben siempre (`artist_id` como WHERE,
+ * `created_at` y `updated_at`) van fuera del allowlist a propósito.
+ */
+const DOSSIER_UPDATABLE_COLUMNS = new Set([
+  "biography",
+  "press_text",
+  "genre",
+  "location",
+  "influences",
+  "contact_email",
+  "booking_email",
+  "management",
+  "website",
+  "rider_pa_system",
+  "rider_monitors",
+  "rider_console",
+  "rider_subwoofers",
+  "rider_guitar",
+  "rider_bass",
+  "rider_drums",
+  "rider_keyboards",
+  "rider_lighting",
+  "rider_stage_size",
+  "rider_stage_conditions",
+  "rider_hospitality",
+  "rider_transport",
+  "rider_special_notes",
+]);
+
 export interface DossierData {
   id: string;
   artist_id: string;
@@ -3509,9 +3624,19 @@ export async function upsertDossier(artistId: string, data: Partial<DossierData>
   const now = new Date().toISOString();
 
   if (existing) {
-    const fields = Object.keys(data).filter(k => k !== "id" && k !== "artist_id" && k !== "created_at" && k !== "updated_at");
+    const pedidas = Object.keys(data).filter(k => k !== "id" && k !== "artist_id" && k !== "created_at" && k !== "updated_at");
+    // Allowlist, por el mismo motivo que `TRACK_UPDATABLE_COLUMNS`: aquí el
+    // nombre de la columna también salía de `Object.keys()` del objeto recibido.
+    // `DossierData` es una interfaz, y una interfaz no existe en runtime: no
+    // ata nada. Las que se descartan se avisan, para que un caller que se
+    // equivoque no se entere solo por ausencia de efecto.
+    const fields = pedidas.filter(k => DOSSIER_UPDATABLE_COLUMNS.has(k));
+    const descartadas = pedidas.filter(k => !DOSSIER_UPDATABLE_COLUMNS.has(k));
+    if (descartadas.length > 0) {
+      console.warn(`[upsertDossier] claves ignoradas por no ser columnas de dossiers: ${descartadas.join(", ")}`);
+    }
     const setClauses = fields.map(k => `${k} = ?`).join(", ");
-    const values = fields.map(k => (data as any)[k] ?? null);
+    const values = fields.map(k => (data as Record<string, unknown>)[k] ?? null);
 
     if (isTursoEnabled()) {
       await tursoExecUpdate(`UPDATE dossiers SET ${setClauses}, updated_at = ? WHERE artist_id = ?`, [...values, now, artistId]);

@@ -209,8 +209,23 @@ export async function PUT(req: NextRequest) {
       updates.push("external_links = ?");
       paramsBatch.push(typeof external_links === "string" ? external_links : JSON.stringify(external_links ?? null));
     }
-    updates.push("admin_notes = ?", "updated_at = ?");
-    paramsBatch.push(admin_notes ?? null, now);
+    // `admin_notes` es el motivo de la decisión, y **no se toca si el body no lo
+    // trae**. Antes era incondicional (`paramsBatch.push(admin_notes ?? null)`), y
+    // como la UI manda la clave ausente al pulsar "Aprobar" —solo manda `status`—
+    // cada aprobación borraba el motivo de un rechazo anterior. Ese motivo se le
+    // enseña al artista en `app/releases/[id]/edit/page.tsx`, así que el efecto
+    // era: el admin razonaba por qué rechazaba, aprobaba, y el artista perdía la
+    // explicación sin que nadie la hubiera borrado a mano.
+    //
+    // Se pregunta por la **presencia de la clave**, no por su valor: `null` es
+    // una orden de limpiar y tiene que seguir funcionando, y `undefined` no es lo
+    // mismo que `null`.
+    if ("admin_notes" in body) {
+      updates.push("admin_notes = ?");
+      paramsBatch.push(admin_notes ?? null);
+    }
+    updates.push("updated_at = ?");
+    paramsBatch.push(now);
     paramsBatch.push(id);
 
     await dbBatch([

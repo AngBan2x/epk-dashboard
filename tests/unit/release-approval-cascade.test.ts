@@ -160,6 +160,21 @@ describe("Tarea 1 — la cascada entra en la MISMA transacción que el padre", (
     expect(ADMIN_RELEASES).not.toMatch(/await dbRun\(/);
   });
 
+  it("admin_notes solo se escribe si el body trae la clave", () => {
+    // El motivo de la decisión vive en `admin_notes`. La UI manda solo `status`
+    // al pulsar "Aprobar" (`app/admin/page.tsx`), así que con un
+    // `paramsBatch.push(admin_notes ?? null)` incondicional **cada aprobación
+    // borraba el motivo de un rechazo anterior**. Y ese motivo se le enseña al
+    // artista en `app/releases/[id]/edit/page.tsx`, que es donde se notaba.
+    //
+    // Se pregunta por la presencia de la clave y no por su valor a propósito:
+    // `null` es una orden de limpiar y tiene que seguir funcionando.
+    expect(ADMIN_RELEASES).toMatch(/if \("admin_notes" in body\)/);
+    expect(ADMIN_RELEASES).not.toMatch(
+      /updates\.push\("admin_notes = \?",\s*"updated_at = \?"\)/
+    );
+  });
+
   it("PUT /api/releases mete la cascada en el mismo dbBatch que el padre y las hijas", () => {
     const batchBuild = slice(
       RELEASES,

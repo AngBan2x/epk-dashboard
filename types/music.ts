@@ -182,6 +182,17 @@ export interface RawTrackRow {
   isrc?: string | null;
   composers?: string | null;
   is_instrumental?: number | null;
+  /**
+   * P12 — la tabla los tiene y `Track` los declaraba, pero `RawTrackRow` no.
+   * Una fila cruda que omite columnas existentes hace que la allowlist de
+   * `updateTrack` parezca estar equivocada cuando no lo está:
+   * `allowlist-de-columnas.test.ts` compara contra esta interfaz para detectar
+   * columnas inventadas, y sin estas dos daba un falso positivo.
+   */
+  start_time?: number | null;
+  end_time?: number | null;
+  description?: string | null;
+  streams?: number | null;
   /** RC.33 · Ola 4 — `'videoclip' | 'live' | 'topic_audio'`, o `NULL`. */
   video_kind?: string | null;
 }

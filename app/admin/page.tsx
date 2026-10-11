@@ -1147,7 +1147,7 @@ export default function AdminPage() {
                         </td>
                         <td className="p-3 font-medium text-slate-900 dark:text-slate-100">{notif.title}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400 max-w-[300px] truncate">{notif.message}</td>
-                        <td className="p-3 text-slate-600 dark:text-slate-400 font-mono text-xs">{notif.user_id.slice(0, 8)}...</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400 font-mono text-xs">{safeString(notif.user_id).slice(0, 8)}...</td>
                         <td className="p-3">
                           <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${!notif.read 
                             ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700"

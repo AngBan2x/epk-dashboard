@@ -159,8 +159,8 @@ completa") no se cumple.
 | 4 | `fase-naming.test.ts`: derivar la lista de ficheros | **hecho** |
 | 5 | `release_type`: `"Álbum"`, `edit/page.tsx:377`, `lib/db.ts:3127`, `admin/page.tsx:178` | **hecho** |
 | 6 | `lib/release-type.ts`: conectar de verdad o borrar | **hecho** |
-| 7 | Allowlist de columnas en `lib/db.ts:3290` y `:3505` | pendiente |
-| 8 | `admin_notes` condicional + `admin/page.tsx:1146` con helper | pendiente |
+| 7 | Allowlist de columnas en `lib/db.ts:3290` y `:3505` | **hecho** |
+| 8 | `admin_notes` condicional + `admin/page.tsx:1146` con helper | **hecho** |
 | 9 | `buildReleaseQueue` sin `fallbackVideoId` (cada hija su vídeo) | pendiente |
 | 10 | `ReleaseTracklistSection`: verificar alcanzabilidad y borrar si muerto | pendiente |
 | 11 | `sync-data.yml` y `cleanup-shows.yml` | pendiente |
@@ -440,6 +440,67 @@ npx vitest run       → Test Files 75 passed (75)
 ```
 
 **1530.** Otra vez la cifra real, para cuando se corrija `AGENTS.md`.
+
+### Fase 4 · P12.2-B · Seguridad
+
+**Fila 7 — el nombre de la columna sale del body.** `updateTrack` y
+`upsertDossier` construían el `SET` con `Object.keys()`: el valor ya iba con `?`,
+pero el **nombre** se interpolaba. La firma de TypeScript acota las claves en
+compilación y el objeto viene de `req.json()` — en runtime no había nada que lo
+ate. `PUT /api/tracks` pasaba el body entero sin filtrar, así que una clave como
+`"title = (SELECT …) --"` producía SQL arbitrario.
+
+La allowlist va en **`lib/db.ts`**, no en la ruta, y por eso: dos rutas ya tenían
+la suya (`app/api/tracks/[id]` y `app/api/releases`) y una no. La divergencia
+existía porque la validación estaba en el sitio que se olvidó de ponerla. En la
+capa de datos no hay sitio que se pueda olvidar.
+
+Dos decisiones que no son obvias:
+
+- **Una clave desconocida se descarta y se avisa por `console.warn`.** Silenciarla
+  evita la inyección; descartarla *en silencio además* evitaría el peor
+  resultado, que es devolver 200 y que quien llama crea que guardó algo que no se
+  guardó. Sin el aviso, un caller legítimo que se equivoca no se entera nunca.
+- **La lista y el tipo de la firma están separados a propósito.** Si el tipo se
+  derivara de la lista, añadir una columna sería cambiar una línea y nadie la
+  leería.
+
+**Dos ficheros de test, porque atar la forma y probar el efecto son cosas
+distintas.** `allowlist-de-columnas.test.ts` compara la allowlist con la interfaz
+para que no se separen — y al escribirlo encontró dos fallos reales: mi primera
+versión de la lista de dossiers tenía **siete columnas que no existen**
+(`guest_list`, `press_photos`, `stage_plot`…) y le faltaban cinco que sí, y
+`RawTrackRow` no declaraba `start_time`/`end_time` aunque la tabla los tiene y
+`Track` sí. Eso también es cómo se rompe una allowlist: nadie la ejecuta, se mira.
+
+`allowlist-ejecutada.test.ts` **la ejecuta**: inserta una fila, intenta escribir
+con una clave que es SQL y comprueba que la fila no cambia. Y comprueba también
+que la clave legítima *del mismo body* sí se aplica, porque una allowlist que
+bloquease todo también "funcionaría" y dejaría el producto roto sin que ningún
+test lo dijera.
+
+**Fila 8 — `admin_notes`.** Era incondicional (`paramsBatch.push(admin_notes ??
+null)`), y como la UI manda solo `status` al pulsar "Aprobar", **cada aprobación
+borraba el motivo de un rechazo anterior** — que `app/releases/[id]/edit/page.tsx`
+le enseña al artista. Ahora se pregunta por la **presencia de la clave** y no por
+su valor, porque `null` es una orden de limpiar y tiene que seguir funcionando.
+Y `admin/page.tsx:1150` usaba `notif.user_id.slice(0, 8)` a pelo: un `user_id`
+nulo reventaba el render del panel entero. Va por `safeString`.
+
+**Disciplina de reversión, las tres ejecutadas:**
+
+| Revertido | Resultado |
+|---|---|
+| Allowlist de `updateTrack` quitada | **4 failed**, incluido el ataque |
+| `admin_notes` a incondicional | 1 failed |
+
+```
+npx tsc --noEmit     → exit 0
+npx next lint        → ✔ No ESLint warnings or errors
+npx vitest run       → Test Files 77 passed (77)
+                       Tests      1549 passed (1549)
+```
+
 
 
 
