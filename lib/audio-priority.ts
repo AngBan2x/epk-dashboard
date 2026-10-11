@@ -69,9 +69,39 @@ export const EMPTY_AUDIO_URL_TOKENS: ReadonlySet<string> = new Set([
 /** ¿Es una URL que el `<audio>` puede abrir de verdad? */
 export function isUsableAudioUrl(value: unknown): value is string {
   if (typeof value !== 'string') return false;
+
   const trimmed = value.trim();
   if (EMPTY_AUDIO_URL_TOKENS.has(trimmed)) return false;
   return /^(https?:\/\/|\/|\.{1,2}\/|blob:|data:)/i.test(trimmed);
+}
+
+/**
+ * ¿Es un id de YouTube que el embed puede abrir de verdad?
+ *
+ * P12. Comparte vocabulario con `isUsableAudioUrl` a propósito. El conjunto se
+ * llama `EMPTY_AUDIO_URL_TOKENS` pero lo que enumera no son URLs: son los
+ * marcadores de posición que un formulario deja en un campo de medio. Un
+ * `youtube_video_id` es el **mismo tipo de campo**, y lo rellena el mismo tipo
+ * de gente.
+ *
+ * Antes este consumidor usaba `trim() !== ''`, así que un `"—"` —el marcador de
+ * "no hay" que aparece en la tabla del admin— pasaba el filtro, devolvía una
+ * fuente de tipo `youtube`, pintaba el botón de YouTube activo y llegaba a
+ * `new YT.Player` con el id `"—"`. Un id que no existe es un 404 del player, no
+ * un error capturable: el reproductor se queda negro sin explicación.
+ *
+ * Un segundo conjunto habría sido el error de verdad: dos vocabularios para el
+ * mismo concepto se separan en el primer parche que se olvide de uno.
+ */
+export function isUsableYoutubeId(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+
+  const trimmed = value.trim();
+  if (EMPTY_AUDIO_URL_TOKENS.has(trimmed)) return false;
+  // Un id de YouTube son 11 caracteres de [A-Za-z0-9_-]. Se exige el formato
+  // entero, no un subconjunto: `youtube.com/watch?v=...` no es un id y una URL
+  // pegada en el campo es un error de tecleo, no una pista reproducible.
+  return /^[A-Za-z0-9_-]{11}$/.test(trimmed);
 }
 
 /**
@@ -136,9 +166,12 @@ function getAudioSources(track: TrackAudioInfo | null | undefined): AudioSource[
   }
 
   // 3. YouTube iframe embed — MENOR PRIORIDAD
+  //
+  // `isUsableYoutubeId`, no `!== ''`: un `"—"` o un `"N/A"` no son un id vacío,
+  // son un id que **no existe**, y llegan igual desde el formulario.
   const youtubeId = track.youtube_video_id
     || (typeof external?.youtube_video_id === 'string' ? (external.youtube_video_id as string) : null);
-  if (youtubeId && youtubeId.trim() !== '') {
+  if (isUsableYoutubeId(youtubeId)) {
     const id = youtubeId.trim();
     const origin = typeof window !== 'undefined'
       ? window.location.origin
@@ -838,12 +871,18 @@ export interface TracklistDurationLabel {
  * o sea, las 55 pistas con `end_time > 30` enseñaban un rango de capítulo y la
  * duración real — la rama de `track.duration` — era **inalcanzable** para ellas.
  *
- * ## Por qué la asimetría es la señal
- *
- * `components/ReleaseTracklistSection.tsx` (otra vista, misma función, mismo
- * catálogo) ya imprimía `track.duration` sin mirar los timestamps. Dos
- * componentes haciendo lo contrario no es un descuido: una de las dos está
- * haciendo bien lo que el usuario pidió.
+  * ## Por qué la asimetría es la señal
+  *
+  * `components/ReleaseTracklistSection.tsx` (otra vista, misma función, mismo
+  * catálogo) ya imprimía `track.duration` sin mirar los timestamps. Dos
+  * componentes haciendo lo contrario no es un descuido: una de las dos está
+  * haciendo bien lo que el usuario pidió.
+  *
+  * **P12 lo resolvió borrando la otra vista.** Se montaba solo en
+  * `/track/<id>`, que solo renderiza para filas **huérfanas**, y un huérfano no
+  * puede tener hijas: la rama pedía `children.length > 0`. Con el componente
+  * fuera, esta función tiene un solo llamador y la divergencia no puede volver a
+  * aparecer por el otro lado.
  *
  * ## Lo que NO se borra
  *

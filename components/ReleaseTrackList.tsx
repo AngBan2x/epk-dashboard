@@ -8,7 +8,6 @@ import {
   getPlayableAudioSource,
   resolvePlaybackTimeline,
   tracklistDurationLabel,
-  type AudioSourceType,
 } from "@/lib/audio-priority";
 import { safeString } from "@/lib/null-safe";
 import { hasTrackLyrics, releaseRowDurationLabel } from "@/lib/release-page";
@@ -83,14 +82,30 @@ interface ReleaseTrackListProps {
  * Aquí se resuelven con `resolvePlaybackTimeline`, que es también lo que usa
  * `loadTrack`: el medio decide, y si es un preview los capítulos no aplican.
  */
+/**
+ * ## Por qué NO hay un `youtube_video_id` de reserva
+ *
+ * Antes este tercer parámetro hacía que una hija sin audio propio heredase el
+ * vídeo de la **cabecera** del release. El efecto: un álbum con vídeo de portada
+ * metía a **todas** sus hijas en la cola como pistas de YouTube, y como
+ * `mediaDuration` se pasa a `0` a propósito (`context/AudioPlayerContext.tsx`),
+ * cada una sonaba **30 segundos** —el techo por defecto de
+ * `resolvePlaybackTimeline`— y avanzaba sola. El dueño del catálogo decidió que
+ * una hija use solo lo suyo: si no tiene preview ni vídeo propio, **no suena**.
+ *
+ * El parámetro se conserva en la firma porque llamarlo es más barato que quitarlo
+ * de los cuatro call sites, y para que la próxima persona que lo lea entienda
+ * que la decisión fue deliberada. Si algún día hay que quitarlo de verdad, está
+ * aquí documentado por qué.
+ */
 export function buildReleaseQueue(
   tracks: Track[],
   releaseCoverImage?: string,
   releaseYoutubeVideoId?: string
 ): ActiveTrack[] {
   const items: ActiveTrack[] = [];
-  const fallbackVideoId =
-    releaseYoutubeVideoId && releaseYoutubeVideoId.trim() !== "" ? releaseYoutubeVideoId : undefined;
+  // Se acepta y se ignora a propósito. Ver la nota de arriba.
+  void releaseYoutubeVideoId;
 
   for (const track of tracks) {
     const own = getPlayableAudioSource({
@@ -99,12 +114,14 @@ export function buildReleaseQueue(
     });
 
     const audioUrl = own?.type === "preview" ? own.url : "";
-    const youtubeVideoId = own?.type === "youtube" && own.videoId ? own.videoId : fallbackVideoId;
+    const youtubeVideoId = own?.type === "youtube" ? own.videoId : undefined;
 
+    // Sin medio propio, la pista no entra en la cola. Antes el `fallbackVideoId`
+    // hacía que casi nunca se cumpliera.
     if (audioUrl === "" && !youtubeVideoId) continue;
 
     const timeline = resolvePlaybackTimeline({
-      sourceType: (audioUrl === "" ? "youtube" : "preview") as AudioSourceType,
+      sourceType: audioUrl === "" ? "youtube" : "preview",
       declaredStart: track.start_time ?? 0,
       declaredEnd: track.end_time ?? 0,
     });

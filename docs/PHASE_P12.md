@@ -161,9 +161,9 @@ completa") no se cumple.
 | 6 | `lib/release-type.ts`: conectar de verdad o borrar | **hecho** |
 | 7 | Allowlist de columnas en `lib/db.ts:3290` y `:3505` | **hecho** |
 | 8 | `admin_notes` condicional + `admin/page.tsx:1146` con helper | **hecho** |
-| 9 | `buildReleaseQueue` sin `fallbackVideoId` (cada hija su vídeo) | pendiente |
-| 10 | `ReleaseTracklistSection`: verificar alcanzabilidad y borrar si muerto | pendiente |
-| 11 | `sync-data.yml` y `cleanup-shows.yml` | pendiente |
+| 9 | `buildReleaseQueue` sin `fallbackVideoId` (cada hija su vódeo) | hecha |
+| 10 | `ReleaseTracklistSection`: verificar alcanzabilidad y borrar si muerto | hecha |
+| 11 | `sync-data.yml` y `cleanup-shows.yml` | hecha |
 | 12 | 14 bugs de documentación + los 5 del método | en curso (4 de 19 cerrados) |
 | 13 | Extraer P11 a `docs/PHASE_P11.md` | **hecho** |
 | 14 | Filas P11/P12 y rc.34/rc.35 en `docs/PHASES.md` | **hecho** (rc.36 queda para el paso 7) |
@@ -512,5 +512,99 @@ cierto**: el condicional está muerto y `status = ?` se empuja siempre. No es un
 bug —comportamiento correcto por el camino de todos modos— pero es un condicional
 que aparenta proteger algo que ya está protegido tres líneas más arriba. Se anota
 para la fila 8, que toca ese mismo bloque.
+---
 
+## Ronda 3 (filas 9, 10 y 11): reproductor, vista muerta y CI
 
+Cerradas las tres filas. El detalle de por que cada una se cierra asi esta en
+los ficheros; aqui van los numeros y lo que **no** se hizo.
+
+### Fila 9 - cada pista usa su propio medio
+
+`buildReleaseQueue` ya no recibe el `youtube_video_id` de la cabecera como
+reserva. Cada hija entra en la cola solo si tiene preview o video propios.
+
+El tercer parametro se conserva en la firma (los llamadores lo pasan) pero se
+ignora con un `void`, en vez de eliminarse, porque la firma es parte de lo que
+`EPKCard` consume y el parametro documenta que existio una reserva.
+
+Lo que se perdio,Medido: una hija sin medio propio y con cabecera con video
+pasaba de sonar 30 s a no sonar. No se cambia la duracion de las que ya
+funcionaban.
+
+### Fila 10 - `ReleaseTracklistSection` era inalcanzable, no solo duplicado
+
+Verificado antes de borrar, con la regla de no borrar codigo sin comprobar:
+
+1. `resolveTrackRoute` devuelve `release` cuando no hay padre **o** cuando
+   el padre existe (`lib/releases.ts:144-162`). En ambos casos la pagina hace
+   `redirect()`, que lanza. Solo `orphan` llega a renderizar.
+2. `orphan` significa: tiene `release_id` y su padre **no existe**.
+3. La rama que montaba el componente pedia `children.length > 0`, es decir,
+   que la fila tuviera hijas.
+4. Tener hijas significaria que su id es una cabecera. Si es una cabecera, su
+   padre existe y no es un huerfano. Contradiccion: no hay ninguna fila que
+   cumpla 2 y 3 a la vez.
+5. Dato de produccion: `seed_huerfanas: 0`.
+
+La rama no se ejecutaba. Componente, import y rama eliminados (609 -> 603
+lineas). Se actualizo el comentario de `lib/audio-priority.ts` que citaba al
+componente como "la otra vista", porque ya no hay otra vista y el invariante de
+fichero unico acababa de blanquearse.
+
+**Hallazgo lateral, corregido tambien aqui:** `isUsableAudioUrl` ya sabia que
+`"-"` no es una URL desde P7, pero el consumidor de `youtube_video_id` uso
+siempre `trim() !== ''`. Un `"-"` --el marcador de "no hay" del formulario
+del admin-- pasaba el filtro, devolvia fuente `youtube` y llegaba a
+`new YT.Player` con ese id. Un id inexistente no es un error capturable: el
+reproductor se queda negro. Se anadio `isUsableYoutubeId`, que **comparte el
+set de tokens** en vez de crear un segundo vocabulario, y exige el formato
+completo del id (11 caracteres de `[A-Za-z0-9_-]`).
+
+Comprobado contra produccion antes de aceptar el formato estricto: los 38 ids
+de YouTube de la tabla `tracks` pasan el guard. **0 rechazados.** El bug era
+latente, no estaba en los datos.
+
+### Fila 11 - los dos workflows de CI
+
+**`sync-data.yml`: borrado, no arreglado.** No era un bug de un nombre de
+script. Llamaba a `pnpm db:sync` (que no existe) sobre
+`scripts/sync-to-turso.ts`, y ese script sincroniza `tracks` con
+`INSERT OR REPLACE` --que es DELETE + INSERT-- y con una lista de columnas
+que **omite** `status`, `release_id`, `start_time`, `end_time`,
+`external_links`, `disc_number`, `track_number`, `isrc`,
+`description`, `streams`... Al resincronizar, esas columnas vuelven a su
+DEFAULT. El resultado seria: todos los tracks vuelven a `pending`, todos a
+`release_id` NULL, y por tanto el catalogo entero se descoloca en una sola
+ejecucion.
+
+Arreglar el workflow lo habria convertido en un job destructivo en vez de uno
+roto. Borrarlo es el arreglo. La nota de por que queda en el commit.
+
+**`cleanup-shows.yml`:** eliminado el default ``.
+Ese workflow **borra filas**, y un default silencioso significa un DELETE real
+en produccion cada dia. La credencial faltante ya fallaba ruidosamente; la URL
+faltaba por la unica via que no falla: la que destruye. Ahora ambas fallan con
+un `::error::` que dice que crear la variable es un paso de un minuto.
+
+### Reversiones
+
+Cada arreglo se comprobó revirtiesendolo:
+
+| Revertido | Tests que caen |
+|---|---|
+| La cabecera vuelve a ser la reserva de video | 2 |
+| El guard de YouTube vuelve a `trim() !== ''` | 2 |
+
+La primera vez que se hizo la primera reversion el regex no caso y el test paso
+en verde. Se detecto porque el codigo revertido no aparecia en
+`Select-String`. Un verde que no verifico que la reversion ocurrio no es un
+verde: se anota para que no se tome como metodo.
+
+### Gate
+
+- `tsc --noEmit`: limpio
+- `next lint`: limpio
+- `vitest run --no-file-parallelism`: **1563 / 1563 en 78 ficheros** (antes 1549 / 77)
+- `turso-check.ts`: 83 tracks, 9 padres, 65 hijas, 0 huerfanas, sin fallos
+- Sin `pnpm build` ni E2E de produccion: pendiente de credenciales

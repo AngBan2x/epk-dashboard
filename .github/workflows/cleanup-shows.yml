@@ -46,13 +46,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Comprobar que hay credenciales configuradas
+      - name: Comprobar que hay credenciales y destino configurados
         env:
           TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
           TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          BASE_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
         run: |
           if [ -z "${TEST_ADMIN_PASSWORD:-}" ]; then
             echo "::error::Falta el secreto TEST_ADMIN_PASSWORD. Sin él este workflow no puede autenticarse (ver docs/CONFIG_TODO.md, C12)."
+            exit 1
+          fi
+          if [ -z "${BASE_URL:-}" ]; then
+            # Antes caía a `https://epk-dashboard.vercel.app` por defecto. Es
+            # una operación que **borra filas**, y caer en silencio significa
+            # hacer un DELETE real en producción cada día sin que nadie lo pidiera.
+            # La credencial faltante ya falla ruidosamente; la URL faltaba de la
+            # única forma que no falla: la que destruye.
+            echo "::error::Falta la variable NEXT_PUBLIC_APP_URL (Settings > Secrets and variables > Actions > Variables). Sin ella este workflow borraría en la URL por defecto. No se pone a propósito: crear la variable es un paso de un minuto, y borrando sin querer no lo es."
             exit 1
           fi
 
@@ -64,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          base="${BASE_URL:-https://epk-dashboard.vercel.app}"
+          base="${BASE_URL}"
           echo "Base: $base"
 
           jar="$(mktemp)"

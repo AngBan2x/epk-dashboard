@@ -12,7 +12,6 @@ import { VideoShowcase } from "@/components/VideoShowcase";
 export const dynamic = "force-dynamic";
 import { BioSection } from "@/components/BioSection";
 import { CoverImage } from "@/components/CoverImage";
-import { ReleaseTracklistSection } from "@/components/ReleaseTracklistSection";
 import LastfmMetrics from "@/components/LastfmMetrics";
 import { UnifiedMetrics } from "@/components/UnifiedMetrics";
 import { PageTransition, SlideIn } from "@/components/MotionWrappers";
@@ -391,12 +390,22 @@ export default async function TrackDetailPage({ params }: TrackDetailPageProps) 
                 era un monton de tarjetas vacias. Solo se muestran las que
                 aportan algo, y en su lugar va la lista de pistas, que es lo
                 que un periodista viene a buscar a un album.
+
+                Esa lista era `ReleaseTracklistSection`, y se ha borrado en P12
+                por ser inalcanzable, no por estar fea. `/track/<id>` solo llega
+                a renderizar cuando la fila es un **huerfano** —tiene
+                `release_id` y su padre no existe— porque en cualquier otro caso
+                `resolveTrackRoute` devuelve `release` y el `redirect()` lanza
+                (`lib/releases.ts:144-162`). Y un huerfano no puede tener hijas:
+                tenerlas significaría que su id es una cabecera, y entonces no
+                sería un huerfano. La rama pedía `children.length > 0`, así que
+                no se ejecutaba nunca. En producción hay 0 huerfanos
+                (`seed_huerfanas` en `scripts/turso-check.ts`).
+
+                La lista de pistas que se ve de verdad es `ReleaseTrackList`, en
+                `/releases/<id>`.
               */}
-              {isRelease ? (
-                <SlideIn index={2}>
-                  <ReleaseTracklistSection release={track} tracks={children} />
-                </SlideIn>
-              ) : (
+              {(
                 <>
                   {/* Lyrics Section */}
                   <SlideIn index={2}>
