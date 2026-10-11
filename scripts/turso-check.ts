@@ -27,6 +27,51 @@ async function main() {
     url: process.env.TURSO_DATABASE_URL!,
     authToken: process.env.TURSO_AUTH_TOKEN!,
   });
+
+  // ── Por qué esto existe (P12, fila 1) ──────────────────────────────────
+  // Este script imprimía un número por check y **nunca podía salir con código
+  // distinto de 0**: los errores de query se capturaban y se imprimían, las
+  // expectativas eran prosa en la consola, y el proceso terminaba igual. Un
+  // "check" que no puede fallar no es un check — es una impresión. Y lo que
+  // custó: los guards que añadió `a35fa6f` (incluido
+  // `tracks_release_type_con_mayusculas`, puesto a cero a propósito) no
+  // protegían nada, y nadie se enteró de que un test roto estaba en producción
+  // por otra vía.
+  //
+  // Ahora cada check con valor esperado se **compara**, y el proceso sale con 1
+  // si alguno falla o si una query no se pudo ejecutar. Un check que no corre
+  // tampoco protege: contarlo como fallo es lo honesto.
+  const fallos: string[] = [];
+
+  /** Compara un resultado contra lo esperado y registra el fallo si no cuadra. */
+  const comprobar = (label: string, actual: number, esperado: number) => {
+    if (actual === esperado) return true;
+    fallos.push(`${label}: ${actual}, esperado ${esperado}`);
+    return false;
+  };
+
+  // Los checks que **sí** tienen un valor correcto. Los que no aparecen aquí son
+  // recuentos informativos y se quedan como están: inventarles un umbral para
+  // que dejen de fallar en silencio sería exactamente el problema que se arregla.
+  const ESPERADO: Record<string, number> = {
+    // Integridad del catálogo semilla (RC.31, P1 + P7 + P15).
+    seed_padres_duracion_cero: 0,
+    seed_errata_ashe_to_ashes: 0,
+    seed_titulos_con_comillas: 0,
+    seed_huerfanas: 0,
+    // P12: `getTracksByReleaseType()` compara con `WHERE release_type = ?`, y
+    // en SQLite eso distingue mayúsculas. Cualquier `Single` mayúscula rompe el
+    // filtro, y `normalize-release-type.ts` existe justo para que no vuelva.
+    tracks_release_type_con_mayusculas: 0,
+    // Decisión de catálogo: *Vulnicura Strings* se marca `ep` — el padre
+    // `rel-869486ab` y sus 5 hijas. Este check cambió de signo con esa decisión
+    // y usa `lower()` porque en minúsculas un `=` dejaría de comprobar nada.
+    seed_vulnicura_como_EP: 6,
+    // El anti-spam del buzón no está conteniendo en Turso. Los tests corren
+    // contra SQLite, así que esta capa solo se verifica aquí.
+    suggestions_email_duplicado_en_24h: 0,
+  };
+
   const queries = [
     ["tracks", "SELECT COUNT(*) c FROM tracks"],
     ["shows", "SELECT COUNT(*) c FROM shows"],
@@ -42,9 +87,13 @@ async function main() {
   for (const [label, sql] of queries) {
     try {
       const r = await client.execute(sql);
-      console.log(`${label}: ${r.rows[0].c}`);
+      const valor = Number(r.rows[0].c);
+      console.log(`${label}: ${valor}`);
+      if (label in ESPERADO) comprobar(label, valor, ESPERADO[label]);
     } catch (e) {
+      // Una query que no corre no es un 0: es un check que no ha protegido nada.
       console.log(`${label}: ERROR ${(e as Error).message.slice(0, 120)}`);
+      fallos.push(`${label}: la query falló — ${(e as Error).message.slice(0, 120)}`);
     }
   }
 
@@ -61,12 +110,20 @@ async function main() {
   // interpretable, y ya ha pasado: `seed_vulnicura_como_EP` se leía como "no
   // debe haber EP" cuando su sentido real pasó a ser "las 6 filas DEBEN ser ep".
   // Con un 0 en ambos casos, el que se equivocaba no tenía forma de enterarse.
-  console.log(
-    "  (esperado 0: seed_padres_duracion_cero, seed_errata_ashe_to_ashes,\n" +
-      "              seed_titulos_con_comillas, seed_huerfanas,\n" +
-      "              tracks_release_type_con_mayusculas)"
-  );
-  console.log("  (esperado 6: seed_vulnicura_como_EP = el padre de Vulnicura + sus 5 hijas)");
+  //
+  // La lista se imprime desde `ESPERADO`, no a mano. Antes estas tres líneas
+  // eran prosa escrita a mano y `ESPERADO` no existía: dos fuentes de verdad
+  // para lo mismo, que es como `AGENTS.md:12` lleva desde hace tiempo
+  // diciendo que va a ser un 0 en dos sitios distintos.
+  const porValor = new Map<number, string[]>();
+  for (const [label, esperado] of Object.entries(ESPERADO)) {
+    const grupo = porValor.get(esperado) ?? [];
+    grupo.push(label);
+    porValor.set(esperado, grupo);
+  }
+  for (const [esperado, labels] of [...porValor].sort((a, b) => a[0] - b[0])) {
+    console.log(`  (esperado ${esperado}: ${labels.join(", ")})`);
+  }
   console.log("  (los demás: recuento informativo, sin valor esperado)");
   const SEED_ARTISTS = [
     "Pink Floyd",
@@ -154,9 +211,12 @@ async function main() {
       const r = usesArgs
         ? await client.execute({ sql, args: SEED_ARTISTS })
         : await client.execute(sql);
-      console.log(`${label}: ${r.rows[0].c}`);
+      const valor = Number(r.rows[0].c);
+      console.log(`${label}: ${valor}`);
+      if (label in ESPERADO) comprobar(label, valor, ESPERADO[label]);
     } catch (e) {
       console.log(`${label}: ERROR ${(e as Error).message.slice(0, 120)}`);
+      fallos.push(`${label}: la query falló — ${(e as Error).message.slice(0, 120)}`);
     }
   }
 
@@ -335,6 +395,7 @@ async function main() {
     if (duplicados > 0) {
       console.log("  ⚠️  la capa 4 del anti-spam NO está conteniendo en Turso");
     }
+    comprobar("suggestions_email_duplicado_en_24h", duplicados, 0);
 
     const { rows: sinHash } = await client.execute(
       `SELECT COUNT(*) c FROM suggestions WHERE ip_hash IS NULL`
@@ -342,15 +403,24 @@ async function main() {
     console.log(`suggestions_sin_ip_hash: ${Number(sinHash[0]?.c ?? 0)}`);
   } catch (e) {
     // La tabla se crea la primera vez que `ensureTursoSchema()` corre contra
-    // Turso. Antes de ese momento este check no puede existir.
+    // Turso. Antes de ese momento este check no puede existir, así que no es un
+    // fallo: es un check que todavía no tiene contra qué correr.
     console.log(
       `suggestions: no disponible (${(e as Error).message.slice(0, 80)}) — ¿migración aplicada?`
     );
   }
+
+  // ── Veredicto ─────────────────────────────────────────────────────────
+  if (fallos.length === 0) {
+    console.log("\n✔ Todos los checks con valor esperado cuadran.");
+    return;
+  }
+  console.error(`\n✖ ${fallos.length} check(s) fallaron:`);
+  for (const f of fallos) console.error(`  ✖ ${f}`);
+  process.exitCode = 1;
 }
 
 main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
-

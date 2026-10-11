@@ -99,11 +99,42 @@ describe("Fase, no Phase", () => {
     expect(ofensores).toEqual([]);
   });
 
-  it("los titulos de los ocho documentos de fase dicen FASE", () => {
-    for (const p of ["P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]) {
-      const ruta = path.join("docs", `PHASE_${p}.md`);
-      const primera = readFileSync(path.resolve(process.cwd(), ruta), "utf8").split("\n")[0];
-      expect(primera.startsWith(`# FASE ${p}`)).toBe(true);
+  it("los titulos de todos los documentos de fase dicen FASE", () => {
+    // La lista se **deriva** de los ficheros que existen, no está escrita a mano.
+    // Estaba hardcodeada a P3–P10, así que P11 (que se creó anidada dentro de
+    // PHASE_P3.md) y P12 quedaban fuera de la comprobación sin que nadie lo
+    // notara: era la única puerta que vigila la convención, y no los veía.
+    const docs = readdirSync(path.resolve(process.cwd(), "docs"))
+      .filter((f) => /^PHASE_P\d+\.md$/.test(f))
+      .sort();
+
+    expect(docs.length).toBeGreaterThanOrEqual(10);
+
+    for (const fichero of docs) {
+      const fase = fichero.match(/PHASE_(P\d+)\.md/)![1];
+      const primera = readFileSync(path.resolve(process.cwd(), "docs", fichero), "utf8")
+        .split("\n")[0];
+      expect(primera.startsWith(`# FASE ${fase}`), `${fichero}: «${primera}»`).toBe(true);
+    }
+  });
+
+  it("toda fase del indice tiene documento, y todo documento esta en el indice", () => {
+    // El otro lado del mismo problema: `docs/PHASES.md` se define a sí mismo como
+    // «un índice, no un plan» que «solo dice dónde está cada uno y qué estado
+    // tiene». P11 estuvo fuera del índice una ronda entera sin que la puerta
+    // dijera nada, porque solo miraba una dirección.
+    const indice = readFileSync(path.resolve(process.cwd(), "docs", "PHASES.md"), "utf8");
+    const docs = readdirSync(path.resolve(process.cwd(), "docs")).filter((f) =>
+      /^PHASE_P\d+\.md$/.test(f)
+    );
+
+    for (const fichero of docs) {
+      const fase = fichero.match(/PHASE_(P\d+)\.md/)![1];
+      expect(indice, `${fichero} no aparece en docs/PHASES.md`).toContain(fichero);
+      // Y que la fila exista de verdad, no solo el nombre en prosa.
+      expect(indice, `${fichero} no tiene fila en la tabla del índice`).toMatch(
+        new RegExp(`\\|\\s*\\**${fase}\\**\\s*\\|`)
+      );
     }
   });
 

@@ -153,10 +153,10 @@ completa") no se cumple.
 | # | Qué | Estado |
 |---|---|---|
 | 0 | Arreglar el test de cascada rojo | **hecho** |
-| 1 | `turso-check.ts` con aserciones y exit code | pendiente |
-| 2 | `admin-catalog.test.ts` con ejecución real | pendiente |
-| 3 | Meta-test que falla ante asertaciones tautológicas | pendiente |
-| 4 | `fase-naming.test.ts`: derivar la lista de ficheros | pendiente |
+| 1 | `turso-check.ts` con aserciones y exit code | **hecho** |
+| 2 | `admin-catalog.test.ts` con ejecución real | **hecho** |
+| 3 | Meta-test que falla ante asertaciones tautológicas | **hecho** |
+| 4 | `fase-naming.test.ts`: derivar la lista de ficheros | **hecho** |
 | 5 | `release_type`: `"Álbum"`, `edit/page.tsx:377`, `lib/db.ts:3127`, `admin/page.tsx:178` | pendiente |
 | 6 | `lib/release-type.ts`: conectar de verdad o borrar | pendiente |
 | 7 | Allowlist de columnas en `lib/db.ts:3290` y `:3505` | pendiente |
@@ -290,6 +290,96 @@ npx vitest run       → Test Files 73 passed (73)
 ```
 
 **Producción sale verde con este push.**
+
+### Fase 2 — P12.1 · Las puertas que no fallan
+
+Las cuatro van antes que las correcciones a propósito: si estas funcionaran,
+la Fase 3 no habría llegado a producción.
+
+**Fila 1 — `scripts/turso-check.ts`.** Una tabla `ESPERADO` con los siete checks
+que sí tienen un valor correcto, una función `comprobar` que compara, una lista
+`fallos` que acumula, y `process.exitCode = 1` al final. Dos decisiones que no
+son obvias:
+
+- **Una query que no corre cuenta como fallo.** Un `catch` que solo imprime
+  convierte "no lo comprobé" en "todo bien", que es exactamente el problema que
+  se arregla.
+- **La prosa de expectativas se imprime desde `ESPERADO`.** Antes había tres
+  `console.log("(esperado 0: …")` escritos a mano *y* ninguna lista. Ahora hay
+  una sola fuente, y el bucle la recorre. No se puede distinguir una línea
+  generada de una escrita a mano por su forma —son idénticas—, así que el test
+  comprueba de dónde sale, no cómo se ve.
+
+Ejecutado contra Turso: `✔ Todos los checks con valor esperado cuadran`, exit 0.
+Con el umbral de Vulnicura puesto a 99 a propósito: `✖ 1 check(s) fallaron`,
+exit 1.
+
+**Fila 2 — `tests/unit/admin-catalog.test.ts`, reescrito entero.** Lo anterior
+era esto:
+
+```ts
+const handlerIncludesReleaseType = "release_type"; // verificado en edicion manual
+expect(handlerIncludesReleaseType).toBeTruthy();
+```
+
+Afirmaba que un literal de cadena es *truthy*. El cuarto era
+`expect(true).toBe(true)`. Ninguno leía un fichero. Ahora hay nueve tests que
+leen los tres ficheros reales, y cubren algo que el original no: que `catalog`
+tiene entrada en `TAB_ACCENT` (sin ella, `TAB_ACCENT[activeTab]` es `undefined`
+y la pestaña revienta al pulsarla), y que las **dos** ramas de subida de
+imagen tienen la guarda de admin —había una blindada y la otra no.
+
+Uno de los tests nuevos **documenta una deuda en vez de fingir**: afirma que
+`release_type` **no** se valida contra su vocabulario mientras `status` sí. Es la
+fila 5. Está escrita como aserción negativa explícita para que se vea la deuda
+en el sitio donde se decide el código, y para que cuando se arregle haya que
+cambiar el test a propósito.
+
+**Fila 3 — `tests/unit/puertas-que-fallan.test.ts`, nuevo.** Escanea los 72
+ficheros de test y falla si encuentra una aserción tautológica o un `it()` con
+el cuerpo vacío.
+
+Dos cosas que solo se descubren escribiéndolo:
+
+- **Se excluye a sí mismo del barrido.** Contiene los patrones literales que
+  escanea; sin excluirlo se detecta a sí mismo y la comprobación no vale nada.
+- **Escanea el código sin comentarios.** Un test que *documenta* una tautología
+  no es una tautología —este fichero nombra `expect(true).toBe(true)` al
+  explicarlo, y `admin-catalog.test.ts` citaba la suya al contar qué estaba
+  mal—. Marcarlos sería empujar a no escribir la explicación.
+
+Cuando se escribió, **falló**: encontró los `expect(true).toBe(true)` de
+`admin-catalog.test.ts`. La puerta hizo su trabajo en el acto.
+
+**Fila 4 — `tests/unit/fase-naming.test.ts`.** La lista de documentos estaba
+hardcodeada a `P3`–`P10`, así que P11 y P12 quedaban fuera de la única puerta
+que vigila la convención. Ahora se deriva de los ficheros que existen. Y se
+añade el test que faltaba en la otra dirección: `docs/PHASES.md` se define como
+*"un índice, no un plan"*, y P11 estuvo fuera del índice una ronda entera sin
+que nada lo dijera. Ahora toda fase con fichero tiene fila, y toda fila con
+fase tiene fichero.
+
+**Disciplina de reversión, las cuatro ejecutadas:**
+
+| Revertido | Resultado |
+|---|---|
+| Cascada fuera del `dbBatch` | 1 failed / 38 passed |
+| Umbral de Vulnicura a 99 | exit 1 |
+| Botón de la pestaña `catalog` | 1 failed |
+| `release_type` en el `UPDATE` del admin | 1 failed |
+| P12 fuera del índice | 1 failed / 4 passed |
+
+```
+npx tsc --noEmit     → exit 0
+npx next lint        → ✔ No ESLint warnings or errors
+npx vitest run       → Test Files 73 passed (73)
+                       Tests      1519 passed (1519)
+```
+
+**El número de tests subió de 1357 a 1519 y la cifra de `AGENTS.md` está
+todavía más lejos de la real.** Anotado para la fila 12: cuando se corrija, la
+cifra hay que medirla el día del gate, no copiarla de aquí.
+
 
 ### Un hallazgo lateral, sin arreglar
 
