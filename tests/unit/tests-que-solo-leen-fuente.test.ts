@@ -91,6 +91,7 @@ const NATURALEZA = new Set([
   "dark-mode-pairing.test.ts",        // clases Tailwind: jsdom no aplica la cascada CSS
   "override-compaction.test.ts",     // mide opencode.json y AGENTS.md: tampoco se importan
   "capturas-social.test.ts",         // mide JPEG en disco: una imagen no se importa
+  "social-drafter-limites.test.ts", // mide opencode.json y un .md de agente
 ]);
 
 const CON_GEMELO = new Set([

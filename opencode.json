@@ -311,6 +311,19 @@
         "bash": "allow",
         "edit": "allow"
       }
+    },
+    "social-drafter": {
+      "description": "Redacta borradores de publicación para redes sociales. NUNCA publica: el modelo redacta, el administrador publica.",
+      "mode": "subagent",
+      "model": "opencode/space-bunny-free",
+      "permission": {
+        "bash": { "*": "deny" },
+        "edit": { "*": "deny" },
+        "write": { "*": "deny" },
+        "webfetch": "deny",
+        "websearch": "deny",
+        "task": "deny"
+      }
     }
   }
 }

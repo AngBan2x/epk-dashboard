@@ -9,8 +9,8 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `npx vitest run --no-file-parallelism` | **1617 tests** (Vitest, 82 archivos; medido en `0034385`). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
-| ⚠️ `--no-file-parallelism` no es opcional | Sin él, el reciclado de workers dispara una asertación nativa de teardown de V8 (`node::RemoveEnvironmentCleanupHook`, `(env) != nullptr`) y el run muere con `ERR_IPC_CHANNEL_CLOSED`. **No es un test rojo**: los 1617 pasan. Se dispara desde que los ficheros superpower cargan un módulo nativo (`better-sqlite3`, vía `@/libsql/client`) a través de un route handler, y el hook de limpieza nativo se ejecuta con el isolate ya destruido. Verificado: excluyendo solo `tests/unit/official-videos.test.ts` el run en paralelo vuelve a ser verde; bajando concurrencia a 2 workers también crashea. Secuencial: 1617/1617, ~65 s. Aislado es un problema de **infraestructura de test**, no de producto |
+| `npx vitest run --no-file-parallelism` | **1631 tests** (Vitest, 83 archivos; medido en `0034385`). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
+| ⚠️ `--no-file-parallelism` no es opcional | Sin él, el reciclado de workers dispara una asertación nativa de teardown de V8 (`node::RemoveEnvironmentCleanupHook`, `(env) != nullptr`) y el run muere con `ERR_IPC_CHANNEL_CLOSED`. **No es un test rojo**: los 1631 pasan. Se dispara desde que los ficheros superpower cargan un módulo nativo (`better-sqlite3`, vía `@/libsql/client`) a través de un route handler, y el hook de limpieza nativo se ejecuta con el isolate ya destruido. Verificado: excluyendo solo `tests/unit/official-videos.test.ts` el run en paralelo vuelve a ser verde; bajando concurrencia a 2 workers también crashea. Secuencial: 1631/1631, ~65 s. Aislado es un problema de **infraestructura de test**, no de producto |
 | `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast. Usa `PLAYWRIGHT_BASE_URL=https://epk-dashboard.vercel.app` para correr contra producción |
 | `npx tsx scripts/turso-check.ts` | Verifica la higiene de datos en Turso por SQL directo (tracks, shows, usuarios QA, huerfanos). Es la fuente de verdad, no las lecturas de API (la réplica va retrasada) |
 | `npx tsx scripts/qa-cleanup.ts --apply` | Limpia datos de QA de producción. **Dry-run por defecto**: siempre revisa el dry-run antes de aplicar |
@@ -245,7 +245,7 @@ La salida máxima declarada se descuenta del presupuesto de entrada: `context �
 ### No asignar
 `ling-3.0-flash-fin` (dominio financiero), `jev-*` (no es chat, decisiones estructuradas), nada pago (`kimi-k2.7-code`, `deepseek-v4-flash`, `muse-spark-1.2`, `kimi-k2.7-code-highspeed` son de pago).
 
-### Builders (17)
+### Builders (18)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
 | `api-builder` | space-bunny-free | Endpoints REST |
@@ -262,6 +262,7 @@ La salida máxima declarada se descuenta del presupuesto de entrada: `context �
 | `search-builder` | space-bunny-free | Búsqueda |
 | `subscriber-builder` | space-bunny-free | Suscriptores |
 | `social-links-builder` | mimo-v2.6-flash-free | Links sociales |
+| **`social-drafter`** | space-bunny-free | **Redacta** borradores para redes. **Nunca publica** |
 | `account-settings-builder` | space-bunny-free | Configuración cuenta |
 | `release-form-builder` | space-bunny-free | Formularios releases |
 | `artist-dashboard-builder` | mimo-v2.6-flash-free | Dashboard artista |
