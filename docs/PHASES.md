@@ -34,6 +34,7 @@ decisiones ya tomadas.
 | P10 | [`PHASE_P10.md`](./PHASE_P10.md) — buzón de sugerencias anónimo | completada |
 | P11 | [`PHASE_P11.md`](./PHASE_P11.md) — admin: catálogo unificado, `release_type`/`external_links` editables | completada con deuda declarada; salió de `PHASE_P3.md` en P12 |
 | P12 | [`PHASE_P12.md`](./PHASE_P12.md) — auditoría post-rc.35: las puertas que no fallan | **en curso**; bloqueada en los pasos 5 y 7 del Flujo Obligatorio |
+| P13 | [`PHASE_P13.md`](./PHASE_P13.md) — publicación en redes sociales | **en curso**; entrega prevista hasta el paso 6 inclusive, frontera en credenciales |
 
 ## Los RC (numeración aparte)
 

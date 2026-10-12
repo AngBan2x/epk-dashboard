@@ -492,4 +492,41 @@ y después los pasos 5 y 7 del Flujo Obligatorio (pruebas en producción y
 release `v4.0.0-rc.36`), bloqueados por las seis variables `TEST_*`.
 
 **Puertas.** Pendientes de esta entrada.
+---
 
+## 2026-10-11 · P13 empieza: publicación en redes sociales
+
+**Antes que nada, una corrección de cuenta.** El plan que había propuesto para
+P13 no cumplía el Flujo Obligatorio: ponía el E2E de producción como primer paso y
+la documentación después. La regla dice documentar antes de cualquier acción, y se
+invierte. Ahora el orden es: este documento, y luego el resto.
+
+**La otra corrección era de fondo.** El plan llevaba como fotos las portadas de los
+albums del catálogo, enlazadas al CDN de Apple. Eso anuncia el catálogo de
+Apple, no la herramienta, y encima la portada es obra de terceros. Las imágenes
+van a ser **capturas de la propia plataforma**, lo que además quita de en medio
+el problema de derechos.
+
+**Lo que sí se decidió hoy, con datos:**
+
+- **Meta no pide App Review para cuentas propias.** Literal: *"If your app only
+  serves your Instagram professional account or an account you manage, Standard
+  Access is all your app needs"*. Facebook, Instagram y Threads entran sin
+  revisión y sin verificación de empresa. Requisito duro: Instagram en cuenta
+  **profesional**.
+- **X no tiene plan gratuito**: 0,015 $/post y 0,20 $/post con URL. Descartado.
+- **TikTok es gratis pero inservible**: sin auditar, *"all content posted by
+  unaudited clients will be restricted to private viewing mode"*. Descartado.
+- **LinkedIn no publica sus límites.** Literal: *"Standard rate limits are not
+  published in documentation"*. El adaptador tendrá que manejar 429 y descubrir
+  el suyo.
+
+**La cola de aprobaciones se queda fuera de las capturas**, y el porqué está
+escrito en PHASE_P13.md para que nadie la reañada creyéndola nueva.
+
+**Frontera de esta entrega.** Se implementa hasta el paso 6 inclusive —los seis
+adaptadores probados contra capa HTTP simulada— y **no se hace ni una sola
+llamada real a ninguna plataforma**. A partir de ahí hacen falta credenciales.
+
+**Lo que se hace.** Solo documentación, que es exactamente lo que pide el paso 1
+del Flujo: PHASE_P13.md nuevo y su entrada en el índice de docs/PHASES.md.
