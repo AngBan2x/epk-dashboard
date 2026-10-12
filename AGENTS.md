@@ -9,8 +9,8 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `npx vitest run --no-file-parallelism` | **1592 tests** (Vitest, 80 archivos; medido en `0034385`). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
-| ⚠️ `--no-file-parallelism` no es opcional | Sin él, el reciclado de workers dispara una asertación nativa de teardown de V8 (`node::RemoveEnvironmentCleanupHook`, `(env) != nullptr`) y el run muere con `ERR_IPC_CHANNEL_CLOSED`. **No es un test rojo**: los 1592 pasan. Se dispara desde que los ficheros superpower cargan un módulo nativo (`better-sqlite3`, vía `@/libsql/client`) a través de un route handler, y el hook de limpieza nativo se ejecuta con el isolate ya destruido. Verificado: excluyendo solo `tests/unit/official-videos.test.ts` el run en paralelo vuelve a ser verde; bajando concurrencia a 2 workers también crashea. Secuencial: 1592/1592, ~65 s. Aislado es un problema de **infraestructura de test**, no de producto |
+| `npx vitest run --no-file-parallelism` | **1603 tests** (Vitest, 81 archivos; medido en `0034385`). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
+| ⚠️ `--no-file-parallelism` no es opcional | Sin él, el reciclado de workers dispara una asertación nativa de teardown de V8 (`node::RemoveEnvironmentCleanupHook`, `(env) != nullptr`) y el run muere con `ERR_IPC_CHANNEL_CLOSED`. **No es un test rojo**: los 1603 pasan. Se dispara desde que los ficheros superpower cargan un módulo nativo (`better-sqlite3`, vía `@/libsql/client`) a través de un route handler, y el hook de limpieza nativo se ejecuta con el isolate ya destruido. Verificado: excluyendo solo `tests/unit/official-videos.test.ts` el run en paralelo vuelve a ser verde; bajando concurrencia a 2 workers también crashea. Secuencial: 1603/1603, ~65 s. Aislado es un problema de **infraestructura de test**, no de producto |
 | `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast. Usa `PLAYWRIGHT_BASE_URL=https://epk-dashboard.vercel.app` para correr contra producción |
 | `npx tsx scripts/turso-check.ts` | Verifica la higiene de datos en Turso por SQL directo (tracks, shows, usuarios QA, huerfanos). Es la fuente de verdad, no las lecturas de API (la réplica va retrasada) |
 | `npx tsx scripts/qa-cleanup.ts --apply` | Limpia datos de QA de producción. **Dry-run por defecto**: siempre revisa el dry-run antes de aplicar |
@@ -223,7 +223,21 @@ Configurado en `opencode.json`: `auto: true`, `prune: true`, `reserved: 20000`.
 
 **No existe un umbral en porcentaje.** El esquema (`https://opencode.ai/config.json`) solo admite `auto`, `prune`, `tail_turns`, `preserve_recent_tokens` y `reserved`; y es **global**, no por agente (`AgentConfig` no acepta `compaction`). `reserved` son **tokens absolutos**, no porcentaje.
 
-Con `reserved: 20000` la compactación salta al **90% del modelo de 200K** (mimo, el que más se usa) y al **98% de los de 1M**. Para 90% en los de 1M haría falta `reserved: 100000`, pero eso dejaría a mimo compactando al 50% y lo volvería inusable.
+**Lo que manda no es `reserved`: es `limit.output` del modelo.** La línea de abajo (hasta la de "98%") estaba mal, y la explicación buena es la siguiente.
+
+Medido contra `models.dev/api.json` el 2026-10-11:
+
+| Modelo | `limit.context` | `limit.output` | usable |
+|---|---|---|---|
+| `space-bunny-free` | 1.048.576 | **524.288** | **50,0 %** |
+| `muse-spark-1.3` | 1.048.576 | 131.072 | 87,5 % |
+| `mimo-v2.6-flash-free` | 200.000 | 32.000 | 84 % |
+
+La salida máxima declarada se descuenta del presupuesto de entrada: `context − output`. `space-bunny-free` declara una salida de **exactamente la mitad** de su contexto, así que de 1M solo se podían usar ~524K antes de compactar — de ahí que saltara al ~50 % con `reserved: 20000`, que a esta escala es ruido (2 %). No era la ventana: `muse-spark-1.3` comparte los mismos 1M y llega al 87,5 % porque pide 4× menos salida.
+
+**Por eso `opencode.json` sobrescribe `space-bunny-free.limit.output` a `32000`.** Sube lo usable a ~95 %. `32000` es el mismo output que ya usa `mimo-v2.6-flash-free` en este repo y trabaja sin problemas; para diffs, documentación y respuestas de agente es de sobra.
+
+**La fórmula es una inferencia, no una regla documentada.** La documentación de opencode describe `reserved` pero no publica cómo se calcula el umbral; que `context − output` dé exactamente 50,0 % —y coincida con lo observado— es evidencia fuerte, no confirmación. Si alguna vez la compactación se dispara antes de lo previsto, el culpable es este número y no `reserved`.
 
 ### Banco de pruebas (NO asignar sin evaluar con evidencia)
 `qwen3-coder-30b-a3b`, `devstral-2512`, `qwen3.8-27b`, `gemini-2.5-flash` (todos $0 OpenRouter, code-capables).

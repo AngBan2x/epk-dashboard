@@ -7,6 +7,18 @@
     "prune": true,
     "reserved": 20000
   },
+  "provider": {
+    "opencode": {
+      "models": {
+        "space-bunny-free": {
+          "limit": {
+            "context": 1048576,
+            "output": 32000
+          }
+        }
+      }
+    }
+  },
   "mcp": {
     "vercel": {
       "type": "remote",

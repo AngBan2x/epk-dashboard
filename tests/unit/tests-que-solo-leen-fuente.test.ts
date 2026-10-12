@@ -89,6 +89,7 @@ const NATURALEZA = new Set([
   "fase-naming.test.ts",              // deriva la lista de docs del directorio
   "puertas-que-fallan.test.ts",       // meta-test: solo puede leer otros tests
   "dark-mode-pairing.test.ts",        // clases Tailwind: jsdom no aplica la cascada CSS
+  "override-compaction.test.ts",     // mide opencode.json y AGENTS.md: tampoco se importan
 ]);
 
 const CON_GEMELO = new Set([
