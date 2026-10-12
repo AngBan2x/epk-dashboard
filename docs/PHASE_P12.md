@@ -183,7 +183,7 @@ completa") no se cumple.
 | 9 | `buildReleaseQueue` sin `fallbackVideoId` (cada hija su vódeo) | hecha |
 | 10 | `ReleaseTracklistSection`: verificar alcanzabilidad y borrar si muerto | hecha |
 | 11 | `sync-data.yml` y `cleanup-shows.yml` | hecha |
-| 12 | 14 bugs de documentación + los 5 del método | en curso (4 de 19 cerrados) |
+| 12 | 14 bugs de documentación + los 5 del método | en curso (11 de 19; ver el recuento honesto debajo) |
 | 13 | Extraer P11 a `docs/PHASE_P11.md` | **hecho** |
 | 14 | Filas P11/P12 y rc.34/rc.35 en `docs/PHASES.md` | **hecho** (rc.36 queda para el paso 7) |
 
@@ -648,3 +648,60 @@ esto va a buscar un fallo que no esta.
 Con esto, la parte local del ciclo del Flujo Obligatorio queda cerrada. La parte
 de produccion (paso 5) y 4.0.0-rc.36 (paso 7) siguen bloqueados por las
 seis credenciales TEST_*.
+### Fila 12, recuento honesto
+
+El "4 de 19" que ponia la tabla era un numero escrito a ojo, que es justo lo
+que la fila 12 denuncia. Recuento lo que se ha **verificado** cerrado:
+
+**Los 5 del metodo, los 5 cerrados.**
+
+| Que | Estado |
+|---|---|
+| PHASE_P3 dice que el fichero del usuario esta "intacto; verificado con git show" | cerrado antes |
+| PHASE_P3:241 cita al propio PHASE_P3.md como evidencia de un hecho | cerrado antes |
+| PHASE_P3 afirma "cada test tiene referencia al archivo que protege" | cerrado antes |
+| AI_LOG seis recuentos mal por +5 | cerrado en 1b948f |
+| tests que solo leen el fuente sin ejecutar nada | enumerados en 	ests/unit/tests-que-solo-leen-fuente.test.ts |
+
+**De los 14 de contenido, 6 cerrados y 8 sin nombrar uno a uno en este
+documento.** Los seis: AGENTS.md con la cifra de tests (x2, en :12 y
+:13), README.md con la misma cifra, AGENTS.md:76 con los "83 guards", y
+AI_LOG con la tabla de lineas. Los otros ocho existen como hallazgos del
+barrido pero no tienen linea propia aqui, asi que **no se cuentan**: no se
+puede declarar cerrada una fila que nadie ha escrito.
+
+#### El quinto bug de metodo, en detalle
+
+De los 79 ficheros de 	ests/unit, **8 leen el fuente y no ejecutan nada**.
+Antes de esta ronda no habia forma de saberlo: nadie los habia contado. La
+clasificacion:
+
+| Categoria | N | Ficheros |
+|---|---|---|
+| Por naturaleza: no hay otra forma | 4 | dark-mode-pairing (jsdom no aplica la cascada CSS, solo hay cadenas de texto), puertas-que-fallan (meta-test sobre otros tests), ase-naming (deriva la lista del directorio), cifras-de-la-documentacion (mide .md) |
+| Con gemelo que si ejecuta | 3 | llowlist-de-columnas / llowlist-ejecutada, image-robustness / rtist-images-script, 
+o-audio-y-enlace-al-artista / elease-type-normalization |
+| **Deuda real** | 1 | dmin-catalog.test.ts |
+
+dmin-catalog.test.ts sigue siendo deuda, y no poco: doce aserciones sobre el
+fuente de pp/admin/page.tsx, de las cuales **"se lee del body" y "se anade a
+la sentencia con parametro, no interpolado" si se podrian ejecutar** contra la
+capa de datos, y serian el test que de verdad detectaria una inyeccion. Las
+diez otras son estructura de JSX, y para eso leer el fuente es lo correcto.
+Convertirlo pide extraer la lectura del body y la construccion del SQL a
+funciones testeables en el panel: es trabajo de otra ronda, no un apano de
+cinco minutos. Se declara abierta.
+
+**El predicado tambien fallo antes de dar bien.** La primera version exclnia
+solo los imports 
+ode:*, asi que dark-mode-pairing (que importa "fs")
+contaba como "importa el proyecto" y se salia de la lista: siete tests de
+analisis de Tailwind aparecian como si ejecutaran codigo. Una lista de deuda
+que se vacia por un predicado mal escrito miente en la direccion que mas caro
+sale, que es **parecer que no hay deuda**. Corregido, y el filtro excluye
+ahora los builtins con y sin prefijo.
+
+Y el fichero se excluye a si mismo de su propia lista, por la misma razon que
+puertas-que-fallan: leer el fuente de otros tests es literalmente su trabajo.
+Sin la exclusion no cuadra nunca, y el guard que vigila la lista se declararia
+a si mismo deuda.

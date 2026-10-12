@@ -251,7 +251,7 @@ Todos con **dry-run por defecto**; escriben solo con `--apply`.
 | Check | Resultado |
 |-------|-----------|
 | TypeScript Strict | ✅ 0 errores |
-| Unit Tests | ✅ 1578/1578 en 79 archivos (secuencial) |
+| Unit Tests | ✅ 1592/1592 en 80 archivos (secuencial) |
 | Lint | ✅ 0 errores, 0 warnings |
 | Build | ✅ Success |
 | Dark Mode | ✅ Consistente en todos los modos |

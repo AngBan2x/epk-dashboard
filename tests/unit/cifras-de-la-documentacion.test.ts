@@ -90,20 +90,20 @@ describe("AI_LOG.md: los seis recuentos de docs/ai-log/", () => {
 });
 
 describe("las cifras de test llevan el commit donde se midieron", () => {
-  it("AGENTS.md dice 1578 tests en 79 ficheros, con el commit al lado", () => {
+  it("AGENTS.md dice 1592 tests en 80 ficheros, con el commit al lado", () => {
     const agentes = leer("AGENTS.md");
-    expect(agentes).toContain("**1578 tests**");
-    expect(agentes).toContain("79 archivos");
-    // Sin commit, el 1578 no se puede evaluar: si la suite crece, no hay forma
+    expect(agentes).toContain("**1592 tests**");
+    expect(agentes).toContain("80 archivos");
+    // Sin commit, el 1592 no se puede evaluar: si la suite crece, no hay forma
     // de distinguir "el doc va atrasado" de "el test se rompió".
-    expect(agentes).toMatch(/1578 tests\*\*[^|]*medido en `\w+`/);
+    expect(agentes).toMatch(/1592 tests\*\*[^|]*medido en `\w+`/);
   });
 
   it("README.md no lleva una cifra suelta", () => {
     // README es lo primero que lee alguien que no eres tú. Un 1146/1146 sin
     // contexto ahí es la peor versión del problema.
     const readme = leer("README.md");
-    expect(readme).toContain("1578/1578 en 79 archivos");
+    expect(readme).toContain("1592/1592 en 80 archivos");
     expect(readme).not.toContain("1146/1146");
   });
 
