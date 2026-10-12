@@ -90,6 +90,7 @@ const NATURALEZA = new Set([
   "puertas-que-fallan.test.ts",       // meta-test: solo puede leer otros tests
   "dark-mode-pairing.test.ts",        // clases Tailwind: jsdom no aplica la cascada CSS
   "override-compaction.test.ts",     // mide opencode.json y AGENTS.md: tampoco se importan
+  "capturas-social.test.ts",         // mide JPEG en disco: una imagen no se importa
 ]);
 
 const CON_GEMELO = new Set([
