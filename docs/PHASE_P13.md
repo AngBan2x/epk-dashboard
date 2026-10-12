@@ -283,3 +283,75 @@ A partir de ahí hace falta lo que está en
   por tanto, `db-migrator`. Ahora no está previsto: se asume que no.
 - **LinkedIn sin límites publicados**: el primer día útil contra la API real se
   anota el número que devuelva el Developer Portal, con la fecha.
+---
+
+## Estado al llegar a la frontera
+
+Pasos 0 a 6 hechos. **No se ha hecho ni una sola llamada real a ninguna
+plataforma.**
+
+| Paso | Qué | Commit |
+|---|---|---|
+| 0 | Arreglo de compactación | 841aca |
+| 1 | Este documento | 821668e |
+| 2 | E2E de producción → cierre de P12 |  8fc59e |
+| 3 | scripts/capture-social.ts + 20 capturas |  8fc59e |
+| 4 | Test que vigila las capturas |  8fc59e |
+| 5 | Subagente social-drafter |  1f69ec |
+| 6 | Interfaz + seis adaptadores | c93a008 |
+
+### Lo entregado
+
+- **20 capturas** en public/pressplay/, 3,21 MB. Se commitean porque Vercel
+  sirve public/ por CDN y cada una es ya una URL pública.
+- **scripts/capture-social.ts** con dos comprobaciones que abortan: el selector
+  de la página tiene que existir, y el peso tiene que pasar un suelo.
+- **social-drafter**, con ash, dit, write, 	ask, webfetch y
+  websearch en deny.
+- **lib/social/limites.ts**: la tabla única de límites con fecha.
+- **lib/social/tipos.ts** + seis adaptadores con la capa HTTP inyectada.
+- **1.657 tests** en 84 ficheros. Gate: 	sc, lint, itest y uild limpios.
+
+### Lo que se encontró por el camino
+
+Tres cosas que no estaban en el plan y quevalen más que el plan:
+
+1. **Un bug real en alidar de Mastodon**: comparaba siempre contra el 500 de
+   la tabla, así que con una instancia que permite 280 un texto de 300 pasaba.
+   Lo encontró el test al fijar limiteTexto: 280, no la lectura del código.
+2. **Un fallo de diseño propio**: AdaptadorSocial no tenía publicar, así que
+   crearAdaptador() devolvía la mitad de un adaptador. Corregido en los seis.
+3. **La landing y la ficha de release no tienen landmark <main>.** Se vio al
+   escribir el generador. Deuda de accesibilidad, anotada para su ronda.
+
+### Lo que queda sin confirmar, y por qué es donde mirar primero
+
+Nada de esto se ha podido comprobar sin una llamada real. El subagente lo
+declaró en vez de rellenarlo:
+
+| Plataforma | Sin confirmar |
+|---|---|
+| **Threads** | La forma de cada elemento de children en un carrusel |
+| **Instagram** | El patrón de dos fases del carrusel |
+| **LinkedIn** | El verbo PUT para subir los bytes, y el nombre del campo image |
+| **Bluesky** | El máximo de imágenes por post; si la contraseña es de cuenta o *app password* |
+| **Mastodon** | El máximo de medios por estado |
+
+**El orden de comprobación es el de los adaptadores**, porque es el orden en que
+se puede fallar: Bluesky es el único sin muro de revisión, y su límite de
+imágenes es el único que no tenemos. Si algo falla, empieza por ahí.
+
+### Lo que hace falta para cruzar la frontera
+
+| Plataforma | Qué |
+|---|---|
+| **Bluesky** | App password de la cuenta. **Empieza por aquí**: es el más rápido |
+| **Meta** | Un app. Threads como *tester*, Instagram en cuenta **Profesional**, client secret |
+| **Mastodon** | La instancia elegida y su token. **Hay que elegirla**: el alcance depende de cuál |
+| **LinkedIn** | Client ID y secret. Ojo: sus límites no se publican, se descubren probando |
+
+Los secretos van a .env.local y a las variables de Vercel marcadas como secret.
+**No se pasan por el chat**: se leen del fichero.
+
+Una vez haya una credencial, el orden es: **una** publicación de prueba a mano
+por el admin, comprobar que el flujo funciona, y solo después conectar el panel.

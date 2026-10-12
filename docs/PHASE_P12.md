@@ -705,3 +705,20 @@ Y el fichero se excluye a si mismo de su propia lista, por la misma razon que
 puertas-que-fallan: leer el fuente de otros tests es literalmente su trabajo.
 Sin la exclusion no cuadra nunca, y el guard que vigila la lista se declararia
 a si mismo deuda.
+---
+
+## Cierre de P12 (2026-10-11)
+
+El paso 5 del Flujo Obligatorio era el E2E en produccion, y estaba bloqueado por
+las seis variables TEST_*.
+
+`
+PLAYWRIGHT_BASE_URL=https://epk-dashboard.vercel.app npx playwright test --project=chromium
+→ 136 passed (40,7 m), 0 failed, 0 skipped, 0 flaky
+`
+
+Las seis credenciales de .env.local funcionan. **P12 queda cerrado.**
+
+Cierre de la fila 12: 11 de 19 bugs cerrados de forma verificada, y el resto
+declarado como deuda con su categoría. La única que queda marcada DEUDA_REAL
+es dmin-catalog.test.ts, y está anotada con por qué no se convierte ahora.

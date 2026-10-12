@@ -33,8 +33,8 @@ decisiones ya tomadas.
 | P9 | [`PHASE_P9.md`](./PHASE_P9.md) — pruebas de correo sin `eu.org` | completada |
 | P10 | [`PHASE_P10.md`](./PHASE_P10.md) — buzón de sugerencias anónimo | completada |
 | P11 | [`PHASE_P11.md`](./PHASE_P11.md) — admin: catálogo unificado, `release_type`/`external_links` editables | completada con deuda declarada; salió de `PHASE_P3.md` en P12 |
-| P12 | [`PHASE_P12.md`](./PHASE_P12.md) — auditoría post-rc.35: las puertas que no fallan | **en curso**; bloqueada en los pasos 5 y 7 del Flujo Obligatorio |
-| P13 | [`PHASE_P13.md`](./PHASE_P13.md) — publicación en redes sociales | **en curso**; entrega prevista hasta el paso 6 inclusive, frontera en credenciales |
+| P12 | [`PHASE_P12.md`](./PHASE_P12.md) - auditoría post-rc.35: las puertas que no fallan | **cerrada**: E2E 136/136 en producción (2026-10-11). Queda deuda declarada |
+| P13 | [`PHASE_P13.md`](./PHASE_P13.md) - publicación en redes sociales | **hasta la frontera**: los 6 adaptadores escritos y probados, sin ninguna llamada real |
 
 ## Los RC (numeración aparte)
 
