@@ -108,6 +108,32 @@ export const DEFAULT_SUBSCRIBER_EMAIL = "subscriber@epk.local";
 export const SUBSCRIBER_EMAIL = readEnv("TEST_SUBSCRIBER_EMAIL", DEFAULT_SUBSCRIBER_EMAIL);
 export const SUBSCRIBER_PASSWORD = readEnvStrict("TEST_SUBSCRIBER_PASSWORD");
 
+/**
+ * P13 — la cuenta de demostracion para las capturas publicas.
+ *
+ * Es una cuarta credencial y **no** un cuarto `TestRole`: `artist`, `admin` y
+ * `subscriber` son personas con permisos sobre la aplicacion; esta es un perfil
+ * inventado que existe unicamente para que `scripts/capture-social.ts` tenga una
+ * sesion que capturar en `/dashboard` sin exponer la de una persona real. Por eso
+ * va en su propio bloque y no dentro de `ENV_NAME`: no tiene nada que ver con los
+ * roles.
+ *
+ * El correo si lleva default por el mismo motivo que los otros dos de dominio
+ * inventado (`epk.local`), y la contrasena no, porque ninguna la tiene. Una
+ * contrasena con default estaria en el repositorio, y eso es justo lo que este
+ * fichero lleva tres reglas Y un test intentando que no ocurra.
+ */
+export const DEFAULT_DEMO_ARTIST_EMAIL = "demo.artist@epk.local";
+export const DEMO_ARTIST_EMAIL = readEnv("DEMO_ARTIST_EMAIL", DEFAULT_DEMO_ARTIST_EMAIL);
+export const DEMO_ARTIST_PASSWORD = readEnvStrict("DEMO_ARTIST_PASSWORD");
+
+/** Que falta para crear la cuenta de demostracion, sin imprimir ningun valor. */
+export function missingDemoCredentialEnvVars(): string[] {
+  const faltan: string[] = [];
+  if (!DEMO_ARTIST_PASSWORD) faltan.push("DEMO_ARTIST_PASSWORD");
+  return faltan;
+}
+
 /** Variable de entorno que hay que definir para un rol, para el mensaje de error. */
 const ENV_NAME: Record<TestRole, { email: string; password: string }> = {
   artist: { email: "TEST_ARTIST_EMAIL", password: "TEST_ARTIST_PASSWORD" },

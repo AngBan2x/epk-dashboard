@@ -253,16 +253,29 @@ async function capturar(
 /**
  * La sesión se hace **una vez** y se reutiliza en los dos contextos.
  *
- * Autenticar dos veces contra Turso cuesta dos veces, y contra producción cada
- * login tarda. El estado (`storageState`) es portable entre contextos de
- * Playwright, así que se hace una vez y se clona.
+ * ## Por qué la cuenta de DEMO y no la de artista de pruebas
+ *
+ * `/dashboard` es la única de las cinco rutas que no existe sin sesión, así que
+ * hay que autenticarse para capturarla. Pero estas imágenes van a
+ * `public/pressplay/`, que se sirve **sin autenticación** y está pensado para
+ * publicarse en redes: capturar con `TEST_ARTIST_*` mete en un fichero público
+ * el nombre, el correo y los contadores de notificaciones de una persona real.
+ *
+ * Las otras cuatro rutas ya se capturaban sin sesión por el mismo motivo — la
+ * primera versión de la landing salió con el nombre real. Con esta, las cinco
+ * rutas quedan limpias por el mismo motivo y por el mismo camino.
+ *
+ * Si faltan las credenciales de la demo, `/dashboard` se salta **visible**, no en
+ * silencio: una captura que falta es un aviso; una captura con el nombre de
+ * alguien es un problema que ya se publicó.
  */
 async function autenticar(url: string): Promise<ReturnType<BrowserContext["storageState"]> | null> {
-  const email = process.env.TEST_ARTIST_EMAIL;
-  const password = process.env.TEST_ARTIST_PASSWORD;
+  const email = process.env.DEMO_ARTIST_EMAIL;
+  const password = process.env.DEMO_ARTIST_PASSWORD;
 
   if (!email || !password) {
-    console.log("  sin credenciales de artista: se capturará solo lo público");
+    console.log("  sin credenciales de la cuenta de demo: NO se capturará /dashboard");
+    console.log("    (crear con: npx tsx scripts/create-demo-artist.ts --apply)");
     return null;
   }
 
@@ -279,7 +292,7 @@ async function autenticar(url: string): Promise<ReturnType<BrowserContext["stora
     // señal observable desde la página es la URL, así que se espera a salir de
     // `/login`. El login contra Turso tarda, de ahí los 60 s.
     await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 60_000 });
-    console.log("  sesión de artista iniciada");
+    console.log("  sesión de la cuenta de demo iniciada");
     return await contexto.storageState();
   } finally {
     await navegador.close();
@@ -293,7 +306,7 @@ async function main(): Promise<void> {
 
   await mkdir(OUT_DIR, { recursive: true });
 
-  const hayCredenciales = !!(process.env.TEST_ARTIST_EMAIL && process.env.TEST_ARTIST_PASSWORD);
+  const hayCredenciales = !!(process.env.DEMO_ARTIST_EMAIL && process.env.DEMO_ARTIST_PASSWORD);
   const sesion = hayCredenciales ? await autenticar(BASE_URL) : null;
 
   const hechas: { fichero: string; bytes: number }[] = [];

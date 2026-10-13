@@ -24,6 +24,12 @@ const ENV_KEYS = [
   // enseñó en la salida del test.
   "TEST_SUBSCRIBER_EMAIL",
   "TEST_SUBSCRIBER_PASSWORD",
+  // P13: la cuenta de demostracion. Mismo motivo que C6, y por el mismo modo
+  // de fallo: si la variable no se limpia aqui, `credentials.ts` la repuebla
+  // desde su propio `dotenv.config()` y este fichero acaba imprimiendo la
+  // contrasena real en el fallo de una asercion.
+  "DEMO_ARTIST_EMAIL",
+  "DEMO_ARTIST_PASSWORD",
 ] as const;
 
 type EnvKey = (typeof ENV_KEYS)[number];
@@ -107,6 +113,46 @@ describe("scripts/lib/credentials", () => {
     // C6: el suscriptor entra en la misma regla. Su correo sí tiene default
     // (dominio inventado), pero la contrasena no.
     expect(c.SUBSCRIBER_PASSWORD).toBe("");
+    // P13: la cuenta de demostracion entra en la misma regla. Su correo si
+    // lleva default (`demo.artist@epk.local`, dominio inventado), la contrasena
+    // no — aunque la cuenta sea inventada de principio a fin.
+    expect(c.DEMO_ARTIST_PASSWORD).toBe("");
+  });
+
+  it("la cuenta de demostracion: correo con default, contrasena sin", async () => {
+    const c = await loadHelper();
+
+    expect(c.DEMO_ARTIST_EMAIL).toBe(c.DEFAULT_DEMO_ARTIST_EMAIL);
+    expect(c.DEMO_ARTIST_EMAIL).toContain("epk.local");
+    expect(c.DEMO_ARTIST_PASSWORD).toBe("");
+
+    // y el correo sigue siendo sobreescribible
+    process.env.DEMO_ARTIST_EMAIL = "otro@example.test";
+    const c2 = await loadHelper();
+    expect(c2.DEMO_ARTIST_EMAIL).toBe("otro@example.test");
+  });
+
+  it("missingDemoCredentialEnvVars solo nombra la contrasena, y nunca un valor", async () => {
+    process.env.DEMO_ARTIST_PASSWORD = "pw-inventada-de-prueba";
+    const c = await loadHelper();
+
+    expect(c.missingDemoCredentialEnvVars()).toEqual([]);
+    expect(c.DEMO_ARTIST_PASSWORD).toBe("pw-inventada-de-prueba");
+
+    delete process.env.DEMO_ARTIST_PASSWORD;
+    const c2 = await loadHelper();
+    expect(c2.missingDemoCredentialEnvVars()).toEqual(["DEMO_ARTIST_PASSWORD"]);
+  });
+
+  it("la contrasena de demo no llega a ser un default aunque se vacie", async () => {
+    // Una variable presente pero vacia tiene que contar como ausente. Es el caso
+    // que rompe el `.env.local` al que se le borra el valor, y el mismo por el
+    // que el default decia aparecer justo cuando el entorno estaba mal.
+    process.env.DEMO_ARTIST_PASSWORD = "";
+    const c = await loadHelper();
+
+    expect(c.DEMO_ARTIST_PASSWORD).toBe("");
+    expect(c.missingDemoCredentialEnvVars()).toEqual(["DEMO_ARTIST_PASSWORD"]);
   });
 
   it("SIN variables NO devuelve ninguna credencial real (protege el default)", async () => {
