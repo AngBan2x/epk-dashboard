@@ -51,11 +51,13 @@
 import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { config } from "dotenv";
 
-// `.env.local` se carga aquí y no se espera que quien lo invoca lo haya hecho:
-// este script se ejecuta suelto, no desde los tests.
-config({ path: ".env.local" });
+// Este import **carga** `.env.local` por su cuenta (`scripts/lib/credentials.ts`
+// llama a `config()` en su propio cuerpo). Por eso este fichero ya no lo carga:
+// en ES modules los imports se evaluan antes que el cuerpo del módulo, asi que
+// un `config()` aqui correria DESPUES de que `credentials.ts` hubiera leido un
+// `process.env` vacio.
+import { DEMO_ARTIST_EMAIL, DEMO_ARTIST_PASSWORD } from "./lib/credentials";
 
 const BASE_URL = process.env.SOCIAL_BASE_URL || "https://epk-dashboard.vercel.app";
 const OUT_DIR = path.resolve(process.cwd(), "public/pressplay");
@@ -270,8 +272,13 @@ async function capturar(
  * alguien es un problema que ya se publicó.
  */
 async function autenticar(url: string): Promise<ReturnType<BrowserContext["storageState"]> | null> {
-  const email = process.env.DEMO_ARTIST_EMAIL;
-  const password = process.env.DEMO_ARTIST_PASSWORD;
+  // Las credenciales salen de `scripts/lib/credentials.ts` y no de
+  // `process.env`: es el unico sitio donde vive un default, y este script lo
+  // estaba leyendo directo. Consecuencia real: `DEMO_ARTIST_EMAIL` no estaba en
+  // `.env.local`, `process.env` daba `undefined`, y el script se creia sin
+  // credenciales — generaba cero capturas y salia con codigo de exito.
+  const email = DEMO_ARTIST_EMAIL;
+  const password = DEMO_ARTIST_PASSWORD;
 
   if (!email || !password) {
     console.log("  sin credenciales de la cuenta de demo: NO se capturará /dashboard");
@@ -300,14 +307,33 @@ async function autenticar(url: string): Promise<ReturnType<BrowserContext["stora
 }
 
 async function main(): Promise<void> {
+  // `--only` regenera una sola pagina. Existe por una razon concreta: cambiar la
+  // cuenta de las capturas de `/dashboard` no debería reescribir las otras 18,
+  // que ya estan bien y cuyo unico cambio seria un nuevo timestamp en el
+  // binario, haciendo el diff ilegible.
+  const solo = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);
+
+  const paginas = solo
+    ? PAGINAS.filter((p) => p.nombre === solo)
+    : PAGINAS;
+
+  if (solo && paginas.length === 0) {
+    const disponibles = PAGINAS.map((p) => p.nombre).join(", ");
+    throw new Error(`--only=${solo} no coincide con ninguna pagina.\n  Disponibles: ${disponibles}`);
+  }
+
   console.log(`\nP13 · capturas para redes sociales`);
   console.log(`  destino: ${OUT_DIR}`);
-  console.log(`  base:    ${BASE_URL}\n`);
+  console.log(`  base:    ${BASE_URL}`);
+  if (solo) console.log(`  solo:    ${solo}`);
+  console.log("");
 
   await mkdir(OUT_DIR, { recursive: true });
 
-  const hayCredenciales = !!(process.env.DEMO_ARTIST_EMAIL && process.env.DEMO_ARTIST_PASSWORD);
-  const sesion = hayCredenciales ? await autenticar(BASE_URL) : null;
+  // Autenticar cuesta un login contra Turso. Si lo filtrado no incluye ninguna
+  // pagina con sesion, no se hace: es un segundo entero por nada.
+  const haceFaltaSesion = paginas.some((p) => p.necesitaSesion);
+  const sesion = haceFaltaSesion ? await autenticar(BASE_URL) : null;
 
   const hechas: { fichero: string; bytes: number }[] = [];
   const fallos: string[] = [];
@@ -332,7 +358,7 @@ async function main(): Promise<void> {
         await fijarTema(contexto, tema);
         const page = await contexto.newPage();
 
-        for (const pagina of PAGINAS) {
+        for (const pagina of paginas) {
           if (pagina.necesitaSesion !== autenticado) continue;
           if (pagina.necesitaSesion && !sesion) {
             console.log(`  - ${pagina.nombre}: omitida, necesita sesión`);
@@ -359,6 +385,18 @@ async function main(): Promise<void> {
   }
 
   console.log(`\n${hechas.length} capturas, ${fallos.length} fallos`);
+
+  // Cero capturas NO es un exito. Pasaba: sin credenciales de la demo, la
+  // pagina se omitia con un "omitida, necesita sesion" y el script terminaba
+  // con 0 capturas, 0 fallos y codigo de salida 0. Un set de capturas que se
+  // regenera entero y se queda vacio es peor que no regenerarlo: deja las
+  // imagenes viejas en su sitio y nadie se entera de que no se ha comprobado
+  // nada.
+  if (hechas.length === 0) {
+    console.error("\nAbortando: no se ha generado ninguna captura.");
+    process.exitCode = 1;
+    return;
+  }
 
   if (fallos.length > 0) {
     // Sale con código distinto de cero: un generador que falla tiene que poder

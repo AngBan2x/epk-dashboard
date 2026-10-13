@@ -376,7 +376,7 @@ importante no es cuántas veces fallé, sino que seguí fallando sin comprobar.*
 | Empieza por activos y permisos | Nombre, variación, identificador, activos, permisos | Sigue el orden equivocado |
 | `pages_manage_posts` no existe | Existe, bajo el caso de uso de Page | Lo puse en duda sin comprobar la tabla oficial |
 | Registrar la cuenta de IG como desarrollador | No existe ese rol para un activo | Inventé un requisito |
-| `instagram_content_publish` | **`instagram_content_publishing`** | Falta el `-ing` |
+| `instagram_content_publish` | `instagram_content_publish` | **Yo me equivoque aqui.** Ver abajo |
 | Los permisos no están disponibles | Están, en otro caso de uso | No busqué por qué el buscador vacío |
 
 ### Lo que sí explica el buscador vacío
@@ -387,12 +387,46 @@ tabula los permisos **por caso de uso**, y las filas no se mezclan:
 - *Manage everything on your Page* → `pages_manage_posts`, `pages_read_engagement`,
   `pages_show_list`, `read_insights`
 - *Manage messaging & content on Instagram* → `instagram_basic`,
-  **`instagram_content_publishing`**, `pages_read_engagement`,
+  `instagram_content_publish`, `pages_read_engagement`,
   `pages_show_list`, `business_management`
 
 El asistente de Login for Business solo ofrece los del caso de uso de Facebook.
 Por eso `instagram_basic` daba "no coincide ningún resultado": **no faltaba,
 se estaba buscando en la lista equivocada.**
+
+### La contradicción de la documentación, y por qué la pierde
+
+La página del caso de uso de Instagram pide **`instagram_content_publishing`**, con
+`-ing`. La referencia de permisos lista **`instagram_content_publish`**, sin
+`-ing`. **Las dos son de Meta y no coinciden.**
+
+La que acepta el diálogo es la **segunda**. Comprobado:
+
+| `scope` enviado | Resultado |
+|---|---|
+| `instagram_basic` | HTTP 200, pide iniciar sesión |
+| `instagram_content_publishing` | **HTTP 500**, "Sorry, something went wrong" |
+| `instagram_content_publish` | HTTP 200, pide iniciar sesión |
+
+Es un **500**, no un 400 de permisos. Es decir: el servidor ni siquiera llega a
+evaluar el permiso, revienta al construir la petición. Por eso el mensaje es el
+genérico y no dice nada de scopes, y por eso seis intentos de adivinar nombres
+no podían converger.
+
+**Un control con un `client_id` inventado da un error distinto** —"Identificador
+de la app no válido"— lo que confirma que el 500 es del `scope` y no de la app.
+
+### El método que sí funcionó: bisecar la URL
+
+Ni Hypótesis ni memoria: quitar un parámetro cada vez hasta que el 500
+desaparezca, y **leer el HTTP de cada combinación**. Diez peticiones, y el
+culpable queda aislado sin adivinar.
+
+Vale aquí lo que vale en `tests/unit/adaptadores-social.test.ts`: un
+comportamiento que se rompe se comprueba **contra el sistema**, no contra lo que
+uno recuerda de haber leído. La referencia de permisos que yo había descargado
+decía `instagram_content_publish` y **la había pasado por alto**, precisamente
+porque ya venía con una "corrección" mía escrita en el mismo sitio.
 
 ### El token vuelve en el fragmento
 

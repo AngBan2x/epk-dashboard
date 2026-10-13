@@ -140,6 +140,7 @@ describe("scripts/lib/credentials", () => {
     expect(c.DEMO_ARTIST_PASSWORD).toBe("pw-inventada-de-prueba");
 
     delete process.env.DEMO_ARTIST_PASSWORD;
+    process.env.DEMO_ARTIST_PASSWORD = "";
     const c2 = await loadHelper();
     expect(c2.missingDemoCredentialEnvVars()).toEqual(["DEMO_ARTIST_PASSWORD"]);
   });
