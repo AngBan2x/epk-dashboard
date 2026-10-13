@@ -62,6 +62,7 @@ config({ path: ".env.local" });
 import {
   leerCuentas,
   elegirPage,
+  type PageElegida,
   type RespuestaCuentas,
 } from "../lib/social/meta";
 
@@ -69,6 +70,19 @@ const API_VERSION = "v26.0";
 const HOST = `https://graph.facebook.com/${API_VERSION}`;
 
 const CAMPOS = "id,name,access_token,instagram_business_account";
+
+async function desdeMeAccounts(token: string): Promise<PageElegida> {
+  const url = `${HOST}/me/accounts?fields=${encodeURIComponent(CAMPOS)}&access_token=${encodeURIComponent(token)}`;
+
+  const respuesta = await fetch(url);
+  const cuerpo = (await respuesta.json()) as RespuestaCuentas;
+
+  if (!respuesta.ok || cuerpo.error) {
+    throw errorDeApi(cuerpo, respuesta.status);
+  }
+
+  return elegirPage(leerCuentas(cuerpo));
+}
 
 /** Error de la API de Meta, con su codigo, para no perderlo al formatear. */
 function errorDeApi(cuerpo: RespuestaCuentas, estado: number): Error {
@@ -101,6 +115,82 @@ function escribirEnEnvLocal(clave: string, valor: string): void {
   fs.writeFileSync(ruta, contenido, "utf8");
 }
 
+/**
+ * Consulta la Page directamente por su id, saltándose `/me/accounts`.
+ *
+ * ## Por qué hace falta este camino
+ *
+ * Porque hay **dos** clases de problema que se ven igual desde fuera:
+ *
+ * - Una Page **nueva** que el usuario todavía no tiene asignada como tarea.
+ * - Un token que **no ve** ninguna Page.
+ *
+ * En ambas, `/me/accounts` devuelve `data: []`. Con una Page nueva eso es lo
+ * normal: la tarea se refleja en la API con retraso.
+ *
+ * Y con `/me/accounts` vacío no hay forma de obtener **ningún** token de Page, que
+ * es justo lo que hace falta para desbloquear el código. Así que cuando se sabe
+ * el id, se pregunta a la Page directamente: **si el token puede leerla, devuelve
+ * su `access_token`**, y no hace falta pasar por `/me/accounts` para nada.
+ *
+ * ## El id que hay que usar
+ *
+ * **El que aparece en `facebook.com/profile.php?id=...` NO es el mismo** que el
+ * que usa la Graph API. Se comprobaron los dos contra la API:
+ *
+ * ```
+ * 61595566701130    -> "Object does not exist"
+ * 1306361615901216  -> responde
+ * ```
+ *
+ * El segundo es el que sale en "Elige las páginas a las que quieras que acceda".
+ *
+ * ## Un detalle que costó tiempo
+ *
+ * Pedir `fields=id,name,tasks,...` falla con `#100 Tried accessing nonexisting
+ * field (tasks)`. Es un error de **campo**, no de permiso: `tasks` no existe en
+ * ese nodo, y confundirlos hace creer que el token no tiene acceso cuando sí lo
+ * tiene. Aquí solo se piden campos que existen.
+ */
+
+async function consultarPageDirecta(pageId: string, token: string): Promise<PageElegida> {
+  const url =
+    `${HOST}/${encodeURIComponent(pageId)}?fields=${encodeURIComponent(CAMPOS)}` +
+    `&access_token=${encodeURIComponent(token)}`;
+
+  const respuesta = await fetch(url);
+  const cuerpo = (await respuesta.json()) as RespuestaCuentas & {
+    id?: string;
+    name?: string;
+    access_token?: string;
+    instagram_business_account?: { id?: string };
+  };
+
+  if (!respuesta.ok) {
+    const mensaje = typeof cuerpo.error?.message === "string" ? cuerpo.error.message : "sin mensaje";
+    if (/does not exist|Unsupported get request/i.test(mensaje)) {
+      throw new Error(
+        `La Page ${pageId} no existe para este token.\n` +
+          `  O no es una Page, o el id es el de otro sitio.\n` +
+          `  El id de profile.php?id=... NO es el de la Graph API. El bueno es el\n` +
+          `  que sale en el dialogo "Elige las Paginas a las que quieras que acceda".\n` +
+          `  API: ${mensaje}`
+      );
+    }
+    throw errorDeApi(cuerpo, respuesta.status);
+  }
+
+  const ig = cuerpo.instagram_business_account;
+
+  return {
+    id: cuerpo.id ?? pageId,
+    nombre: cuerpo.name ?? null,
+    accessToken: cuerpo.access_token ?? "",
+    igUserId: typeof ig?.id === "string" ? ig.id : null,
+    otras: [],
+  };
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const aplicar = args.includes("--apply");
@@ -118,17 +208,9 @@ async function main(): Promise<void> {
     );
   }
 
-  const url = `${HOST}/me/accounts?fields=${encodeURIComponent(CAMPOS)}&access_token=${encodeURIComponent(tokenUsuario)}`;
-
-  const respuesta = await fetch(url);
-  const cuerpo = (await respuesta.json()) as RespuestaCuentas;
-
-  if (!respuesta.ok || cuerpo.error) {
-    throw errorDeApi(cuerpo, respuesta.status);
-  }
-
-  const cuentas = leerCuentas(cuerpo);
-  const elegida = elegirPage(cuentas, pedido);
+  const elegida = pedido
+    ? await consultarPageDirecta(pedido, tokenUsuario)
+    : await desdeMeAccounts(tokenUsuario);
 
   console.log(`\nRC.37 · token de Page y ID de Instagram`);
   console.log(`  Page: ${elegida.id}  ${elegida.nombre ?? "(sin nombre)"}`);
@@ -141,7 +223,7 @@ async function main(): Promise<void> {
   console.log("");
 
   if (elegida.igUserId === null) {
-    console.log("  AVISO: esta Page no tiene una cuenta de Instagram Profesional vinculada.");
+    console.log("  AVISO: la API no ha devuelto una cuenta de Instagram vinculada a esta Page.");
     console.log("  Se escribe el token de Page, pero META_IG_USER_ID quedara vacio y");
     console.log("  `social-check.ts` seguira marcando Instagram como incompleta.");
     console.log("");
