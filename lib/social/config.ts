@@ -27,6 +27,20 @@
  * configurado" y "lo he configurado mal" — dos fallos que se diagnostican en
  * sitios distintos.
  *
+ * ## Por qué `META_USER_ACCESS_TOKEN` no aparece aquí
+ *
+ * Porque no lo consume ningún adaptador. El login de Meta devuelve un token de
+ * **usuario**, y `POST /{page-id}/feed` necesita un token de **Page**: son
+ * objetos distintos, y `/me/accounts` devuelve el segundo dentro de la
+ * respuesta del primero. `scripts/meta-page-token.ts` hace ese intercambio y
+ * guarda el resultado en `META_PAGE_ACCESS_TOKEN`.
+ *
+ * La versión anterior de este fichero mapeaba una sola variable a los dos
+ * papeles, y por eso `META_USER_ACCESS_TOKEN` **no** debe aparecer aquí: si se
+ * añade, el token de usuario vuelve a llegar a `facebook.ts` y falla en
+ * producción con un 401 que habla de permisos del usuario, no del token.
+ * `tests/unit/social-config.test.ts` tiene un test que se pone rojo si pasa.
+ *
  * ## Lo que este modulo NO hace
  *
  * No llama a ninguna API, no valida que un token funcione y no imprime ningun
@@ -89,13 +103,13 @@ export const REQUISITOS: readonly RequisitosPlataforma[] = [
   },
   {
     plataforma: "facebook",
-    variables: ["META_PAGE_ID", "META_ACCESS_TOKEN"],
+    variables: ["META_PAGE_ID", "META_PAGE_ACCESS_TOKEN"],
     motivo:
-      "el token es un token de Page (`/me/accounts` en Login for Business), no el token de usuario: sin el de Page no puede publicar en la pagina",
+      "el token es un token de Page (`/me/accounts`), no el token de usuario: no son intercambiables y el de usuario da 401 al publicar",
   },
   {
     plataforma: "instagram",
-    variables: ["META_IG_USER_ID", "META_ACCESS_TOKEN"],
+    variables: ["META_IG_USER_ID", "META_PAGE_ACCESS_TOKEN"],
     motivo: "la cuenta debe ser Profesional y estar vinculada a la Page; el `META_IG_USER_ID` es el ID numerico, no el `@nombre`",
   },
   {
@@ -221,7 +235,7 @@ export function opcionesMastodon(http: CapaHttp): Resultado<OpcionesMastodon> {
 // ── Facebook ───────────────────────────────────────────────────────────────
 
 export function opcionesFacebook(http: CapaHttp): Resultado<OpcionesFacebook> {
-  const faltan = reunirFaltantes(["META_PAGE_ID", "META_ACCESS_TOKEN"]);
+  const faltan = reunirFaltantes(["META_PAGE_ID", "META_PAGE_ACCESS_TOKEN"]);
   if (faltan.length > 0) return { ok: false, faltan };
   return {
     ok: true,
@@ -229,7 +243,7 @@ export function opcionesFacebook(http: CapaHttp): Resultado<OpcionesFacebook> {
       http,
       graphHost: HOST_FACEBOOK,
       pageId: leer("META_PAGE_ID"),
-      pageAccessToken: leer("META_ACCESS_TOKEN"),
+      pageAccessToken: leer("META_PAGE_ACCESS_TOKEN"),
     },
   };
 }
@@ -237,7 +251,7 @@ export function opcionesFacebook(http: CapaHttp): Resultado<OpcionesFacebook> {
 // ── Instagram ──────────────────────────────────────────────────────────────
 
 export function opcionesInstagram(http: CapaHttp): Resultado<OpcionesInstagram> {
-  const faltan = reunirFaltantes(["META_IG_USER_ID", "META_ACCESS_TOKEN"]);
+  const faltan = reunirFaltantes(["META_IG_USER_ID", "META_PAGE_ACCESS_TOKEN"]);
   if (faltan.length > 0) return { ok: false, faltan };
   return {
     ok: true,
@@ -245,7 +259,7 @@ export function opcionesInstagram(http: CapaHttp): Resultado<OpcionesInstagram> 
       http,
       graphHost: HOST_FACEBOOK,
       igUserId: leer("META_IG_USER_ID"),
-      accessToken: leer("META_ACCESS_TOKEN"),
+      accessToken: leer("META_PAGE_ACCESS_TOKEN"),
     },
   };
 }

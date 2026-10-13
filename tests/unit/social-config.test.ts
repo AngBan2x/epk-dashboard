@@ -58,6 +58,8 @@ const TODAS = [
   "MASTODON_ACCESS_TOKEN",
   "META_PAGE_ID",
   "META_ACCESS_TOKEN",
+  "META_PAGE_ACCESS_TOKEN",
+  "META_USER_ACCESS_TOKEN",
   "META_IG_USER_ID",
   "THREADS_APP_ID",
   "THREADS_USER_ID",
@@ -166,10 +168,10 @@ describe("lo que devuelve al faltar", () => {
 });
 
 describe("Threads no comparte credenciales con Facebook", () => {
-  it("Threads exige THREADS_ACCESS_TOKEN, y no acepta META_ACCESS_TOKEN", () => {
+  it("Threads exige THREADS_ACCESS_TOKEN, y no acepta el token de Facebook", () => {
     definir({
       META_PAGE_ID: "130636161590121",
-      META_ACCESS_TOKEN: "EAAB-token-de-facebook",
+      META_PAGE_ACCESS_TOKEN: "EAAB-token-de-page",
       META_IG_USER_ID: "17841400000000001",
       THREADS_APP_ID: "1234567890123456",
       THREADS_USER_ID: "9876543210987654",
@@ -193,9 +195,76 @@ describe("Threads no comparte credenciales con Facebook", () => {
     const varsFacebook = REQUISITOS.find((r) => r.plataforma === "facebook")!.variables;
 
     expect(varsThreads).toContain("THREADS_ACCESS_TOKEN");
-    expect(varsThreads).not.toContain("META_ACCESS_TOKEN");
-    expect(varsFacebook).toContain("META_ACCESS_TOKEN");
+    expect(varsThreads).not.toContain("META_PAGE_ACCESS_TOKEN");
+    expect(varsFacebook).toContain("META_PAGE_ACCESS_TOKEN");
     expect(varsFacebook).not.toContain("THREADS_ACCESS_TOKEN");
+  });
+});
+
+describe("el token de usuario NO vale como token de Page", () => {
+  it("META_USER_ACCESS_TOKEN no aparece en ningun requisito", () => {
+    // Este es el error de diseño que se cometió al escribir config.ts por
+    // primera vez: una sola variable mapeada a los dos papeles. El token del
+    // login es de USUARIO; POST /{page-id}/feed necesita el de PAGE. Se
+    // distinguer por GET /me/accounts.
+    for (const req of REQUISITOS) {
+      expect(req.variables).not.toContain("META_USER_ACCESS_TOKEN");
+    }
+  });
+
+  it("Facebook e Instagram piden META_PAGE_ACCESS_TOKEN", () => {
+    expect(REQUISITOS.find((r) => r.plataforma === "facebook")!.variables).toContain(
+      "META_PAGE_ACCESS_TOKEN"
+    );
+    expect(REQUISITOS.find((r) => r.plataforma === "instagram")!.variables).toContain(
+      "META_PAGE_ACCESS_TOKEN"
+    );
+  });
+
+  it("con solo el token de usuario, Facebook NO queda configurada", () => {
+    // Y no cae a la primera: quedaría se queda en false en vez de tomar un token
+    // que va a fallar en producción con un 401 que no explica nada.
+    definir({ META_PAGE_ID: "130636161590121", META_USER_ACCESS_TOKEN: "EAA-usuario" });
+
+    expect(estaConfigurada("facebook")).toBe(false);
+    expect(faltanPara("facebook")).toEqual(["META_PAGE_ACCESS_TOKEN"]);
+
+    const r = opcionesFacebook(httpFalso);
+    expect(r.ok).toBe(false);
+  });
+
+  it("META_ACCESS_TOKEN (el nombre viejo) ya no lo usa nadie", () => {
+    for (const req of REQUISITOS) {
+      expect(req.variables).not.toContain("META_ACCESS_TOKEN");
+    }
+  });
+
+  it("el token que LLEGA al adaptador de Instagram es el de Page, no el de usuario", () => {
+    // El test anterior, que solo miraba `REQUISITOS.variables`, NO protecto esto:
+    // el mapeo de `opcionesInstagram` es otro sitio, y se puede equivocar sin
+    // que la lista de requisitos se entere. Se comprobo revirtiendo el mapeo:
+    // 19 tests en verde con el bug puesto.
+    //
+    // Este si lo ata: comprueba el VALOR que sale, no el nombre que se pidio.
+    definir({
+      META_PAGE_ID: "130636161590121",
+      META_IG_USER_ID: "17841400000000001",
+      META_PAGE_ACCESS_TOKEN: "EAAB-ESTE-es-el-de-page",
+      META_USER_ACCESS_TOKEN: "EAAH-ESTE-es-el-de-usuario",
+    });
+
+    const ig = opcionesInstagram(httpFalso);
+    expect(ig.ok).toBe(true);
+    if (ig.ok) {
+      expect(ig.valor.accessToken).toBe("EAAB-ESTE-es-el-de-page");
+      expect(ig.valor.accessToken).not.toBe("EAAH-ESTE-es-el-de-usuario");
+    }
+
+    const fb = opcionesFacebook(httpFalso);
+    expect(fb.ok).toBe(true);
+    if (fb.ok) {
+      expect(fb.valor.pageAccessToken).toBe("EAAB-ESTE-es-el-de-page");
+    }
   });
 });
 
@@ -231,18 +300,24 @@ describe("plataformas completas", () => {
   });
 
   it("Facebook mapea META_PAGE_ID a pageId y el token a pageAccessToken", () => {
-    definir({ META_PAGE_ID: "130636161590121", META_ACCESS_TOKEN: "EAAB-tok" });
+    definir({
+      META_PAGE_ID: "130636161590121",
+      META_PAGE_ACCESS_TOKEN: "EAAB-token-de-page",
+    });
 
     const r = opcionesFacebook(httpFalso);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.valor.pageId).toBe("130636161590121");
-      expect(r.valor.pageAccessToken).toBe("EAAB-tok");
+      expect(r.valor.pageAccessToken).toBe("EAAB-token-de-page");
     }
   });
 
   it("Instagram mapea META_IG_USER_ID a igUserId", () => {
-    definir({ META_IG_USER_ID: "17841400000000001", META_ACCESS_TOKEN: "EAAB-tok" });
+    definir({
+      META_IG_USER_ID: "17841400000000001",
+      META_PAGE_ACCESS_TOKEN: "EAAB-token-de-page",
+    });
 
     const r = opcionesInstagram(httpFalso);
     expect(r.ok).toBe(true);

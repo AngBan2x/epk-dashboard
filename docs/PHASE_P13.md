@@ -355,3 +355,87 @@ Los secretos van a .env.local y a las variables de Vercel marcadas como secret.
 
 Una vez haya una credencial, el orden es: **una** publicación de prueba a mano
 por el admin, comprobar que el flujo funciona, y solo después conectar el panel.
+---
+
+## RC.37 - Token de Meta: seis nombres que estaban mal
+
+La parte de credenciales de esta fase seattemptó por escrito antes que por
+código, y esa decisiónSave the trabajo: **seis de los nombres que di estaban
+mal**, y todos se habrían escrito en el `.env.local` y en el código.
+
+No los cuento como seis fallos equivalentes. Los dos primeros son la misma
+cosa —no había mirado la pantalla que el usuario tenía delante— y los cuatro
+siguientes son consecuencia de haber seguido sin verificar. **La diferencia
+importante no es cuántas veces fallé, sino que seguí fallando sin comprobar.**
+
+### Los seis
+
+| Dije | Real | Por qué lo dije |
+|---|---|---|
+| Botón "Generar token de acceso" | "Crear ajuste" | No miré la pantalla |
+| Empieza por activos y permisos | Nombre, variación, identificador, activos, permisos | Sigue el orden equivocado |
+| `pages_manage_posts` no existe | Existe, bajo el caso de uso de Page | Lo puse en duda sin comprobar la tabla oficial |
+| Registrar la cuenta de IG como desarrollador | No existe ese rol para un activo | Inventé un requisito |
+| `instagram_content_publish` | **`instagram_content_publishing`** | Falta el `-ing` |
+| Los permisos no están disponibles | Están, en otro caso de uso | No busqué por qué el buscador vacío |
+
+### Lo que sí explica el buscador vacío
+
+`developers.facebook.com/docs/development/create-an-app/use-cases-permission-mapping`
+tabula los permisos **por caso de uso**, y las filas no se mezclan:
+
+- *Manage everything on your Page* → `pages_manage_posts`, `pages_read_engagement`,
+  `pages_show_list`, `read_insights`
+- *Manage messaging & content on Instagram* → `instagram_basic`,
+  **`instagram_content_publishing`**, `pages_read_engagement`,
+  `pages_show_list`, `business_management`
+
+El asistente de Login for Business solo ofrece los del caso de uso de Facebook.
+Por eso `instagram_basic` daba "no coincide ningún resultado": **no faltaba,
+se estaba buscando en la lista equivocada.**
+
+### El token vuelve en el fragmento
+
+Esto es lo que decide la arquitectura de la página de callback:
+
+```
+https://tu-callback?#access_token=...&long_lived_token=...&expires_in=...
+                     ↑ lo que va tras # no llega al servidor
+```
+
+El fragmento no viaja en la petición HTTP. **Un route handler de Next.js no puede
+leerlo**, por muy bien escrito que esté. Tiene que ser una página de cliente que
+lea `window.location.hash`, y por eso `app/auth/meta/callback/page.tsx` es
+`'use client'` y no un `route.ts`.
+
+Por el mismo motivo la página limpia la URL con `history.replaceState` en
+cuanto lee el fragmento: si se queda en la barra de direcciones, está en el
+historial del navegador y en el `Referer` de lo que se cargue después.
+
+### `localhost` no hay que registrarlo
+
+Aviso literal del panel, que parece error y no lo es:
+
+> *"Las redirecciones de `http://localhost` se permiten de manera predeterminada
+> cuando la aplicación se encuentra en modo de desarrollo, por lo que no es
+> necesario añadirlo aquí."*
+
+Con el distintivo **Sin publicar**, `http://localhost:3000/...` vale sin
+registrarlo. Registrarlo produce un error rojo que no significa nada.
+
+### `/me/accounts` devuelve las tres credenciales de una vez
+
+Esto sustituye al script intermedio que tenía planeado:
+
+```
+GET /me/accounts?fields=id,name,access_token,instagram_business_account
+```
+
+Cada elemento trae `id` (Page), `access_token` (**de Page**, no de usuario) e
+`instagram_business_account.id`. **Un solo GET** da las tres cosas.
+
+Lo que sí queda confirmado: **el token de Page y el token de usuario son
+distintos**. `lib/social/config.ts` mapeaba una sola variable a los dos papeles,
+que habría fallado en producción con un 401 que habla de permisos y no del
+token. Ahora son `META_USER_ACCESS_TOKEN` (intermedio) y
+`META_PAGE_ACCESS_TOKEN` (el que usa `facebook.ts`).
