@@ -179,6 +179,7 @@ async function main(): Promise<void> {
   const aplicar = process.argv.includes("--apply");
   const flags = process.argv.slice(2);
   const codigoFlag = flags.find((f) => f.startsWith("--code="))?.slice("--code=".length);
+  const tokenFlag = flags.find((f) => f.startsWith("--token="))?.slice("--token=".length);
   const redirectFlag = flags.find((f) => f.startsWith("--redirect-uri="))?.slice("--redirect-uri=".length);
 
   const appId = leer("THREADS_APP_ID");
@@ -194,6 +195,49 @@ async function main(): Promise<void> {
 
   console.log(`\nRC.39 · token de Threads`);
   console.log(`  app  ${appId}`);
+
+  // ── Via del generador del dashboard ──────────────────────────────────────
+  //
+  // El flujo normal es Authorization Window -> code -> token. Ese flujo esta
+  // atascado en `1349168` ("la URI no esta incluida en la lista de autorizacion
+  // OAuth"), que se ha resistido a cuatro intentos de configuracion.
+  //
+  // Pero el panel trae un **Generador de identificadores de usuario** que emite
+  // un token de larga duracion **directo**, sin Authorization Window y sin
+  // `redirect_uri`. Solo funciona para cuentas que ya son **evaluadores de
+  // Threads** de la app, que es el caso de `pressplayepk`.
+  //
+  // El flag `--token=` gana sobre la variable de entorno para no dejar el token
+  // en el historial de PowerShell: en PowerShell se pondria
+  // `$env:THREADS_DASHBOARD_TOKEN` en la sesion, no en un comando.
+  const tokenDirecto = tokenFlag || leer("THREADS_DASHBOARD_TOKEN") || "";
+  if (tokenDirecto !== "") {
+    const perfil = await leerPerfil(tokenDirecto, fetch);
+    if (perfil.error !== null || perfil.id === null) {
+      throw new Error(
+        `El token del generador no puede leer el perfil: ${perfil.error}\n` +
+          "  Dos causas, segun lo que diga el mensaje de Meta:\n" +
+          "  - La cuenta no es **evaluadora de Threads** de esta app.\n" +
+          "  - El perfil es privado: el generador no emite tokens para esos perfiles."
+      );
+    }
+    console.log(`  token  ${tokenDirecto.length} caracteres (generador del dashboard)`);
+    console.log(`  user   ${perfil.id}  (@${perfil.usuario})\n`);
+
+    if (!aplicar) {
+      console.log("  Dry-run. Usa --apply para escribir.");
+      return;
+    }
+
+    // No se pasa por `th_exchange_token`: el token del generador ya es largo, y
+    // ese canje **consume** el token de entrada. Pasarselo lo gastaria.
+    escribirEnEnvLocal("THREADS_ACCESS_TOKEN", tokenDirecto);
+    escribirEnEnvLocal("THREADS_USER_ID", perfil.id);
+    console.log("  Escrito: THREADS_ACCESS_TOKEN, THREADS_USER_ID");
+    console.log("  Ningun valor impreso. Comprobacion:");
+    console.log("    npx tsx scripts/social-smoke.ts");
+    return;
+  }
 
   // Si ya hay token largo, solo hay que leer el perfil para saber el user id.
   const yaHay = leer("THREADS_ACCESS_TOKEN");

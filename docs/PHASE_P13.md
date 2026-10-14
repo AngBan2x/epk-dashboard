@@ -782,3 +782,76 @@ hemos revocado el token**, porque no lo hemos revocado. El token sigue vivo
 hasta que caduca. Un `200` honesto es mejor que un `200` que miente.
 
 Gate: 1753 tests en 89 ficheros, tsc y lint limpios.
+
+## RC.43 — El `1349168` no lo arregla el repo, pero hay una puerta que no exige OAuth
+
+### Lo que se ha descartado, con evidencia
+
+Cuatro hipotesis seguidas, y **las cuatro falsas**:
+
+| Hipotesis | Como se cayo |
+|---|---|
+| Falta registrar la URI en el panel | Registrada y guardada (`Se han guardado los cambios`) |
+| El nombre de Threads esta pillado | `PressPlay EPK` y `PressPlay Music` fallan igual |
+| Falta el rol *Threads Tester* | Ya estaba en la captura de Roles |
+| Falta aceptar la invitacion | Toast `Invite accepted` |
+
+El `1349168` persiste con las cuatro piezas verificadas. **No es un problema de este
+repo**, y a partir de aqui dejaria de adivinar sobre un panel que no se puede ver
+desde aqui.
+
+### La pista que estaba en la captura y no se leyo
+
+El panel donde se guardo la URI tiene esta URL:
+
+```
+developers.facebook.com/apps/1654721962854119/business-login/settings/?business_id=1125540349998145
+```
+
+Es `/business-login/settings/`: **Facebook Login for Business**, que es un panel
+distinto del ajuste de OAuth de la app. Threads no es Facebook Login, asi que es
+plausible que lea otra lista. Y el rol lo muestra tambien la app:
+
+> "Cuenta de Meta Business Suite: PressPlay EPK administra esta aplicacion."
+
+Sin confirmar: una sesion de administracion de Business Suite puede tener
+sustituido el guardado del panel de la app.
+
+### La puerta de atrás: el Generador de identificadores
+
+El panel de Threads trae un bloque que no es OAuth en absoluto:
+
+> **Generador de identificadores de usuario** — Genera identificadores de acceso
+> de larga duracion para los **evaluadores de Threads** de esta aplicacion. Solo
+> se pueden generar identificadores para cuentas publicas de Threads.
+
+`pressplayepk` ya es evaluador (consta en Roles), asi que **este bloque emite un
+token de larga duracion sin Authorization Window y sin `redirect_uri`**. No
+contorna una comprobacion de seguridad: contorna una casilla del panel que se ha
+quedado atascada, y solo aplica a cuentas que ya tienen rol en la app.
+
+### `--token=` en el script, y por que NO se alarga
+
+```bash
+npx tsx scripts/threads-token.ts --token=EL_TOKEN --apply
+```
+
+o, mejor en PowerShell para no dejarlo en el historial:
+
+```powershell
+$env:THREADS_DASHBOARD_TOKEN = "EL_TOKEN"; npx tsx scripts/threads-token.ts --apply
+```
+
+**No se pasa por `th_exchange_token`.** El token del generador ya es largo, y ese
+canje **consume el token de entrada**: pasarselo lo gastaria y habria que ir al
+panel otra vez. Aqui solo se valida con `GET /me` y se saca el `user_id` de la
+misma respuesta.
+
+Hay un test que comprueba que **el token no sale por pantalla** en la rama nueva.
+Un script que valida tokens no puede imprimirlos.
+
+### Lo que queda pendiente de verdad
+
+`redirect_uri` hay que resolverlo antes de implementar el OAuth real en la app
+para otros usuarios. Se reporta con el Bug Tool de Meta citando `1349168`, con
+las cuatro piezas verificadas. Anotado aqui para que no se pierda.
