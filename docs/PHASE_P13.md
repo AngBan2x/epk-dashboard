@@ -713,3 +713,72 @@ codigo rompe un test; un servidor stale rompe todos. Antes de culpar al codigo,
 comprobar que el servidor es el actual.
 
 Gate: 1747 tests en 88 ficheros, tsc y lint limpios, 14/14 E2E del callback.
+
+## RC.42 — Los dos callbacks que faltaban, y por que `1349168` no era la lista
+
+### `1349168`: "la URI no esta incluida en la lista de autorizacion OAuth"
+
+Ese error se leyo como "no has guardado la URI en App settings". Se habia
+guardado: habia appearing "Se guardaron los cambios" justo antes.
+
+Lo que faltaba era **el otro sitio**. Threads no lee la lista de
+*Facebook Login for Business*, sino la del **caso de uso**: *Casos de uso ->
+Acceder a la API de Threads -> Configuracion -> Redirigir URL de devolucion de
+llamada*. Ese campo estaba vacio, y el propio formulario lo decia con un error
+que no parece de campo obligatorio sino de validacion:
+
+```
+El formulario no se puede guardar
+  Redirect Urls: Especifica un URI de redireccionamiento de OAuth
+```
+
+El orden de los hechos explica por que ambos errores coexistieron:
+
+1. Con la lista de la app vacia, rellenar el campo del caso de uso no se podia
+   guardar.
+2. Con la lista ya guardada, el Authorization Window seguia dando `1349168`
+   porque el caso de uso no tenia URI.
+
+Ni el uno ni el otro se resolvia solo. Era un ciclo, y por eso los dos seemed
+fallos a la vez.
+
+### Los dos callbacks que faltaban
+
+La doc de Meta pide **tres** URLs en el mismo paso, y solo se estaba haciendo la
+primera:
+
+| URL | Para que |
+|---|---|
+| URI OAuth validos | adonde vuelve el Authorization Window |
+| Deauthorize callback | Meta hace ping al revocar |
+| Data deletion callback | Meta hace ping al pedir borrar datos |
+
+Las otras dos apuntaban a nada. Anadidas:
+
+- `app/meta/deauthorize/route.ts` — `GET` y `POST` a `200`.
+- `app/meta/data-deletion/route.ts` — `GET` devuelve la pagina de instrucciones
+  para una persona; `POST` acepta la peticion firmada de Meta.
+
+### Por que `GET` devuelve HTML en la de eliminacion
+
+Porque Meta usa **una sola direccion para dos lectores**. La pagina la lee alguien
+que pide borrar sus datos, y el `POST` lo hace Meta. Splittearlas obligaria a
+inventar la segunda. Y un `{"ok":true}` en crudo leeria quien llega desde Threads
+como "me han ignorado".
+
+### Las dos rutas no borran nada, y lo dicen
+
+La peticion de eliminacion llega firmada con `X-Hub-Signature-256`. **Validar esa
+firma es lo que separa un `POST` real de uno cualquiera**, asi que sin ella
+cualquiera que descubra la URL podria escribir en ella. No se borra nada todavia.
+
+El `POST` responde `{ok: true, borrado: "pendiente"}` y **no** `{borrado: true}`:
+un `200` diciendo que si, haria que Meta creyera que un desconocido puede borrar
+cuentas. Hay un test que ata el texto de esa pagina para que no siga diciendo
+"pendiente" cuando el codigo ya borre.
+
+Igual en *desautorizar*: el texto dice "autorizacion revocada" pero **no dice que
+hemos revocado el token**, porque no lo hemos revocado. El token sigue vivo
+hasta que caduca. Un `200` honesto es mejor que un `200` que miente.
+
+Gate: 1753 tests en 89 ficheros, tsc y lint limpios.
