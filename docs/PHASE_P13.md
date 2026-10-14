@@ -473,3 +473,54 @@ distintos**. `lib/social/config.ts` mapeaba una sola variable a los dos papeles,
 que habría fallado en producción con un 401 que habla de permisos y no del
 token. Ahora son `META_USER_ACCESS_TOKEN` (intermedio) y
 `META_PAGE_ACCESS_TOKEN` (el que usa `facebook.ts`).
+
+---
+
+## RC.38 — Mastodon: la instancia estaba creada, solo faltaba la URL
+
+### El URN de OAuth no es una URL
+
+```
+MASTODON_URL=urn:ietf:wg:oauth:2.0:oob" # para pruebas locales
+```
+
+Eso es el URN que la spec de OAuth define para "no hay `redirect_uri`", copiado de
+la documentación. **Mastodon no se habia configurado nunca** en el sentido de que
+nadie sabe en que instancia esta la cuenta.
+
+Y aqui hay una ironia que conviene escribir: el error no lo daba la API. Daba un
+`fetch failed` generico, porque el `urn:` no es un esquema que `fetch` sepa
+abrir. Un mensaje util habria sido "esto no parece una URL".
+
+### Se prueban las instancias en vez de preguntar
+
+`MASTODON_ACCESS_TOKEN`, `MASTODON_CLIENT_ID` y `MASTODON_SECRET` si estaban, y
+**tenian la forma real** de un token de Mastodon. O sea: la cuenta existia.
+
+Un token de Mastodon **solo vale en la instancia que lo emitio**. Se probaron 14
+instancias grandes con `GET /api/v1/accounts/verify_credentials` y salio una:
+
+    https://mastodon.social  ->  @pressplay_epk
+
+Sin preguntar nada. El mismo dato que hacia falta salio de medir, no de recordar.
+
+### Lo que se midio de la instancia
+
+`GET /api/v1/instance` da los limites reales, que **no son los de la tabla**:
+
+| | `limites.ts` | `mastodon.social` |
+|---|---|---|
+| Caracteres | 500 (por defecto del software) | **500** |
+| Imagenes por post | `null` (sin verificar) | **4** |
+| Peso maximo de imagen | — | **16 MiB** |
+
+Los caracteres coinciden con el valor por defecto, asi que `limiteTexto` puede
+quedarse sin definir. Los 4 adjuntos **no estaban verificados** y ahora si: es un
+dato que cambia el comportamiento del adaptador cuando se publique un carrusel, y
+no adivinarlo habria significado subir 6 imagenes a una instancia que acepta 4.
+
+Un `OPTIONS` a los endpoints dio 404 en todos, **incluido el que sí funciona por
+GET**: `mastodon.social` no implementa `OPTIONS` con esa cabecera. El script se
+tiro; comprobar permisos de escritura sin escribir **no es posible** en Mastodon,
+porque no hay endpoint de introspeccion de scopes. La prueba real es un post, y ese
+lo decide el usuario.
