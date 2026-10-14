@@ -44,6 +44,8 @@ config({ path: ".env.local" });
 import { escribirEnEnvLocal } from "./lib/env-local";
 
 const HOST = "https://graph.threads.net";
+/** El endpoint del canje vive en `.com`, no en `.net`. Comprobado. */
+const CANJE = "https://graph.threads.com/oauth/access_token";
 const VERSION = "v1.0";
 
 function leer(nombre: string): string {
@@ -63,30 +65,43 @@ export async function canjearCodigo(
   appSecret: string,
   redirectUri: string,
   fetchImpl: typeof fetch
-): Promise<{ token: string | null; error: string | null }> {
-  const url =
-    `${HOST}/oauth/access_token` +
-    `?client_id=${encodeURIComponent(appId)}` +
-    `&client_secret=${encodeURIComponent(appSecret)}` +
-    `&grant_type=authorization_code` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&code=${encodeURIComponent(codigo)}`;
+): Promise<{ token: string | null; error: string | null; userId: string | null }> {
+  const cuerpo = new URLSearchParams({
+    client_id: appId,
+    client_secret: appSecret,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+    code: codigo,
+  });
 
-  const r = await fetchImpl(url);
-  const cuerpo = (await r.json().catch(() => ({}))) as {
+  // `POST` con cuerpo `application/x-www-form-urlencoded`. **No** es multipart:
+  // la documentacion de Threads usa `-F`, que es multipart, pero tambien acepta
+  // form-urlencoded y este va bien con un token que no debe salir en la URL —
+  // el secret viaja en el CUERPO, no en la query.
+  const r = await fetchImpl(CANJE, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: cuerpo.toString(),
+  });
+  const json = (await r.json().catch(() => ({}))) as {
     access_token?: string;
+    user_id?: string | number;
     error?: { message?: string } | string;
   };
 
-  if (cuerpo.error !== undefined) {
+  if (json.error !== undefined) {
     const msg =
-      typeof cuerpo.error === "string" ? cuerpo.error : (cuerpo.error.message ?? "error desconocido");
-    return { token: null, error: msg };
+      typeof json.error === "string" ? json.error : (json.error.message ?? "error desconocido");
+    return { token: null, error: msg, userId: null };
   }
-  if (typeof cuerpo.access_token !== "string" || cuerpo.access_token === "") {
-    return { token: null, error: "Threads no devolvio access_token" };
+  if (typeof json.access_token !== "string" || json.access_token === "") {
+    return { token: null, error: "Threads no devolvio access_token", userId: null };
   }
-  return { token: cuerpo.access_token, error: null };
+  return {
+    token: json.access_token,
+    error: null,
+    userId: typeof json.user_id === "string" || typeof json.user_id === "number" ? String(json.user_id) : null,
+  };
 }
 
 /** Intercambia el token corto por uno de larga duracion (60 dias). */
@@ -96,29 +111,33 @@ export async function alargar(
   appSecret: string,
   fetchImpl: typeof fetch
 ): Promise<{ largo: string | null; dias: number | null; error: string | null }> {
-  const url =
-    `${HOST}/oauth/access_token` +
-    `?grant_type=th_exchange_token` +
-    `&client_id=${encodeURIComponent(appId)}` +
-    `&client_secret=${encodeURIComponent(appSecret)}` +
-    `&fb_exchange_token=${encodeURIComponent(tokenCorto)}`;
+  const cuerpo = new URLSearchParams({
+    grant_type: "th_exchange_token",
+    client_id: appId,
+    client_secret: appSecret,
+    fb_exchange_token: tokenCorto,
+  });
 
-  const r = await fetchImpl(url);
-  const cuerpo = (await r.json().catch(() => ({}))) as {
+  const r = await fetchImpl(CANJE, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: cuerpo.toString(),
+  });
+  const json = (await r.json().catch(() => ({}))) as {
     access_token?: string;
     expires_in?: number;
     error?: { message?: string } | string;
   };
 
-  if (cuerpo.error !== undefined) {
+  if (json.error !== undefined) {
     const msg =
-      typeof cuerpo.error === "string" ? cuerpo.error : (cuerpo.error.message ?? "error desconocido");
+      typeof json.error === "string" ? json.error : (json.error.message ?? "error desconocido");
     return { largo: null, dias: null, error: msg };
   }
-  if (typeof cuerpo.access_token !== "string" || cuerpo.access_token === "") {
+  if (typeof json.access_token !== "string" || json.access_token === "") {
     return { largo: null, dias: null, error: "Threads no devolvio access_token" };
   }
-  if (cuerpo.access_token === tokenCorto) {
+  if (json.access_token === tokenCorto) {
     return {
       largo: null,
       dias: null,
@@ -127,8 +146,8 @@ export async function alargar(
   }
 
   return {
-    largo: cuerpo.access_token,
-    dias: typeof cuerpo.expires_in === "number" ? Math.round(cuerpo.expires_in / 86_400) : null,
+    largo: json.access_token,
+    dias: typeof json.expires_in === "number" ? Math.round(json.expires_in / 86_400) : null,
     error: null,
   };
 }
@@ -188,22 +207,38 @@ async function main(): Promise<void> {
 
   const codigo = codigoFlag ?? leer("THREADS_AUTH_CODE");
   if (codigo === "") {
+    const redirect =
+      redirectFlag || leer("THREADS_REDIRECT_URI") || "http://localhost:3000/auth/meta/callback";
     throw new Error(
-      "Falta el authorization code.\n" +
-        "  Se obtiene asi:\n" +
-        "  1. developers.facebook.com > tu app > Casos de uso > Acceder a la API de Threads\n" +
-        "     > Permisos de acceso web > anade el boton y acepta la invitacion.\n" +
-        "  2. Abre el Authorization Window con THREADS_USER_ID=me:\n" +
-        "     https://www.facebook.com/v19.0/dialog/oauth\n" +
-        "       ?client_id=" + appId + "\n" +
-        "       &redirect_uri=" + encodeURIComponent(redirectFlag ?? "http://localhost:3000/auth/meta/callback") + "\n" +
-        "       &response_type=code\n" +
-        "       &scope=threads_basic,threads_content_publish\n" +
-        "     3. Meta redirige a tu redirect_uri con ?code=... — ese code es el que hace falta.\n" +
-        "  Pasa despues:  npx tsx scripts/threads-token.ts --code=PEQUE_CODIGO"
+      [
+        "Falta el authorization code.",
+        "",
+        "  Se obtiene asi:",
+        "",
+        "  1. developers.facebook.com > tu app > Casos de uso",
+        "     > Acceder a la API de Threads > Permisos de acceso web",
+        "     > anade el boton y acepta la invitacion.",
+        "",
+        "  2. Abre el Authorization Window **de Threads**, que esta en threads.com:",
+        "",
+        `     https://threads.com/oauth/authorize?client_id=${appId}`,
+        `       &redirect_uri=${encodeURIComponent(redirect)}`,
+        "       &response_type=code",
+        "       &scope=threads_basic,threads_content_publish",
+        "",
+        "  3. Threads redirige a esa URI con ?code=... — ese code es el que hace falta.",
+        "",
+        "     NO vale la de facebook.com/dialog/oauth: esa es el login de Facebook",
+        "     y rechaza el App ID de Threads con PLATFORM_INVALID_APP_ID.",
+        "",
+        "     Threads anade un #_ al final del code. El code es lo de antes del #_.",
+        "",
+        "  Luego:",
+        "",
+        "     npx tsx scripts/threads-token.ts --code=PEQUE_CODIGO --apply",
+      ].join("\n")
     );
   }
-
   const redirectUri = redirectFlag ?? leer("THREADS_REDIRECT_URI") ?? "http://localhost:3000/auth/meta/callback";
 
   // 2. code -> token corto

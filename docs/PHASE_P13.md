@@ -570,3 +570,66 @@ ves" dan mensajes parecidos.
 Los pasos 2 y 3 los hace `scripts/threads-token.ts` con las dos variables que ya
 existen. **No se puede comprobar el canje sin un code**, y un code solo se
 consigue en un navegador: por eso esta fase se queda esperando en el paso 1.
+
+## RC.40 — Threads: la URL que di era de Facebook, y el canje no era un GET
+
+### `PLATFORM_INVALID_APP_ID` era diagnostico, no ruido
+
+La URL que di en RC.39 era `facebook.com/dialog/oauth`, que es el **login de
+Facebook**. Threads tiene su propio Authorization Window en **`threads.com`**, y el
+error lo decia:
+
+> "Identificador de aplicacion no valido: el identificador de aplicacion
+> proporcionado no parece un identificador de aplicacion valido."
+
+O sea: el App ID de Threads no vale *para ese dialogo*. No estaba mal el App ID —
+estaba en el sitio equivocado. Siete nombres y URLs erroneos en esta fase, y este
+se habia evitado de leer la documentacion antes de escribir el mensaje de error.
+
+La URL buena, comprobada con `curl -L`:
+
+    https://threads.com/oauth/authorize?client_id=...&redirect_uri=...
+      &response_type=code&scope=threads_basic,threads_content_publish
+
+Responde `301` a `www.threads.com` y de ahi `302` a `/login`, que es lo correcto
+para alguien sin sesion. **No da error.** Comprobado, no supuesto.
+
+### El canje es POST a `.com`, y el secret va en el cuerpo
+
+Tres cosas que solo se ven leyendo la doc del canje:
+
+| | Lo que puse en RC.39 | Lo que es |
+|---|---|---|
+| Metodo | `GET` con query | **`POST`** con cuerpo |
+| Host | `graph.threads.net` | **`graph.threads.com`** |
+| `client_secret` | en la query | **en el cuerpo** |
+
+El host es el detalle caro: `.net` es el host de la API, y el endpoint de OAuth
+existe en `.com`. A `.net` daria 404.
+
+Y con el secret en el cuerpo hay un test que lo comprueba. En la query el secret
+queda en el historial del navegador, en los logs del proxy y en cualquier
+`Referer` que salga despues. Es un app secret.
+
+### El canje devuelve el `user_id` de regalo
+
+La respuesta trae `access_token` **y** `user_id` en el mismo JSON, asi que
+`THREADS_USER_ID` sale de ahi sin una segunda llamada. Y el ejemplo de la
+documentacion lo manda como **numero** (`17841405793187218`), no como string: hay
+un test que comprueba que se convierte, porque `THREADS_USER_ID` es string en
+todas partes y un number colado haria fallar la comparacion con el id del API sin
+motivo aparente.
+
+### El `#_` del final
+
+Meta documenta que al code se le anade un `#_`:
+
+```
+https://tu-callback/?code=AQBx-hBsH3...#_
+```
+
+> "`#_` will be appended to the end of the redirect URI, but it is not part of the
+> code itself, **so strip it out**."
+
+Lo mismo que el `#access_token` de Facebook: llega en el fragmento y no forma parte
+del valor.

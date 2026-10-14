@@ -49,32 +49,87 @@ describe("canjearCodigo", () => {
     expect(r.token).toBe("TOKEN-CORTO-THREADS");
   });
 
-  it("manda grant_type=authorization_code, el code y el redirect_uri", async () => {
-    let pedida = "";
-    const espia: typeof fetch = (async (u: string) => {
-      pedida = u;
+  it("manda grant_type, el code, el redirect_uri y el client_id", async () => {
+    let cuerpo = "";
+    const espia: typeof fetch = (async (_u: string, i?: RequestInit) => {
+      cuerpo = String(i?.body);
       return new Response(JSON.stringify({ access_token: "x" }));
     }) as unknown as typeof fetch;
 
     await canjearCodigo(CODIGO, APP_ID, SECRET, REDIRECT, espia);
 
-    expect(pedida).toContain("grant_type=authorization_code");
-    expect(pedida).toContain("code=");
-    expect(pedida).toContain("redirect_uri=");
-    expect(pedida).toContain(`client_id=${APP_ID}`);
+    expect(cuerpo).toContain("grant_type=authorization_code");
+    expect(cuerpo).toContain("code=");
+    expect(cuerpo).toContain("redirect_uri=");
+    expect(cuerpo).toContain(`client_id=${APP_ID}`);
   });
 
-  it("va al host de Threads, no al de Facebook", async () => {
-    let pedida = "";
-    const espia: typeof fetch = (async (u: string) => {
-      pedida = u;
+  it("va a .com con POST, que es lo que documenta Threads", async () => {
+    let pedido: { url: string; init: RequestInit | undefined } = { url: "", init: undefined };
+    const espia: typeof fetch = (async (u: string, init?: RequestInit) => {
+      pedido = { url: u, init };
       return new Response(JSON.stringify({ access_token: "x" }));
     }) as unknown as typeof fetch;
 
     await canjearCodigo(CODIGO, APP_ID, SECRET, REDIRECT, espia);
 
-    expect(pedida).toContain("graph.threads.net");
-    expect(pedida).not.toContain("graph.facebook.com");
+    // El canje va a graph.threads.**com**, no a .net. Con `.net` responde 404:
+    // el endpoint de OAuth existe una sola vez y en un solo host.
+    expect(pedido.url).toBe("https://graph.threads.com/oauth/access_token");
+    expect(pedido.url).not.toContain(".net");
+    expect(pedido.init?.method).toBe("POST");
+  });
+
+  it("el secret viaja en el CUERPO, no en la query", async () => {
+    let init: RequestInit | undefined;
+    const espia: typeof fetch = (async (_u: string, i?: RequestInit) => {
+      init = i;
+      return new Response(JSON.stringify({ access_token: "x" }));
+    }) as unknown as typeof fetch;
+
+    await canjearCodigo(CODIGO, APP_ID, SECRET, REDIRECT, espia);
+
+    // En la query el secret queda en el historial del navegador y en los logs
+    // del proxy. En el cuerpo, no.
+    expect(String(init?.body)).toContain(`client_secret=${SECRET}`);
+    expect(String(init?.body)).toContain("grant_type=authorization_code");
+  });
+
+  it("devuelve el user_id que viene en la misma respuesta", async () => {
+    // El canje trae `user_id` junto al token: no hace falta una segunda llamada
+    // para saber quien es, y por eso `THREADS_USER_ID` sale de aqui.
+    const r = await canjearCodigo(
+      CODIGO,
+      APP_ID,
+      SECRET,
+      REDIRECT,
+      httpFalso({ access_token: "tok", user_id: 17841405793187218 })
+    );
+
+    expect(r.token).toBe("tok");
+    expect(r.userId).toBe("17841405793187218");
+  });
+
+  it("un user_id numerico se convierte a string, no se queda number", async () => {
+    // `user_id` puede venir como numero. `THREADS_USER_ID` es string en todas
+    // partes, y un number colado en la variable haria que la comparacion con
+    // el id del API fallara sin motivo aparente.
+    const r = await canjearCodigo(
+      CODIGO,
+      APP_ID,
+      SECRET,
+      REDIRECT,
+      httpFalso({ access_token: "tok", user_id: 17841405793187218 })
+    );
+
+    expect(typeof r.userId).toBe("string");
+  });
+
+  it("sin user_id devuelve null y no lo inventa", async () => {
+    const r = await canjearCodigo(CODIGO, APP_ID, SECRET, REDIRECT, httpFalso({ access_token: "tok" }));
+
+    expect(r.token).toBe("tok");
+    expect(r.userId).toBeNull();
   });
 
   it("un code caducado o gastado dice que es de un solo uso", async () => {
@@ -122,9 +177,9 @@ describe("alargar", () => {
   });
 
   it("usa grant_type=th_exchange_token, que es el de Threads", async () => {
-    let pedida = "";
-    const espia: typeof fetch = (async (u: string) => {
-      pedida = u;
+    let cuerpo = "";
+    const espia: typeof fetch = (async (_u: string, i?: RequestInit) => {
+      cuerpo = String(i?.body);
       return new Response(JSON.stringify({ access_token: "largo" }));
     }) as unknown as typeof fetch;
 
@@ -137,12 +192,12 @@ describe("alargar", () => {
     // token` **contiene** esa subcadena, asi que un `not.toContain` de la version
     // de Facebook se cumple con el valor correcto y no protegeria nada. Se
     // compara el parametro entero.
-    expect(pedida).toContain("grant_type=th_exchange_token");
-    expect(pedida).not.toMatch(/[?&]grant_type=fb_exchange_token/);
-    expect(pedida).not.toMatch(/[?&]grant_type=fb_exchange/);
+    expect(cuerpo).toContain("grant_type=th_exchange_token");
+    expect(cuerpo).not.toMatch(/[?&]grant_type=fb_exchange_token/);
+    expect(cuerpo).not.toMatch(/[?&]grant_type=fb_exchange/);
   });
 
-  it("va a graph.threads.net", async () => {
+  it("va tambien a graph.threads.com, el mismo endpoint", async () => {
     let pedida = "";
     const espia: typeof fetch = (async (u: string) => {
       pedida = u;
@@ -151,7 +206,7 @@ describe("alargar", () => {
 
     await alargar("corto", APP_ID, SECRET, espia);
 
-    expect(pedida).toContain("graph.threads.net");
+    expect(pedida).toBe("https://graph.threads.com/oauth/access_token");
   });
 });
 
