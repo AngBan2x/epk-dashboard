@@ -524,3 +524,49 @@ GET**: `mastodon.social` no implementa `OPTIONS` con esa cabecera. El script se
 tiro; comprobar permisos de escritura sin escribir **no es posible** en Mastodon,
 porque no hay endpoint de introspeccion de scopes. La prueba real es un post, y ese
 lo decide el usuario.
+
+## RC.39 — Threads: dos apps, no una app con permisos
+
+La documentacion de Meta lo dice sin rodeos:
+
+> "When creating your app there will be **2 app IDs and app secrets**. For Threads
+> API implementation purposes, use the **Threads app ID** and its corresponding
+> app secret."
+
+Comprobado en `.env.local` y **los cuatro valores son distintos entre si**:
+`THREADS_APP_ID` (`1390840160777783`) no es `META_APP_ID`
+(`1654721962854119`), y sus secrets tampoco. No es un error de configuracion: es
+la forma que tiene Threads.
+
+Y `graph.threads.net` es otro dominio. Dos hosts distintos significan dos rutas de
+OAuth distintas, y por eso el `grant_type` del intercambio tambien es distinto:
+
+| | Facebook | Threads |
+|---|---|---|
+| Host | `graph.facebook.com` | `graph.threads.net` |
+| Intercambio | `fb_exchange_token` | `th_exchange_token` |
+| Caducidad del largo | no caduca | 60 dias, refrescable |
+
+Hay un test que comprueba el `grant_type` entero y **no** por subcadena, porque
+`th_exchange_token` contiene `fb_exchange_token` dentro: un `not.toContain` de la
+version de Facebook se cumple con el valor correcto y no protegeria nada.
+
+### El App ID de Threads existe
+
+`GET graph.threads.net/{app-id}` sin token responde **190 Invalid OAuth 2.0 Access
+Token**, no "app no encontrada". La diferencia importa: 190 significa que el App ID
+**existe** y solo falta el token, mientras que un id inventado daria "Unsupported
+get request". Es la misma distincion que en Facebook, donde "no existe" y "no lo
+ves" dan mensajes parecidos.
+
+### El flujo, y cual de los tres pasos es mio
+
+1. **Tú**: el usuario acepta el **Authorization Window** y Meta redirige con un
+   **authorization code**. Dura **1 hora** y es de **un solo uso**.
+2. **Yo**: `POST /oauth/access_token` con `grant_type=authorization_code` cambia
+   ese code por un token de 1 hora.
+3. **Yo**: `grant_type=th_exchange_token` lo cambia por uno de 60 dias.
+
+Los pasos 2 y 3 los hace `scripts/threads-token.ts` con las dos variables que ya
+existen. **No se puede comprobar el canje sin un code**, y un code solo se
+consigue en un navegador: por eso esta fase se queda esperando en el paso 1.

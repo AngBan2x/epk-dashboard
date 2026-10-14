@@ -1,0 +1,199 @@
+/**
+ * Tests de `scripts/threads-token.ts`.
+ *
+ * ## Que se esta atando
+ *
+ * 1. **El token largo nunca es el corto.** Si Threads devolviera el de entrada,
+ *    el script lo escribiria y `.env.local` quedaria igual: un token de 1 hora
+ *    guardado creyendo que dura 60 dias, y el fallo apareceria semanas despues.
+ *
+ * 2. **Los dos tokens de Threads son distintos entre si**, y ninguno es el de
+ *    Facebook. Threads corre en `graph.threads.net` y su token lo emite otro par
+ *    de credenciales; `lib/social/config.ts` ya tiene un test que protege la
+ *    separacion de Threads respecto a Facebook, y aqui se protege el canje.
+ *
+ * 3. **El authorization code se gasta.** Si el canje falla, el mensaje lo dice,
+ *    porque el codigo valia 1 hora y no hay forma de recuperarlo: sin ese aviso
+ *    el error se lee como "el codigo esta mal" y se pierde la causa real.
+ */
+
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { canjearCodigo, alargar, leerPerfil } from "../../scripts/threads-token";
+
+function httpFalso(cuerpo: unknown, ok = true): typeof fetch {
+  return (async () =>
+    new Response(JSON.stringify(cuerpo), {
+      status: ok ? 200 : 400,
+      headers: { "Content-Type": "application/json" },
+    })) as unknown as typeof fetch;
+}
+
+const CODIGO = "AQB-un-codigo-de-prueba-que-es-de-un-solo-uso";
+const APP_ID = "1390840160777783";
+const SECRET = "secret-de-threads-de-prueba";
+const REDIRECT = "http://localhost:3000/auth/meta/callback";
+
+describe("canjearCodigo", () => {
+  it("devuelve el token corto con el codigo correcto", async () => {
+    const r = await canjearCodigo(
+      CODIGO,
+      APP_ID,
+      SECRET,
+      REDIRECT,
+      httpFalso({ access_token: "TOKEN-CORTO-THREADS", token_type: "bearer" })
+    );
+
+    expect(r.error).toBeNull();
+    expect(r.token).toBe("TOKEN-CORTO-THREADS");
+  });
+
+  it("manda grant_type=authorization_code, el code y el redirect_uri", async () => {
+    let pedida = "";
+    const espia: typeof fetch = (async (u: string) => {
+      pedida = u;
+      return new Response(JSON.stringify({ access_token: "x" }));
+    }) as unknown as typeof fetch;
+
+    await canjearCodigo(CODIGO, APP_ID, SECRET, REDIRECT, espia);
+
+    expect(pedida).toContain("grant_type=authorization_code");
+    expect(pedida).toContain("code=");
+    expect(pedida).toContain("redirect_uri=");
+    expect(pedida).toContain(`client_id=${APP_ID}`);
+  });
+
+  it("va al host de Threads, no al de Facebook", async () => {
+    let pedida = "";
+    const espia: typeof fetch = (async (u: string) => {
+      pedida = u;
+      return new Response(JSON.stringify({ access_token: "x" }));
+    }) as unknown as typeof fetch;
+
+    await canjearCodigo(CODIGO, APP_ID, SECRET, REDIRECT, espia);
+
+    expect(pedida).toContain("graph.threads.net");
+    expect(pedida).not.toContain("graph.facebook.com");
+  });
+
+  it("un code caducado o gastado dice que es de un solo uso", async () => {
+    const r = await canjearCodigo(
+      CODIGO,
+      APP_ID,
+      SECRET,
+      REDIRECT,
+      httpFalso({ error: { message: "This authorization code has expired." } }, false)
+    );
+
+    expect(r.token).toBeNull();
+    expect(r.error).toMatch(/expired/i);
+  });
+
+  it("sin access_token devuelve error, no un null silencioso", async () => {
+    const r = await canjearCodigo(CODIGO, APP_ID, SECRET, REDIRECT, httpFalso({ token_type: "bearer" }));
+
+    expect(r.token).toBeNull();
+    expect(r.error).toMatch(/no devolvio access_token/);
+  });
+});
+
+describe("alargar", () => {
+  it("devuelve el token largo con su caducidad en dias", async () => {
+    const r = await alargar(
+      "TOKEN-CORTO",
+      APP_ID,
+      SECRET,
+      httpFalso({ access_token: "TOKEN-LARGO", expires_in: 5_184_000 })
+    );
+
+    expect(r.error).toBeNull();
+    expect(r.largo).toBe("TOKEN-LARGO");
+    expect(r.dias).toBe(60);
+  });
+
+  it("NUNCA devuelve el mismo token que le han dado", async () => {
+    // El fallo que este test evita: un token de 1 hora escrito como si durara
+    // 60 dias, con `.env.local` identico y el problema visible semanas despues.
+    const r = await alargar("TOKEN-CORTO", APP_ID, SECRET, httpFalso({ access_token: "TOKEN-CORTO" }));
+
+    expect(r.largo).toBeNull();
+    expect(r.error).toMatch(/MISMO token/i);
+  });
+
+  it("usa grant_type=th_exchange_token, que es el de Threads", async () => {
+    let pedida = "";
+    const espia: typeof fetch = (async (u: string) => {
+      pedida = u;
+      return new Response(JSON.stringify({ access_token: "largo" }));
+    }) as unknown as typeof fetch;
+
+    await alargar("corto", APP_ID, SECRET, espia);
+
+    // El de Facebook es `fb_exchange_token`. Si alguien copia el script de
+    // Facebook, este test falla.
+    //
+    // La comparacion no puede ser "no contiene fb_exchange_token": `th_exchange_
+    // token` **contiene** esa subcadena, asi que un `not.toContain` de la version
+    // de Facebook se cumple con el valor correcto y no protegeria nada. Se
+    // compara el parametro entero.
+    expect(pedida).toContain("grant_type=th_exchange_token");
+    expect(pedida).not.toMatch(/[?&]grant_type=fb_exchange_token/);
+    expect(pedida).not.toMatch(/[?&]grant_type=fb_exchange/);
+  });
+
+  it("va a graph.threads.net", async () => {
+    let pedida = "";
+    const espia: typeof fetch = (async (u: string) => {
+      pedida = u;
+      return new Response(JSON.stringify({ access_token: "largo" }));
+    }) as unknown as typeof fetch;
+
+    await alargar("corto", APP_ID, SECRET, espia);
+
+    expect(pedida).toContain("graph.threads.net");
+  });
+});
+
+describe("leerPerfil", () => {
+  it("devuelve el user id y el usuario", async () => {
+    const p = await leerPerfil("tok", httpFalso({ id: "77602", username: "pressplay_epk" }));
+
+    expect(p.error).toBeNull();
+    expect(p.id).toBe("77602");
+    expect(p.usuario).toBe("pressplay_epk");
+  });
+
+  it("un token invalido devuelve el error, no un id inventado", async () => {
+    const p = await leerPerfil(
+      "malo",
+      httpFalso({ error: { message: "Invalid OAuth 2.0 Access Token" } }, false)
+    );
+
+    expect(p.id).toBeNull();
+    expect(p.error).toMatch(/invalid/i);
+  });
+});
+
+describe("el secret de Threads no se filtra", () => {
+  const fuente = readFileSync(path.join(process.cwd(), "scripts/threads-token.ts"), "utf8");
+
+  it("no se imprime el app secret", () => {
+    expect(fuente).not.toMatch(/console\.(log|error)\([^)]*appSecret/);
+  });
+
+  it("el secret no se escribe en .env.local", () => {
+    for (const linea of fuente.split("\n").filter((l) => l.includes("escribirEnEnvLocal("))) {
+      expect(linea).not.toContain("THREADS_KEY");
+      expect(linea).not.toContain("appSecret");
+    }
+  });
+
+  it("no imprime el authorization code ni ningun token", () => {
+    for (const linea of fuente.split("\n").filter((l) => /console\.(log|error)/.test(l))) {
+      expect(linea).not.toMatch(/\$\{codigo\}/);
+      expect(linea).not.toMatch(/\$\{corto\}/);
+      expect(linea).not.toMatch(/\$\{largo\}/);
+    }
+  });
+});
