@@ -26,6 +26,8 @@ import {
   leerCuenta,
   elegirPage,
   leerFragmento,
+  leerQuery,
+  esCancelacion,
   ErrorDePage,
 } from "@/lib/social/meta";
 
@@ -218,5 +220,105 @@ describe("leerFragmento", () => {
 
     expect(t.error).toBe("access_denied");
     expect(t.accessToken).toBeNull();
+  });
+});
+// ── La query del Authorization Window de Threads ──────────────────────────
+
+describe("leerQuery: el code de Threads", () => {
+  it("saca el code de la query", () => {
+    // Es la URL que devuelve Threads de verdad:
+    //   /auth/meta/callback/?code=AQBx-hBsH3...#_
+    // El `#_` va en el fragmento, no aqui. Por eso este test lo comprobara
+    // aparte con `leerFragmento`.
+    const q = leerQuery("?code=AQBx-hBsH3code");
+
+    expect(q.code).toBe("AQBx-hBsH3code");
+    expect(q.error).toBeNull();
+  });
+
+  it("admite la query con y sin el interrogante inicial", () => {
+    // Por lo mismo que en `leerFragmento`: `window.location.search` siempre trae
+    // el `?`, pero un test (o un script) que monte la URL a mano puede no
+    // ponerlo. Un parser que solo entiende una de las dos formas pasa los tests
+    // de una y falla en la otra.
+    expect(leerQuery("?code=abc").code).toBe("abc");
+    expect(leerQuery("code=abc").code).toBe("abc");
+  });
+
+  it("una query vacia no inventa un code", () => {
+    expect(leerQuery("").code).toBeNull();
+    expect(leerQuery("?").code).toBeNull();
+  });
+
+  it("el #_ que manda Threads NO se lee como token", () => {
+    // Este es el test que importa. Threads manda:
+    //     /?code=AQBx...#_
+    // El `#_` es basura de redireccion de Meta y va en el FRAGMENTO. Si alguien
+    // "mejora" el parser para coger el primer segmento del hash como si fuera un
+    // valor, aqui aparecio un token de una letra y el canje fallaria en el
+    // script, en silencio, con un error que no menciona la URL.
+    const t = leerFragmento("#_");
+
+    expect(t.accessToken).toBeNull();
+    expect(t.longLivedToken).toBeNull();
+    expect(t.error).toBeNull();
+    // Ni se confunde con un valor de un solo caracter.
+    expect(t.accessToken).not.toBe("_");
+  });
+
+  it("code con el fragmento #_ pegado sigue siendo un code usable", () => {
+    // El caso real completo: query con el code, fragmento con el #_.
+    const q = leerQuery("?code=AQBx-hBsH3code");
+    const t = leerFragmento("#_");
+
+    expect(q.code).toBe("AQBx-hBsH3code");
+    expect(q.code).not.toContain("#");
+    expect(t.accessToken).toBeNull();
+  });
+
+  it("lee el state si viene", () => {
+    // `state` es opcional y se usa contra CSRF. Si se manda, hay que poder
+    // comprobarlo contra lo que se guardo al abrir el Authorization Window.
+    expect(leerQuery("?code=abc&state=miEstado").state).toBe("miEstado");
+    expect(leerQuery("?code=abc").state).toBeNull();
+  });
+});
+
+describe("leerQuery: la cancelacion de Threads", () => {
+  it("lee los tres campos de error que manda Threads", () => {
+    //   /?error=access_denied&error_reason=user_denied
+    //       &error_description=The+user+denied+your+request
+    const q = leerQuery(
+      "?error=access_denied&error_reason=user_denied&error_description=The+user+denied+your+request"
+    );
+
+    expect(q.error).toBe("access_denied");
+    expect(q.errorReason).toBe("user_denied");
+    expect(q.errorDescription).toBe("The user denied your request");
+  });
+
+  it("reconoce la cancelacion", () => {
+    expect(esCancelacion(leerQuery("?error=access_denied"))).toBe(true);
+    expect(esCancelacion(leerQuery("?code=abc"))).toBe(false);
+    expect(esCancelacion(leerQuery(""))).toBe(false);
+  });
+
+  it("no corrige la errata de la documentacion", () => {
+    // La tabla de Meta escribe `acceess_denied` (tres ceses) y el ejemplo de
+    // mas abajo pone `access_denied`. Aqui pasan los dos tal cual.
+    //
+    // Normalizar "acceess" -> "access" estaria mal: si Meta empezase a mandar
+    // otra cosa, un parser que "limpia" valores conocidos seguiria tragandose
+    // el cambio en silencio. Se muestra lo que llego y que lo juzgue la
+    // persona.
+    expect(leerQuery("?error=acceess_denied").error).toBe("acceess_denied");
+    expect(leerQuery("?error=access_denied").error).toBe("access_denied");
+  });
+
+  it("una cancelacion sin code no se confunde con un code", () => {
+    const q = leerQuery("?error=access_denied&error_reason=user_denied");
+
+    expect(q.code).toBeNull();
+    expect(esCancelacion(q)).toBe(true);
   });
 });

@@ -633,3 +633,83 @@ https://tu-callback/?code=AQBx-hBsH3...#_
 
 Lo mismo que el `#access_token` de Facebook: llega en el fragmento y no forma parte
 del valor.
+
+## RC.41 — La pagina de callback no sabia leer el code, y el code se perdia
+
+### El fallo era de la pagina, no del script
+
+`lib/social/meta.ts` tenia `leerFragmento`, que lee `#access_token=...`. Threads
+devuelve el code **en la query**, `?code=...`. La pagina solo llamaba a
+`leerFragmento`, asi que abria, no encontraba nada, y decia "No hay ningun token
+en la URL".
+
+Lo grave no es el mensaje: es el orden de las lineas. El `useEffect` hace
+`replaceState` **antes** de pintar. Para cuando aparecia el aviso, el code ya
+habia salido de la barra de direcciones. Quien venía del login se encontraba una
+pagina que decia que no habia nada, con el code ya borrado y sin forma de
+recuperarlo. Un code de Threads es de un solo uso: pedir otro obliga a repetir
+todo el login a mano.
+
+Se noto al hacer el test, no al leer el codigo. Siete RC y la pagina nunca se
+habia ejecutado con la URL que Threads manda de verdad.
+
+### `leerQuery`, al lado de `leerFragmento`
+
+Las dos mitades de la URL se leen por separado y se mezclan en el componente.
+No se intenta una unica funcion que entienda de las dos: el token de Facebook y
+el code de Threads son credenciales distintas con vidas distintas (24 h y una
+hora), y tratarlos como lo mismo es como se confunden.
+
+La pagina ahora dice **que** ha leido y **como** usarlo, porque el comando es
+distinto:
+
+| | Facebook | Threads |
+|---|---|---|
+| Viene en | fragmento `#` | query `?` |
+| Vida | 24 h | **1 hora**, un solo uso |
+| Se pasa a | `.env.local` | `THREADS_AUTH_CODE` |
+
+### El `#_` que manda Threads
+
+```
+https://tu-callback/?code=AQBx-hBsH3...#_
+                                       ↑ esto
+```
+
+Meta documenta que "no forma parte del code, quítalo". Aqui no hay nada que
+quitar — el code esta en la query — pero si hay algo que evitar: que alguien lea
+el `#_` como si fuera un valor. Hay un test que pasa `#_` a `leerFragmento` y
+comprueba que devuelve `SIN_TOKEN` y **no** `"_"`. Sin ese test, el unico
+candidato a "arreglar" el parser es justo el que lo rompe, y el canje falla en
+el script con un error que no menciona la URL.
+
+### La errata de la documentacion de Meta
+
+La tabla de errores escribe `acceess_denied` (tres ceses) y el ejemplo de mas
+abajo pone `access_denied`. Hay un test que fija que **los dos pasan tal cual**:
+normalizar "acceess" -> "access" estaria mal, porque si Meta cambiase el valor,
+un parser que "limpia" lo conocido se lo tragaria en silencio.
+
+### `??` donde tocaba `||`
+
+`redirectUri` se leia con `??` en un sitio y con `||` en otro. `??` no salta ante
+`""`, solo ante `null`/`undefined`, asi que con `THREADS_REDIRECT_URI=` presente
+pero vacia — lo que deja un editor al guardar una variable sin valor — el canje
+salia con `redirect_uri=` a pelo. Threads lo rechaza, y su error no menciona la
+redirect_uri: **parece un code caducado, que no es**. Era el mismo bug que ya
+habia salido en el mensaje de ayuda de RC.40, y no estaba arreglado: se habia
+arreglado un sitio y no el otro.
+
+### Y el 404 que no era un 404
+
+Los 14 E2E fallaron de golpe, incluidos los 7 de RC.37 que pasaban antes. La
+pagina daba 404 y Playwright decia que su `webServer` no arrancaba. No era la
+pagina: habia un `next dev` viejo en el 3000 sirviendo un build anterior a la
+ruta, que respondia 200 en `/` y 404 en `/auth/meta/callback`. Un servidor viejo
+que responde 200 es peor que uno caido, porque el gate parece sano.
+
+El sintoma que lo delata: **una suite entera falla a la vez**. Un cambio de
+codigo rompe un test; un servidor stale rompe todos. Antes de culpar al codigo,
+comprobar que el servidor es el actual.
+
+Gate: 1747 tests en 88 ficheros, tsc y lint limpios, 14/14 E2E del callback.

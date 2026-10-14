@@ -191,3 +191,78 @@ export function leerFragmento(hash: string): TokenFragmento {
     errorDescription: null,
   };
 }
+
+// ── La query del Authorization Window de Threads ──────────────────────────
+
+export interface CallbackQuery {
+  readonly code: string | null;
+  readonly state: string | null;
+  readonly error: string | null;
+  readonly errorReason: string | null;
+  readonly errorDescription: string | null;
+}
+
+export const SIN_QUERY: CallbackQuery = {
+  code: null,
+  state: null,
+  error: null,
+  errorReason: null,
+  errorDescription: null,
+};
+
+/**
+ * Lee la query `?code=...` que devuelve el Authorization Window de Threads.
+ *
+ * ## Por qué esto vive al lado de `leerFragmento` y no dentro
+ *
+ * Porque son **la misma página** las dos que devuelven datos: `/auth/meta/callback`
+ * sirve tanto al login de Facebook (token en el fragmento) como al de Threads
+ * (code en la query). Se leen por separado y se mezclan en el componente.
+ *
+ * ## Lo que Meta manda de más
+ *
+ * **El `#_` del final.** Threads redirige a
+ *
+ *     https://tu-callback/?code=AQBx-hBsH3...#_
+ *                                        ↑ esto
+ *
+ * y documenta que "no forma parte del code, quítalo". Aquí no hay nada que quitar:
+ * el code viene en la query, no en el fragmento. Lo que sí hay que evitar es que
+ * alguien interprete ese `#_` como si fuera un token, y por eso `leerFragmento`
+ * tiene un test con `#_` que devuelve `SIN_TOKEN` en vez de inventarse un valor.
+ *
+ * ## El `error` de Threads
+ *
+ * Cuando el usuario cancela, Threads manda `error=access_denied` **y** además
+ * `error_reason=user_denied` y `error_description`. La tabla de la documentación
+ * escribe el valor con una errata (`acceess_denied`, tres ceses) mientras que el
+ * ejemplo de más abajo lleva `access_denied`. Se leen los dos campos tal cual
+ * llegan y no se normaliza ninguno: el texto se muestra al usuario, y un
+ * `acceess` → `access` "arreglado" por nosotros escondería un cambio real de Meta.
+ */
+export function leerQuery(search: string): CallbackQuery {
+  const limpio = search.startsWith("?") ? search.slice(1) : search;
+  if (limpio === "") return SIN_QUERY;
+
+  const p = new URLSearchParams(limpio);
+
+  return {
+    code: texto(p.get("code")),
+    state: texto(p.get("state")),
+    error: texto(p.get("error")),
+    errorReason: texto(p.get("error_reason")),
+    errorDescription: texto(p.get("error_description")),
+  };
+}
+
+/**
+ * ¿Es esto un error de cancelación de Threads?
+ *
+ * Se mira `error` y `error_reason` por separado porque los dos vienen rellenos y
+ * solo uno es el que dice por qué pasó. Se considera cancelación cualquier cosa
+ * que no sea `null`: una lista de valores aceptados sería una lista que se queda
+ * corta el día que Meta añada uno.
+ */
+export function esCancelacion(q: CallbackQuery): boolean {
+  return q.error !== null || q.errorReason !== null;
+}

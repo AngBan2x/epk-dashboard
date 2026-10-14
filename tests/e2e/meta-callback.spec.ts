@@ -83,10 +83,15 @@ test.describe("callback de Meta", () => {
   test("sin fragmento explica que hay que venir del login", async ({ page }) => {
     await page.goto(RUTA);
 
-    // Abrirla a mano es el caso mas probable: se copia la ruta, se pega en una
+// Abrirla a mano es el caso mas probable: se copia la ruta, se pega en una
     // pestana nueva. Decir "no hay ningun token" es mucho mejor que una pagina
     // en blanco que parece que no carga.
-    await expect(page.getByText("No hay ningún token en la URL")).toBeVisible();
+    //
+    // El texto ahora menciona los dos porque la misma pagina sirve a Facebook y
+    // a Threads, y el code de Threads no es un token. Decir solo "token"
+    // dejaria a alguien con un code en la URL pensando que se ha equivocado de
+    // plataforma.
+    await expect(page.getByText("No hay ni token ni code en la URL")).toBeVisible();
     await expect(page.getByRole("button", { name: /copiar/i })).toHaveCount(0);
   });
 
@@ -104,5 +109,87 @@ test.describe("callback de Meta", () => {
     // La unica proteccion de esta pagina es el aviso: si alguien la publica, lo
     // que evita un accidente es que se lea que no debe estar ahi.
     await expect(page.getByText(/Solo para desarrollo/i)).toBeVisible();
+  });
+});
+// ── El code de Threads ─────────────────────────────────────────────────────
+
+test.describe("callback de Threads", () => {
+  // El caso que falla es el que la pagina lleva siete RC sin cubrir: Threads
+  // devuelve el code en la QUERY y no en el fragmento. `leerFragmento` no lo ve,
+  // asi que la pagina decia "No hay ningun token en la URL" con el code a tres
+  // caracteres de la barra de direcciones, y el code se perdia porque la URL ya
+  // se habia limpiado.
+
+  const CODE = "AQBx-hBsH3codigoDePrueba";
+
+  test("muestra el code de la query y dice como usarlo", async ({ page }) => {
+    // Esta es la URL que devuelve Threads de verdad, con el #_ incluido.
+    await page.goto(`/auth/meta/callback/?code=${CODE}#_`);
+
+    await expect(page.getByText("Authorization code de Threads")).toBeVisible();
+    await expect(page.locator("code", { hasText: CODE })).toBeVisible();
+    await expect(page.getByText("1 hora")).toBeVisible();
+  });
+
+  test("el code NO se confunde con un token de Meta", async ({ page }) => {
+    // El texto de la pagina no puede hablar de tokens: el que se pasa a
+    // `threads-token.ts` es un code, y quien lo lea tiene que saber cual de los
+    // dos es.
+    await page.goto(`/auth/meta/callback/?code=${CODE}#_`);
+
+    await expect(page.getByText("Token de Meta", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("threads-token.ts")).toBeVisible();
+  });
+
+  test("BORRA el code de la URL nada mas leerlo", async ({ page }) => {
+    await page.goto(`/auth/meta/callback/?code=${CODE}#_`);
+    await expect(page.getByText("Authorization code de Threads")).toBeVisible();
+
+    // El code es de un solo uso y una hora, pero eso no lo hace seguro de
+    // dejar en la barra de direcciones: se queda en el historial y sale en
+    // cualquier `Referer` posterior.
+    await expect(page).not.toHaveURL(new RegExp(CODE));
+    expect(page.url()).toBe(page.url().split("?")[0]);
+  });
+
+  test("el code NO vuelve al pulsar 'atras'", async ({ page }) => {
+    await page.goto("/auth/meta/callback/");
+    await page.goto(`/auth/meta/callback/?code=${CODE}#_`);
+    await expect(page.getByText("Authorization code de Threads")).toBeVisible();
+
+    await page.goBack();
+
+    // `replaceState` no deja entrada: al volver se ve la pagina sin code, no el
+    // code. Con `pushState` el code seguiria ahi, que es el bug.
+    await expect(page.locator("code", { hasText: CODE })).toHaveCount(0);
+  });
+
+  test("el #_ de Threads no aparece como si fuera el code", async ({ page }) => {
+    await page.goto(`/auth/meta/callback/?code=${CODE}#_`);
+
+    // El code va en la query. Si alguien leyera el #_ como valor, lo que se
+    // copiaria seria un "_" y el canje fallaria en el script con un error que
+    // no menciona la URL.
+    const bloqueado = page.locator("code").first();
+    await expect(bloqueado).toHaveText(CODE);
+    await expect(bloqueado).not.toHaveText("_");
+  });
+
+  test("una cancelacion de Threads se explica, no se traga", async ({ page }) => {
+    await page.goto(
+      "/auth/meta/callback/?error=access_denied&error_reason=user_denied&error_description=The+user+denied+your+request"
+    );
+
+    await expect(page.getByText("El login devolvi")).toBeVisible();
+    await expect(page.getByText("access_denied")).toBeVisible();
+    await expect(page.getByText("user_denied")).toBeVisible();
+    // Y no dice "no hay nada": son cosas distintas.
+    await expect(page.getByText("No hay ni token ni code")).toHaveCount(0);
+  });
+
+  test("sin code ni token sigue explicando que hay que venir del login", async ({ page }) => {
+    await page.goto("/auth/meta/callback/");
+
+    await expect(page.getByText("No hay ni token ni code")).toBeVisible();
   });
 });

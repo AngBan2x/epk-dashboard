@@ -239,7 +239,15 @@ async function main(): Promise<void> {
       ].join("\n")
     );
   }
-  const redirectUri = redirectFlag ?? leer("THREADS_REDIRECT_URI") ?? "http://localhost:3000/auth/meta/callback";
+  // `||` y no `??`, y en los tres sitios donde aparece este valor.
+  //
+  // `??` solo salta ante `null`/`undefined`, no ante `""`. Con
+  // `THREADS_REDIRECT_URI=` (presente pero vacía, que es justo lo que hace un
+  // editor al guardar una variable sin valor) `??` se queda con `""` y el canje
+  // sale con `redirect_uri=` a pelo. Threads lo rechaza, y el error que devuelve
+  // no dice nada de la redirect_uri: parece un code caducado, que no es.
+  const redirectUri =
+    redirectFlag || leer("THREADS_REDIRECT_URI") || "http://localhost:3000/auth/meta/callback";
 
   // 2. code -> token corto
   const { token: corto, error: errCorto } = await canjearCodigo(codigo, appId, appSecret, redirectUri, fetch);
