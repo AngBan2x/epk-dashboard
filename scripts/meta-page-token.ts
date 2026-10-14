@@ -59,6 +59,7 @@ import { config } from "dotenv";
 // `process.env` vacío.
 config({ path: ".env.local" });
 
+import { escribirEnEnvLocal } from "./lib/env-local";
 import {
   leerCuentas,
   elegirPage,
@@ -101,19 +102,10 @@ function errorDeApi(cuerpo: RespuestaCuentas, estado: number): Error {
   return new Error(`La API de Meta respondio ${estado}: ${mensaje}${explicacion ? `\n  ${explicacion}` : ""}`);
 }
 
-/** Sustituye `CLAVE=valor` en .env.local, o lo anade al final. */
-function escribirEnEnvLocal(clave: string, valor: string): void {
-  const ruta = ".env.local";
-  const fs = require("fs") as typeof import("fs");
-  let contenido = fs.existsSync(ruta) ? fs.readFileSync(ruta, "utf8") : "";
-
-  const linea = `${clave}=${valor}`;
-  const patron = new RegExp(`^${clave}=.*$`, "m");
-
-  contenido = patron.test(contenido) ? contenido.replace(patron, linea) : `${contenido.trimEnd()}\n${linea}\n`;
-
-  fs.writeFileSync(ruta, contenido, "utf8");
-}
+/** La escritura en .env.local vive en scripts/lib/env-local.ts: lo comparten este
+ * script y meta-long-lived-token.ts, y duplicar la regexp en ambos es duplicar
+ * el modo de romperse. Ahi esta escrito el por que de la flag m.
+ */
 
 /**
  * Consulta la Page directamente por su id, saltándose `/me/accounts`.
@@ -125,34 +117,25 @@ function escribirEnEnvLocal(clave: string, valor: string): void {
  * - Una Page **nueva** que el usuario todavía no tiene asignada como tarea.
  * - Un token que **no ve** ninguna Page.
  *
- * En ambas, `/me/accounts` devuelve `data: []`. Con una Page nueva eso es lo
- * normal: la tarea se refleja en la API con retraso.
- *
- * Y con `/me/accounts` vacío no hay forma de obtener **ningún** token de Page, que
- * es justo lo que hace falta para desbloquear el código. Así que cuando se sabe
- * el id, se pregunta a la Page directamente: **si el token puede leerla, devuelve
- * su `access_token`**, y no hace falta pasar por `/me/accounts` para nada.
+ * En las dos, `/me/accounts` devuelve `data: []`. Y con la lista vacía no hay
+ * forma de obtener **ningún** token de Page, que es justo lo que hace falta.
  *
  * ## El id que hay que usar
  *
- * **El que aparece en `facebook.com/profile.php?id=...` NO es el mismo** que el
- * que usa la Graph API. Se comprobaron los dos contra la API:
+ * **El de `facebook.com/profile.php?id=...` NO es el de la Graph API.**
  *
  * ```
  * 61595566701130    -> "Object does not exist"
  * 1306361615901216  -> responde
  * ```
  *
- * El segundo es el que sale en "Elige las páginas a las que quieras que acceda".
- *
  * ## Un detalle que costó tiempo
  *
- * Pedir `fields=id,name,tasks,...` falla con `#100 Tried accessing nonexisting
- * field (tasks)`. Es un error de **campo**, no de permiso: `tasks` no existe en
- * ese nodo, y confundirlos hace creer que el token no tiene acceso cuando sí lo
+ * Pedir `fields=...,tasks` falla con `#100 Tried accessing nonexisting field
+ * (tasks)`. Es un error de **campo**, no de permiso: `tasks` no existe en ese
+ * nodo, y confundirlos hace creer que el token no tiene acceso cuando sí lo
  * tiene. Aquí solo se piden campos que existen.
  */
-
 async function consultarPageDirecta(pageId: string, token: string): Promise<PageElegida> {
   const url =
     `${HOST}/${encodeURIComponent(pageId)}?fields=${encodeURIComponent(CAMPOS)}` +
@@ -171,7 +154,6 @@ async function consultarPageDirecta(pageId: string, token: string): Promise<Page
     if (/does not exist|Unsupported get request/i.test(mensaje)) {
       throw new Error(
         `La Page ${pageId} no existe para este token.\n` +
-          `  O no es una Page, o el id es el de otro sitio.\n` +
           `  El id de profile.php?id=... NO es el de la Graph API. El bueno es el\n` +
           `  que sale en el dialogo "Elige las Paginas a las que quieras que acceda".\n` +
           `  API: ${mensaje}`
