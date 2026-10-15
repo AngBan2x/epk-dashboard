@@ -918,3 +918,74 @@ lo que es un `Imagen`; lo que falta es la ruta que lo publique.
 - **`redirect_uri` sigue sin resolverse.** No bloquea esta cuenta, pero bloquea
   el OAuth para cualquier usuario que no sea evaluador. Se reporta con el Bug
   Tool de Meta.
+
+## RC.45 — Threads publicable: comprobar el medio, y dos rutas que no se confunden
+
+### El fallo mas caro de Threads no es de permisos, es de medio
+
+> "We download media used in publishing attempts so **the media must be hosted on a
+> publicly accessible server** at the time of the attempt."
+
+Meta **descarga** la imagen cuando se publica. Un medio que no se puede descargar
+no da un error de "imagen no valida": da un `400` opaco, o crea el contenedor y
+deja la publicacion **a medias**. Y una publicacion a medias ya la ve gente.
+
+Por eso la comprobacion va en el `preview()`, que es gratis y repetible, y no en
+el `publicar()`, que no lo es.
+
+### `problema` y `aviso` no sondecorators, son la decision
+
+- `problema` -> **bloquea**. No depende de la red, asi que reintentar no lo arregla:
+  `http://` en vez de `https://`, localhost, un HTML en vez de una imagen, 9 MB.
+- `aviso` -> **no bloquea**. Un `HEAD` que revienta, un `403`, un CDN sin
+  `content-length`. El requisito real de Threads es que el **`GET`** de la imagen
+  funcione, y eso no lo responde un `HEAD`. Bloquear aqui dejaria al admin sin
+  poder publicar por un CDN que funciona.
+
+Hay tests para las dos mitades, incluida la direccion: un fallo de red que
+bloquearia sale como `ok: true` con aviso.
+
+### Las dimensiones NO se comprueban
+
+Saber si una imagen mide 320x320 o 50x50 exige bajarla entera y parsear la
+cabecera de JPEG, PNG o WEBP. No se hace, y el `preview` **lo dice** en un aviso.
+Un aviso honesto vale mas que una comprobacion que da seguridad falsa.
+
+### El `preview` no puede publicar. Ni por error deflags
+
+La razon de que sean dos rutas y no una con `publicar: true` es que **una ruta
+que no puede publicar no tiene ningun camino de codigo que escriba en Threads**.
+Con un flag, un `?publicar=1` o un valor por defecto equivocado es una
+publicacion real.
+
+Y la de publicar exige `confirmar === true`, chequeado con `=== true` y no de
+presencia: `{"confirmar": "si"}` y `{"confirmar": 1}` se quedan fuera. Los tests
+miran **`fetch` llamado 0 veces**, no el codigo de respuesta: un `400` con la red
+tocada habria publicado el post y luego avisado del error.
+
+### Revalida en el momento de publicar
+
+No confía en lo que el navegador le dijera al `preview`. El texto puede haber
+cambiado entre una llamada y otra, y validar es gratis. Un cliente que nunca haya
+pasado por el `preview` puede publicar igual, pero nunca con texto sin validar.
+
+### Comprobado en local, contra la API real
+
+```
+[recorte-900]     listo=true  chars=500        <- recorta y lo dice
+[portada-itunes]  listo=true  img[ok=true tipo=image/jpeg bytes=89063]
+[url-no-imagen]   listo=false ERROR: no devuelve una imagen sino `text/html`
+[http-no-https]   listo=false ERROR: tiene que ser https
+[localhost]       listo=false ERROR: Meta esta en otro servidor
+```
+
+Las portadas que ya hay en `tracks.cover_image` son URLs de CDN publico
+(`is1-ssl.mzstatic.com`, 600x600, 87 KB): cumplen el minimo de 320 px de ancho y
+el maximo de 1440. **Se pueden publicar tal cual**, sin tuberias de medios.
+
+### Lo que falta para usarlo en produccion
+
+Las rutas leen `THREADS_APP_ID`, `THREADS_USER_ID` y `THREADS_ACCESS_TOKEN` del
+entorno. Esas tres estan en `.env.local` y **no en Vercel**: en produccion la ruta
+responde `503` diciendo que variables faltan, por nombre y nunca por valor. El
+token tampoco es de producción: es el del generador del panel, para `@pressplayepk`.
