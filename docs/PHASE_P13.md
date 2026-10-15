@@ -855,3 +855,66 @@ Un script que valida tokens no puede imprimirlos.
 `redirect_uri` hay que resolverlo antes de implementar el OAuth real en la app
 para otros usuarios. Se reporta con el Bug Tool de Meta citando `1349168`, con
 las cuatro piezas verificadas. Anotado aqui para que no se pierda.
+
+## RC.44 — Threads tiene el permiso de publicar, comprobado sin publicar
+
+### El permiso no se pide, se demuestra
+
+Que el token "funcione" en `social-smoke.ts` solo demuestra `threads_basic`: la
+comprobacion lee `GET /me` y nada mas. **`threads_content_publish` es otro
+permiso**, y el flujo que lo pedia —el Authorization Window con
+`scope=threads_content_publish`— nunca llego a completarse por el `1349168`.
+
+Hay un endpoint que lo demuestra sin escribir nada:
+
+```
+GET /{threads-user-id}/threads_publishing_limit?fields=quota_usage,config
+```
+
+> "This endpoint requires the `threads_basic` and `threads_content_publish`
+> permissions."
+
+```
+[OK]  quota_usado=0  de 250 cada 86400s
+```
+
+Es una **lectura**. Y sirve: si el permiso no estuviera, responderia 403 y el
+mensaje seria sobre permisos, no sobre cuota. El token de `pressplayepk` puede
+publicar.
+
+### Lo que Threads ya tiene y lo que no
+
+| | Estado |
+|---|---|
+| Credenciales contra la API real | ✅ `@pressplayepk`, id `29332926652967905` |
+| `threads_content_publish` | ✅ concedido, cuota 250/dia sin usar |
+| Adaptador (`redactarThreads`, `crearContenedor`, publicar) | ✅ implementado |
+| **Algo que llame al adaptador** | ❌ **no existe**: `threads_publish` no aparece en `app/` |
+| Primera publicación real | ❌ ninguna, y no se hace sin aprobacion |
+| **Medio accesible publicamente** | ❌ **es el siguiente obstaculo real** |
+
+### El medio obligatorio
+
+De la documentacion del API:
+
+> "We download media used in publishing attempts so **the media must be hosted on
+> a publicly accessible server** at the time of the attempt."
+
+Y `threads_publish` pide `media_id`. O sea: **un post de solo texto tambien
+necesita imagen** — tipicamente un PNG transparente de 1x1 — porque el
+contenedor se crea siempre contra una URL. Meta **descarga** el fichero en el
+momento del intento: una URL que solo responde autenticada, o que cambia, deja
+el post a medias con un error que no dice "tu imagen no es publica".
+
+Esto no es un detalle de implementacion, cambia el diseno: hace falta una ruta
+sirva el medio desde `epk-dashboard.vercel.app` sin sesion. El adaptador ya sabe
+lo que es un `Imagen`; lo que falta es la ruta que lo publique.
+
+### Los dos timers que nadie esta mirando
+
+- **El token caduca a los 60 dias** y hay que refrescarlo con
+  `GET /refresh_access_token?grant_type=th_refresh_token` **antes**, mientras siga
+  vivo. Pasado ese punto no hay renewal: hay que volver al panel.
+- **`redirect_uri` sigue sin resolverse.** No bloquea esta cuenta, pero bloquea
+  el OAuth para cualquier usuario que no sea evaluador. Se reporta con el Bug
+  Tool de Meta.
