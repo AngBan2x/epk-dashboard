@@ -42,8 +42,7 @@
  */
 
 import { LIMITES, cabeElTexto, limiteDeTexto } from "./limites";
-import {
-  recortar,
+import { recortar,
   type AdaptadorSocial,
   type Borrador,
   type CapaHttp,
@@ -53,6 +52,8 @@ import {
   type ResultadoPublicacion,
   type ResultadoValidacion,
 } from "./tipos";
+import { ErrorApi } from "./tipos";
+import type { Paso, Plataforma } from "./tipos";
 
 export interface OpcionesMastodon {
   readonly http: CapaHttp;
@@ -87,16 +88,6 @@ export interface OpcionesMastodon {
 // Utilidades de HTTP. Duplicadas a propósito: ver la nota de `bluesky.ts`.
 // ---------------------------------------------------------------------------
 
-class ErrorApi extends Error {
-  constructor(
-    mensaje: string,
-    readonly status: number,
-    readonly cuerpo: unknown,
-  ) {
-    super(mensaje);
-    this.name = "ErrorApi";
-  }
-}
 
 async function cuerpoDe(res: Response): Promise<unknown> {
   const texto = await res.text();
@@ -108,10 +99,15 @@ async function cuerpoDe(res: Response): Promise<unknown> {
   }
 }
 
-async function exigirOk(res: Response, que: string): Promise<unknown> {
+async function exigirOk(
+  res: Response,
+  que: string,
+  plataforma: Plataforma,
+  paso: Paso
+): Promise<unknown> {
   const cuerpo = await cuerpoDe(res);
   if (!res.ok) {
-    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, res.status, cuerpo);
+    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, plataforma, paso, res.status, cuerpo);
   }
   return cuerpo;
 }
@@ -132,10 +128,10 @@ function exigirCampo(registro: Record<string, unknown>, campo: string, que: stri
 }
 
 /** `ArrayBuffer` y no `Uint8Array`: ver el motivo en `descargar()` de `bluesky.ts`. */
-async function descargar(http: CapaHttp, url: string): Promise<ArrayBuffer> {
+async function descargar(http: CapaHttp, url: string, plataforma: Plataforma): Promise<ArrayBuffer> {
   const res = await http(url, { method: "GET" });
   if (!res.ok) {
-    throw new ErrorApi(`No se pudo descargar la imagen (${res.status})`, res.status, await cuerpoDe(res));
+    throw new ErrorApi(`No se pudo descargar la imagen (${res.status})`, plataforma, "medio", res.status, await cuerpoDe(res));
   }
   return res.arrayBuffer();
 }
@@ -263,7 +259,7 @@ async function redactarMastodon(o: OpcionesMastodon, contenido: Contenido): Prom
  * cuándo, no descubrirlo con un 429 en la sexta.
  */
 export async function subirMedio(o: OpcionesMastodon, imagen: Imagen): Promise<string> {
-  const bytes = await descargar(o.http, imagen.url);
+  const bytes = await descargar(o.http, imagen.url, "mastodon");
   const blob = new Blob([bytes], { type: mimeDeUrl(imagen.url) });
 
   const form = new FormData();
@@ -278,6 +274,8 @@ export async function subirMedio(o: OpcionesMastodon, imagen: Imagen): Promise<s
         body: form,
       }),
       "POST /api/v1/media",
+      "mastodon",
+      "medio",
     ),
     "POST /api/v1/media",
   );
@@ -306,6 +304,8 @@ export async function publicar(o: OpcionesMastodon, publicacion: Publicacion): P
         body: JSON.stringify(cuerpo),
       }),
       "POST /api/v1/statuses",
+      "mastodon",
+      "publicar",
     ),
     "POST /api/v1/statuses",
   );

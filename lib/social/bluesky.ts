@@ -47,8 +47,7 @@
  */
 
 import { LIMITES, cabeElTexto, contarGraphemes, limiteDeTexto } from "./limites";
-import {
-  recortar,
+import { recortar,
   type AdaptadorSocial,
   type Borrador,
   type CapaHttp,
@@ -58,6 +57,8 @@ import {
   type ResultadoPublicacion,
   type ResultadoValidacion,
 } from "./tipos";
+import { ErrorApi } from "./tipos";
+import type { Paso, Plataforma } from "./tipos";
 
 export interface OpcionesBluesky {
   /** Inyectada, no importada: es lo que permite probar el adaptador sin red. */
@@ -98,16 +99,6 @@ export interface OpcionesBluesky {
 // ---------------------------------------------------------------------------
 
 /** Un 4xx no se maquilla de éxito. Ver la nota sobre `RateLimitExceeded`. */
-class ErrorApi extends Error {
-  constructor(
-    mensaje: string,
-    readonly status: number,
-    readonly cuerpo: unknown,
-  ) {
-    super(mensaje);
-    this.name = "ErrorApi";
-  }
-}
 
 async function cuerpoDe(res: Response): Promise<unknown> {
   const texto = await res.text();
@@ -119,10 +110,15 @@ async function cuerpoDe(res: Response): Promise<unknown> {
   }
 }
 
-async function exigirOk(res: Response, que: string): Promise<unknown> {
+async function exigirOk(
+  res: Response,
+  que: string,
+  plataforma: Plataforma,
+  paso: Paso
+): Promise<unknown> {
   const cuerpo = await cuerpoDe(res);
   if (!res.ok) {
-    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, res.status, cuerpo);
+    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, plataforma, paso, res.status, cuerpo);
   }
   return cuerpo;
 }
@@ -151,10 +147,10 @@ function exigirCampo(registro: Record<string, unknown>, campo: string, que: stri
  * El `ArrayBuffer` no tiene ese problema y además sirve tal cual para el `Blob` de
  * Mastodon.
  */
-async function descargar(http: CapaHttp, url: string): Promise<ArrayBuffer> {
+async function descargar(http: CapaHttp, url: string, plataforma: Plataforma): Promise<ArrayBuffer> {
   const res = await http(url, { method: "GET" });
   if (!res.ok) {
-    throw new ErrorApi(`No se pudo descargar la imagen (${res.status})`, res.status, await cuerpoDe(res));
+    throw new ErrorApi(`No se pudo descargar la imagen (${res.status})`, plataforma, "medio", res.status, await cuerpoDe(res));
   }
   return res.arrayBuffer();
 }
@@ -286,6 +282,8 @@ async function crearSesion(o: OpcionesBluesky): Promise<Sesion> {
         body: JSON.stringify({ identifier: o.identifier, password: o.password }),
       }),
       "com.atproto.server.createSession",
+      "bluesky",
+      "sesion",
     ),
     "com.atproto.server.createSession",
   );
@@ -305,7 +303,7 @@ async function subirEmbed(o: OpcionesBluesky, jwt: string, imagenes: readonly Im
   const subidas: { image: unknown; alt: string }[] = [];
 
   for (const imagen of imagenes) {
-    const bytes = await descargar(o.http, imagen.url);
+    const bytes = await descargar(o.http, imagen.url, "bluesky");
     // `uploadBlob` devuelve el *blob ref* tal cual: el cuerpo de la respuesta ES
     // el objeto `{ $type, ref, mimeType, size }` que va dentro del registro. Por
     // eso se reenvía entero y no se reconstruye.
@@ -319,6 +317,8 @@ async function subirEmbed(o: OpcionesBluesky, jwt: string, imagenes: readonly Im
         body: bytes,
       }),
       "com.atproto.repo.uploadBlob",
+      "bluesky",
+      "medio",
     );
 
     subidas.push({ image: blob, alt: o.alt ?? "" });
@@ -361,6 +361,8 @@ export async function publicar(o: OpcionesBluesky, publicacion: Publicacion): Pr
         }),
       }),
       "app.bsky.feed.post",
+      "bluesky",
+      "publicar",
     ),
     "app.bsky.feed.post",
   );

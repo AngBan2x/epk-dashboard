@@ -81,3 +81,7 @@ artist-image-candidates.json
 # se tragó `middleware.ts` en RC.31, y por eso AGENTS.md manda stagear con rutas
 # explícitas. Ignorarlos quita esa segunda vía de error.
 .opencode/plans/
+
+# Informes de publicacion social: son historial de salida a internet, no codigo.
+# Ademas podrian llevar texto de un post ya publicado.
+informes/

@@ -989,3 +989,110 @@ Las rutas leen `THREADS_APP_ID`, `THREADS_USER_ID` y `THREADS_ACCESS_TOKEN` del
 entorno. Esas tres estan en `.env.local` y **no en Vercel**: en produccion la ruta
 responde `503` diciendo que variables faltan, por nombre y nunca por valor. El
 token tampoco es de producción: es el del generador del panel, para `@pressplayepk`.
+
+## RC.46 — El paso es un campo, y a publication se responde con un informe
+
+### `ErrorApi` estaba copiado en los seis adaptadores
+
+Identica byte a byte, seis veces. Anadir un campo obligaba a seis ediciones que
+podian divergir sin que nada lo indicara. Ahora es una clase sola en `tipos.ts`, y
+`plataforma` y `paso` son campos.
+
+Y `paso` es un **vocabulario cerrado** (`sesion`, `medio`, `contenedor`,
+`publicar`, `consulta`), no texto libre, porque la pregunta que hay que poder
+contestar es "¿que fallo?" y contestarla exige poder **filtrar**. La distincion que
+mas importa: `createSession` de Bluesky es `sesion`, no `publicar`. "La contrasena
+de la app esta mal" y "la API fallo al publicar" piden acciones distintas, y un
+solo string las mezcla.
+
+### Los pasos de cada plataforma, que no son todos iguales
+
+| Plataforma | Pasos |
+|---|---|
+| Facebook | `publicar` (`/feed`) despues `medio` (`/photos`) |
+| Mastodon | `medio` y `publicar` |
+| Threads | `contenedor` y `publicar` |
+| Instagram | `medio` (hijos de carrusel), `contenedor`, `publicar` |
+| Bluesky | `sesion`, `medio`, `publicar` |
+| LinkedIn | `medio` (x2), `publicar` |
+
+Que Facebook y Threads hagan `/feed` y `/threads` **antes** de adjuntar el medio
+significa que un fallo en el paso 2 deja un post **ya publicado sin imagen**. Marcar
+el primer paso como `publicar` es lo que hace visible eso en el informe en vez de
+salir como "anadio la foto".
+
+### Por que el script y no una ruta web
+
+Porque el token tiene que vivir en algun sitio. En una funcion serverless,
+cualquiera con una sesion de admin valida pasa a poder publicar en la cuenta de la
+marca: eso no es "admin de una app de musica", es control de la presencia en
+redes. En el `.env.local` de una persona, solo publica quien tiene ese fichero.
+
+Las variables de Threads **no estan en Vercel** y no se van a poner.
+
+### `no-intentado` es un estado, no la ausencia de uno
+
+Con dos estados ("publicado" / "fallo"), despues de un fallo no se puede
+contestar que paso con las siguientes: se quedaron en un limbo. El tercero
+responde exactamente eso.
+
+### El fallo que casi se cuela: mirar el pre-flight dentro del bucle
+
+La primera version de `publicarEnOrden` comprobaba `preparado.listo` en cada
+vuelta. Con Threads listo y Mastodon no, **publicaba Threads y luego se
+paraba**. El test lo caza:
+
+```
+Expected: publicadas 0
+Received: 1
+```
+
+El pre-flight se mira **entero y antes de empezar**. Si una plataforma no esta
+lista, no se escribe en ninguna: un fallo barato en la segunda no puede dejar un
+post fuera sin avisar.
+
+### Por que `Promise.all` no aparece en ninguna parte
+
+Rechaza en el primer error y **pierde los resultados de las demas**. Publicando
+en cuatro con uno roto, `Promise.all` daria a entender que no salio ninguno.
+Secuencial, y con corte en el primer fallo.
+
+### El informe sobrevive al terminal
+
+`informes/publicacion-<ts>.json`, con una linea por plataforma. Sin eso, un fallo
+a las tres de la manana no se puede diagnosticar. `informes/` esta en
+`.gitignore`: es historial de salida a internet, no codigo.
+
+El informe **no lleva tokens**: hay un test que lo comprueba.
+
+### El token de Threads caduca a los 60 dias y no se renueva
+
+El permission grant dura 90 si el perfil es publico y refrescarlo lo extiende. El
+**token** son 60, y despues no hay renewal: hay que volver al panel.
+
+Aviso con margen, a partir de 14 dias, y uno especifico cuando ya caduco, que dice
+que solo se arregla desde el panel. La antiguedad se saca del **mtime** de
+`.env.local` en vez de una variable de fecha, porque esa variable se queda vieja
+en cuanto se regenera el token y nadie se acuerda de actualizarla. Va en la
+direccion segura: avisa de mas, no de menos. Y si no sabe, **no dice nada** en vez
+de decir "todo bien".
+
+### Estado de las seis plataformas
+
+| Plataforma | Publica | Probado contra la API real |
+|---|---|---|
+| Threads | si | perfil y cuota. El camino de escritura, solo con capa falsa |
+| Facebook | si | no |
+| Instagram | si | no |
+| Mastodon | si | no |
+| Bluesky | si | no |
+| LinkedIn | si | no |
+
+`--plataformas` es **obligatorio y sin valor por defecto**. Un "publicar en todas
+las configuradas" por defecto es un accidente esperando en cuanto se anade una
+plataforma nueva.
+
+Nota: 2 tests de `deezer-previews.test.ts` fallan desde antes de RC.46, en HEAD.
+No se han tocado.
+
+Gate: 1799 tests en 91 ficheros (2 fallan, los de Deezer), tsc y lint limpios.

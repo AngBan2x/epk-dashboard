@@ -28,6 +28,79 @@
 
 import type { Plataforma } from "./limites";
 
+/** Reexportada para que los seis adaptadores importen de un solo sitio. */
+export type { Plataforma };
+
+// ── El error que se puede diagnosticar ──────────────────────────────────────
+
+/**
+ * En qué punto del flujo falló.
+ *
+ * ## Por qué un vocabulario cerrado y no texto libre
+ *
+ * Porque la pregunta que hay que poder contestar es **"¿qué falló?"**, y
+ * contestarla con una cadena obliga a parsear el mensaje de error. Eso se rompe
+ * el día que alguien edita una cadena, y falla sin avisar: el informe sale
+ * vacío y parece que no hubo fallo.
+ *
+ * Con un vocabulario cerrado, `paso` se puede filtrar y comparar. Y la
+ * distinción importa: `createSession` de Bluesky es `sesion`, no `publicar`.
+ * Esa diferencia es exactamente la que separa "el texto era demasiado largo" de
+ * "la contraseña de la app está mal", que son fallos opuestos.
+ *
+ * `medio` es el paso de subir el fichero, que en Threads e Instagram se
+ * hace **antes** de crear el contenedor: si falla ahí, no existe nada que
+ * borrar después.
+ */
+export type Paso = "sesion" | "medio" | "contenedor" | "publicar" | "consulta";
+
+/**
+ * Un fallo de la API que se sabe de dónde viene.
+ *
+ * Antes de RC.46 esta clase estaba **copiada en los seis adaptadores**, idéntica
+ * byte a byte. Añadir un campo obligaba a seis ediciones que podían divergir
+ * sin que nada lo indicara, y el informe de una publicación ya no se podía
+ * construir porque el paso viajaba dentro del texto.
+ *
+ * Ahora es una clase sola, y `plataforma` y `paso` son campos.
+ */
+export class ErrorApi extends Error {
+  constructor(
+    mensaje: string,
+    readonly plataforma: Plataforma,
+    readonly paso: Paso,
+    readonly status: number,
+    readonly cuerpo: unknown,
+  ) {
+    super(mensaje);
+    this.name = "ErrorApi";
+  }
+}
+
+/**
+ * Lo que Meta (o cualquier API) dice en su cuerpo de error.
+ *
+ * Se digs `error.message` (Meta), `error` (Bluesky) o `message` (Mastodon) sin
+ * normalizar: el texto se muestra a quien lee el informe y **corregirlo** las
+ * veces que se equivoca escondería un cambio real de la plataforma.
+ */
+export function detalleApi(cuerpo: unknown): string | null {
+  if (typeof cuerpo === "string") return cuerpo;
+  if (cuerpo === null || typeof cuerpo !== "object") return null;
+  const r = cuerpo as Record<string, unknown>;
+
+  const directo = r["error_message"] ?? r["error_description"] ?? r["message"];
+  if (typeof directo === "string" && directo !== "") return directo;
+
+  const envuelto = r["error"];
+  if (typeof envuelto === "string" && envuelto !== "") return envuelto;
+  if (envuelto !== null && typeof envuelto === "object") {
+    const m = (envuelto as Record<string, unknown>)["message"];
+    if (typeof m === "string" && m !== "") return m;
+  }
+  return null;
+}
+
 /**
  * Una capa de HTTP mínima. No es la de `fetch` a propósito: es lo más pequeño
  * que los adaptadores necesitan, y un tipo pequeño es un tipo que un test puede

@@ -56,8 +56,7 @@
  */
 
 import { LIMITES, cabeElTexto, limiteDeTexto } from "./limites";
-import {
-  recortar,
+import { recortar,
   type AdaptadorSocial,
   type Borrador,
   type CapaHttp,
@@ -67,6 +66,8 @@ import {
   type ResultadoPublicacion,
   type ResultadoValidacion,
 } from "./tipos";
+import { ErrorApi } from "./tipos";
+import type { Paso, Plataforma } from "./tipos";
 
 export interface OpcionesLinkedin {
   readonly http: CapaHttp;
@@ -102,16 +103,6 @@ export interface OpcionesLinkedin {
 // Utilidades de HTTP. Duplicadas a propósito: ver la nota de `bluesky.ts`.
 // ---------------------------------------------------------------------------
 
-class ErrorApi extends Error {
-  constructor(
-    mensaje: string,
-    readonly status: number,
-    readonly cuerpo: unknown,
-  ) {
-    super(mensaje);
-    this.name = "ErrorApi";
-  }
-}
 
 async function cuerpoDe(res: Response): Promise<unknown> {
   const texto = await res.text();
@@ -123,12 +114,17 @@ async function cuerpoDe(res: Response): Promise<unknown> {
   }
 }
 
-async function exigirOk(res: Response, que: string): Promise<unknown> {
+async function exigirOk(
+  res: Response,
+  que: string,
+  plataforma: Plataforma,
+  paso: Paso
+): Promise<unknown> {
   const cuerpo = await cuerpoDe(res);
   if (!res.ok) {
     // El 429 llega aquí con su cuerpo entero a propósito. Es la única forma de
     // descubrir el límite de LinkedIn: la documentación no lo publica.
-    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, res.status, cuerpo);
+    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, plataforma, paso, res.status, cuerpo);
   }
   return cuerpo;
 }
@@ -149,10 +145,10 @@ function exigirCampo(registro: Record<string, unknown>, campo: string, que: stri
 }
 
 /** `ArrayBuffer` y no `Uint8Array`: ver el motivo en `descargar()` de `bluesky.ts`. */
-async function descargar(http: CapaHttp, url: string): Promise<ArrayBuffer> {
+async function descargar(http: CapaHttp, url: string, plataforma: Plataforma): Promise<ArrayBuffer> {
   const res = await http(url, { method: "GET" });
   if (!res.ok) {
-    throw new ErrorApi(`No se pudo descargar la imagen (${res.status})`, res.status, await cuerpoDe(res));
+    throw new ErrorApi(`No se pudo descargar la imagen (${res.status})`, plataforma, "medio", res.status, await cuerpoDe(res));
   }
   return res.arrayBuffer();
 }
@@ -265,6 +261,8 @@ async function subirImagen(o: OpcionesLinkedin, imagen: Imagen): Promise<string>
         body: JSON.stringify({ owner: o.authorUrn }),
       }),
       "POST /images?action=initializeUpload",
+      "linkedin",
+      "medio",
     ),
     "POST /images?action=initializeUpload",
   );
@@ -274,7 +272,7 @@ async function subirImagen(o: OpcionesLinkedin, imagen: Imagen): Promise<string>
   const uploadUrl = exigirCampo(reserva, "uploadUrl", "POST /images?action=initializeUpload");
   const urn = exigirCampo(reserva, "image", "POST /images?action=initializeUpload");
 
-  const bytes = await descargar(o.http, imagen.url);
+  const bytes = await descargar(o.http, imagen.url, "linkedin");
 
   await exigirOk(
     await o.http(uploadUrl, {
@@ -283,6 +281,8 @@ async function subirImagen(o: OpcionesLinkedin, imagen: Imagen): Promise<string>
       body: bytes,
     }),
     "PUT al uploadUrl de la imagen",
+    "linkedin",
+    "medio",
   );
 
   return urn;
@@ -318,6 +318,8 @@ export async function publicar(o: OpcionesLinkedin, publicacion: Publicacion): P
         body: JSON.stringify(cuerpo),
       }),
       "POST /rest/posts",
+      "linkedin",
+      "publicar",
     ),
     "POST /rest/posts",
   );

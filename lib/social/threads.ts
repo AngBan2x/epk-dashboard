@@ -48,8 +48,7 @@
  */
 
 import { LIMITES, cabeElTexto, limiteDeTexto } from "./limites";
-import {
-  recortar,
+import { recortar,
   type AdaptadorSocial,
   type Borrador,
   type CapaHttp,
@@ -59,6 +58,8 @@ import {
   type ResultadoPublicacion,
   type ResultadoValidacion,
 } from "./tipos";
+import { ErrorApi } from "./tipos";
+import type { Paso, Plataforma } from "./tipos";
 
 export interface OpcionesThreads {
   readonly http: CapaHttp;
@@ -81,16 +82,6 @@ export interface OpcionesThreads {
 // Utilidades de HTTP. Duplicadas a propósito: ver la nota de `bluesky.ts`.
 // ---------------------------------------------------------------------------
 
-class ErrorApi extends Error {
-  constructor(
-    mensaje: string,
-    readonly status: number,
-    readonly cuerpo: unknown,
-  ) {
-    super(mensaje);
-    this.name = "ErrorApi";
-  }
-}
 
 async function cuerpoDe(res: Response): Promise<unknown> {
   const texto = await res.text();
@@ -102,10 +93,15 @@ async function cuerpoDe(res: Response): Promise<unknown> {
   }
 }
 
-async function exigirOk(res: Response, que: string): Promise<unknown> {
+async function exigirOk(
+  res: Response,
+  que: string,
+  plataforma: Plataforma,
+  paso: Paso
+): Promise<unknown> {
   const cuerpo = await cuerpoDe(res);
   if (!res.ok) {
-    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, res.status, cuerpo);
+    throw new ErrorApi(`${que} respondió ${res.status} ${res.statusText}`, plataforma, paso, res.status, cuerpo);
   }
   return cuerpo;
 }
@@ -250,6 +246,8 @@ export async function crearContenedor(o: OpcionesThreads, publicacion: Publicaci
         body: JSON.stringify(cuerpo),
       }),
       "POST /threads (crear contenedor)",
+      "threads",
+      "contenedor",
     ),
     "POST /threads (crear contenedor)",
   );
@@ -269,6 +267,8 @@ export async function publicar(o: OpcionesThreads, publicacion: Publicacion): Pr
         body: JSON.stringify({ creation_id: contenedor.creationId }),
       }),
       "POST /threads_publish",
+      "threads",
+      "publicar",
     ),
     "POST /threads_publish",
   );
