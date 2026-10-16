@@ -686,12 +686,27 @@ export interface DeezerUpdate {
  * construir el enlace de Apple Music: produciría un enlace a otra canción. Es
  * peor que dejar la columna a null.
  */
-export function buildDeezerUpdate(resolution: DeezerResolution): DeezerUpdate | null {
+export function buildDeezerUpdate(
+  resolution: DeezerResolution,
+  nowMs: number = Date.now()
+): DeezerUpdate | null {
   const { wanted, chosen, verified } = resolution;
   if (!chosen || !verified) return null;
   // Durabilidad: una URL que caduca antes de que la vuelva a abrir alguien no
   // se escribe. Es el punto donde los 900 s del token se convierten en "no".
-  if (!isDurablePreviewUrl(verified.url, Date.now())) return null;
+  //
+  // `nowMs` es un parametro y no `Date.now()` fijo, y por dos razones que
+  // importan las dos:
+  //
+  // 1. **Sin el, la funcion no se puede probar.** Un test de "la URL dura 30
+  //    dias" necesita saber que la_URL es durable; con el reloj real, el test
+  //    solo pasa mientras el reloj no haya avanzado 30 dias. Es lo que hacia
+  //    fallar dos tests de este fichero con un `NOW` fijo de junio de 2026.
+  // 2. **Discrepa de su gemelo.** `selectDeezerUpdates` recibe `nowMs`. Dos
+  //    funciones que deciden lo mismo con relojes distintos pueden discrepar
+  //    sobre la misma URL si se ejecutan con minutos de diferencia, y entonces
+  //    una dice "escribe" y la otra "no escribas" del mismo enlace.
+  if (!isDurablePreviewUrl(verified.url, nowMs)) return null;
   return {
     id: wanted.id,
     audio_preview_url: verified.url,

@@ -167,12 +167,19 @@ function validarThreads(publicacion: Publicacion): ResultadoValidacion {
     }
   }
 
-  if (total > 0) {
-    // Se sabe el dato y no se puede comprobar aquí: `validar()` no hace red.
-    avisos.push(
-      "Las imágenes no se han comprobado: Threads exige entre 320 y 1440 px de ancho, JPEG/PNG/WEBP y 8 MB como máximo, y eso solo se ve descargando el archivo.",
-    );
-  }
+  // Sin aviso de imágenes aquí, a propósito.
+  //
+  // Antes decía "las imágenes no se han comprobado: 320-1440 px, JPEG/PNG/WEBP
+  // y 8 MB". Con `preparar()` eso es **falso**: `lib/social/imagenes.ts` sí
+  // comprueba el tipo y el tamaño, y deja un aviso solo con lo que de verdad no
+  // puede saber, que son las dimensiones.
+  //
+  // Dejarlo aquí producía dos avisos que decían lo mismo y uno mentía, y quien
+  // lee un informe con "no se ha comprobado el formato" junto a una comprobación
+  // que sí lo hizo, deja de fiarse de los dos.
+  //
+  // `validar()` es el validador de **texto**, y no hace red: que lo diga, sin
+  // prometer que hay una comprobación de medios detrás.
 
   return { ok: errores.length === 0, errores, avisos };
 }

@@ -530,3 +530,101 @@ llamada real a ninguna plataforma**. A partir de ahí hacen falta credenciales.
 
 **Lo que se hace.** Solo documentación, que es exactamente lo que pide el paso 1
 del Flujo: PHASE_P13.md nuevo y su entrada en el índice de docs/PHASES.md.
+
+## 2026-10-15 - P13 RC.46: el paso del error es un campo, y publicar es local
+
+### Lo que cambia de verdad
+
+**El token se queda en local y se retiran las rutas web.** RC.45 dejo
+`/api/admin/social/threads/preview` y `.../publish`, que solo funcionarian con
+los secretos en Vercel. Con ellos, cualquier sesion de admin valida del sitio
+pasaba a poder publicar en las cuentas de la marca: eso no es "admin de una app
+de musica", es control de la presencia en redes. Borradas, y verificado que
+produccion ya devuelve `404`.
+
+**`ErrorApi` estaba copiado en los seis adaptadores**, identica byte a byte. Anadir
+un campo obligaba a seis ediciones que podian divergir sin que nada lo indicara.
+Ahora es una clase sola con `plataforma` y `paso` como campos, y `paso` es un
+vocabulario cerrado: `sesion`, `medio`, `contenedor`, `publicar`, `consulta`.
+
+Para poder filtrar y comparar, que es lo que convierte "fallo" en un
+diagnostico. La distincion que mas importa: `createSession` de Bluesky es
+`sesion`, no `publicar`. Contrasena de la app mal puesta y API caida piden
+acciones opuestas.
+
+Que Facebook y Threads hagan `/feed` y `/threads` **antes** de adjuntar el medio
+significa que un fallo en el paso 2 deja un post ya publicado sin imagen. Marcar
+el paso 1 como `publicar` lo hace visible en el informe en vez de salir como
+"anadio la foto".
+
+### Como se responde a "¿que fallo?"
+
+Tres capas, y ninguna es transaccion: si Threads publica y Bluesky falla, el post
+de Threads ya esta visible.
+
+1. **Pre-flight de todas antes de escribir nada** (`lib/social/preparar.ts`).
+2. **Secuencial, parando en el primer fallo.** No `Promise.all`: rechaza en el
+   primer error y **pierde los resultados de las demas**, asi que publicando en
+   cuatro con una rota se creeria que no salio ninguna.
+3. **`no-intentado` como estado de primera clase.** Con dos estados, despues de un
+   fallo no se puede contestar que paso con las siguientes.
+
+Informe en `informes/publicacion-<ts>.json`, que esta en `.gitignore`: es
+historial de salida a internet, no codigo. Hay un test que comprueba que no lleva
+tokens.
+
+### Un fallo que casi se cuela
+
+La primera version de `publicarEnOrden` comprobaba el pre-flight **dentro del
+bucle**. Con Threads listo y Mastodon no, publicaba Threads y luego se paraba:
+justo lo contrario de lo que promete el pre-flight. El test lo caza
+(`publicadas: 0, recibido: 1`). El pre-flight se mira entero y antes de empezar.
+
+### El aviso de imagenes era falso
+
+Threads anadia "las imagenes no se han comprobado: 320-1440 px, JPEG/PNG/WEBP y
+8 MB". Con `preparar()` eso es **mentira**: `lib/social/imagenes.ts` comprueba
+tipo y tamano de verdad. Salian dos avisos diciendo lo mismo y uno mentia. Quitado
+del adaptador; ahora queda solo el que es cierto, el de las dimensiones.
+
+### El token de Threads no se renueva despues de caducar
+
+60 dias, no 90 (ese es el permission grant). Despues hay que volver al panel.
+El script avisa a partir de 14 dias y tiene mensaje propio para cuando ya caduco.
+La antiguedad sale del **mtime** de `.env.local`, no de una variable de fecha:
+esa se queda vieja en cuanto se regenera el token y nadie se acuerda de
+actualizarla. Si no sabe, no dice nada en vez de decir "todo bien".
+
+### Deuda que se cierra de paso
+
+**Dos tests rojos de `deezer-previews`, y no eran tests viejos.** `buildDeezerUpdate`
+usaba `Date.now()` mientras su gemelo `selectDeezerUpdates` recibe `nowMs`: dos
+funciones que deciden lo mismo con relojes distintos, y sin parametro la primera
+**no se puede probar** (el test con `NOW` de junio de 2026 solo pasaba mientras el
+reloj real no hubiera avanzado 30 dias). Ahora recibe `nowMs` con default.
+26/26.
+
+**`detalleApi()` estaba muerto.** Lo escribi en RC.46 y `falloDe` duplico su
+logica inline, mirando solo `error.message`. Un fallo de Bluesky salia como
+"401" a secas, sin el motivo: justo el dato que mas hace falta para diagnosticar.
+Ahora se usa la funcion comun, con test para los cuatro formatos de cuerpo
+(Meta, Bluesky, Mastodon y texto plano).
+
+**`--track` sin probar.** `getTrackById` es `async` y va por Turso. Probado:
+`--track=trk-001` saca titulo y portada, y un id inexistente avisa sin tocar la
+red.
+
+### Estado
+
+Las seis plataformas tienen camino de escritura. Solo **Threads** lo ha probado
+contra la API real (perfil y cuota); su escritura, solo con capa HTTP falsa.
+Facebook, Instagram, Mastodon, Bluesky y LinkedIn **no han publicado nunca**.
+
+`--plataformas` es obligatorio y sin valor por defecto: "publicar en todas las
+configuradas" es un accidente esperando en cuanto se anade una plataforma nueva.
+
+Nada publicado. El primer post real lo lanza una persona con `--publish
+--confirmar`.
+
+Gate: 1802 tests en 91 ficheros, **todos verdes** (los 2 de Deezer incluidos).
+tsc y lint limpios.

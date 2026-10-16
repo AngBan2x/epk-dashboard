@@ -65,7 +65,13 @@ import {
   opcionesThreads,
 } from "../lib/social/config";
 import { preparar, type Preparado } from "../lib/social/preparar";
-import { ErrorApi, type AdaptadorSocial, type Contenido, type Imagen } from "../lib/social/tipos";
+import {
+  ErrorApi,
+  detalleApi,
+  type AdaptadorSocial,
+  type Contenido,
+  type Imagen,
+} from "../lib/social/tipos";
 import type { Plataforma } from "../lib/social/limites";
 import { getTrackById } from "../lib/db";
 
@@ -110,9 +116,12 @@ export interface Informe {
  */
 export function falloDe(plataforma: string, e: unknown): Resultado {
   if (e instanceof ErrorApi) {
-    const detalle = (e.cuerpo !== null && typeof e.cuerpo === "object"
-      ? ((e.cuerpo as Record<string, unknown>)["error"] as { message?: string } | undefined)?.message
-      : undefined) ?? (typeof e.cuerpo === "string" ? e.cuerpo : null);
+    // Se usa `detalleApi()` y no una copia: cada API mete el motivo en un sitio
+    // distinto (`error.message` en Meta, `error` en Bluesky, `message` en
+    // Mastodon). La primera version de esta funcion solo miraba
+    // `error.message`, asi que un fallo de Bluesky salia sin motivo y el informe
+    // decia "500" a secas. Dos copias de la misma tabla divergen.
+    const detalle = detalleApi(e.cuerpo);
     return {
       plataforma: e.plataforma || plataforma,
       estado: "fallo",
@@ -285,8 +294,6 @@ async function contenidoDe(args: { de: string | null; track: string | null }): P
     return {
       titulo: track.title,
       cuerpo: track.artist_name,
-      // La URL suelta, no un `Imagen`: `contenidoDe` devuelve `Contenido`, y
-      // aquí se rellena más abajo.
       imagenes: track.cover_image !== "" ? [{ url: track.cover_image }] : [],
     };
   }

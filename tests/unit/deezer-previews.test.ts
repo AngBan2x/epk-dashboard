@@ -386,7 +386,7 @@ describe("buildDeezerUpdate / selectDeezerUpdates", () => {
     expect(resolution.chosen).not.toBeNull();
     expect(resolution.verified?.httpStatus).toBe(200);
     expect(resolution.reason).toContain("NO escribible");
-    expect(buildDeezerUpdate(resolution)).toBeNull();
+    expect(buildDeezerUpdate(resolution, NOW)).toBeNull();
     expect(selectDeezerUpdates([resolution], NOW)).toHaveLength(0);
   });
 
@@ -397,7 +397,7 @@ describe("buildDeezerUpdate / selectDeezerUpdates", () => {
       async (u) => okProbe(u),
       NOW
     );
-    const update = buildDeezerUpdate(durable);
+    const update = buildDeezerUpdate(durable, NOW);
     expect(update?.audio_preview_url).toBe(LONG_LIVED);
     expect(selectDeezerUpdates([durable], NOW)).toHaveLength(1);
 
@@ -420,7 +420,7 @@ describe("buildDeezerUpdate / selectDeezerUpdates", () => {
       async (u) => okProbe(u),
       NOW
     );
-    const update = buildDeezerUpdate(resolution);
+    const update = buildDeezerUpdate(resolution, NOW);
     expect(update).not.toBeNull();
     // `tracks` no tiene columna `deezer_track_id`, y rellenar la de iTunes con
     // un id de Deezer haría que `lib/downloadable-assets.ts` construyera un
@@ -430,7 +430,7 @@ describe("buildDeezerUpdate / selectDeezerUpdates", () => {
 
   it("una resolución sin elegido no produce actualización", async () => {
     const resolution = await resolveDeezerPreview(wanted(), [], async () => okProbe("x"), NOW);
-    expect(buildDeezerUpdate(resolution)).toBeNull();
+    expect(buildDeezerUpdate(resolution, NOW)).toBeNull();
     expect(selectDeezerUpdates([resolution], NOW)).toHaveLength(0);
   });
 });

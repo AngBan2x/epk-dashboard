@@ -147,6 +147,44 @@ describe("falloDe: un fallo de API conserva su paso", () => {
     const r = falloDe("x", new Error("a".repeat(5000)));
     expect(r.error!.length).toBeLessThanOrEqual(400);
   });
+
+  it("el motivo sale de donde lo ponga CADA plataforma", () => {
+    // Cada API mete el mensaje en un sitio: Meta en `error.message`, Bluesky en
+    // `error` a pelo, Mastodon en `message`. La primera version de `falloDe` solo
+    // miraba `error.message`, asi que un fallo de Bluesky salia como "401" a
+    // secas, sin decir por que. Y sin el motivo, "que fallo?" queda sin
+    // responder justo en el fallo que mas lo necesita.
+    const bluesky = falloDe(
+      "bluesky",
+      new ErrorApi("x", "bluesky", "sesion", 401, { error: "AuthenticationRequired" })
+    );
+    expect(bluesky.error).toContain("AuthenticationRequired");
+
+    const meta = falloDe(
+      "threads",
+      new ErrorApi("x", "threads", "publicar", 429, {
+        error: { message: "Rate limit exceeded", type: "OAuthException" },
+      })
+    );
+    expect(meta.error).toContain("Rate limit exceeded");
+
+    const mastodon = falloDe(
+      "mastodon",
+      new ErrorApi("x", "mastodon", "publicar", 422, { error: "Validation failed" })
+    );
+    expect(mastodon.error).toContain("Validation failed");
+
+    const azul = falloDe("x", new ErrorApi("x", "threads", "publicar", 500, "Internal Server Error"));
+    expect(azul.error).toContain("Internal Server Error");
+  });
+
+  it("un cuerpo que no dice nada no inventa un motivo", () => {
+    const r = falloDe("x", new ErrorApi("x", "threads", "publicar", 500, {}));
+    // Sale el status y el mensaje propio, y nada inventado entre medias.
+    expect(r.error).toContain("500");
+    expect(r.error).not.toContain("undefined");
+    expect(r.error).not.toContain("null");
+  });
 });
 
 describe("publicarEnOrden: la pregunta que responde el script", () => {
@@ -322,8 +360,39 @@ describe("preparar: la mitad que se puede repetir sin miedo", () => {
     const a = adaptadorFalso("threads", async () => ({ id: null, url: null }));
     const p = await preparar(a, CONTENIDO, httpSinRed);
 
-    // `httpSinRed` lanza. Si se llamara, el test fallaria aqui.
+    // `httpSinRed` rechaza. Si se llamara, el test fallaria aqui.
     expect(p.imagenes).toEqual([]);
     expect(p.listo).toBe(true);
+  });
+
+  it("con una imagen buena: UN aviso, y solo sobre las dimensiones", async () => {
+    // Threads arrivaba con dos avisos sobre lo mismo, y uno de ellos MENTIA:
+    // decia que el formato y el tamano no se habian comprobado, cuando
+    // `comprobarImagenes` los comprueba de verdad. Un informe que dice "no se
+    // ha comprobado el formato" junto a una comprobacion que si lo hizo hace
+    // que se dejen de leer los dos.
+    // `content-length` presente a proposito: es lo que hace un CDN real (el de
+    // iTunes lo manda), y asi queda **un** aviso. Sin el, sale ademas "la imagen
+    // no declara tamaño", que tambien menciona los 8 MB pero por otra causa.
+    const http = (async () =>
+      new Response(null, {
+        status: 200,
+        headers: { "content-type": "image/jpeg", "content-length": "89063" },
+      })) as never;
+
+    const p = await preparar(
+      adaptadorFalso("threads", async () => ({ id: null, url: null })),
+      { titulo: "", cuerpo: "hola", imagenes: [{ url: "https://cdn.example.com/a.jpg" }] },
+      http
+    );
+
+    expect(p.listo).toBe(true);
+    expect(p.imagenes[0].ok).toBe(true);
+    // Exactamente uno, y sobre lo que de verdad no se puede saber.
+    expect(p.avisos).toHaveLength(1);
+    expect(p.avisos[0]).toContain("dimensiones");
+    // Y el tipo y el tamano SI se han comprobado: nada puede afirmar lo contrario.
+    expect(p.avisos.join(" ")).not.toContain("JPEG");
+    expect(p.avisos.join(" ")).not.toContain("8 MB");
   });
 });
