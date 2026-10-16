@@ -39,6 +39,9 @@ import {
   opcionesLinkedin,
   opcionesMastodon,
   opcionesThreads,
+} from "@/lib/social/config";
+import { abrirSesion } from "@/lib/social/bluesky";
+import {
 } from "../lib/social/config";
 
 type Resultado = { ok: boolean; detalle: string };
@@ -110,27 +113,20 @@ async function comprobarMastodon(): Promise<Resultado> {
 }
 
 async function comprobarBluesky(): Promise<Resultado> {
-  const op = opcionesBluesky(REAL_FETCH);
-  if (!op.ok) return { ok: false, detalle: `faltan variables: ${op.faltan.join(", ")}` };
+    const op = opcionesBluesky(REAL_FETCH);
+    if (!op.ok) return { ok: false, detalle: `faltan variables: ${op.faltan.join(", ")}` };
 
-  // `resolve` es publico: no necesita token, asi que **no** prueba nada. Se usa
-  // `describe` con sesion propia, que si exige uno.
-  const r = await REAL_FETCH(`${op.valor.pds}/xrpc/app.bsky.actor.getProfile`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${op.valor.password}`,
-    },
-    body: JSON.stringify({ actor: op.valor.repo }),
-  });
-  const cuerpo = await leerJson(r);
+    // Se usa `abrirSesion()` y no una llamada propia a `getProfile`.
+    //
+    // La version anterior mandaba **el app password como bearer** y por eso daba
+    // `HTTP 400` siempre, con unas credenciales perfectamente buenas: un app
+    // password autentica en `createSession`, y lo que autoriza despues es el
+    // `accessJwt` que esa llamada devuelve. Un `400` sin mensaje se lee como
+    // "credenciales malas", que es justo la conclusion equivocada.
+    const sesion = await abrirSesion(op.valor);
 
-  if (!r.ok) {
-    const msg = (cuerpo as { error?: { message?: string } })?.error?.message ?? "";
-    return { ok: false, detalle: `HTTP ${r.status}: ${msg.slice(0, 80)}` };
+    return { ok: true, detalle: `resuelve @${sesion.handle ?? op.valor.repo}` };
   }
-  return { ok: true, detalle: `resuelve @${String((cuerpo as { handle?: string }).handle)}` };
-}
 
 async function comprobarThreads(): Promise<Resultado> {
   const op = opcionesThreads(REAL_FETCH);

@@ -31,7 +31,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { crearAdaptador as crearBluesky } from "@/lib/social/bluesky";
+import { abrirSesion, crearAdaptador as crearBluesky } from "@/lib/social/bluesky";
 import { crearAdaptador as crearThreads } from "@/lib/social/threads";
 import { crearAdaptador as crearInstagram } from "@/lib/social/instagram";
 import { crearAdaptador as crearFacebook } from "@/lib/social/facebook";
@@ -185,6 +185,63 @@ describe("Facebook: endpoint distinto según haya imagen o no", () => {
     const { http } = capa([{ id: "PHOTO_9", post_id: "POST_9" }]);
     const r = await crearFacebook({ ...opciones, http }).publicar(pub("x", [IMG]));
     expect(r.id).toBe("POST_9");
+  });
+});
+
+describe("Bluesky: abrirSesion es lo unico que prueba las credenciales", () => {
+  const opciones = {
+    pds: "https://pds.example",
+    identifier: "cuenta",
+    password: "app-password",
+    repo: "did:plc:x",
+  };
+
+  it("el app password solo sirve para autenticarse, no como bearer", async () => {
+    // Este es el bug que hacia que el script de comprobacion dijera
+    // "HTTP 400, credenciales malas" con unas credenciales **buenas**.
+    //
+    // Un app password se usa en `createSession`. Lo que autoriza las llamadas
+    // despues es el `accessJwt` que esa llamada devuelve. Mandar el app password
+    // como `Authorization: Bearer` no puede funcionar nunca, y el 400 que sale
+    // no dice por que: se lee como "esta mal" cuando esta bien.
+    const http = (async (url: string) => {
+      if (url.includes("createSession")) {
+        return new Response(
+          JSON.stringify({ accessJwt: "jwt-real", handle: "prueba.bsky.social", did: "did:plc:x" }),
+          { headers: { "content-type": "application/json" } }
+        );
+      }
+      throw new Error(`no deberia llegar a ${url}`);
+    }) as unknown as CapaHttp;
+
+    const s = await abrirSesion({ ...opciones, http });
+
+    expect(s.accessJwt).toBe("jwt-real");
+    expect(s.handle).toBe("prueba.bsky.social");
+    // Y lo que sale en el informe es la cuenta, no un error sin explicar.
+    expect(`@${s.handle}`).toBe("@prueba.bsky.social");
+  });
+
+  it("el bearer es el accessJwt, no el app password", async () => {
+    // Se comprueba en la llamada de verdad: si el bearer fuera el app password,
+    // este test veria la cadena equivocada autorizando una peticion.
+    let bearer: string | null = null;
+    const http = (async (url: string, init?: RequestInit) => {
+      if (url.includes("createSession")) {
+        return new Response(JSON.stringify({ accessJwt: "jwt-real", handle: "h" }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      bearer = (init?.headers as Record<string, string>)?.["Authorization"] ?? null;
+      return new Response(JSON.stringify({ uri: "at://x", cid: "c" }), {
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as CapaHttp;
+
+    await crearBluesky({ ...opciones, http }).publicar(pub("Hola"));
+
+    expect(bearer).toBe("Bearer jwt-real");
+    expect(bearer).not.toContain("app-password");
   });
 });
 

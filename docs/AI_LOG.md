@@ -628,3 +628,54 @@ Nada publicado. El primer post real lo lanza una persona con `--publish
 
 Gate: 1802 tests en 91 ficheros, **todos verdes** (los 2 de Deezer incluidos).
 tsc y lint limpios.
+
+### Bluesky cierra: 5 de 6, y el que fallaba no era la cuenta
+
+Faltaban `BLUESKY_PDS` y `BLUESKY_REPO`. Puestas, el smoke dio **`HTTP 400`** y
+parecia que las credenciales estaban mal. No lo estaban: **el script de
+comprobacion estaba mal.**
+
+Mandaba **el app password como `Authorization: Bearer`** en un `getProfile`. Eso no
+puede funcionar nunca:
+
+- un **app password** sirve para autenticarse en `com.atproto.server.createSession`;
+- lo que autoriza las llamadas despues es el **`accessJwt`** que esa llamada
+  devuelve.
+
+Son dos cosas distintas. El `400` no decia por que, asi que se leia como
+"credenciales malas" con la cuenta perfectamente bien.
+
+Lo que hacia que el error fuera tan dificil de leer es que el comentario del
+propio script decia *"se usa `describe` con sesion propia, que si exige uno"*.
+Ese `describe` **no existia**: era una referencia a una funcion inexistente, que
+es peor que no tenerla porque quien la lee la da por cierta.
+
+Arreglado en dos piezas:
+
+- `abrirSesion()` exportada en `lib/social/bluesky.ts`. `crearSesion()` ya hacia
+  exactamente lo correcto; era privada.
+- `comprobarBluesky()` usa esa funcion en vez de su propia llamada.
+
+Hay dos tests que atan el bug: uno que comprueba que sale el `accessJwt`, y otro
+que mira el `Authorization: Bearer` de la llamada de verdad y verifica que **no**
+contiene el app password.
+
+**Estado: 5 de 6 funcionan contra la API real.**
+
+```
+[FUNCIONA]  Facebook   lee la Page "PressPlay"
+[FUNCIONA]  Instagram  @pressplayepk
+[FUNCIONA]  Mastodon   @pressplay_epk
+[FUNCIONA]  Bluesky    resuelve @pressplay-epk.bsky.social
+[FUNCIONA]  Threads    @pressplayepk
+[SIN CONFIGURAR]  LinkedIn
+```
+
+### La leccion, que es la misma de siempre
+
+Cuando un chequeo falla, la primera pregunta no es "estan mal las credenciales",
+es **"esta bien el chequeo"**. Un `400` sin mensaje no distingue entre las dos
+cosas, y por eso la respuesta obvia ("las credenciales estan mal") es la que mas
+probabilidad tiene de estar equivocada.
+
+Gate: 1804 tests en 91 ficheros, todos verdes. tsc y lint limpios.

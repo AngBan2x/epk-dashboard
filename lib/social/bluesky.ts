@@ -273,6 +273,30 @@ interface Sesion {
   readonly handle: string | null;
 }
 
+/**
+ * Abre sesión en el PDS y devuelve el `accessJwt`.
+ *
+ * ## Por qué es `export` y no un detalle interno
+ *
+ * Porque es la **única** forma de comprobar que unas credenciales de Bluesky
+ * sirven, y durante meses el script de comprobación se saltó esta función y se
+ * hizo su propia llamada a `getProfile` mandando **el app password como bearer**.
+ *
+ * Eso no puede funcionar nunca: un app password sirve para autenticarse en
+ * `createSession`, y lo que autoriza las llamadas después es el `accessJwt` que
+ * esa llamada devuelve. Son dos cosas distintas y el error sale como un `400`
+ * sin explicación, que se lee como "credenciales malas" cuando están bien.
+ *
+ * ## Lo que devuelve
+ *
+ * El `handle` a pelo, para que el informe diga a qué cuenta pertenece. La API
+ * `getProfile` sí lo devolvería, pero llegar hasta ella exige esta sesión antes:
+ * sin ella no hay forma honesta de preguntar.
+ */
+export async function abrirSesion(o: OpcionesBluesky): Promise<Sesion> {
+  return crearSesion(o);
+}
+
 async function crearSesion(o: OpcionesBluesky): Promise<Sesion> {
   const registro = comoRegistro(
     await exigirOk(
