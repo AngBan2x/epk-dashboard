@@ -189,6 +189,60 @@ El aviso al admin es **best-effort**: se escribe primero y se avisa después. Un
 de Resend no puede llevarse por delante el mensaje de alguien que solo quería
 reportar un problema.
 
+### P14 - publicar solo lo puede hacer un agente designado, y el deny no es una caja fuerte
+
+`scripts/social-publish.ts` publica en las cinco plataformas reales y lee tokens de
+`.env.local`. El único agente que podía tocarlo antes era `social-drafter`, con un
+`bash: deny` suyo. Los demás podían ejecutarlo, y `--confirmar` **no distingue a una
+persona de un agente**: cualquiera con bash pone el flag.
+
+**El deny global, por sí solo, no protege a nadie.** Es la parte que parece obvia y
+no lo es: en opencode `"bash": "allow"` se normaliza a `{ "*": "allow" }`, las reglas
+de nivel de agente se **añaden después** de las globales, y **gana la última regla que
+coincide**. Ese `"*": "allow"` aterriza encima del deny global y lo anula. Seis
+agentes (`orchestrator`, `playwright-tester`, `api-tester`, `db-migrator`,
+`vercel-deployer`, `doc-writer`) quedaron igual de expuestos que antes: el deny
+existía, se veía en `opencode debug config`, y no hacía nada.
+
+Por eso los `deny` van **dentro** del bloque de cada uno, no solo en el raíz. La
+comprobación correcta es si la **última coincidencia** es `deny`, no si existe un
+`deny`: un guard que solo mira existencia no detecta el orden, que es el bug.
+
+**El deny es por subcadena, la ruta no vale.** Las formas de escribir una ruta son
+infinitas (`./`, sin extensión, absoluta, `npm exec`, `pnpm dlx`,
+`node_modules/.bin/tsx`). Una sola regla lo cubre:
+`"*social-publish.ts*": "deny"`. Y no se come los tests, porque
+`social-publish.test.ts` no casa con `social-publish.ts` — el `.test` va en medio.
+
+La asimetría es intencionada y no la "corrijas": el deny del público es **ancho**, y
+el allow de `social-publisher` es **por ruta**, para que su superficie sea el comando
+documentado y nada más. `social-publisher` no tiene `edit`, `write` ni `task`: no
+publica, solo redacta, y no puede tocar el código ni delegar.
+
+**R-1b: un `./` inicial esquiva cualquier permiso de bash de opencode.** No solo los
+nuestros: también el `deny` total de `social-drafter`. Medido en sandbox,
+`zz social-publish.ts` queda bloqueado y `./zz social-publish.ts` pasa. Es una
+limitación de la plataforma, **sin arreglo por configuración**. En Windows la
+exposición práctica es baja (ahí está el `.cmd`); en POSIX resuelve y ejecuta.
+
+De ahí lo que hay que leer en este bloque: **un `bash: deny` es un guardarraíl contra
+accidentes, no una caja fuerte.** Quien tenga bash, el código y `.env.local` a mano
+puede publicar si se propone. El control real es de diseño — un único agente
+designado, sin `edit`/`write`/`task`, que solo publica ante petición explícita de una
+persona — y por eso está aquí escrito, para que nadie lo lea como una garantía que
+sea.
+
+**R-1a**: la invocación sin extensión (`npx tsx scripts/social-publish`) sigue
+escapando. Va con `it.fails` a propósito: el día que alguien la cierre, ese test
+avisa de que la tabla de `docs/PHASE_P13.md` quedó vieja, en vez de ponerse rojo sin
+explicación.
+
+El guard es `tests/unit/social-publish-permisos.test.ts` (14 tests), verificado por
+mutación de `opencode.json`: 11 variantes, todas rojas. Dos se encontraron
+mutando —el arnés de mutación restauraba el fichero antes de que Vitest lo leyera, y
+el guard no detectaba ampliar el patrón— y ambas eran del lado de la comprobación.
+Un guard que no puede fallar no vigila nada.
+
 ## Reglas de Delegación (CRÍTICO)
 
 Cuando el usuario reporte un bug o pida un fix:
@@ -199,9 +253,15 @@ Cuando el usuario reporte un bug o pida un fix:
 4. **Siempre en paralelo**: Usar `task()` con múltiples subagentes cuando los fixes son independientes
 5. **NUNCA** hacer fixes directos sin considerar si un subagente es más adecuado
 
-## Subagentes Disponibles (29)
+## Subagentes Disponibles (31)
 
 > **Configuración centralizada en `opencode.json`** — Los markdown files en `.opencode/agents/` son referencia de documentación.
+
+⚠️ **Un agente nuevo no es invocable por `task()` en la sesión que lo creó.** Pasó
+el 2026-10-17 con `social-publisher`: el `.md` y su bloque en `opencode.json` estaban
+correctos y `opencode agent list` lo veía, pero `task()` devolvía
+`Unknown agent type`. La sesión cachea la lista de agentes al arrancar. **Hay que
+reiniciar la sesión**; no es un error de configuración y no se arregla editando JSON.
 
 ### Modelos Utilizados
 
@@ -283,12 +343,13 @@ Por eso partir el trabajo en subagentes no es estilo: es lo que hace que esto ag
 | `release-form-builder` | space-bunny-free | Formularios releases |
 | `artist-dashboard-builder` | mimo-v2.6-flash-free | Dashboard artista |
 
-### QA & Security (3)
+### QA & Security (4)
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
 | `quality-auditor` | space-bunny-free | Tests E2E |
 | `visual-tester` | muse-spark-1.3 | Screenshots/DOM |
 | `security-auditor` | space-bunny-free | Seguridad |
+| **`social-publisher`** | space-bunny-free | **El único que publica**, y solo por petición explícita. Sin `edit`/`write`/`task` |
 
 ### DevOps & Docs (3)
 | Subagente | Modelo | Uso |
@@ -487,6 +548,7 @@ built-in `webfetch`.
 5. Mismas pruebas en **producción** (matriz + funcional + headed + screenshots); corregir y **reiterar hasta que todo pase**
 6. Documentar lo hecho, lo corregido y resultados finales (`docs/AI_LOG.md` + doc de fase)
 7. Crear release si es fase completa
+8. **Publicación social, si toca** — y es el **último** paso, siempre. Va por el subagente `social-publisher`, nunca desde el agente principal ni desde una API en Vercel, y **solo** ante petición explícita de la persona en la conversación: `--confirmar` no es la puerta, es una comprobación. Antes de `--publish` siempre el modo preview, que redacta y valida sin escribir en ninguna plataforma; si el preview falla, no se publica, porque un post a medias es peor que no publicar. Detalle y límites en **P14**.
 
 ## Convenciones
 
