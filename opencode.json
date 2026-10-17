@@ -53,6 +53,10 @@
     },
     "task": {
       "*": "allow"
+    },
+    "bash": {
+      "*": "allow",
+      "*social-publish.ts*": "deny"
     }
   },
   "agent": {
@@ -66,7 +70,10 @@
       "model": "opencode/space-bunny-free",
       "permission": {
         "task": { "*": "allow" },
-        "bash": { "*": "allow" },
+        "bash": {
+          "*": "allow",
+          "*social-publish.ts*": "deny"
+        },
         "edit": { "*": "allow" },
         "read": { "*": "allow" },
         "glob": { "*": "allow" },
@@ -262,7 +269,10 @@
       "mode": "subagent",
       "model": "opencode/space-bunny-free",
       "permission": {
-        "bash": "allow",
+        "bash": {
+          "*": "allow",
+          "*social-publish.ts*": "deny"
+        },
         "edit": "allow"
       }
     },
@@ -271,7 +281,10 @@
       "mode": "subagent",
       "model": "opencode/space-bunny-free",
       "permission": {
-        "bash": "allow",
+        "bash": {
+          "*": "allow",
+          "*social-publish.ts*": "deny"
+        },
         "edit": "allow"
       }
     },
@@ -280,7 +293,10 @@
       "mode": "subagent",
       "model": "opencode/space-bunny-free",
       "permission": {
-        "bash": "allow",
+        "bash": {
+          "*": "allow",
+          "*social-publish.ts*": "deny"
+        },
         "edit": "allow"
       }
     },
@@ -289,7 +305,10 @@
       "mode": "subagent",
       "model": "opencode/muse-spark-1.3",
       "permission": {
-        "bash": "allow",
+        "bash": {
+          "*": "allow",
+          "*social-publish.ts*": "deny"
+        },
         "edit": "allow"
       }
     },
@@ -298,7 +317,10 @@
       "mode": "subagent",
       "model": "opencode/muse-spark-1.3",
       "permission": {
-        "bash": "allow",
+        "bash": {
+          "*": "allow",
+          "*social-publish.ts*": "deny"
+        },
         "edit": "allow"
       }
     },
@@ -312,6 +334,20 @@
         "write": { "*": "deny" },
         "webfetch": "deny",
         "websearch": "deny",
+        "task": "deny"
+      }
+    },
+    "social-publisher": {
+      "description": "Ejecuta scripts/social-publish.ts. SIEMPRE en preview primero; publica solo si una persona lo pide de forma explicita en la conversacion.",
+      "mode": "subagent",
+      "model": "opencode/space-bunny-free",
+      "permission": {
+        "bash": {
+          "*": "deny",
+          "npx tsx scripts/social-publish.ts*": "allow"
+        },
+        "edit": "deny",
+        "write": "deny",
         "task": "deny"
       }
     }

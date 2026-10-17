@@ -8,6 +8,15 @@ permission:
     "*": "allow"
   bash:
     "*": "allow"
+    # El deny global de `opencode.json` NO protege a este agente: las reglas de
+    # agente se anaden despues de las globales y gana la ultima que coincide, asi
+    # que este `"*": "allow"` se comeria el deny. Por eso el deny va aqui, y va
+    # DESPUES. Ademas es POR NOMBRE DE FICHERO y no por ruta: el emparejamiento es
+    # de subcadena con `*`, asi que cierra `./scripts/…`, `npm exec …`, `pnpm dlx …`,
+    # la ruta absoluta y el `\`. El `.ts` va dentro para no comerse el vitest de
+    # `social-publish.test.ts`. Publicar lo decide `social-publisher`, no el
+    # orquestador. Ver social-publish-permisos.test.ts
+    "*social-publish.ts*": "deny"
   edit:
     "*": "allow"
   read:

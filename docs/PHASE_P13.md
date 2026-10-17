@@ -539,7 +539,7 @@ Comprobado en `.env.local` y **los cuatro valores son distintos entre si**:
 la forma que tiene Threads.
 
 Y `graph.threads.net` es otro dominio. Dos hosts distintos significan dos rutas de
-OAuth distintas, y por eso el `grant_type` del intercambio tambien es distinto:
+OAuth distintas, y por eso el `grant_type` del intercambio también es distinto:
 
 | | Facebook | Threads |
 |---|---|---|
@@ -810,7 +810,7 @@ developers.facebook.com/apps/1654721962854119/business-login/settings/?business_
 
 Es `/business-login/settings/`: **Facebook Login for Business**, que es un panel
 distinto del ajuste de OAuth de la app. Threads no es Facebook Login, asi que es
-plausible que lea otra lista. Y el rol lo muestra tambien la app:
+plausible que lea otra lista. Y el rol lo muestra también la app:
 
 > "Cuenta de Meta Business Suite: PressPlay EPK administra esta aplicacion."
 
@@ -900,7 +900,7 @@ De la documentacion del API:
 > "We download media used in publishing attempts so **the media must be hosted on
 > a publicly accessible server** at the time of the attempt."
 
-Y `threads_publish` pide `media_id`. O sea: **un post de solo texto tambien
+Y `threads_publish` pide `media_id`. O sea: **un post de solo texto también
 necesita imagen** — tipicamente un PNG transparente de 1x1 — porque el
 contenedor se crea siempre contra una URL. Meta **descarga** el fichero en el
 momento del intento: una URL que solo responde autenticada, o que cambia, deja
@@ -933,7 +933,7 @@ deja la publicacion **a medias**. Y una publicacion a medias ya la ve gente.
 Por eso la comprobacion va en el `preview()`, que es gratis y repetible, y no en
 el `publicar()`, que no lo es.
 
-### `problema` y `aviso` no sondecorators, son la decision
+### `problema` y `aviso` no sondecorators, son la decisión
 
 - `problema` -> **bloquea**. No depende de la red, asi que reintentar no lo arregla:
   `http://` en vez de `https://`, localhost, un HTML en vez de una imagen, 9 MB.
@@ -1161,3 +1161,130 @@ lo que hacen los subagentes: el contexto de uno es independiente del del agente 
 lo delega.
 
 Gate: 1805 tests en 91 ficheros, todos verdes. tsc y lint limpios.
+
+
+---
+
+## Deuda R-1 · Que cierra y que no cierra el permiso de bash
+
+**Medido el 2026-10-17. Corregido a medias, y el resto escrito con su nombre.**
+
+### Que se pretendia y que setiene
+
+Que `scripts/social-publish.ts` solo se pudiera ejecutar desde el agente
+`social-publisher`. Hoy lo cumple **casi todo**, y lo casi todo se midio, no se supuso.
+
+El patron final, en `opencode.json` raiz **y** en los seis agentes que traen
+`"bash": "allow"` explicito (`orchestrator`, `playwright-tester`, `api-tester`,
+`db-migrator`, `vercel-deployer`, `doc-writer`):
+
+```
+"*social-publish.ts*": "deny"
+```
+
+**Por que por nombre de fichero y no por ruta.** El emparejamiento de opencode es de
+cadena entera con `*` como cero-o-mas-caracteres, y `*` **cruza `/`**. O sea que
+un patron de ruta deja abiertas todas las formas de nombrar la misma ruta, y se
+terminaba enumerando variantes para siempre. Casa por el nombre, y se acabo la
+enumeracion.
+
+**Por que el `.ts` va DENTRO del patron.** Detras de `social-publish` viene `.test.ts`
+en los dos ficheros de test del repo, no `.ts`. Con el `.ts` dentro, el deny no toca
+`tests/unit/social-publish.test.ts` ni `tests/unit/social-publish-permisos.test.ts`.
+Eso no es estetico: ampliar el patron a `*social-publish*` **rompe el suite**, y hay
+un test que lo avisa antes de que se entere el siguiente `vitest run`.
+
+**Por que el deny va despues del `*`.** Las reglas de un bloque van en orden y gana
+la ultima que coincide. El deny global esta despues del allow global, y en los seis
+agentes el deny esta despues de su propio `*`: allow. Mismo mecanismo en los dos
+sitios.
+
+### Lo que cierra, medido en un sandbox con el bloque real
+
+| Invocacion | Antes (patron de ruta) | Ahora |
+|---|---|---|
+| `npx tsx scripts/social-publish.ts` | deny | **deny** |
+| `node --import tsx scripts/social-publish.ts` | deny | **deny** |
+| `npx tsx ./scripts/social-publish.ts` | **allow** | **deny** |
+| `npx tsx scripts\social-publish.ts` | deny | **deny** |
+| `npm exec tsx scripts/social-publish.ts` | **allow** | **deny** |
+| `pnpm dlx tsx scripts/social-publish.ts` | **allow** | **deny** |
+| `node_modules/.bin/tsx scripts/social-publish.ts` | **allow** | **deny** |
+| ruta absoluta `/…/scripts/social-publish.ts` | **allow** | **deny** |
+| ruta con `/` en el prefijo, `foo/bar/baz scripts/social-publish.ts` | allow | **deny** |
+
+Las cuatro filas en `allow` de la columna "antes" se ejecutaron de verdad en el
+sandbox: el stub imprimio su marca.
+
+### Lo que NO cierra, y tiene nombre
+
+#### R-1a · la forma sin extension
+
+`npx tsx scripts/social-publish` (sin `.ts`). Ejecuta: el stub lo confirma.
+
+Se cierra con **una linea mas**: `"*social-publish": "deny"` al lado de la otra. No
+rompe los tests, porque `*social-publish` esta anclado al final y
+`social-publish.test.ts` no termina en `social-publish`. **No se ha aplicado**: es un
+cambio de configuracion y este documento no es el sitio para tomarlo solo.
+
+Estahay una alarma puesta: el guard tiene un `it.fails` que **afirma que esta fuga
+sigue abierta**. El dia que alguien la cierre, ese test se pondra en rojo, que es
+justo el aviso de que esta tabla se ha quedado vieja. Sin el, la nota se
+envejeceria en silencio, que es como mueren estas cosas.
+
+#### R-1b · un `./` al principio del comando esquiva la comprobacion entera
+
+Este **no lo arregla ningun patron**, porque no es un problema del patron: es que la
+regla no se consulta.
+
+Medido en el sandbox, con el bloque de permisos real:
+
+| Comando | Gate |
+|---|---|
+| `zz social-publish.ts` | **deny** |
+| `qq ./zz social-publish.ts` | **deny** |
+| `./zz social-publish.ts` | **no comprobado** |
+| `./zz qq social-publish.ts` | **no comprobado** |
+
+O sea: un `./` inicial saca el comando del chequeo. Y como el comando ni se ejecuta,
+el deny es irrelevante.
+
+**El alcance es mayor que este script.** El agente del sandbox tenia su propio deny de
+bash, y ese deny tbien se salto. O sea que **cualquier** permiso de bash de opencode
+tiene esta via, incluido el `bash: deny` de `social-drafter`. No es una decisión de
+este repo: es como funciona el motor.
+
+En Windows la exposicion practica es baja: `./node_modules/.bin/tsx` no resuelve
+(`tsx.cmd` es lo que hay), asi que el comando pasa al shell y muere ahi. En POSIX
+`./node_modules/.bin/tsx` **si** resuelve, y entonces ejecuta.
+
+Cerrarlo requiere que el motor no tenga ese hueco. **No hay patron que lo arregle.**
+
+### Lo que NO hay, y se comprobo
+
+- **No hay wrapper.** Ningun fichero de `scripts/` importa, invoca ni llama a
+  `social-publish.ts`. La unica referencia es el guard de la linea 499,
+  `process.argv[1].includes("social-publish")`, que existe para que
+  `tests/unit/social-publish.test.ts` pueda importar el modulo sin correr `main()`.
+- **No hay alias en `package.json`.** Los cuatro `db:seed*` usan `tsx` a pelo, pero
+  ninguno llama a `social-publish`.
+- **No hay otra ruta al token.** `.env.local` solo lo lee el propio script.
+
+### Que ata `tests/unit/social-publish-permisos.test.ts`
+
+Ata lo que si es decidible por configuracion: que el orden de las reglas deje al
+publicador como unico con `allow`; que los seis agentes con bash traigan el deny
+**despues** de su `*`; que el deny global siga tras el allow global; que el patron
+lleve el `.ts` dentro; y que ningun deny especifico se coma los comandos de test.
+
+**No ata la superficie**, y el propio fichero lo dice en su cabecera. Y con mas
+motivo despues de R-1b: su `coincide()` modela el motor como `*` = "cualquier
+caracter, `/` incluido", que es lo que el motor hace **salvo cuando el comando
+empieza por `./`**. Ese caso no se puede escribir en el test porque no hay
+configuracion que lo cambie, y un test que lo afirmara estaria rojo para siempre
+sin que nadie pudiera arreglarlo.
+
+Lo que cierra esto de verdad no es configuracion: es que el token no este al alcance
+de un agente que pueda saltarse un permiso. Cuesta, porque el publicador necesita el
+token y "sin token" y "el agente publica" son incompatibles. Es una decisión de la
+persona, no una ola de trabajo.

@@ -92,6 +92,7 @@ const NATURALEZA = new Set([
   "override-compaction.test.ts",     // mide opencode.json y AGENTS.md: tampoco se importan
   "capturas-social.test.ts",         // mide JPEG en disco: una imagen no se importa
   "social-drafter-limites.test.ts", // mide opencode.json y un .md de agente
+  "social-publish-permisos.test.ts", // mide opencode.json y dos .md de agente
 ]);
 
 const CON_GEMELO = new Set([
