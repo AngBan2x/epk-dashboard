@@ -271,8 +271,8 @@ reiniciar la sesión**; no es un error de configuración y no se arregla editand
 
 | Modelo | Contexto | Input | Cantidad | Uso principal |
 |--------|----------|-------|----------|---------------|
-| `opencode/space-bunny-free` | 1M | text, image, video | 18 | Orquestación, reasoning, APIs, DB, auth, security, testing, y el agente interno `compaction` |
-| `opencode/mimo-v2.6-flash-free` | 200K | text, image, audio, video | 8 | Builders UI, y `small_model` para títulos |
+| `opencode/space-bunny-free` | 1M | text, image, video | 18 | Orquestación, reasoning, APIs, DB, auth, security, testing, `small_model` para títulos y tareas cortas, y el agente interno `compaction` |
+| `opencode/mimo-v2.6-flash-free` | 200K | text, image, audio, video | 8 | Builders UI (ya no es `small_model`) |
 | `opencode/muse-spark-1.3` | 1M | text, image, video, pdf, audio | 4 | `visual-tester` (ver screenshots), deploy, releases y documentación |
 
 **Los 3 aceptan imágenes**, así que `visual-tester` ya no necesita el modelo vision de Nemotron. `opencode/nemotron-3-ultra-free` además era **solo texto** (sin imagen), por lo que nunca servía para análisis visual.
