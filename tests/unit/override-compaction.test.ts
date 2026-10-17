@@ -1,32 +1,51 @@
 /**
- * El arreglo de compactación, atado a un test.
+ * La compactación de `space-bunny-free`, y por qué **no** tiene arreglo por config.
  *
  * ## Qué pasó
  *
  * La compactación automática saltaba al ~50 % del contexto con
- * `space-bunny-free`, y el motivo no era la ventana. El modelo declara
- * `limit.output = 524288`: **exactamente la mitad** de sus 1.048.576 de
- * contexto. Si la salida máxima se descuenta del presupuesto de entrada, de
- * 1M solo quedan ~524K utilizables, y `reserved: 20000` —un 2 %— es ruido a
- * esa escala.
+ * `space-bunny-free`. Durante meses se creyó que la causa era que el modelo declara
+ * `limit.output = 524288` —exactamente la mitad de sus 1.048.576 de contexto— y
+ * que se podía bajar ese número desde `opencode.json`.
  *
- * `muse-spark-1.3` comparte los mismos 1M y llega al 87,5 % porque declara
- * `131072` de salida. La ventana no es el problema; la reserva sí.
+ * **No se podía.** Se midió el 2026-10-16 y aquí está la cuenta.
  *
- * ## Por qué este test existe
+ * ## El experimento, y por qué con mimo y no con space-bunny
  *
- * El arreglo es **una línea en un JSON que nadie abre**. Es exactamente el tipo
- * de cosa que sobrevive a un `git checkout`, a un revert de `opencode.json`, o a
- * que alguien lo quite "porque sobra". El síntoma sería la compactación al
- * 50 %, que no rompe nada: solo cuesta caro, y de forma intermitente, lo cual
- * hace que nadie lo relacione con una línea de configuración de tres meses antes.
+ * Probarlo con el modelo de 1M exigiría llenar medio millón de tokens: caro y
+ * lento. Pero la pregunta es si el runtime **lee** el override, y eso se responde
+ * con un modelo de 200K donde el efecto es brutal:
  *
- * ## Lo que este test NO afirma
+ * - Contexto 200.000, salida real 32.000 → ventana útil **168.000** (84 %).
+ * - Se puso `limit.output = 190000` en `opencode.json` → ventana **10.000** (5 %).
  *
- * No comprueba que la compactación ocurra al 95 %. Eso requiere ejecutar una
- * sesión real hasta llenarla, y ningún test unitario va a pagar ese coste. Lo
- * que ata es **la configuración**, que es lo que se puede degradar en silencio.
- * La comprobación empírica queda a mano y se anota en `docs/PHASE_P13.md`.
+ * Se Lanzó una sesión con `opencode run -m opencode/mimo-v2.6-flash-free
+ * --format json` y se leyeron los `cache_read` de los eventos `step_finish`.
+ *
+ * | | `cache_read` observado | ventana si el override se honra |
+ * |---|---|---|
+ * | Resultado | **180.800** | 10.000 — imposible |
+ *
+ * **El runtime no aplica `provider.*.models.*.*.limit.output`.** Dos indicios de
+ * por qué no podía: el schema marca `provider` como `deprecated: true`, y la
+ * documentación de opencode solo explica `provider.*.models.*.variants`.
+ *
+ * ## Lo que este test ata, y lo que NO ata
+ *
+ * Ata **que la documentación no afirme un arreglo que no existe**. Eso sí se
+ * puede degradar en silencio: alguien lee *"sube lo usable a ~95 %"*, lo da por
+ * cierto, y compactar al 50 % le parece un misterio sin explicación.
+ *
+ * NO ata el comportamiento de la compactación. Eso solo se mide gastando una
+ * sesión entera, y ningún test unitario paga ese coste. **Este fichero no puede
+ * volver a ser la prueba de que el arreglo funciona**, porque no lo es.
+ *
+ * ## La lección, que es la del repo entero
+ *
+ * La versión anterior de este test afirmaba `usable > 0.9`, calculado sobre los
+ * números del propio JSON: `1048576 − 32000` da 96,9 %, **sea cual sea el mundo**.
+ * Pasaba siempre, y no protegía de nada. Un check que siempre pasa es peor que
+ * ninguno, porque da la sensación de que algo está vigilado.
  */
 
 import { describe, it, expect } from "vitest";
@@ -38,52 +57,54 @@ const leer = (rel: string) => readFileSync(path.resolve(process.cwd(), rel), "ut
 interface Config {
   model?: string;
   compaction?: { auto?: boolean; prune?: boolean; reserved?: number };
-  provider?: Record<string, { models?: Record<string, { limit?: { context?: number; output?: number } }> }>;
+  provider?: Record<string, unknown>;
 }
 
-describe("el override de salida de space-bunny-free está puesto", () => {
+describe("no queda ningún arreglo de compactación por configuración", () => {
   const cfg = JSON.parse(leer("opencode.json")) as Config;
 
   it("el modelo por defecto sigue siendo space-bunny-free", () => {
-    // Si esto cambia, este test deja de describir el problema que corrige.
+    // Si esto cambia, la mitad de este fichero deja de describir el problema.
     expect(cfg.model).toBe("opencode/space-bunny-free");
   });
 
-  it("declara limit.output de 32000", () => {
-    const limit = cfg.provider?.opencode?.models?.["space-bunny-free"]?.limit;
-    expect(limit, "no hay override de modelo en opencode.json").toBeDefined();
-    expect(limit!.output).toBe(32000);
+  it("no declara ningún override de límite de modelo", () => {
+    // La línea se quitó porque no hacía nada. Dejarla sería peor que quitarla:
+    // es una linea de configuracion que *parece* arreglar un problema y no lo
+    // hace, y eso es exactamente lo que hace que alguien no entienda por que la
+    // compactacion sigue al 50 %.
+    const provider = cfg.provider ?? {};
+    const conOverrides = Object.entries(provider).filter(([, v]) => {
+      const modelos = (v as { models?: Record<string, { limit?: unknown }> })?.models;
+      return modelos !== undefined && Object.values(modelos).some((m) => m.limit !== undefined);
+    });
+
+    expect(
+      conOverrides,
+      "ha vuelto un override de limit: está medido que no hace nada. Ver AGENTS.md"
+    ).toHaveLength(0);
   });
 
-  it("mantiene el contexto declarado, porque bajarlo también rompería cosas", () => {
-    // El override va a `output`, no a `context`: bajar el contexto avisaría al
-    // usuario y se notaría. El problema era la reserva, no la ventana.
-    const limit = cfg.provider!.opencode!.models!["space-bunny-free"]!.limit!;
-    expect(limit.context).toBe(1048576);
-  });
-
-  it("deja libre más del 90 % del contexto", () => {
-    // El motivo del arreglo, escrito como aserción para que no se pueda
-    // "ajustar" el número a algo que vuelva a dejarlo al 50 %.
-    const limit = cfg.provider!.opencode!.models!["space-bunny-free"]!.limit!;
-    const usable = (limit.context! - limit.output!) / limit.context!;
-    expect(usable).toBeGreaterThan(0.9);
-  });
-
-  it("no toca la compactación, que no era el problema", () => {
-    // Un `reserved` enorme parecería arreglarlo y en realidad lo empeoraría:
-    // es un número absoluto, no un porcentaje, así que un valor grande castiga
-    // igual al modelo de 200K que al de 1M.
+  it("no toca la compactación, porque tampoco era el problema", () => {
+    // `reserved` sigue a 20000. Bajarlo a 0 Ganaría un 1,9 % de los 524K reales
+    // y se haría a costa de dejar sin margen para la propia salida del modelo,
+    // que es un modo de fallo nuevo a cambio de una ganancia irrelevante.
     expect(cfg.compaction).toEqual({ auto: true, prune: true, reserved: 20000 });
   });
 });
 
-describe("AGENTS.md ya no miente sobre el umbral", () => {
+describe("AGENTS.md dice la verdad sobre la compactación", () => {
   const agentes = leer("AGENTS.md");
 
-  it("no afirma el 98 % que sí era falso", () => {
-    expect(agentes).not.toContain("98% de los de 1M");
-    expect(agentes).not.toContain("salta al **90% del modelo de 200K**");
+  it("no afirma que el override suba la ventana", () => {
+    // La frase que lived 7 años de commits y era falsa.
+    expect(agentes).not.toMatch(/Sobrescribe `space-bunny-free\.limit\.output`/i);
+    expect(agentes).not.toMatch(/Sube lo usable a ~95/);
+  });
+
+  it("afirma explícitamente que no funciona", () => {
+    expect(agentes).toMatch(/NO hay arreglo por configuración/);
+    expect(agentes).toMatch(/no lo aplica|No lo aplica/);
   });
 
   it("da los tres números que sostienen la explicación", () => {
@@ -95,10 +116,23 @@ describe("AGENTS.md ya no miente sobre el umbral", () => {
     expect(agentes).toContain("50,0 %");
   });
 
+  it("documenta el experimento, para que no haya que repetirlo", () => {
+    // El paso a paso. Una conclusion sin procedimiento no se puede revisar ni
+    // volver a comprobar cuando opencode cambie.
+    expect(agentes).toMatch(/180\.800/);
+    expect(agentes).toMatch(/deprecated/);
+  });
+
   it("dice que la fórmula es inferida, no documentada", () => {
-    // La fórmula `context - output` casa al 50,0 % exacto, pero opencode no la
-    // publica. Presentarla como regla seria exactamente el fallo que este
-    // fichero critica en otros sitios del repo.
-    expect(agentes).toMatch(/es una inferencia, no una regla documentada/);
+    // `context - output` casa al 50,0 % exacto, pero opencode no la publica.
+    // Con el dato de `cache_read` hay aun un cabo suelto, y se dice.
+    expect(agentes).toMatch(/sigue siendo una inferencia/);
+  });
+
+  it("apunta a la delegacion como la defensa real", () => {
+    // Un tope de ~524K no se arregla con configuracion. Se arregla con subagentes,
+    // cuyo contexto es independiente. Sin esto, la primera mitad del fichero se
+    // lee como "no hay solución" y la gente busca otra vez el mismo numero.
+    expect(agentes).toMatch(/La defensa real es la delegación/);
   });
 });

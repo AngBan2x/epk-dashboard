@@ -233,11 +233,27 @@ Medido contra `models.dev/api.json` el 2026-10-11:
 | `muse-spark-1.3` | 1.048.576 | 131.072 | 87,5 % |
 | `mimo-v2.6-flash-free` | 200.000 | 32.000 | 84 % |
 
-La salida máxima declarada se descuenta del presupuesto de entrada: `context − output`. `space-bunny-free` declara una salida de **exactamente la mitad** de su contexto, así que de 1M solo se podían usar ~524K antes de compactar — de ahí que saltara al ~50 % con `reserved: 20000`, que a esta escala es ruido (2 %). No era la ventana: `muse-spark-1.3` comparte los mismos 1M y llega al 87,5 % porque pide 4× menos salida.
+La salida máxima declarada se descuenta del presupuesto de entrada: `context − output`. `space-bunny-free` declara una salida de **exactamente la mitad** de su contexto, así que de 1M solo se pueden usar ~524K antes de compactar — de ahí que salte al ~50 %. No es la ventana: `muse-spark-1.3` comparte los mismos 1M y llega al 87,5 % porque pide 4× menos salida.
 
-**Por eso `opencode.json` sobrescribe `space-bunny-free.limit.output` a `32000`.** Sube lo usable a ~95 %. `32000` es el mismo output que ya usa `mimo-v2.6-flash-free` en este repo y trabaja sin problemas; para diffs, documentación y respuestas de agente es de sobra.
+**NO hay arreglo por configuración. Se midió, no se suponer.**
 
-**La fórmula es una inferencia, no una regla documentada.** La documentación de opencode describe `reserved` pero no publica cómo se calcula el umbral; que `context − output` dé exactamente 50,0 % —y coincida con lo observado— es evidencia fuerte, no confirmación. Si alguna vez la compactación se dispara antes de lo previsto, el culpable es este número y no `reserved`.
+Hubo durante meses una línea en `opencode.json` que ponía `space-bunny-free.limit.output` en `32000`, con la intención de subir lo usable al ~95 %. **No funciona.** Se comprobó el 2026-10-16:
+
+1. `opencode debug config` resuelve el valor: muestra `output: 32000`. Es decir, **la configuración se lee**.
+2. Pero un override con `output: 190000` sobre `mimo-v2.6-flash-free` (ventana que quedaría en 10.000 tokens) siguió permitiendo `cache_read` de **180.800**. Imposible con 10.000 de ventana: **el runtime no lo aplica**.
+3. Indicios de que no podía funcionar: el schema marca `provider` como **`deprecated: true`**, y la documentación solo explica `provider.*.models.*.variants` — **nunca `limit`**.
+
+La línea se quitó de `opencode.json`. Si una versión futura de opencode la honra, el procedimiento para volver a comprobarlo está en `docs/PHASE_P13.md`: poner un `output` absurdo en un modelo **pequeño** y mirar si `cache_read` deja de poder pasar de la ventana resultante. Con 1M de contexto habría que llenar medio millón de tokens; con mimo se ve en minutos.
+
+**La fórmula sigue siendo una inferencia.** La documentación de opencode no publica cómo se calcula el umbral. Que `context − output` dé exactamente el 50,0 % observado es evidencia fuerte, no confirmación. Con la observación de arriba hay un cabo suelto: `cache_read` llegó a 180.800 en un modelo cuya ventana `context − output` da 168.000, así que la cuenta del runtime **no es exactamente** esa fórmula.
+
+**Lo que sí es un dato sólido:** `space-bunny-free` declara 524.288 de salida sobre 1.048.576 de contexto. Da igual la aritmética exacta; reservar la mitad del contexto para la salida deja media ventana, y ese es el número que manda.
+
+### La defensa real es la delegación
+
+Si `space-bunny-free` tiene ~524K utilizables, la palanca **no es un número de configuración: es no llenar esa ventana**. Y eso es justo lo que hacen los subagentes: `security-auditor` con 200K de contexto no toca la ventana principal, porque el contexto de un subagente es independiente del del agente que lo delega.
+
+Por eso partir el trabajo en subagentes no es estilo: es lo que hace que esto aguante.
 
 ### Banco de pruebas (NO asignar sin evaluar con evidencia)
 `qwen3-coder-30b-a3b`, `devstral-2512`, `qwen3.8-27b`, `gemini-2.5-flash` (todos $0 OpenRouter, code-capables).

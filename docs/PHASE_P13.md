@@ -1096,3 +1096,68 @@ Nota: 2 tests de `deezer-previews.test.ts` fallan desde antes de RC.46, en HEAD.
 No se han tocado.
 
 Gate: 1799 tests en 91 ficheros (2 fallan, los de Deezer), tsc y lint limpios.
+
+### El override de compactación: medido, y no funciona
+
+La compactación de `space-bunny-free` seguía saltando al ~50 %. Durante meses la
+explicación fue que el modelo declara `limit.output = 524288` —la mitad de sus
+1.048.576 de contexto— y que `opencode.json` lo bajaba a `32000` para subir la
+ventana al ~95 %.
+
+**No funciona. Se midió.**
+
+`opencode debug config` resuelve el valor: `output: 32000`. Es decir, **la
+configuración se lee**. Pero leerla no es aplicarla.
+
+#### El experimento, y por qué con mimo y no con space-bunny
+
+Probarlo con el modelo de 1M exigiría llenar medio millón de tokens. La pregunta
+—"¿lee el runtime el override?"— se responde con un modelo de 200K donde el
+efecto es brutal:
+
+- Contexto 200.000, salida real 32.000 → ventana **168.000** (84 %).
+- Con `limit.output = 190000` → ventana **10.000** (5 %).
+
+Una sesión con `opencode run -m opencode/mimo-v2.6-flash-free --format json` dio
+`cache_read` de **180.800**. Con 10.000 de ventana eso es imposible.
+
+**El runtime no aplica `provider.*.models.*.*.limit.output`.** Dos indicios de
+por qué no podía: el schema marca `provider` como **`deprecated: true`**, y la
+documentación solo explica `provider.*.models.*.variants`, **nunca `limit`**.
+
+La línea se quitó de `opencode.json`. Dejarla era peor: una línea que *parece*
+arreglar un problema y no lo hace.
+
+#### El test anterior era una tautología
+
+`override-compaction.test.ts` afirmaba `usable > 0.9`, calculado sobre los números
+del propio JSON: `1048576 − 32000` da 96,9 %, **sea cual sea el mundo**. Pasaba
+siempre y no protegía de nada.
+
+Lo interesante es que su cabecera **sí era honesta**: "No comprueba que la
+compactación ocurra al 95 %". Ató la configuración, no el comportamiento, y lo
+dijo. El problema es que la existencia del test implicaba que algo estaba
+vigilado, y `AGENTS.md` afirmaba el 95 % sin ninguna salvedad.
+
+Reescrito para atar lo único que **sí** se puede degradar en silencio: que la
+documentación no afirme un arreglo inexistente, y que registre el procedimiento
+para volver a comprobarlo cuando opencode cambie.
+
+#### Un cabo suelto, dicho
+
+La fórmula `context − output` sigue siendo una inferencia. Con el dato nuevo hay
+un cabo: `cache_read` llegó a 180.800 en un modelo cuya ventana `context − output`
+da 168.000. Así que la cuenta del runtime **no es exactamente** esa fórmula.
+
+Lo que sí es sólido: `space-bunny-free` declara 524.288 de salida sobre 1.048.576.
+Reservar la mitad del contexto para la salida deja media ventana, y ese es el
+número que manda. `reserved` se queda en 20000: bajarlo a 0 ganaría un 1,9 % de
+los 524K reales y dejaría sin margen para la salida del modelo.
+
+#### La defensa real
+
+No hay arreglo por configuración. La palanca es **no llenar esa ventana**, y eso es
+lo que hacen los subagentes: el contexto de uno es independiente del del agente que
+lo delega.
+
+Gate: 1805 tests en 91 ficheros, todos verdes. tsc y lint limpios.
