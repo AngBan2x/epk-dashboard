@@ -275,7 +275,10 @@ describe("Bluesky: el AT Protocol no acepta URLs de imagen", () => {
     const { http, llamadas } = capa([
       { did: "did:plc:x", accessJwt: "jwt" },
       BYTES(),
-      { blob: { $type: "blob", ref: { $link: "BLOB1" } } },
+      // **La forma real de la respuesta de `uploadBlob`**: un envoltorio `blob`
+      // con el objeto del blob dentro. El PDS responde 200 y el `createRecord`
+      // es el que rechaza el registro si esto se reenvía entero.
+      { blob: { $type: "blob", ref: { $link: "BLOB1" }, mimeType: "image/jpeg", size: 3 } },
       { uri: "at://x/app.bsky.feed.post/1", cid: "C" },
     ]);
 
@@ -297,6 +300,35 @@ describe("Bluesky: el AT Protocol no acepta URLs de imagen", () => {
       "https://pds.example/xrpc/com.atproto.repo.uploadBlob",
       "https://pds.example/xrpc/com.atproto.repo.createRecord",
     ]);
+  });
+
+  it("el embed lleva el objeto INTERNO del blob, no el envoltorio", async () => {
+    // El lexicon define `images[].image` como un **blob**, o sea el objeto de
+    // dentro. `uploadBlob` responde `{"blob": {...}}`, y reenviar el cuerpo
+    // entero hace que el PDS responda:
+    //
+    //   Invalid app.bsky.feed.post record: Expected blob value type
+    //   (got {"blob": ...}) at $.record.embed.images[0].image
+    //
+    // Pasó de verdad: el `uploadBlob` daba 200 y el `createRecord` rechazaba el
+    // registro. El error nombra el campo, pero el mensaje dice "got {"blob":..}",
+    // que es la forma de decir "esto no es un blob, es algo que contiene uno".
+    const { http, llamadas } = capa([
+      { did: "did:plc:x", accessJwt: "jwt" },
+      BYTES(),
+      { blob: { $type: "blob", ref: { $link: "BLOB1" }, mimeType: "image/jpeg", size: 3 } },
+      { uri: "at://x/app.bsky.feed.post/1", cid: "C" },
+    ]);
+
+    await crearBluesky({ ...opciones, http }).publicar(pub("Hola", [IMG]));
+
+    const cuerpo = JSON.parse(String(llamadas[3]!.init.body));
+    const image = cuerpo.record.embed.images[0].image;
+    // Es un blob, no un objeto con una propiedad "blob".
+    expect(image.$type).toBe("blob");
+    expect(image.ref).toEqual({ $link: "BLOB1" });
+    expect(image.mimeType).toBe("image/jpeg");
+    expect(image.blob).toBeUndefined();
   });
 
   it("el registro lleva el type dentro, no en la URL", async () => {

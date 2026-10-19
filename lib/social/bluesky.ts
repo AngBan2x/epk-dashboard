@@ -334,9 +334,6 @@ async function subirEmbed(o: OpcionesBluesky, jwt: string, imagenes: readonly Im
 
   for (const imagen of imagenes) {
     const bytes = await descargar(o.http, imagen.url, "bluesky");
-    // `uploadBlob` devuelve el *blob ref* tal cual: el cuerpo de la respuesta ES
-    // el objeto `{ $type, ref, mimeType, size }` que va dentro del registro. Por
-    // eso se reenvía entero y no se reconstruye.
     const blob = await exigirOk(
       await o.http(`${o.pds}/xrpc/com.atproto.repo.uploadBlob`, {
         method: "POST",
@@ -351,7 +348,33 @@ async function subirEmbed(o: OpcionesBluesky, jwt: string, imagenes: readonly Im
       "medio",
     );
 
-    subidas.push({ image: blob, alt: o.alt ?? "" });
+    // **El registro espera el objeto interno del blob, no el envoltorio.**
+    //
+    // `uploadBlob` responde `{"blob": {"$type":"blob","ref":{...},"mimeType":...,
+    // "size":...}}`, pero el lexicon `app.bsky.feed.post` define
+    // `images[].image` como un **blob**, o sea el objeto de dentro. Reenviar el
+    // cuerpo entero hace que el PDS lo lea como un objeto con una propiedad
+    // `blob` y responda:
+    //
+    //   Invalid app.bsky.feed.post record: Expected blob value type
+    //   (got {"blob": ...}) at $.record.embed.images[0].image
+    //
+    // El error nombra el campo exacto, pero el mensaje dice "got {"blob": ...}",
+    // que es la forma de decir "esto no es un blob, es algo que contiene un
+    // blob". Pasó de verdad: el `uploadBlob` devolvía 200 y el `createRecord`
+    // rechazaba el registro.
+    const interno = (blob as { blob?: unknown }).blob;
+    if (interno === undefined || interno === null) {
+      throw new ErrorApi(
+        "com.atproto.repo.uploadBlob respondió sin el objeto del blob",
+        "bluesky",
+        "medio",
+        200,
+        blob,
+      );
+    }
+
+    subidas.push({ image: interno, alt: o.alt ?? "" });
   }
 
   return { $type: "app.bsky.embed.images", images: subidas };
