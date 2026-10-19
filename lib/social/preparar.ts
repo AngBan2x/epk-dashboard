@@ -41,17 +41,42 @@ import type { AdaptadorSocial, Contenido } from "./tipos";
  * veces: una dentro del cuerpo y otra como enlace separado que cada adaptador
  * añade al final (`componerTexto` en threads, y los equivalentes en el resto).
  *
- * Solo quita la última línea con contenido si es equivalente al enlace (mismo
- * host y path, ignorando protocolo y www). Todo lo demás se deja intacto.
+ * Solo quita la última línea con contenido si es equivalente al enlace. Todo lo
+ * demás se deja intacto.
  */
 function urlEquals(a: string, b: string): boolean {
-  try {
-    const ua = new URL(a);
-    const ub = new URL(b);
-    return ua.hostname === ub.hostname && ua.pathname === ub.pathname;
-  } catch {
-    return a === b;
-  }
+  // **Por qué se normaliza antes de comparar y no se comparan las cadenas.**
+  //
+  // La primera versión de esto comparaba `new URL(x).hostname` y `pathname`, con
+  // un `catch` que devolvía `a === b` si la URL no parseaba. Y aquí está el
+  // problema: `new URL("epk-dashboard.vercel.app")` **lanza**, porque no tiene
+  // esquema. O sea, justo el caso real —el cuerpo con el dominio pelado y el
+  // `enlace` con `https://`— caía siempre en el `catch` y devolvía `false`.
+  //
+  // El fix no arreglaba nada, y no se notó porque el test usaba el mismo formato
+  // en los dos lados. Se notó al publicar: el post salió con el enlace dos
+  // veces en Mastodon y en Instagram.
+  //
+  // Por eso aquí se mete un esquema por defecto antes de parsear: `"foo.com"` y
+  // `"https://foo.com"` son la misma dirección, y quien escribe el borrador
+  // escribe las dos formas.
+  const normalizar = (s: string): URL | null => {
+    const conEsquema = /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`;
+    try {
+      return new URL(conEsquema);
+    } catch {
+      return null;
+    }
+  };
+
+  const ua = normalizar(a);
+  const ub = normalizar(b);
+  if (ua === null || ub === null) return a === b;
+
+  const host = (u: URL) => u.hostname.replace(/^www\./i, "");
+  const ruta = (u: URL) => u.pathname.replace(/\/+$/, "");
+
+  return host(ua) === host(ub) && ruta(ua) === ruta(ub);
 }
 
 function normalizarContenido(contenido: Contenido): Contenido {

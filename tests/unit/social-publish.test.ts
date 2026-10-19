@@ -395,4 +395,96 @@ describe("preparar: la mitad que se puede repetir sin miedo", () => {
     expect(p.avisos.join(" ")).not.toContain("JPEG");
     expect(p.avisos.join(" ")).not.toContain("8 MB");
   });
+
+  describe("el enlace no se duplica", () => {
+    // Adaptador que compone como los de verdad: titulo + cuerpo + enlace.
+    // Es lo que hace `componerTexto` en threads, bluesky, mastodon, facebook e
+    // instagram: el `enlace` va como parte separada, al final.
+    const queCompone = () =>
+      ({
+        plataforma: "threads",
+        validar: () => ({ ok: true, errores: [], avisos: [] }),
+        redactar: async (contenido: Contenido) => {
+          const partes: string[] = [];
+          if (contenido.titulo.trim()) partes.push(contenido.titulo.trim());
+          if (contenido.cuerpo.trim()) partes.push(contenido.cuerpo.trim());
+          if (contenido.enlace) partes.push(contenido.enlace);
+          return {
+            plataforma: "threads",
+            publicacion: { texto: partes.join("\n\n"), imagenes: contenido.imagenes ?? [] },
+            ajustes: [],
+            requiereRevision: false,
+          };
+        },
+        publicar: async () => ({ id: null, url: null }),
+      }) as never;
+
+    it("quita del cuerpo la URL que ya va como enlace, aun sin https", async () => {
+      // **El caso real**, con las dos formas en las que se escribe un dominio:
+      // el cuerpo con el dominio pelado y el `enlace` con el esquema. Por eso
+      // hace falta normalizar antes de comparar: `new URL("epk.com")` lanza, y
+      // un `catch` que devuelve `false` deja el enlace duplicado.
+      //
+      // Esto ya pasó: el post de Threads salio con el enlace dos veces, se
+      // corrigio a mano, y el fix se dio por bueno. Volvio a pasar en Mastodon y
+      // en Instagram porque el fix comparaba las URL con `new URL()` y el cuerpo
+      // no parsea. El test anterior usaba el mismo formato en los dos lados, y
+      // por eso no lovio nada: **el test no cubria el caso que se dio**.
+      const p = await preparar(
+        queCompone(),
+        {
+          titulo: "",
+          cuerpo: "Acabamos de abrir PressPlay.\n\nUna ficha para decidir.\n\nepk-dashboard.vercel.app",
+          enlace: "https://epk-dashboard.vercel.app",
+        },
+        httpSinRed
+      );
+
+      expect(p.texto.match(/epk-dashboard\.vercel\.app/g)).toHaveLength(1);
+      expect(p.texto).not.toContain("epk-dashboard.vercel.app\n\nhttps://");
+      // Y el texto que se queda es el que se queria: sin perder la frase.
+      expect(p.texto).toContain("Una ficha para decidir.");
+    });
+
+    it("tambien quita el www y la barra final", async () => {
+      const p = await preparar(
+        queCompone(),
+        {
+          titulo: "",
+          cuerpo: "Mira esto:\n\nwww.epk-dashboard.vercel.app/",
+          enlace: "https://epk-dashboard.vercel.app",
+        },
+        httpSinRed
+      );
+
+      expect(p.texto.match(/epk-dashboard\.vercel\.app/g)).toHaveLength(1);
+    });
+
+    it("NO toca un enlace distinto que aparece en el cuerpo", async () => {
+      // Si el cuerpo cita otra direccion, esa se queda. Quitarla seria perder
+      // informacion, y esto no va de limpiar texto: va de no repetir el mismo.
+      const p = await preparar(
+        queCompone(),
+        {
+          titulo: "",
+          cuerpo: "Antes: https://otro-sitio.com\n\nepk-dashboard.vercel.app",
+          enlace: "https://epk-dashboard.vercel.app",
+        },
+        httpSinRed
+      );
+
+      expect(p.texto).toContain("https://otro-sitio.com");
+      expect(p.texto.match(/epk-dashboard\.vercel\.app/g)).toHaveLength(1);
+    });
+
+    it("no inventa nada cuando no hay enlace", async () => {
+      const p = await preparar(
+        queCompone(),
+        { titulo: "", cuerpo: "Solo texto con https://epk-dashboard.vercel.app dentro" },
+        httpSinRed
+      );
+
+      expect(p.texto).toContain("https://epk-dashboard.vercel.app");
+    });
+  });
 });
