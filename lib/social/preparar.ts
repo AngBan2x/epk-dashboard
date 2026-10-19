@@ -36,6 +36,39 @@
 import { comprobarImagenes, type InformeImagen } from "./imagenes";
 import type { AdaptadorSocial, Contenido } from "./tipos";
 
+/**
+ * Normaliza el contenido antes de redactar, para que el enlace no aparezca dos
+ * veces: una dentro del cuerpo y otra como enlace separado que cada adaptador
+ * añade al final (`componerTexto` en threads, y los equivalentes en el resto).
+ *
+ * Solo quita la última línea con contenido si es equivalente al enlace (mismo
+ * host y path, ignorando protocolo y www). Todo lo demás se deja intacto.
+ */
+function urlEquals(a: string, b: string): boolean {
+  try {
+    const ua = new URL(a);
+    const ub = new URL(b);
+    return ua.hostname === ub.hostname && ua.pathname === ub.pathname;
+  } catch {
+    return a === b;
+  }
+}
+
+function normalizarContenido(contenido: Contenido): Contenido {
+  if (!contenido.enlace) return contenido;
+  const enlace = contenido.enlace.trim();
+  if (!enlace) return contenido;
+  const lineas = contenido.cuerpo.split("\n");
+  let idx = lineas.length - 1;
+  while (idx >= 0 && lineas[idx].trim() === "") idx--;
+  if (idx >= 0 && urlEquals(lineas[idx].trim(), enlace)) {
+    const nuevas = lineas.slice(0, idx);
+    while (nuevas.length > 0 && nuevas[nuevas.length - 1].trim() === "") nuevas.pop();
+    return { ...contenido, cuerpo: nuevas.join("\n") };
+  }
+  return contenido;
+}
+
 export interface Preparado {
   readonly plataforma: string;
   /** Texto ya recortado a lo que quepa. Es lo que se publicaría, no lo que se escribió. */
@@ -65,7 +98,11 @@ export async function preparar(
   contenido: Contenido,
   http: (url: string, init: RequestInit) => Promise<Response>
 ): Promise<Preparado> {
-  const borrador = await adaptador.redactar(contenido);
+  // Evitar que el enlace quede duplicado: una vez dentro del cuerpo y otra como
+  // enlace separado que el adaptador añade al final. Esto protege a las seis
+  // plataformas desde un solo punto.
+  const contenidoLimpio = normalizarContenido(contenido);
+  const borrador = await adaptador.redactar(contenidoLimpio);
   const validacion = adaptador.validar(borrador.publicacion);
 
   const informes =
