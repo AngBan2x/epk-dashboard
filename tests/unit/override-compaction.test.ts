@@ -56,16 +56,70 @@ const leer = (rel: string) => readFileSync(path.resolve(process.cwd(), rel), "ut
 
 interface Config {
   model?: string;
+  small_model?: string;
   compaction?: { auto?: boolean; prune?: boolean; reserved?: number };
   provider?: Record<string, unknown>;
+  agent?: Record<string, { model?: string }>;
 }
+
+/**
+ * Contexto declarado por models.dev para un modelo, o `null` si no se conoce.
+ *
+ * Va hardcodeado a proposito: la alternativa —consultar la API en cada test—
+ * hace que el test dependa de la red, y un test que depende de la red falla
+ * cuando la red falla, que es cuando menos te fias de el.
+ */
+const CONTEXTO_DECLARADO: Record<string, number> = {
+  "opencode/minimax-m3.1-flash-free": 1_000_000,
+  "opencode/nemotron-3.5-super-vl-free": 1_048_576,
+  "opencode/muse-spark-1.3": 1_048_576,
+  "opencode/space-bunny-free": 1_048_576,
+  "opencode/mimo-v2.6-flash-free": 200_000,
+  "opencode/nemotron-3.5-lightning-free": 262_144,
+  "opencode/deepseek-v4.1-flash-free": 200_000,
+  "opencode/glm-5.3-flash-free": 200_000,
+};
 
 describe("no queda ningún arreglo de compactación por configuración", () => {
   const cfg = JSON.parse(leer("opencode.json")) as Config;
 
-  it("el modelo por defecto sigue siendo space-bunny-free", () => {
-    // Si esto cambia, la mitad de este fichero deja de describir el problema.
-    expect(cfg.model).toBe("opencode/space-bunny-free");
+  it("el modelo por defecto tiene 1M+ de contexto", () => {
+    // **El invariante, no el nombre.** El nombre del modelo ya ha cambiado dos
+    // veces por cuota agotada; un test que atara `space-bunny-free` se rompio
+    // solo, y no por un fallo del repo. Lo que importa es la propiedad:
+    // un modelo con 200K hace thrashing de compactacion, y con 1M no.
+    //
+    // La tabla de arriba es la fuente. Un modelo que no este en ella hace fallar
+    // el test, que es lo que se quiere: anadir un modelo es una decision que
+    // hay que verificar contra models.dev, no una linea suelta.
+    const contexto = cfg.model === undefined ? 0 : CONTEXTO_DECLARADO[cfg.model];
+    expect(
+      contexto,
+      `el modelo ${cfg.model} no esta en la tabla de contexto declarado`
+    ).toBeGreaterThanOrEqual(1_000_000);
+  });
+
+  it("ningun agente usa un modelo de 200K", () => {
+    // El mismo motivo, aplicado a los subagentes: un builder con 200K
+    // compacta en bucle y no avanza. Se comprueba sobre TODOS los agentes,
+    // no solo sobre los que se usan hoy.
+    const bajos = Object.entries(cfg.agent ?? {})
+      .filter(([, a]) => a.model !== undefined)
+      .filter(([, a]) => (CONTEXTO_DECLARADO[a.model as string] ?? 0) < 1_000_000)
+      .map(([n, a]) => `${n} -> ${a.model}`);
+
+    expect(
+      bajos,
+      "estos agentes usan un modelo de menos de 1M de contexto: van a compactar en bucle"
+    ).toEqual([]);
+  });
+
+  it("el small_model tampoco es de 200K", () => {
+    // `small_model` es el que se usa para titulos y tareas cortas. Con 200K se
+    // queda sin margen en cuanto la sesion principal ha llenado contexto, y el
+    // resultado es una compactacion que no compensa.
+    const contexto = cfg.small_model === undefined ? 0 : CONTEXTO_DECLARADO[cfg.small_model];
+    expect(contexto).toBeGreaterThanOrEqual(1_000_000);
   });
 
   it("no declara ningún override de límite de modelo", () => {

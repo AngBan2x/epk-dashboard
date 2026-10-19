@@ -271,11 +271,39 @@ reiniciar la sesión**; no es un error de configuración y no se arregla editand
 
 | Modelo | Contexto | Input | Cantidad | Uso principal |
 |--------|----------|-------|----------|---------------|
-| `opencode/space-bunny-free` | 1M | text, image, video | 18 | Orquestación, reasoning, APIs, DB, auth, security, testing, `small_model` para títulos y tareas cortas, y el agente interno `compaction` |
-| `opencode/mimo-v2.6-flash-free` | 200K | text, image, audio, video | 8 | Builders UI (ya no es `small_model`) |
+| `opencode/minimax-m3.1-flash-free` | 1M | text, image | 28 | **Modelo principal.** Orquestación, reasoning, APIs, DB, auth, security, testing, `small_model` para títulos y tareas cortas, y el agente interno `compaction` |
 | `opencode/muse-spark-1.3` | 1M | text, image, video, pdf, audio | 4 | `visual-tester` (ver screenshots), deploy, releases y documentación |
 
-**Los 3 aceptan imágenes**, así que `visual-tester` ya no necesita el modelo vision de Nemotron. `opencode/nemotron-3-ultra-free` además era **solo texto** (sin imagen), por lo que nunca servía para análisis visual.
+**Los dos aceptan imágenes**, así que `visual-tester` no necesita el modelo vision de
+Nemotron.
+
+⚠️ **Los modelos gratuitos se caen, y hay que rehacer esta tabla.** Pasó dos
+veces en la misma semana: `space-bunny-free` (1M) agotó la cuota de opencode y
+`mimo-v2.6-flash-free` (200K) se quedaba compactando la sesión sin avanzar. La
+tabla de arriba **no es una decisión estable**: es el estado de hoy.
+
+**Lo que sí es una regla, y no depende de qué modelo esté de moda:** un modelo
+gratuito con **200K de contexto es un arma de fuego** en este repo, porque el
+contexto se llena con los `cache_read` de cada paso y cada compactación empieza
+de cero. `mimo-v2.6-flash-free` declaration 200K con salida de 32K: usable
+~168K, y una sesión de trabajo real se comía eso en dos o tres llamadas. Con
+`output` de 32K contra 1M de contexto, el margen de Manio es una cuarta parte de
+lo que parece.
+
+El criterio al cambiar: **1M+ de contexto y que acepte texto e imágenes**. Con
+eso, el thrashing desaparece por construcción y no hay que medirlo.
+
+**`minimax-m3.1-flash-free`**: 1.000.000 de contexto, 512.000 de salida,
+texto+imagen. Declarado en models.dev y **medido**: responde y no thrasha.
+Es el que se usa ahora.
+
+⚠️ **El override de `limit.output` no funciona.** Medido el 2026-10-16: ponerlo
+no cambia nada, porque el runtime ignora `provider.*.models.*.*.limit`. Ver la
+sección de compactación, más abajo.
+
+**Nemotron tampoco sirve para el análisis visual aquí**: `nemotron-3-ultra-free`
+era solo texto, y `nemotron-3.5-lightning-free` (262K) se queda corto de
+contexto y no acepta imágenes.
 
 ### Compaction
 
@@ -285,15 +313,19 @@ Configurado en `opencode.json`: `auto: true`, `prune: true`, `reserved: 20000`.
 
 **Lo que manda no es `reserved`: es `limit.output` del modelo.** La línea de abajo (hasta la de "98%") estaba mal, y la explicación buena es la siguiente.
 
-Medido contra `models.dev/api.json` el 2026-10-11:
+Medido contra `models.dev/api.json`. Los dos primeros son los que se han usado
+como modelo principal; los otros dos están medidos pero ya no se usan:
 
-| Modelo | `limit.context` | `limit.output` | usable |
-|---|---|---|---|
-| `space-bunny-free` | 1.048.576 | **524.288** | **50,0 %** |
-| `muse-spark-1.3` | 1.048.576 | 131.072 | 87,5 % |
-| `mimo-v2.6-flash-free` | 200.000 | 32.000 | 84 % |
+| Modelo | `limit.context` | `limit.output` | usable | estado |
+|---|---|---|---|---|
+| `minimax-m3.1-flash-free` | 1.000.000 | 512.000 | 50,0 % | **el de ahora** |
+| `muse-spark-1.3` | 1.048.576 | 131.072 | 87,5 % | secondary |
+| `space-bunny-free` | 1.048.576 | 524.288 | 50,0 % | cuota agotada |
+| `mimo-v2.6-flash-free` | 200.000 | 32.000 | 84 % | prolixa compactación |
 
 La salida máxima declarada se descuenta del presupuesto de entrada: `context − output`. `space-bunny-free` declara una salida de **exactamente la mitad** de su contexto, así que de 1M solo se pueden usar ~524K antes de compactar — de ahí que salte al ~50 %. No es la ventana: `muse-spark-1.3` comparte los mismos 1M y llega al 87,5 % porque pide 4× menos salida.
+
+**Y esto se repite con `minimax-m3.1-flash-free`:** 1.000.000 de contexto y 512.000 de salida son otra vez exactamente la mitad. El ~50 % no es un defecto del modelo: es lo que pasa cuando `output` es la mitad de `context`, y va a volver a pasar con el próximo que declame 1M con salida de 512K. La salida declarada es un techo, no lo que se gasta: un turno normal pide mucho menos.
 
 **NO hay arreglo por configuración. Se midió, no se suponer.**
 
