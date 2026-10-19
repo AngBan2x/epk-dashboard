@@ -281,12 +281,39 @@ describe("Bluesky: el AT Protocol no acepta URLs de imagen", () => {
 
     await crearBluesky({ ...opciones, http }).publicar(pub("Hola", [IMG]));
 
+    // **El endpoint es `com.atproto.repo.createRecord`, no `app.bsky.feed.post`.**
+    //
+    // `app.bsky.feed.post` es el *lexicon type* del registro, no un método
+    // invocable: el router no lo tiene, y llamarlo devolvía `501 Not
+    // Implemented`. El método que escribe es el genérico de creación de
+    // registros del AT Protocol, y el type va dentro, en `record.$type`.
+    //
+    // Este test afirmaba el endpoint equivocado, así que el bug estaba
+    // "protegido" por él: verde mientras el post real no salía. Un test que
+    // fija el error no lo detecta; uno que fija la verdad, sí.
     expect(llamadas.map((c) => c.url)).toEqual([
       "https://pds.example/xrpc/com.atproto.server.createSession",
       IMG,
       "https://pds.example/xrpc/com.atproto.repo.uploadBlob",
-      "https://pds.example/xrpc/app.bsky.feed.post",
+      "https://pds.example/xrpc/com.atproto.repo.createRecord",
     ]);
+  });
+
+  it("el registro lleva el type dentro, no en la URL", async () => {
+    // `collection` dice qué tipo de registro es y `record.$type` lo repite.
+    // Los dos van: el primero le dice al PDS dónde escribir, el segundo valida
+    // el lexicon del registro.
+    const { http, llamadas } = capa([
+      { did: "did:plc:x", accessJwt: "jwt" },
+      { uri: "at://x/app.bsky.feed.post/1", cid: "C" },
+    ]);
+
+    await crearBluesky({ ...opciones, http }).publicar(pub("Hola"));
+
+    const cuerpo = JSON.parse(String(llamadas[1]!.init.body));
+    expect(cuerpo.collection).toBe("app.bsky.feed.post");
+    expect(cuerpo.record.$type).toBe("app.bsky.feed.post");
+    expect(cuerpo.repo).toBe("did:plc:x");
   });
 
   it("un borrador con imágenes queda marcado para revisión, porque el máximo no está verificado", async () => {
@@ -439,6 +466,49 @@ describe("redactar recorta y lo dice", () => {
     });
     expect(b.ajustes.join(" ")).toMatch(/recort/i);
     expect([...b.publicacion.texto].length).toBeLessThanOrEqual(500);
+  });
+
+  it("si el recorte parte una URL, la quita entera en vez de dejarla rota", async () => {
+    // **El caso real:** el primer post de Bluesky recortó el texto a 300
+    // graphemes y partió la URL por la mitad, dejando `https://epk-da`. Un
+    // enlace a medias parece que funciona y no lleva a ninguna parte, y el
+    // recorte en la plataforma es irreversible: no hay "deshacer un post".
+    //
+    // Por eso se prefiere un post sin enlace a un post con un enlace roto.
+    const { http } = capa([]);
+    const b = await crearBluesky({
+      pds: "https://pds.example",
+      identifier: "x",
+      password: "p",
+      repo: "did:plc:z",
+      http,
+    }).redactar({
+      titulo: "",
+      cuerpo: textoLargo(280) + "\n\nhttps://epk-dashboard.vercel.app",
+    });
+
+    expect([...b.publicacion.texto].length).toBeLessThanOrEqual(300);
+    // La URL no está a medias: o está entera, o no está.
+    expect(b.publicacion.texto).not.toMatch(/https?:\/\/\S*$/m);
+    expect(b.publicacion.texto).not.toContain("https://epk-da\n");
+    // Y se dice, porque quitarla es una decision visible.
+    expect(b.ajustes.join(" ")).toMatch(/enlace|URL/i);
+  });
+
+  it("si la URL cabe entera, se conserva", async () => {
+    const { http } = capa([]);
+    const b = await crearBluesky({
+      pds: "https://pds.example",
+      identifier: "x",
+      password: "p",
+      repo: "did:plc:z",
+      http,
+    }).redactar({
+      titulo: "",
+      cuerpo: "Corto.\n\nhttps://epk-dashboard.vercel.app",
+    });
+
+    expect(b.publicacion.texto).toContain("https://epk-dashboard.vercel.app");
   });
 
   it("si cabe, no inventa que ha recortado", async () => {

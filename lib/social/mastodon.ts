@@ -42,7 +42,7 @@
  */
 
 import { LIMITES, cabeElTexto, limiteDeTexto } from "./limites";
-import { recortar,
+import { recortarSinPartirUrl,
   type AdaptadorSocial,
   type Borrador,
   type CapaHttp,
@@ -252,7 +252,7 @@ async function redactarMastodon(o: OpcionesMastodon, contenido: Contenido): Prom
   if (limite === null) {
     ajustes.push("Texto sin recortar: no hay límite verificado para esta instancia.");
   } else {
-    const corte = recortar(bruto, limite, LIMITES.mastodon.unidad);
+    const corte = recortarSinPartirUrl(bruto, limite, LIMITES.mastodon.unidad);
     texto = corte.texto;
     if (corte.recortado) {
       ajustes.push(
@@ -260,6 +260,9 @@ async function redactarMastodon(o: OpcionesMastodon, contenido: Contenido): Prom
           ? `Texto recortado a ${limite} caracteres, el valor por defecto de Mastodon.`
           : `Texto recortado a ${limite} caracteres, tomados de la configuración de la instancia.`,
       );
+    }
+    if (corte.urlIncompleta) {
+      ajustes.push("El recorte partía el enlace: se ha quitado la URL entera en vez de dejarla rota.");
     }
   }
 

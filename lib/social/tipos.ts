@@ -193,3 +193,54 @@ export function recortar(texto: string, limite: number, unidad: "graphemes" | "u
   if (partes.length <= limite) return { texto, recortado: false };
   return { texto: partes.slice(0, limite).map((s) => s.segment).join(""), recortado: true };
 }
+
+/** Una URL: esquema, host, y ruta opcional. */
+const URL_EN_LINEA = /https?:\/\/[^\s<>"]+/i;
+
+/**
+ * Recorta sin dejar una URL a medias.
+ *
+ * ## Por qué hace falta
+ *
+ * Recortar es cortar, y una URL cortada por el final es un **enlace roto**:
+ * `https://epk-da` no lleva a ninguna parte. Publicarlo es peor que no
+ * publicar, porque el enlace parece funcionar y no funciona.
+ *
+ * Pasó de verdad: el primer intento en Bluesky recortó el texto a 300 graphemes
+ * y partió la URL por la mitad. El recorte es **irreversible** en la
+ * plataforma —no hay "deshacer un post"— así que el daño se hace al publicar.
+ *
+ * ## Qué hace
+ *
+ * Recorta como `recortar()`, y si el resultado acaba con una URL **incompleta**
+ * (o sea, el recorte ha caído dentro de la URL y no en su final), quita esa
+ * línea entera en vez de dejarla a medias.
+ *
+ * Preferimos un post sin enlace a un post con un enlace que no lleva a nada.
+ * Quitar una URL es una decision visible: la toma quien lee, y el que recorta
+ * no puede saber si ese enlace era imprescindible.
+ */
+export function recortarSinPartirUrl(
+  texto: string,
+  limite: number,
+  unidad: "graphemes" | "utf16"
+): { texto: string; recortado: boolean; urlIncompleta: boolean } {
+  const corte = recortar(texto, limite, unidad);
+  if (!corte.recortado) return { ...corte, urlIncompleta: false };
+
+  const lineas = corte.texto.split("\n");
+  const ultima = lineas[lineas.length - 1] ?? "";
+  const match = URL_EN_LINEA.exec(ultima);
+
+  if (match === null) return { ...corte, urlIncompleta: false };
+
+  // La URL está **entera** si el texto original terminaba con ella. Comparar
+  // "la URL recortada aparece en el original" no vale: un prefijo como
+  // `https://epk-dashbo` también aparece, y eso es justo el caso roto.
+  const completa = texto.trimEnd().endsWith(match[0]);
+  if (completa) return { ...corte, urlIncompleta: false };
+
+  // Está partida: se quita la línea entera.
+  const sinUltima = lineas.slice(0, -1).join("\n").replace(/\s+$/, "");
+  return { texto: sinUltima, recortado: true, urlIncompleta: true };
+}

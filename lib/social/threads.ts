@@ -48,7 +48,7 @@
  */
 
 import { LIMITES, cabeElTexto, limiteDeTexto } from "./limites";
-import { recortar,
+import { recortarSinPartirUrl,
   type AdaptadorSocial,
   type Borrador,
   type CapaHttp,
@@ -193,9 +193,12 @@ async function redactarThreads(contenido: Contenido): Promise<Borrador> {
   if (limite === null) {
     ajustes.push("Texto sin recortar: el límite de Threads no está verificado.");
   } else {
-    const corte = recortar(bruto, limite, LIMITES.threads.unidad);
+    const corte = recortarSinPartirUrl(bruto, limite, LIMITES.threads.unidad);
     texto = corte.texto;
     if (corte.recortado) ajustes.push(`Texto recortado a ${limite} caracteres.`);
+    if (corte.urlIncompleta) {
+      ajustes.push("El recorte partía el enlace: se ha quitado la URL entera en vez de dejarla rota.");
+    }
   }
 
   const imagenes: readonly Imagen[] = contenido.imagenes ?? [];

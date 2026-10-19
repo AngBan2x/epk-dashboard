@@ -47,7 +47,7 @@
  */
 
 import { LIMITES, cabeElTexto, contarGraphemes, limiteDeTexto } from "./limites";
-import { recortar,
+import { recortarSinPartirUrl,
   type AdaptadorSocial,
   type Borrador,
   type CapaHttp,
@@ -240,10 +240,16 @@ async function redactarBluesky(contenido: Contenido): Promise<Borrador> {
     requiereRevision = true;
     ajustes.push("Texto sin recortar: el límite de Bluesky no está verificado.");
   } else {
-    const corte = recortar(bruto, limite, LIMITES.bluesky.unidad);
+    const corte = recortarSinPartirUrl(bruto, limite, LIMITES.bluesky.unidad);
     texto = corte.texto;
     if (corte.recortado) {
       ajustes.push(`Texto recortado a ${limite} ${LIMITES.bluesky.unidad}.`);
+    }
+    if (corte.urlIncompleta) {
+      // El recorte habria partido la URL: se ha quitado entera en vez de dejar
+      // un enlace roto. Un post sin enlace es mejor que un post con un enlace
+      // que no lleva a ninguna parte, y el recorte es irreversible.
+      ajustes.push("El recorte partía el enlace: se ha quitado la URL entera en vez de dejarla rota.");
     }
   }
 
@@ -365,7 +371,7 @@ export async function publicar(o: OpcionesBluesky, publicacion: Publicacion): Pr
 
   const registro = comoRegistro(
     await exigirOk(
-      await o.http(`${o.pds}/xrpc/app.bsky.feed.post`, {
+      await o.http(`${o.pds}/xrpc/com.atproto.repo.createRecord`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${sesion.accessJwt}`,
@@ -384,11 +390,11 @@ export async function publicar(o: OpcionesBluesky, publicacion: Publicacion): Pr
           },
         }),
       }),
-      "app.bsky.feed.post",
+      "com.atproto.repo.createRecord",
       "bluesky",
       "publicar",
     ),
-    "app.bsky.feed.post",
+    "com.atproto.repo.createRecord",
   );
 
   const uri = exigirCampo(registro, "uri", "app.bsky.feed.post");
