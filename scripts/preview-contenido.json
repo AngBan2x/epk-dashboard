@@ -1,0 +1,6 @@
+{
+  "titulo": "PressPlay — Electronic Press Kit",
+  "cuerpo": "Acabamos de abrir PressPlay.\n\nUn Electronic Press Kit donde el artista junta su bio, sus releases, sus fechas y su rider técnico en un solo sitio.\n\nLa ficha que un periodista, un promotor o un festival abre antes de decidir.\n\nepk-dashboard.vercel.app",
+  "enlace": "https://epk-dashboard.vercel.app",
+  "imagenes": [{"url": "https://epk-dashboard.vercel.app/pressplay/landing-desktop-light.jpg"}]
+}

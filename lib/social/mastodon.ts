@@ -140,8 +140,36 @@ function hostDe(o: OpcionesMastodon): string {
   return o.instancia.replace(/\/+$/, "");
 }
 
-function cabeceras(o: OpcionesMastodon): Record<string, string> {
-  return { Authorization: `Bearer ${o.accessToken}` };
+/**
+ * Cabeceras del cuerpo **JSON** de `/api/v1/statuses`.
+ *
+ * ## Por qué `Content-Type` no es opcional aquí
+ *
+ * Mastodon solo interpreta el cuerpo como JSON si la petición lleva
+ * `Content-Type: application/json`. Sin esa cabecera, un `JSON.stringify(cuerpo)`
+ * llega a Rails como un formulario vacío: la API responde `422` con
+ * **"Text cannot be blank"**, y los 318 caracteres —ya validados por el
+ * pre-flight— no salen nunca de este proceso.
+ *
+ * Pasó de verdad: el primer intento de publicar en `@pressplay_epk` devolvió
+ * `422 · Validation failed: Text cannot be blank` con el pre-flight en `listo` y
+ * 318 caracteres. El mensaje de la API culpa al texto, y el texto era el
+ * correcto: esa es la forma más cara de perder tiempo.
+ *
+ * ## Por qué no se fusiona con `cabecerasMultipart`
+ *
+ * Las dos llamadas de este fichero necesitan lo **opuesto**:
+ *
+ * - `POST /api/v1/statuses` lleva JSON → **sí** quiere `Content-Type`.
+ * - `POST /api/v1/media` lleva `FormData` → **no** puede llevarlo, porque el
+ *   `boundary` lo genera el transporte y ponerlo a mano es la forma habitual de
+ *   que un multipart llegue vacío.
+ *
+ * Una función única para las dos haría bien una y mal la otra, y la que queda
+ * mal no da error de sintaxis: simplemente publica en blanco.
+ */
+function cabecerasJson(o: OpcionesMastodon): Record<string, string> {
+  return { Authorization: `Bearer ${o.accessToken}`, "Content-Type": "application/json" };
 }
 
 /**
@@ -152,7 +180,7 @@ function cabeceras(o: OpcionesMastodon): Record<string, string> {
  * multipart llegue con un cuerpo vacío y sin ningún error visible.
  */
 function cabecerasMultipart(o: OpcionesMastodon): Record<string, string> {
-  return cabeceras(o);
+  return { Authorization: `Bearer ${o.accessToken}` };
 }
 
 function mimeDeUrl(url: string): string {
@@ -300,7 +328,7 @@ export async function publicar(o: OpcionesMastodon, publicacion: Publicacion): P
     await exigirOk(
       await o.http(`${hostDe(o)}/api/v1/statuses`, {
         method: "POST",
-        headers: cabeceras(o),
+        headers: cabecerasJson(o),
         body: JSON.stringify(cuerpo),
       }),
       "POST /api/v1/statuses",

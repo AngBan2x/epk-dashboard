@@ -76,6 +76,22 @@ const pub = (texto = "Hola", imagenes: string[] = []): Publicacion => ({
 
 const IMG = "https://epk-dashboard.vercel.app/pressplay/release-desktop-light.jpg";
 
+/**
+ * Lee una cabecera de una llamada, sea cual sea la forma de `HeadersInit`.
+ *
+ * `HeadersInit` es `Headers | string[][] | Record<string, string>`, así que
+ * indexarlo con una cadena no compila en modo estricto. Normalizarlo aquí
+ * evita el `as` en cada aserción, que es la forma de que un `as` mal puesto
+ * termine affirmando algo que nunca se comprobó.
+ */
+function cabeceraDe(llamada: Llamada, nombre: string): string | undefined {
+  const h = llamada.init.headers;
+  if (h === undefined) return undefined;
+  if (h instanceof Headers) return h.get(nombre) ?? undefined;
+  if (Array.isArray(h)) return Object.fromEntries(h)[nombre];
+  return h[nombre];
+}
+
 describe("la tabla de límites es la fuente de verdad", () => {
   it("los verificados tienen número y los no verificados son null, no inventados", () => {
     expect(limiteDeTexto("bluesky")).toBe(300);
@@ -334,6 +350,44 @@ describe("Mastodon: el host y el límite los pone la instancia", () => {
 
     expect(llamadas[1]!.url).toContain("/api/v1/media");
     expect(llamadas[2]!.url).toContain("/api/v1/statuses");
+  });
+
+  it("el status lleva Content-Type: application/json y el texto en el cuerpo", async () => {
+    // **Por qué este test existe:** el primero de este bloque solo comprueba qué
+    // endpoint se llama, no **qué se le manda**. Y con una capa HTTP falsa que
+    // acepta cualquier cosa, un `Content-Type` ausente era invisible: 1822 tests
+    // verdes y un 422 real en producción con el texto vacío.
+    //
+    // La causa: `cabeceras()` estaba compartida entre las dos llamadas, y la
+    // del multipart **no puede** llevar `Content-Type` (el `boundary` lo genera
+    // el transporte). La del JSON **sí**, porque Rails solo parsea el cuerpo si
+    // ve esa cabecera. Compartiendo la función, la del JSON heredaba la
+    // omisión del multipart y Mastodon leía un formulario vacío.
+    //
+    // El mensaje de la API —"Text cannot be blank"— culpa al texto, y el texto
+    // era correcto. Por eso el test mira cabeceras y cuerpo, y no solo la URL.
+    const { http, llamadas } = capa([BYTES(), { id: "MEDIA_1" }, { id: "STATUS_1", url: "https://m/@u/1" }]);
+
+    await crearMastodon({ instancia: "https://mastodon.social", accessToken: "t", http }).publicar(
+      pub("Hola", [IMG]),
+    );
+
+    const status = llamadas[2]!;
+    expect(cabeceraDe(status, "Content-Type")).toBe("application/json");
+    expect(JSON.parse(String(status.init.body)).status).toBe("Hola");
+  });
+
+  it("el multipart NO lleva Content-Type, porque lo pone el transporte", async () => {
+    // La mitad opuesta del test anterior. Si alguien "arregla" la cabecera del
+    // JSON y toca también esta, el `boundary` deja de ir y el medio sube vacío —
+    // y ese fallo tampoco da error de sintaxis.
+    const { http, llamadas } = capa([BYTES(), { id: "MEDIA_1" }, { id: "STATUS_1", url: "https://m/@u/1" }]);
+
+    await crearMastodon({ instancia: "https://mastodon.social", accessToken: "t", http }).publicar(
+      pub("Hola", [IMG]),
+    );
+
+    expect(cabeceraDe(llamadas[1]!, "Content-Type")).toBeUndefined();
   });
 
   it("un límite de instancia distinto manda sobre el de la tabla", () => {
