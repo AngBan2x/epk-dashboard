@@ -77,14 +77,14 @@ La salida máxima declarada se descuenta del presupuesto de entrada (`context �
 
 | # | Tarea | Estado | Commit | Evidencia |
 |---|-------|--------|--------|-----------|
-| P22.1 | Smoke test de los candidatos antes de asignar | ✅ hecha | — | 2 smoke tests reales, ambos respondieron y leyeron un PNG |
-| P22.2 | Asignar el modelo real de los 4 subagentes rotos | ✅ hecha | — | `opencode.json`: `visual-tester` → `longcat-2.5-free`; `release-manager`/`vercel-deployer`/`doc-writer` → `nemotron-3.5-super-vl-free`. Fallback documentado a Nemotron si LongCat agota el cupo |
-| P22.3 | Los `.md` de los agentes no deben nombrar un modelo | ✅ hecha | — | `.opencode/agents/visual-tester.md`: la sección "Modelo" ahora describe **capacidades** y dice de dónde sale el id (`opencode.json`). Se añade la tabla de "si tu modelo no responde" con los dos diagnósticos distintos |
-| P22.4 | Rehacer la tabla de modelos de AGENTS.md con las cifras medidas | ✅ hecha | — | Tabla de 3 modelos en uso + 11 en reserva con su estado en Venezuela + la regla de la ventana útil + el bloque de OpenRouter como plan B |
+| P22.1 | Smoke test de los candidatos antes de asignar | ✅ hecha | `974d8d1` | 2 smoke tests reales, ambos respondieron y leyeron un PNG |
+| P22.2 | Asignar el modelo real de los 4 subagentes rotos | ✅ hecha | `974d8d1` | `opencode.json`: `visual-tester` → `longcat-2.5-free`; `release-manager`/`vercel-deployer`/`doc-writer` → `nemotron-3.5-super-vl-free`. Fallback documentado a Nemotron si LongCat agota el cupo |
+| P22.3 | Los `.md` de los agentes no deben nombrar un modelo | ✅ hecha | `974d8d1` | `.opencode/agents/visual-tester.md`: la sección "Modelo" ahora describe **capacidades** y dice de dónde sale el id (`opencode.json`). Se añade la tabla de "si tu modelo no responde" con los dos diagnósticos distintos |
+| P22.4 | Rehacer la tabla de modelos de AGENTS.md con las cifras medidas | ✅ hecha | `974d8d1` | Tabla de 3 modelos en uso + 11 en reserva con su estado en Venezuela + la regla de la ventana útil + el bloque de OpenRouter como plan B |
 | P22.5 | Verificar el pago de OpenRouter por USDC | ⬜ pendiente | — | **Requiere a la persona**: topping up de la cuenta. No lo hace un agente |
-| P22.6 | Eliminar las referencias a modelos muertos en AGENTS.md | ✅ hecha | — | `space-bunny-free`, `muse-spark-1.3` y `mimo-v2.6-flash-free` ya no aparecen como "modelo en uso". La columna "Modelo" de las 7 tablas de subagentes **se eliminó**: repetía el mismo valor en 27 filas y por eso se quedó obsoleta sin que nadie lo notara |
-| P22.7 | Reglas A–F en AGENTS.md | ✅ hecha | — | La sección "Las fases tienen checklist viva (P17 en adelante)" |
-| P22.8 | Actualizar la tabla de contexto del guard de compactación | ✅ hecha | — | `tests/unit/override-compaction.test.ts`: `longcat-2.5-free` añadido con **1.000.000** (el valor real de models.dev, no 1.048.576) y el de Nemotron corregido. El guard rechazaba el modelo nuevo por no estar en la tabla — que es exactamente lo que tiene que hacer |
+| P22.6 | Eliminar las referencias a modelos muertos en AGENTS.md | ✅ hecha | `974d8d1` | `space-bunny-free`, `muse-spark-1.3` y `mimo-v2.6-flash-free` ya no aparecen como "modelo en uso". La columna "Modelo" de las 7 tablas de subagentes **se eliminó**: repetía el mismo valor en 27 filas y por eso se quedó obsoleta sin que nadie lo notara |
+| P22.7 | Reglas A–F en AGENTS.md | ✅ hecha | `974d8d1` | La sección "Las fases tienen checklist viva (P17 en adelante)" |
+| P22.8 | Actualizar la tabla de contexto del guard de compactación | ✅ hecha | `974d8d1` | `tests/unit/override-compaction.test.ts`: `longcat-2.5-free` añadido con **1.000.000** (el valor real de models.dev, no 1.048.576) y el de Nemotron corregido. El guard rechazaba el modelo nuevo por no estar en la tabla — que es exactamente lo que tiene que hacer |
 
 ## Lo que queda abierto
 

@@ -53,14 +53,14 @@ público, en vez de cuatro sitios donde recordar que hay que filtrar.
 
 | # | Tarea | Estado | Commit | Evidencia |
 |---|-------|--------|--------|-----------|
-| P17.1 | Escapar `<` en el JSON-LD de la ficha de artista | ✅ hecha | — | `lib/safe-json-ld.ts` + test "una biografía con `</script>` no rompe el JSON-LD" |
-| P17.2 | Lectura pública con whitelist en `lib/db.ts` | ✅ hecha | — | `getPublicArtists()` / `getPublicArtistById()`, con las columnas escritas a mano |
-| P17.3 | Usarla en web, sitemap y API (que la web y la API dejen de discrepar) | ✅ hecha | — | `app/artists/page.tsx`, `app/sitemap.ts`, `app/api/artists/route.ts`, `app/api/artists/[id]/route.ts` |
-| P17.4 | `/api/search` filtra por estado | ✅ hecha | — | test "no devuelve releases en draft, pending ni rejected" |
-| P17.5 | Cerrar el IDOR de likes | ✅ hecha | — | test "sin sesión, pedir los likes de un usuario es 401" |
-| P17.6 | `/releases/[id]` y `/track/[id]` solo si `status = 'approved'` | ✅ hecha | — | `getVisibleReleaseWithTracks()` en `lib/releases.ts` + test "el draft no lo ve ni el público ni un suscriptor" |
-| P17.7 | El dossier JSON no lleva el email; el HTML y el PDF sí | ✅ hecha | — | test "el JSON no lleva contact_email, booking_email ni management" |
-| P17.8 | Un test por fuga | ✅ hecha | — | `tests/unit/p17-catalogo-publico.test.ts`, 19 tests. **Mutados los 4 arreglos: 4 rojos** |
+| P17.1 | Escapar `<` en el JSON-LD de la ficha de artista | ✅ hecha | `974d8d1` | `lib/safe-json-ld.ts` + test "una biografía con `</script>` no rompe el JSON-LD" |
+| P17.2 | Lectura pública con whitelist en `lib/db.ts` | ✅ hecha | `974d8d1` | `getPublicArtists()` / `getPublicArtistById()`, con las columnas escritas a mano |
+| P17.3 | Usarla en web, sitemap y API (que la web y la API dejen de discrepar) | ✅ hecha | `974d8d1` | `app/artists/page.tsx`, `app/sitemap.ts`, `app/api/artists/route.ts`, `app/api/artists/[id]/route.ts` |
+| P17.4 | `/api/search` filtra por estado | ✅ hecha | `974d8d1` | test "no devuelve releases en draft, pending ni rejected" |
+| P17.5 | Cerrar el IDOR de likes | ✅ hecha | `974d8d1` | test "sin sesión, pedir los likes de un usuario es 401" |
+| P17.6 | `/releases/[id]` y `/track/[id]` solo si `status = 'approved'` | ✅ hecha | `974d8d1` | `getVisibleReleaseWithTracks()` en `lib/releases.ts` + test "el draft no lo ve ni el público ni un suscriptor" |
+| P17.7 | El dossier JSON no lleva el email; el HTML y el PDF sí | ✅ hecha | `974d8d1` | test "el JSON no lleva contact_email, booking_email ni management" |
+| P17.8 | Un test por fuga | ✅ hecha | `974d8d1` | `tests/unit/p17-catalogo-publico.test.ts`, 19 tests. **Mutados los 4 arreglos: 4 rojos** |
 
 ## Criterio de cierre
 

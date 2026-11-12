@@ -97,7 +97,7 @@ tests/                       # Unit + E2E tests
 
 ## Base de Datos
 
-**Dual-mode**: Turso (producción) o SQLite local (dev). **10 tablas**:
+**Dual-mode**: Turso (producción) o SQLite local (dev). **11 tablas**:
 
 | Tabla | Descripción |
 |-------|-------------|
@@ -111,6 +111,7 @@ tests/                       # Unit + E2E tests
 | `likes` | Likes de usuarios a pistas |
 | `subscriptions` | Suscripciones de usuarios a artistas, con preferencias de aviso |
 | `dossiers` | Dossiers EPK, rider técnico y datos de contacto por artista |
+| `suggestions` | Buzón anónimo de sugerencias, sin FK a propósito (`ip_hash` es un HMAC, no un SHA) |
 
 ## Funcionalidades
 
@@ -251,7 +252,7 @@ Todos con **dry-run por defecto**; escriben solo con `--apply`.
 | Check | Resultado |
 |-------|-----------|
 | TypeScript Strict | ✅ 0 errores |
-| Unit Tests | ✅ 1657/1657 en 84 archivos (secuencial) |
+| Unit Tests | ✅ 1856/1856 en 93 archivos (medido en `974d8d1`) |
 | Lint | ✅ 0 errores, 0 warnings |
 | Build | ✅ Success |
 | Dark Mode | ✅ Consistente en todos los modos |
@@ -260,6 +261,10 @@ Todos con **dry-run por defecto**; escriben solo con `--apply`.
 
 | Versión | Descripción |
 |---------|-------------|
+| v4.0.0-rc.36 | P12: las puertas que no fallan. E2E 136/136 en producción |
+| v4.0.0-rc.35 | Consolidación del reproductor en `AudioPlayer` |
+| v4.0.0-rc.34 | F6: las 12 parejas de imagen del catálogo, y la reescritura de la suite E2E |
+| v4.0.0-rc.33 | Catálogo real, credenciales fuera del código, buzón anónimo y una página por release |
 | v4.0.0-rc.31 | Cierre de fugas S0, cola de audio, descargas por artista, catálogo real con artwork de iTunes y Cover Art Archive |
 | v4.0.0-rc.30 | Ficha de álbum con tracklist, ficha técnica legible, PDF de prensa con fuente incrustada |
 | v4.0.0-rc.29 | Catálogo multi-track, rejilla de releases, aprobaciones y shows con identidad de marca |
@@ -274,13 +279,19 @@ Todos con **dry-run por defecto**; escriben solo con `--apply`.
 | v4.0.0-rc.6 | Turso stale data fix |
 | v4.0.0 | Full platform — shows, releases, subscribers |
 
+> **Sin release todavía:** P17 (el catálogo público es un catálogo público) y P22 (los modelos que
+> existen) están commiteados y verificados, pero esperando a que las fases siguientes dé su propio
+> tag. Ver [`docs/PHASES.md`](docs/PHASES.md).
+
 ## Documentación
 
 | Archivo | Descripción |
 |---------|-------------|
-| `docs/AI_LOG.md` | Bitácora técnica completa |
+| [`docs/PHASES.md`](docs/PHASES.md) | **Índice de las fases.** Cuál está abierta, cuál está cerrada y qué números de la numeración están ocupados |
+| `docs/PHASE_P*.md` | Una fase = un documento, con su checklist de tareas y su estado vivo |
+| `docs/AI_LOG.md` | Bitácora técnica completa (el texto troceado por época está en `docs/ai-log/`) |
 | `MASTER_PLAN.md` | Plan maestro del proyecto |
-| `AGENTS.md` | Configuración de agentes y subagentes |
+| `AGENTS.md` | Configuración de agentes y subagentes, y los invariantes que no se pueden romper |
 
 ## Environment Variables
 
