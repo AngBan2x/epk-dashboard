@@ -50,7 +50,7 @@ completo está en `.opencode/plans/P17-P25-pressplay.md`.
 | **P18** | — | pendiente | La sesión caduca, se suspende y se degrada |
 | **P19** | — | pendiente | Cabeceras de seguridad y CSP |
 | **P20** | — | pendiente | Nada se borra sin que alguien lo pida (soft delete + purga) |
-| **P21** | [`PHASE_P21.md`](./PHASE_P21.md) | **en curso** | **El pipeline: un gate, dos destinos, deploy por tags.** Empezada por lo que bloqueaba a todo lo demás: **la CI no se ejecutaba** (0 ejecuciones verdes en todo el historial) |
+| **P21** | [`PHASE_P21.md`](./PHASE_P21.md) | **en curso** | **El pipeline: un gate, dos destinos, deploy por tags.** La CI **ya se ejecuta** (antes: 0 ejecuciones verdes en todo el historial). Único punto rojo: falta el secreto `TEST_ADMIN_PASSWORD` |
 | **P22** | [`PHASE_P22.md`](./PHASE_P22.md) | **implementada** | **Los modelos que existen.** 4 subagentes apuntaban a un modelo retirado del catálogo. Hecha en `974d8d1`; queda **P22.5**, que es el topping up de OpenRouter y hace la persona |
 | **P23** | — | pendiente | La calidad que se nota |
 | **P24** | — | pendiente | La documentación que se puede leer |

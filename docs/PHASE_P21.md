@@ -135,6 +135,36 @@ Un push a `main` ejecuta typecheck, lint, los tests y el build **en verde**, sin
 Turso, y **no** despliega a producción. Un tag `v*` despliega a producción. Y existe un solo
 comando que hace lo mismo que la CI, en local.
 
+## Dónde está la CI ahora mismo (2026-11-12)
+
+| Step | Estado |
+|------|--------|
+| `pnpm install --frozen-lockfile` | ✅ |
+| `pnpm typecheck` | ✅ 0 errores |
+| `pnpm lint` | ✅ 0 avisos |
+| `pnpm test:unit` | ✅ **1856 tests / 93 ficheros** |
+| `pnpm build` | ✅ |
+| Instalar el navegador de Playwright | ✅ (el step no existía) |
+| **Comprobar las credenciales de los E2E** | ❌ **Falta `TEST_ADMIN_PASSWORD`** — y ahora lo dice en el segundo 2, en vez de 45 tests con "login -> 400" tras 53 minutos |
+| E2E (Playwright) | ⛔ No se llega: 102 pasaron y 45 fallaron en la corrida anterior, todos por el mismo secreto ausente |
+| Deploy a producción | ⛔ No se llega |
+
+**Antes de esta fase, la CI no se ejecutaba: 0 ejecuciones verdes en todo el historial.** Ahora
+ejecuta, y su único punto rojo es **un secreto que solo la persona puede crear** (P21.6).
+
+### Lo que falta para cerrarla
+
+1. **Crear el secreto `TEST_ADMIN_PASSWORD`** en *Settings → Secrets and variables → Actions →
+   Secrets*. Es la cuenta `admin@epk.local` de producción, cuya contraseña se rotó en la rotación de
+   credenciales (`docs/ROTACION_CREDENCIALES.md`).
+2. Con eso, los E2E correrán. Y hay que mirar si se chocan con el rate limit de login: **5/min por
+   IP**, y la CI comparte IP. Con credenciales correctas no hay reintentos en cadena, así que
+   debería ir; si no, el arreglo es **contar los intentos fallidos** en vez de todos (lo que además
+   arregla un DoS real: hoy el límite se aplica **antes** de validar la contraseña, así que cinco
+   intentos fallidos desde una IP bloquean a un usuario legítimo detrás de la misma NAT).
+3. `TEST_ARTIST_PASSWORD` y `TEST_SUBSCRIBER_PASSWORD` también, para los specs que usan esas
+   cuentas.
+
 ## Lo que se hizo
 
 _(se rellena con commit y salida literal de puerta a medida que avanza)_

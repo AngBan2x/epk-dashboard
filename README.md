@@ -261,6 +261,7 @@ Todos con **dry-run por defecto**; escriben solo con `--apply`.
 
 | Versión | Descripción |
 |---------|-------------|
+| v4.0.0-rc.37 | P17 · P21 · P22 — el catálogo público es un catálogo público (3 fugas confirmadas en producción), los modelos que existen (4 subagentes apuntaban a un modelo retirado) y **la CI, que no se ejecutaba** |
 | v4.0.0-rc.36 | P12: las puertas que no fallan. E2E 136/136 en producción |
 | v4.0.0-rc.35 | Consolidación del reproductor en `AudioPlayer` |
 | v4.0.0-rc.34 | F6: las 12 parejas de imagen del catálogo, y la reescritura de la suite E2E |
@@ -279,9 +280,9 @@ Todos con **dry-run por defecto**; escriben solo con `--apply`.
 | v4.0.0-rc.6 | Turso stale data fix |
 | v4.0.0 | Full platform — shows, releases, subscribers |
 
-> **Sin release todavía:** P17 (el catálogo público es un catálogo público) y P22 (los modelos que
-> existen) están commiteados y verificados, pero esperando a que las fases siguientes dé su propio
-> tag. Ver [`docs/PHASES.md`](docs/PHASES.md).
+> **Fases abiertas:** P18 (sesión), P19 (cabeceras y CSP), P20 (soft delete), P21 (el pipeline: un
+> gate, dos destinos, deploy por tags), P23 (calidad), P24 (documentación) y P25 (frontera social).
+> Ver [`docs/PHASES.md`](docs/PHASES.md) para el estado de cada una y sus checklists.
 
 ## Documentación
 
