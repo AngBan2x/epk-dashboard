@@ -119,12 +119,13 @@ Siguen rotos, y son las tareas de esta fase:
 |---|-------|--------|--------|-----------|
 | P21.0 | **La CI arranca**: alinear la versión de pnpm con la del repo y dejar de escribirla a mano | ✅ hecha | — | `engines.pnpm` en `package.json` + `pnpm/action-setup` con `version: 12`. Install ✓ typecheck ✓ lint ✓ en el run `43258873008` |
 | P21.0b | **Los dos tests que mataban el worker**: `scripts/meta-long-lived-token.ts` y `scripts/threads-token.ts` ejecutaban su `main()` al importarse, y sin credenciales (que la CI no tiene) el `process.exit(1)` mataba vitest | ✅ hecha | — | El patrón `invokedDirectly` que ya tenían 7 scripts. Verificado **simulando la CI** (sin `.env.local`): 31/31 verdes, antes moría |
+| P21.0c | **El gate dice la verdad**: check previo que falla en el segundo 2 si falta `TEST_ADMIN_PASSWORD`, y un `globalSetup` que informa de las credenciales que faltan | ✅ hecha | — | Antes: 45 tests con "login -> 400" y luego 429, tras 53 min. El rate limit de login es de 5/min **por IP** y la CI comparte IP, así que los reintentos se bloquean a sí mismos |
 | P21.1 | **Un solo gate**: `pnpm gate` = typecheck + lint + `vitest run --no-file-parallelism` + build, y que la skill, el tool, `package.json` y la CI llamen al mismo script | ⬜ pendiente | — | — |
 | P21.2 | **E2E completos en local y en producción**: local con SQLite + `next start` (el build real); producción contra Turso, con la limpieza automática al final | ⬜ pendiente | — | — |
 | P21.3 | **La limpieza al final de la corrida**: `qa-cleanup.ts --apply` en el mismo job. Sus patrones casan con lo que los specs producen (`@example.com`, `"QA …"`, `[QA]`/`[E2E]`/`[TEST]`) | ⬜ pendiente | — | — |
 | P21.4 | **Deploy por tags**: `push` a `main` → preview; tag `v*` → producción | ⬜ pendiente | — | — |
 | P21.5 | `scripts/danger/` para los 10 scripts que escriben sin dry-run, todos con `--apply` obligatorio | ⬜ pendiente | — | — |
-| P21.6 | Crear el secreto `TEST_ADMIN_PASSWORD` (sin él el cron no corre) + alinear `docs/CONFIG_TODO.md` C12 | ⬜ pendiente | — | — |
+| P21.6 | **Crear el secreto `TEST_ADMIN_PASSWORD`** (sin él el cron no corre **y** los E2E de la CI fallan) + alinear `docs/CONFIG_TODO.md` C12 | ⬜ pendiente | — | **Es de la persona**: un secreto del secret store. El workflow ya lo comprueba y dice qué falta |
 | P21.7 | Verificar `tracks.created_at` en Turso real (`scripts/turso-check.ts`): no está en el schema de `lib/turso.ts` y 3 consultas ordenan por ella | ⬜ pendiente | — | — |
 | P21.8 | Migrar `app/api/admin/users/[id]/role/route.ts:58-63` al patrón único (`getTursoClientSync()`) | ⬜ pendiente | — | — |
 

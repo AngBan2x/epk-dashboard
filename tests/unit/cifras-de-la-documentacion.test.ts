@@ -60,7 +60,7 @@ describe("AI_LOG.md: los seis recuentos de docs/ai-log/", () => {
     "05-rc10-rc28.md": 1438,
     "06-tranches-a-hoy.md": 1628,
     // P17 + P22 — la época de 2026-11-12.
-    "07-p17-p22.md": 314,
+    "07-p17-p22.md": 342,
   };
 
   it("los ficheros que se nombran son exactamente los que existen", () => {

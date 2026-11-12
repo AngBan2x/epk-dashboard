@@ -65,6 +65,32 @@ jobs:
       - name: Instalar el navegador de Playwright
         run: npx playwright install --with-deps chromium
 
+      # Comprobar las credenciales ANTES de gastar 53 minutos en los E2E.
+      #
+      # Sin `TEST_ADMIN_PASSWORD` en el secret store, los specs hacen login con
+      # la contraseña vacía, el servidor responde 400, y **45 tests fallan** con
+      # "login -> 400" y luego "login falló con 429" (el rate limit de login es
+      # de 5/min por IP, y la CI comparte IP: los reintentos se bloquean a sí
+      # mismos). El resultado es un run de una hora con 45 errores que no dicen
+      # nada del problema real.
+      #
+      # Este step falla en el segundo 2 y dice exactamente qué falta. Es el mismo
+      # patrón que `cleanup-shows.yml`: **fallar ruidosamente antes**, no
+      # después de 53 minutos de ruido.
+      #
+      # ⚠️ La contraseña **no** tiene default en el repo, a propósito (P7): un
+      # default silencioso sería una contraseña real en el código.
+      - name: Comprobar las credenciales de los E2E
+        env:
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+        run: |
+          if [ -z "${TEST_ADMIN_PASSWORD:-}" ]; then
+            echo "::error::Falta el secreto TEST_ADMIN_PASSWORD. Los E2E hacen login contra /api/auth/login y, sin ese secreto, fallan con 'login -> 400' y luego 429 (el rate limit de login es 5/min por IP y la CI comparte IP). Créalo en Settings -> Secrets and variables -> Actions -> Secrets. Ver docs/PHASE_P21.md (P21.6)."
+            exit 1
+          fi
+          echo "Credenciales de E2E presentes."
+
       - name: E2E (Playwright)
         run: pnpm test:e2e
         env:

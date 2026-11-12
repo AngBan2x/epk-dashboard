@@ -24,6 +24,10 @@ const contraProduccion = !!process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Avisa de las credenciales que faltan ANTES de empezar. No falla: hay specs
+  // que no las necesitan, y abortarlos a todos por eso sería peor. Ver
+  // `tests/e2e/global-setup.ts`.
+  globalSetup: "./tests/e2e/global-setup.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
