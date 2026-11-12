@@ -2,6 +2,7 @@
   "name": "epk-dashboard",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@12.5.1",
   "description": "PressPlay - Donde la música se presenta",
   "scripts": {
     "prebuild": "node -e \"const fs=require('fs');for(const f of fs.readdirSync('data').filter(x=>/^music_catalog\\.db(-shm|-wal)?$/.test(x))){fs.rmSync('data/'+f,{force:true})}\"",

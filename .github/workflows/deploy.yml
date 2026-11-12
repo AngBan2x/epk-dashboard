@@ -12,9 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # La versión de pnpm sale de `packageManager` en `package.json`.
+      #
+      # Escribirla aquí fue lo que rompió la CI: el workflow iba con **pnpm 9**,
+      # que exige el campo `packages` en `pnpm-workspace.yaml`, y el fichero del
+      # repo usa campos de **pnpm 10+** (`allowBuilds`, `minimumReleaseAgeExclude`).
+      # `pnpm store path` —que es lo que llama `setup-node` para la caché— fallaba
+      # con "packages field missing or empty" y la CI moría en 13 s, **antes de
+      # instalar nada**. Cero ejecuciones verdes en todo el historial del workflow.
+      #
+      # Con la versión en un solo sitio, esto no puede volver a pasar: si el repo
+      # sube de pnpm, la CI sube sola.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
