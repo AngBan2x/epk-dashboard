@@ -1,4 +1,4 @@
-import { getAllArtists } from "@/lib/db";
+import { getPublicArtists } from "@/lib/db";
 import { parseListSortParams } from "@/lib/search";
 import { ArtistsCatalog } from "@/components/ArtistsCatalog";
 
@@ -12,7 +12,7 @@ interface ArtistsPageProps {
 }
 
 export default async function ArtistsPage({ searchParams }: ArtistsPageProps) {
-  const artists = await getAllArtists();
+  const artists = await getPublicArtists();
   const initialSort = parseListSortParams(searchParams.sort, searchParams.order);
 
   return (

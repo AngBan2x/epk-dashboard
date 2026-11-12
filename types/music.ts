@@ -397,6 +397,26 @@ export interface RawMetricsHistoryRow {
   created_at: string;
 }
 
+/**
+ * P17 · Un artista visto desde fuera.
+ *
+ * Es `ArtistProfile` **menos** lo que no es público:
+ *
+ * - `user_id` — la FK que liga el artista con su cuenta de usuario. No
+ *   describe al artista: lo relaciona con la cuenta que lo gestiona. Publicar
+ *   la convierte en un directorio de cuentas, y además enumerable.
+ * - `deleted_at` — interno.
+ * - `is_active` — en una lista pública es constante (todo lo público está
+ *   activo), así que no dice nada; y **sacarlo del tipo** es lo que impide
+ *   que un filtro se olvide de él.
+ *
+ * Vive aquí y no en `lib/db.ts` porque un Client Component la necesita, y
+ * `lib/db.ts` arrastra `better-sqlite3`: importar un tipo de ahí con
+ * `import type` es seguro, pero un `import` normal no lo sería, y este
+ * fichero es el que no puede tener esa dependencia.
+ */
+export type PublicArtist = Omit<ArtistProfile, "user_id" | "deleted_at" | "is_active">;
+
 export interface ArtistProfile {
   id: string;
   name: string;

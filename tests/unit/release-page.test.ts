@@ -48,9 +48,10 @@ import path from "path";
  * `isMultiTrack` → 5 rojos.
  */
 
-const { mockPlayQueue, mockGetReleaseNeighbours } = vi.hoisted(() => ({
+const { mockPlayQueue, mockGetReleaseNeighbours, mockGetReleaseWithTracks } = vi.hoisted(() => ({
   mockPlayQueue: vi.fn(),
   mockGetReleaseNeighbours: vi.fn(),
+  mockGetReleaseWithTracks: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -78,7 +79,19 @@ vi.mock("next/navigation", () => ({
  * nadie importa este símbolo, así que no hay nada que compilar contra él.
  */
 vi.mock("@/lib/releases", () => ({
-  getReleaseWithTracks: vi.fn(),
+  getReleaseWithTracks: mockGetReleaseWithTracks,
+  /**
+   * P17: la página pide el release por el lector con alcance
+   * (`getVisibleReleaseWithTracks`), que decide qué ve el público y qué ve su
+   * autor. El doble **delega** en el de siempre, para que los tests que
+   * configuran `getReleaseWithTracks` sigan sirviendo su fixture sin tocar
+   * nada.
+   *
+   * Lo que aquí NO se prueba es la visibilidad por estado: esto es la
+   * maquetación de la ficha. Eso vive en `tests/unit/p17-catalogo-publico.test.ts`,
+   * contra el módulo real.
+   */
+  getVisibleReleaseWithTracks: vi.fn(async (id: string) => mockGetReleaseWithTracks(id)),
   getReleaseNeighbours: mockGetReleaseNeighbours,
   resolveTrackRoute: vi.fn(),
 }));

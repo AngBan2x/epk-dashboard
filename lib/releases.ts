@@ -3,6 +3,7 @@ import {
   getArtistCatalog,
   getTrackById,
   getTracksByReleaseId,
+  isArtistOwnerOfTrackName,
 } from "@/lib/db";
 import { releaseShape, type ReleaseShape } from "@/lib/release-page";
 import type { Track } from "@/types/music";
@@ -63,6 +64,47 @@ export async function getReleaseWithTracks(id: string): Promise<ReleaseWithTrack
   const tracks = await getTracksByReleaseId(id);
 
   return { release, tracks, ...releaseShape(release, tracks) };
+}
+
+/**
+ * P17 — el lanzamiento que puede ver **quien no es el dueño ni el admin**.
+ *
+ * ## El problema que resuelve
+ *
+ * `getReleaseWithTracks()` devuelve la fila cruda, sin mirar su estado. Y la
+ * página `/releases/[id]` la usaba tal cual: un release en `draft`, `pending` o
+ * `rejected` —o sea, algo que un artista ha enviado y **nadie ha aprobado**—
+ * se servía con HTTP 200, con su portada, su título y su descripción, y
+ * además se anunciaba a los buscadores con
+ * `<meta name="robots" content="index, follow"/>`.
+ *
+ * El mismo catálogo, por la API, sí filtraba: `GET /api/tracks/[id]` usa
+ * `getApprovedTrackById()`. O sea, **la web y la API no compartían criterio de
+ * visibilidad**, y la que no filtraba era la que se indexa.
+ *
+ * ## Quién ve qué
+ *
+ * - **Aprobado**: todo el mundo. Es el catálogo público.
+ * - **Sin aprobar**: el admin (para moderar) y el propio artista (para revisar
+ *   lo que ha enviado antes de que lo aprueben).
+ *
+ * La propiedad se resuelve con `isArtistOwnerOfTrackName()`, que es la fuente
+ * fiable aquí: `tracks` se relaciona con `artists` por **nombre**, no por FK.
+ */
+export async function getVisibleReleaseWithTracks(
+  id: string,
+  viewer?: { userId: string; role: string } | null
+): Promise<ReleaseWithTracks | null> {
+  const data = await getReleaseWithTracks(id);
+  if (!data) return null;
+
+  if (data.release.status === "approved") return data;
+
+  if (!viewer) return null;
+  if (viewer.role === "admin") return data;
+
+  const owns = await isArtistOwnerOfTrackName(data.release.artist_name, viewer.userId);
+  return owns ? data : null;
 }
 
 /**

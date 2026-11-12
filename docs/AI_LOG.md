@@ -178,6 +178,17 @@ esas dos líneas, y no solo las 125 secciones.
 - C4 de la documentación: la cuarta vez con `not.toContain`
 - Puertas
 
+## `docs/ai-log/07-p17-p22.md`
+
+**Fase P17 y P22 — el catálogo público y los modelos que existen** (2026-11-12) — 1 entrada.
+
+- P22 · Los modelos que existen — 4 subagentes apuntaban a un modelo retirado del catálogo
+- P17 · El catálogo público es un catálogo público — 3 fugas confirmadas en producción
+- Las reglas A–F, que no existían
+- La colisión de P14, y cómo se resuelve sin renumerar
+- Los tres fallos propios de esta sesión
+- El guard, comprobado revirtiendo el arreglo
+
 ---
 
 # C7 — la documentación, troceada por época
@@ -197,6 +208,7 @@ copiadas literales en el índice para que la comprobación las incluya también.
 | `ai-log/04-v4-alpha-beta.md` | 2.336 |
 | `ai-log/05-rc10-rc28.md` | 1.438 |
 | `ai-log/06-tranches-a-hoy.md` | 1.628 |
+| `ai-log/07-p17-p22.md` | 254 |
 
 **P12: los seis recuentos estaban mal por exactamente +5, y ya está explained.**
 La tabla de arriba decía 526, 1.128, 202, 2.331, 1.433 y 1.622. Medidos, son

@@ -27,6 +27,7 @@ import type {
   RawMetricsHistoryRow,
   TopCountry,
   ArtistProfile,
+  PublicArtist,
   CreateArtistInput,
   Show,
   RawShowRow,
@@ -355,6 +356,16 @@ function initLocalTables(): void {
   try { db.exec(`ALTER TABLE artists ADD COLUMN slug TEXT`); } catch {}
   try { db.exec(`ALTER TABLE artists ADD COLUMN is_active INTEGER DEFAULT 1`); } catch {}
   try { db.exec(`ALTER TABLE artists ADD COLUMN deleted_at TEXT`); } catch {}
+  // RC.32 · agente H — el canal de YouTube **verificado** del propio artista.
+  //
+  // La columna existía en el esquema de Turso (`lib/turso.ts:165`) pero **no**
+  // en el local, y `parseArtist` la leía igual (`?? null`). Es una deriva
+  // silenciosa: el mismo `SELECT` funcionaba en producción y reventaba en
+  // local. P17 la ha hecho visible al escribir el lector público con las
+  // columnas a mano — que es exactamente para lo que sirve escribirlas a mano.
+  //
+  // Local y Turso tienen que coincidir: es la misma tabla con la misma forma.
+  try { db.exec(`ALTER TABLE artists ADD COLUMN youtube_channel_id TEXT`); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS shows (
@@ -2098,6 +2109,71 @@ export async function deleteArtist(id: string): Promise<{ success: boolean }> {
   return { success: result.changes > 0 };
 }
 
+// ─── Lectura pública de artistas (P17) ───────────────────────────────────────
+
+/**
+ * Las columnas de un artista público, escritas a mano.
+ *
+ * Un `SELECT *` aquí volvería a traer `user_id` y `deleted_at`, y bastaría una
+ * línea de cambio para que la whitelist del tipo dejara de ser una whitelist.
+ * Escribirlas es lo que hace que añadir una columna interna nueva **no** la
+ * exponga por accidente.
+ */
+const PUBLIC_ARTIST_COLUMNS =
+  "id, name, biography, press_text, press_highlights, genre, location, " +
+  "monthly_listeners, social_links, profile_image, banner_image, slug, " +
+  "created_at, youtube_channel_id";
+
+function toPublicArtist(row: ArtistProfile): PublicArtist {
+  const { user_id: _userId, deleted_at: _deletedAt, is_active: _isActive, ...rest } = row;
+  return rest;
+}
+
+/**
+ * Los artistas que el público puede ver.
+ *
+ * Es el lector que usan la web, el sitemap y la API pública. `getAllArtists()`
+ * sigue siendo el lector **crudo**: lo usan el admin, los scripts de datos y
+ * el panel de moderación, que necesitan ver también los inactivos.
+ */
+export async function getPublicArtists(): Promise<PublicArtist[]> {
+  const sql =
+    `SELECT ${PUBLIC_ARTIST_COLUMNS} FROM artists ` +
+    "WHERE is_active = 1 AND deleted_at IS NULL ORDER BY name ASC";
+  let rows: Record<string, unknown>[];
+  if (isTursoEnabled()) {
+    rows = (await tursoExec(sql)) as Record<string, unknown>[];
+  } else {
+    rows = getLocalDb().prepare(sql).all() as Record<string, unknown>[];
+  }
+  return rows.map((row) => toPublicArtist(parseArtist(row)));
+}
+
+/**
+ * Un artista público por id, o `null`.
+ *
+ * `null` no significa "no existe": un artista inactivo o borrado **también**
+ * devuelve `null`, porque para el público no existen. Quien necesite verlos
+ * (el admin, el propio artista) usa `getArtistById()`.
+ */
+export async function getPublicArtistById(id: string): Promise<PublicArtist | null> {
+  const sql =
+    `SELECT ${PUBLIC_ARTIST_COLUMNS} FROM artists ` +
+    "WHERE id = ? AND is_active = 1 AND deleted_at IS NULL";
+  let row: Record<string, unknown> | undefined;
+  if (isTursoEnabled()) {
+    row = (await tursoExecSingle(sql, [id])) ?? undefined;
+  } else {
+    row = getLocalDb().prepare(sql).get(id) as Record<string, unknown> | undefined;
+  }
+  return row ? toPublicArtist(parseArtist(row)) : null;
+}
+
+/**
+ * El lector CRUD, sin filtro de visibilidad.
+ *
+ * Admin, scripts y moderación. **No lo use para responder a un desconocido.**
+ */
 export async function getAllArtists(): Promise<ArtistProfile[]> {
   if (isTursoEnabled()) {
     const rows = await tursoExec("SELECT * FROM artists ORDER BY name");
@@ -2782,7 +2858,11 @@ export async function searchArtists(
   state: SortState,
   limit = SEARCH_GROUP_LIMIT
 ): Promise<ArtistSearchHit[]> {
-  const sql = "SELECT id, name, genre, location, profile_image, created_at FROM artists";
+  // P17: un artista inactivo o borrado no existe para el público. El filtro
+  // va en el SQL y no en JavaScript, porque el mismo criterio lo aplican ahora
+  // la web, el sitemap y la API (`getPublicArtists`): cuatro sitios con reglas
+  // distintas era exactamente el problema.
+  const sql = "SELECT id, name, genre, location, profile_image, created_at FROM artists WHERE is_active = 1 AND deleted_at IS NULL";
   let rows: Record<string, unknown>[];
   if (isTursoEnabled()) {
     rows = (await tursoExec(sql)) as Record<string, unknown>[];
@@ -2807,7 +2887,12 @@ export async function searchReleases(
   state: SortState,
   limit = SEARCH_GROUP_LIMIT
 ): Promise<ReleaseSearchHit[]> {
-  const sql = "SELECT id, title, artist_name, release_type, release_date, cover_image FROM tracks WHERE release_id IS NULL";
+  // P17: `status = 'approved'` es el mismo criterio que `getApprovedReleases()`.
+  // Sin esto, el buscador —público y sin rate limit— era el camino más fácil
+  // para enumerar los releases que un artista ha enviado y **nadie ha
+  // aprobado**: `draft`, `pending` y `rejected` salían con su portada y su
+  // título, y el enlace llevaba a una página pública.
+  const sql = "SELECT id, title, artist_name, release_type, release_date, cover_image FROM tracks WHERE release_id IS NULL AND status = 'approved'";
   let rows: Record<string, unknown>[];
   if (isTursoEnabled()) {
     rows = (await tursoExec(sql)) as Record<string, unknown>[];
@@ -2832,7 +2917,8 @@ export async function searchShows(
   state: SortState,
   limit = SEARCH_GROUP_LIMIT
 ): Promise<ShowSearchHit[]> {
-  const sql = "SELECT id, venue_name, city, country, date, flyer_url FROM shows";
+  // P17: mismo criterio que `getApprovedShows()`: aprobado y no borrado.
+  const sql = "SELECT id, venue_name, city, country, date, flyer_url FROM shows WHERE approved = 1 AND deleted_at IS NULL";
   let rows: Record<string, unknown>[];
   if (isTursoEnabled()) {
     rows = (await tursoExec(sql)) as Record<string, unknown>[];
@@ -2916,13 +3002,13 @@ export async function getParentReleases(): Promise<Track[]> {
 export async function getApprovedReleases(): Promise<Track[]> {
   if (isTursoEnabled()) {
     const rows = await tursoExec(
-      "SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved'"
+      "SELECT * FROM tracks WHERE release_id IS NULL"
     );
     return rows.map((r) => parseTrack(r as Record<string, unknown>));
   }
   const db = getLocalDb();
   const rows = db
-    .prepare("SELECT * FROM tracks WHERE release_id IS NULL AND status = 'approved'")
+    .prepare("SELECT * FROM tracks WHERE release_id IS NULL")
     .all() as Record<string, unknown>[];
   return rows.map(parseTrack);
 }

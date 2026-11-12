@@ -68,10 +68,20 @@ interface Config {
  * Va hardcodeado a proposito: la alternativa —consultar la API en cada test—
  * hace que el test dependa de la red, y un test que depende de la red falla
  * cuando la red falla, que es cuando menos te fias de el.
+ *
+ * **Remedido el 2026-11-12** contra `https://models.dev/api.json`. Los tres
+ * modelos en uso hoy miden **1.000.000** de contexto, no 1.048.576: el
+ * proveedor no usa la potencia de dos. Y `longcat-2.5-free` se añadió porque
+ * un modelo **fuera de esta tabla hace fallar el test**, que es justo lo que
+ * se quiere: poner un modelo nuevo es una decisión que hay que verificar
+ * contra models.dev, no una línea suelta.
  */
 const CONTEXTO_DECLARADO: Record<string, number> = {
   "opencode/minimax-m3.1-flash-free": 1_000_000,
-  "opencode/nemotron-3.5-super-vl-free": 1_048_576,
+  "opencode/longcat-2.5-free": 1_000_000,
+  "opencode/nemotron-3.5-super-vl-free": 1_000_000,
+  // Modelos retirados del catálogo. Se quedan porque explican el histórico:
+  // `space-bunny-free` es el que daba la compactación al 50 %.
   "opencode/muse-spark-1.3": 1_048_576,
   "opencode/space-bunny-free": 1_048_576,
   "opencode/mimo-v2.6-flash-free": 200_000,

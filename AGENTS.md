@@ -73,8 +73,8 @@ tests/             # Vitest + Playwright
   - **Scripts de datos**: `scripts/seed-influential-catalog.ts` (P5.2, **NO aplicado en prod**), `scripts/backfill-artist-owners.ts` (6 de 7 artistas siguen con `user_id` NULL) y `scripts/qa-cleanup.ts`. Los tres con dry-run por defecto y `--apply` para escribir. **RC.33 withdrawing**: `scripts/fetch-official-videos.ts` y `scripts/apply-artist-images.ts` (Wikimedia, dry-run + `--apply`) — ya aplicados solo sobre allowlist.
 - `lib/db.ts` — Funciones de negocio
 - `lib/turso.ts` — Client Turso + schema migrations
-- ⚠️ **`vitest.config.ts:7-8` (los dos `delete process.env.TURSO_*`) es lo que protege Turso en los tests. NO los borres.** Parecen higiene de test y no lo son: bajo vitest el env está ausente, así que `isTursoEnabled()` es falso y los **93 guards `if (isTursoEnabled()) {` de `lib/db.ts` nunca saltan** — están muertos. Si se restaura el env, cualquier import mal resuelto pasa de latente a destructivo: `createUser()` (que sí usa el predicado de tiempo de llamada) escribiría filas de QA en producción, y el fallo sería **verde**. Si alguna vez hay que tocar ese fichero, verifica los conteos con `scripts/turso-check.ts` antes y después.
-  - *P12:* esta línea decía *"83 guards `if (isTursoConfigured()) return;`"*, y ese patrón tiene **1 sola ocurrencia en todo el repo**: la está contando ella misma, en un comentario. Lo real son **93 `if (isTursoEnabled()) {` en `lib/db.ts`**. Quien vaya a verificar el invariante abría el patrón que el doc le daba, no encontraría nada, y no sabría si caducó el invariante o mintió el doc. El mismo error estaba duplicado en `lib/turso.ts:1000`; los dos sitios corregidos.
+- ⚠️ **`vitest.config.ts:7-8` (los dos `delete process.env.TURSO_*`) es lo que protege Turso en los tests. NO los borres.** Parecen higiene de test y no lo son: bajo vitest el env está ausente, así que `isTursoEnabled()` es falso y los **95 guards `if (isTursoEnabled()) {` de `lib/db.ts` nunca saltan** — están muertos. Si se restaura el env, cualquier import mal resuelto pasa de latente a destructivo: `createUser()` (que sí usa el predicado de tiempo de llamada) escribiría filas de QA en producción, y el fallo sería **verde**. Si alguna vez hay que tocar ese fichero, verifica los conteos con `scripts/turso-check.ts` antes y después.
+  - *P12:* esta línea decía *"83 guards `if (isTursoConfigured()) return;`"*, y ese patrón tiene **1 sola ocurrencia en todo el repo**: la está contando ella misma, en un comentario. Lo real son **95 `if (isTursoEnabled()) {` en `lib/db.ts`** (93 en P12, más los 2 lectores públicos de P17). Quien vaya a verificar el invariante abría el patrón que el doc le daba, no encontraría nada, y no sabría si caducó el invariante o mintió el doc. El mismo error estaba duplicado en `lib/turso.ts:1000`; los dos sitios corregidos.
 - **REGLA (corregida en RC.31)**: usar funciones de `lib/db.ts` en vez de SQL suelto en API routes. Y cuando una ruta necesite SQL propio, la decisión de backend se toma con **UNA sola fuente de verdad**: ramificar sobre `getTursoClientSync() !== null`, que devuelve `null` si y solo si `isTursoEnabled()` es falso y lee `process.env` en **tiempo de llamada**. El handle local (`getLocalDb()` para leer, `getLocalDbWrite()` para escribir) se abre **solo en el brazo sin cliente**, nunca antes.
   - **Por qué cambió**: la regla anterior ("nunca `getDbWrite()` en una ruta API") era inejecutable. Sin Turso no hay handle de escritura, así que prohibirlos a todos dejaba las rutas de escritura sin forma de degradar. Lo que estaba mal no era el handle, era **la forma de decidir quién lo abre**.
   - **El patrón roto que sustituye** (GAP-B): ramificar con `isTursoConfigured()` de `@/lib/db` (lee `process.env` al llamar) y ejecutar con `getTursoClient()` de `@/lib/turso` (lee el env al **importar**, `lib/turso.ts:31-32`). Con el env cargando tarde —el caso normal en un bundle de Vercel— la primera decía "turso" y la segunda `null`, se lanzaba y la ruta respondía **500**. Ya no queda ninguna ruta con este patrón.
@@ -265,45 +265,93 @@ reiniciar la sesión**; no es un error de configuración y no se arregla editand
 
 ### Modelos Utilizados
 
-> Investigación 2026-09-28 (models.dev API + `opencode models`). Tiers gratuitos recogen datos para mejora salvo indicación — **nunca poner secretos (tokens, keys, PII) en prompts**.
+> Investigación **2026-11-12** (`opencode.ai/docs/zen` + `models.dev/api.json` + `opencode models` + **smoke tests reales** con la credencial del usuario).
+> Tiers gratuitos recogen datos para mejora salvo indicación — **nunca poner secretos (tokens, keys, PII) en prompts**.
 
-**Nemotron retirado de los subagentes por decisión del usuario (2026-09-28): son demasiado lentos.** Solo quedan 3 modelos:
+**Los que se usan ahora (3):**
 
-| Modelo | Contexto | Input | Cantidad | Uso principal |
-|--------|----------|-------|----------|---------------|
-| `opencode/minimax-m3.1-flash-free` | 1M | text, image | 28 | **Modelo principal.** Orquestación, reasoning, APIs, DB, auth, security, testing, `small_model` para títulos y tareas cortas, y el agente interno `compaction` |
-| `opencode/muse-spark-1.3` | 1M | text, image, video, pdf, audio | 4 | `visual-tester` (ver screenshots), deploy, releases y documentación |
+| Modelo | Contexto | Salida | Ventana útil | Modalidades | Cantidad | Uso principal |
+|--------|----------|--------|--------------|-------------|----------|---------------|
+| `opencode/minimax-m3.1-flash-free` | 1M | 512K | 50 % | text, image, video | 29 | **Modelo principal.** Orquestación, reasoning, APIs, DB, auth, security, testing, `small_model` para títulos y tareas cortas, y el agente interno `compaction` |
+| `opencode/longcat-2.5-free` | 1M | 262K | 75 % | text, image | 1 | `visual-tester` (ver screenshots). **Tope de 100 requests/día** |
+| `opencode/nemotron-3.5-super-vl-free` | 1M | 131K | 87,5 % | text, image | 3 | `release-manager`, `vercel-deployer`, `doc-writer` |
 
-**Los dos aceptan imágenes**, así que `visual-tester` no necesita el modelo vision de
-Nemotron.
+⚠️ **La tabla de arriba no es una decisión estable: es el estado de hoy.** Se ha rehacido tres
+veces en dos meses (`space-bunny-free` → `muse-spark-1.3` → esta). Lo que sí es una regla, y no
+depende de qué modelo esté de moda, está más abajo.
 
-⚠️ **Los modelos gratuitos se caen, y hay que rehacer esta tabla.** Pasó dos
-veces en la misma semana: `space-bunny-free` (1M) agotó la cuota de opencode y
-`mimo-v2.6-flash-free` (200K) se quedaba compactando la sesión sin avanzar. La
-tabla de arriba **no es una decisión estable**: es el estado de hoy.
+#### Lo que hay que mirar antes de asignar un modelo: **disponibilidad geográfica**
 
-**Lo que sí es una regla, y no depende de qué modelo esté de moda:** un modelo
-gratuito con **200K de contexto es un arma de fuego** en este repo, porque el
-contexto se llena con los `cache_read` de cada paso y cada compactación empieza
-de cero. `mimo-v2.6-flash-free` declaration 200K con salida de 32K: usable
-~168K, y una sesión de trabajo real se comía eso en dos o tres llamadas. Con
-`output` de 32K contra 1M de contexto, el margen de Manio es una cuarta parte de
-lo que parece.
+> `opencode models` **lista modelos que no se pueden usar desde Venezuela**. Listar no es poder
+> usarlos. La doc oficial de OpenCode Zen dice, textualmente:
+>
+> - **Inkling 2 Small Free**: *"not available in the European Union, Iceland, Liechtenstein, Norway,
+>   Cuba, Iran, North Korea, Russia, Ukraine, **or Venezuela**."*
+> - **Beam Free**: *"not available in Angola, Belarus, Cambodia, China…, Cuba, …, Iran, Iraq, Laos,
+>   Libya, Nigeria, North Korea, Russia, Syria, Turkmenistan, Uzbekistan, **Venezuela**, or the
+>   Crimea, Donetsk, and Luhansk regions of Ukraine."*
+> - **LongCat 2.5 Free**: *"free on OpenCode for a limited time, **with a limit of 100 requests per
+>   day**… It's **hosted in China**."* (zero-retention: no entrenan con los prompts)
+>
+> Los dos primeros **salen en `opencode models` y fallan al invocarlos**. Los terceros se usaron
+> en un smoke test real (respondieron y leyeron un PNG) — pero con el tope de 100/día encima, que
+> es el único punto frágil del reparto actual: cae sobre `visual-tester`, que es el agente que
+> más llama. **Fallback documentado**: si se agota, `visual-tester` cae a
+> `nemotron-3.5-super-vl-free` (también ve imágenes), que es un cambio de una línea en
+> `opencode.json`.
 
-El criterio al cambiar: **1M+ de contexto y que acepte texto e imágenes**. Con
-eso, el thrashing desaparece por construcción y no hay que medirlo.
+**Los candidatos que quedan en la reserva, y por qué:**
 
-**`minimax-m3.1-flash-free`**: 1.000.000 de contexto, 512.000 de salida,
-texto+imagen. Declarado en models.dev y **medido**: responde y no thrasha.
-Es el que se usa ahora.
+| Modelo | Ctx | Salida | Ventana | Imagen | ¿Sirve en Venezuela? |
+|--------|-----|--------|---------|--------|----------------------|
+| `nemotron-3.5-super-vl-free` | 1M | 131K | 87,5 % | ✅ | ✅ sin restricción en la doc |
+| `longcat-2.5-free` | 1M | 262K | 75 % | ✅ | ⚠️ **100 req/día**, alojado en China |
+| `nemotron-3.5-lightning-free` | 262K | 262K | 50 % | ❌ | ✅ |
+| `flint-40b-free` | 262K | 65K | 75 % | ❌ | ✅ |
+| `iceman-free` | 262K | 131K | 50 % | ❌ | ✅ |
+| `big-pickle` | 200K | 32K | 84 % | ❌ | ✅ (stealth) |
+| `deepseek-v4.1-flash-free` | 200K | 32K | 84 % | ✅ | ✅ |
+| `glm-5.3-flash-free` | 200K | 32K | 84 % | ✅ vídeo | ✅ |
+| `mimo-v2.6-flash-free` | 200K | 32K | 84 % | ✅ audio | ✅ |
+| `inkling-2-small-free` | 1M | 131K | 87,5 % | ✅ | ❌ **bloqueado en Venezuela** |
+| `beam-free` | 1M | 131K | 87,5 % | ❌ | ❌ **bloqueado en Venezuela** |
 
-⚠️ **El override de `limit.output` no funciona.** Medido el 2026-10-16: ponerlo
-no cambia nada, porque el runtime ignora `provider.*.models.*.*.limit`. Ver la
-sección de compactación, más abajo.
+**OpenRouter es el plan B, no el A.** Los `:free` de OpenRouter exigen **créditos pagados** para
+subir el límite de requests, y el pago es *"credit cards, AliPay and **cryptocurrency payments in
+USDC**"* → **USDC es la vía realisticamente usable desde Venezuela** (las tarjetas locales suelen
+ser rechazadas en pagos internacionales). Además, cada proveedor free arrastra **sus** restricciones
+de región: los endpoints de NVIDIA y `thinkingmachines/inkling-2-small:free` arrastran las mismas
+que OpenCode declara para sus equivalentes.
 
-**Nemotron tampoco sirve para el análisis visual aquí**: `nemotron-3-ultra-free`
-era solo texto, y `nemotron-3.5-lightning-free` (262K) se queda corto de
-contexto y no acepta imágenes.
+#### Lo que sí es una regla, y no depende de qué modelo esté de moda
+
+**1M+ de contexto y que acepte texto e imágenes.** Con eso, el thrashing desaparece por
+construcción y no hay que medirlo.
+
+⚠️ **Un modelo gratuito con 200K de contexto es un arma de fuego en este repo**, porque el
+contexto se llena con los `cache_read` de cada paso y cada compactación empieza de cero.
+`mimo-v2.6-flash-free` declara 200K con salida de 32K: usable ~168K, y una sesión de trabajo real
+se comía eso en dos o tres llamadas. Con `output` de 32K contra 1M de contexto, el margen real es
+una cuarta parte de lo que parece.
+
+⚠️ **La ventana útil no es el contexto, es el contexto menos la salida.** El runtime descuenta la
+salida máxima declarada del presupuesto de entrada. `minimax-m3.1-flash-free` declara 1M de
+contexto y **512K de salida**, o sea **exactamente la mitad**: usable ~50 %, no 100 %. Con
+`longcat-2.5-free` (1M / 262K) se sube al 75 %; con `nemotron-3.5-super-vl-free` (1M / 131K), al
+87,5 %.
+
+⚠️ **El override de `limit.output` no funciona.** Medido el 2026-10-16: ponerlo no cambia nada,
+porque el runtime ignora `provider.*.models.*.*.limit`. Ver la sección de compactación, más abajo.
+
+#### Regla: los `.md` de los agentes NO nombran un modelo
+
+`opencode.json` es la **única** fuente de verdad de modelos. Los `.md` de `.opencode/agents/` no
+deben escribir un id de modelo, porque **un `.md` que nombra un modelo es un `.md` que se caduca**:
+cuando el modelo desaparece del proveedor, el `.md` sigue mandando al subagente a un modelo
+muerto, y el síntoma (respuestas raras, vacíos, errores inexplicados) no dice "tu modelo ya no
+existe". Pasó con `muse-spark-1.3`: se retiró del catálogo y dejó a `visual-tester` apuntando al
+vacío. Si un `.md` necesita decir algo del modelo, que diga **capacidades** ("ves imágenes, vídeo,
+PDF y audio"), que es lo que no caduca.
 
 ### Compaction
 
@@ -313,17 +361,23 @@ Configurado en `opencode.json`: `auto: true`, `prune: true`, `reserved: 20000`.
 
 **Lo que manda no es `reserved`: es `limit.output` del modelo.** La línea de abajo (hasta la de "98%") estaba mal, y la explicación buena es la siguiente.
 
-Medido contra `models.dev/api.json`. Los dos primeros son los que se han usado
-como modelo principal; los otros dos están medidos pero ya no se usan:
+Medido contra `models.dev/api.json`. **Remedido el 2026-11-12**; los cuatro modelos que
+importan ahora:
 
 | Modelo | `limit.context` | `limit.output` | usable | estado |
 |---|---|---|---|---|
-| `minimax-m3.1-flash-free` | 1.000.000 | 512.000 | 50,0 % | **el de ahora** |
-| `muse-spark-1.3` | 1.048.576 | 131.072 | 87,5 % | secondary |
-| `space-bunny-free` | 1.048.576 | 524.288 | 50,0 % | cuota agotada |
-| `mimo-v2.6-flash-free` | 200.000 | 32.000 | 84 % | prolixa compactación |
+| `minimax-m3.1-flash-free` | 1.000.000 | 512.000 | 50,0 % | **el de ahora** (29 agentes) |
+| `longcat-2.5-free` | 1.000.000 | 262.144 | 75,0 % | `visual-tester`. Tope de 100 req/día |
+| `nemotron-3.5-super-vl-free` | 1.000.000 | 131.072 | 87,5 % | `release-manager`, `vercel-deployer`, `doc-writer` |
+| `mimo-v2.6-flash-free` | 200.000 | 32.000 | 84 % | **fuera**: 200K es demasiado poco aquí |
 
-La salida máxima declarada se descuenta del presupuesto de entrada: `context − output`. `space-bunny-free` declara una salida de **exactamente la mitad** de su contexto, así que de 1M solo se pueden usar ~524K antes de compactar — de ahí que salte al ~50 %. No es la ventana: `muse-spark-1.3` comparte los mismos 1M y llega al 87,5 % porque pide 4× menos salida.
+⚠️ `muse-spark-1.3` y `space-bunny-free` **ya no existen** en el catálogo: se eliminaron del
+proveedor, y por eso los 4 subagentes que los usaban estaban apuntando al vacío.
+
+La salida máxima declarada se descuenta del presupuesto de entrada: `context − output`. Un modelo
+que declara una salida de **exactamente la mitad** de su contexto deja media ventana, y de ahí
+que salte al ~50 %. No es la ventana: `nemotron-3.5-super-vl-free` comparte los mismos 1M y llega
+al 87,5 % porque pide 4× menos salida.
 
 **Y esto se repite con `minimax-m3.1-flash-free`:** 1.000.000 de contexto y 512.000 de salida son otra vez exactamente la mitad. El ~50 % no es un defecto del modelo: es lo que pasa cuando `output` es la mitad de `context`, y va a volver a pasar con el próximo que declame 1M con salida de 512K. La salida declarada es un techo, no lo que se gasta: un turno normal pide mucho menos.
 
@@ -353,64 +407,71 @@ Por eso partir el trabajo en subagentes no es estilo: es lo que hace que esto ag
 ### No asignar
 `ling-3.0-flash-fin` (dominio financiero), `jev-*` (no es chat, decisiones estructuradas), nada pago (`kimi-k2.7-code`, `deepseek-v4-flash`, `muse-spark-1.2`, `kimi-k2.7-code-highspeed` son de pago).
 
+### Reparto de subagentes (31)
+
+> **Todos usan `opencode/minimax-m3.1-flash-free` salvo los 4 de la tabla de
+> [Modelos Utilizados](#modelos-utilizados).** Por eso estas tablas ya no llevan columna de modelo:
+> una columna que repite el mismo valor en 27 filas es una columna que se caduca sola, y esta
+> tabla se había quedado tres modelos muertos sin que nadie lo notara.
+
 ### Builders (18)
-| Subagente | Modelo | Uso |
-|-----------|--------|-----|
-| `api-builder` | space-bunny-free | Endpoints REST |
-| `auth-builder` | space-bunny-free | Autenticación |
-| `dashboard-builder` | mimo-v2.6-flash-free | UI/Components |
-| `db-builder` | space-bunny-free | Schema DB |
-| `landing-page-builder` | mimo-v2.6-flash-free | Landing page |
-| `header-builder` | mimo-v2.6-flash-free | Header |
-| `epk-card-builder` | mimo-v2.6-flash-free | EPK Cards |
-| `carousel-builder` | mimo-v2.6-flash-free | Carousels |
-| `approval-workflow-builder` | space-bunny-free | Aprobaciones |
-| `show-form-builder` | space-bunny-free | Shows |
-| `notification-builder` | space-bunny-free | Notificaciones |
-| `search-builder` | space-bunny-free | Búsqueda |
-| `subscriber-builder` | space-bunny-free | Suscriptores |
-| `social-links-builder` | mimo-v2.6-flash-free | Links sociales |
-| **`social-drafter`** | space-bunny-free | **Redacta** borradores para redes. **Nunca publica** |
-| `account-settings-builder` | space-bunny-free | Configuración cuenta |
-| `release-form-builder` | space-bunny-free | Formularios releases |
-| `artist-dashboard-builder` | mimo-v2.6-flash-free | Dashboard artista |
+| Subagente | Uso |
+|-----------|-----|
+| `api-builder` | Endpoints REST |
+| `auth-builder` | Autenticación |
+| `dashboard-builder` | UI/Components |
+| `db-builder` | Schema DB |
+| `landing-page-builder` | Landing page |
+| `header-builder` | Header |
+| `epk-card-builder` | EPK Cards |
+| `carousel-builder` | Carousels |
+| `approval-workflow-builder` | Aprobaciones |
+| `show-form-builder` | Shows |
+| `notification-builder` | Notificaciones |
+| `search-builder` | Búsqueda |
+| `subscriber-builder` | Suscriptores |
+| `social-links-builder` | Links sociales |
+| **`social-drafter`** | **Redacta** borradores para redes. **Nunca publica** |
+| `account-settings-builder` | Configuración cuenta |
+| `release-form-builder` | Formularios releases |
+| `artist-dashboard-builder` | Dashboard artista |
 
 ### QA & Security (4)
-| Subagente | Modelo | Uso |
-|-----------|--------|-----|
-| `quality-auditor` | space-bunny-free | Tests E2E |
-| `visual-tester` | muse-spark-1.3 | Screenshots/DOM |
-| `security-auditor` | space-bunny-free | Seguridad |
-| **`social-publisher`** | space-bunny-free | **El único que publica**, y solo por petición explícita. Sin `edit`/`write`/`task` |
+| Subagente | Uso |
+|-----------|-----|
+| `quality-auditor` | Tests E2E |
+| `visual-tester` | Screenshots/DOM |
+| `security-auditor` | Seguridad |
+| **`social-publisher`** | **El único que publica**, y solo por petición explícita. Sin `edit`/`write`/`task` |
 
 ### DevOps & Docs (3)
-| Subagente | Modelo | Uso |
-|-----------|--------|-----|
-| `release-manager` | muse-spark-1.3 | Releases |
-| `vercel-deployer` | muse-spark-1.3 | Deploy Vercel |
-| `doc-writer` | muse-spark-1.3 | Documentación |
+| Subagente | Uso |
+|-----------|-----|
+| `release-manager` | Releases |
+| `vercel-deployer` | Deploy Vercel |
+| `doc-writer` | Documentación |
 
 ### Orchestration (2)
-| Subagente | Modelo | Uso |
-|-----------|--------|-----|
-| `orchestrator` | space-bunny-free | Coordinación general |
-| `fase-orchestrator` | space-bunny-free | Orquestación por fases |
+| Subagente | Uso |
+|-----------|-----|
+| `orchestrator` | Coordinación general |
+| `fase-orchestrator` | Orquestación por fases |
 
 ### Testing (2)
-| Subagente | Modelo | Uso |
-|-----------|--------|-----|
-| `playwright-tester` | space-bunny-free | Tests E2E |
-| `api-tester` | space-bunny-free | Testear endpoints |
+| Subagente | Uso |
+|-----------|-----|
+| `playwright-tester` | Tests E2E |
+| `api-tester` | Testear endpoints |
 
 ### Database (1)
-| Subagente | Modelo | Uso |
-|-----------|--------|-----|
-| `db-migrator` | space-bunny-free | Migraciones DB |
+| Subagente | Uso |
+|-----------|-----|
+| `db-migrator` | Migraciones DB |
 
 ### Branding (1)
-| Subagente | Modelo | Uso |
-|-----------|--------|-----|
-| `brand-fixer` | mimo-v2.6-flash-free | Branding |
+| Subagente | Uso |
+|-----------|-----|
+| `brand-fixer` | Branding |
 
 ## Comandos Personalizados (7)
 
@@ -552,22 +613,31 @@ built-in `webfetch`.
 ## Agentes opencode
 
 ### Modelo Principal
-- **Modelo**: `opencode/space-bunny-free`
-- **Razón**: 1M de contexto, mejor reasoning para orquestación, y acepta imágenes
+- **Modelo**: `opencode/minimax-m3.1-flash-free`
+- **Razón**: 1M de contexto, el más probado (29 agentes) y acepta imágenes
 - **Visión**: Sí (`text, image, video`) — ya no hace falta `test-visual` para leer un screenshot
-- **`small_model`**: `opencode/mimo-v2.6-flash-free` (títulos y tareas cortas)
+- **`small_model`**: `opencode/minimax-m3.1-flash-free` (títulos y tareas cortas)
+- **Los 4 con modelo propio**: `visual-tester` → `longcat-2.5-free` (visión), `release-manager`,
+  `vercel-deployer` y `doc-writer` → `nemotron-3.5-super-vl-free`. Ver
+  [Modelos Utilizados](#modelos-utilizados) para el porqué y el fallback.
 
 ### Subagentes Principales
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `visual-tester` | `muse-spark-1.3` | Análisis de imágenes (1M ctx + image, video, pdf, audio) |
-| `orchestrator` | `space-bunny-free` | Coordinación general |
-| `api-builder` | `space-bunny-free` | APIs y endpoints |
-| `db-builder` | `space-bunny-free` | Base de datos |
-| `quality-auditor` | `space-bunny-free` | Testing y QA |
-| `dashboard-builder` | `mimo-v2.6-flash-free` | Builders UI (el más rápido) |
+| `visual-tester` | `longcat-2.5-free` | Análisis de imágenes (1M ctx + image). Tope de 100 req/día |
+| `release-manager` | `nemotron-3.5-super-vl-free` | Releases y changelogs |
+| `vercel-deployer` | `nemotron-3.5-super-vl-free` | Deploy, build y rollback |
+| `doc-writer` | `nemotron-3.5-super-vl-free` | Documentación técnica |
+| `orchestrator` | `minimax-m3.1-flash-free` | Coordinación general |
+| `api-builder` | `minimax-m3.1-flash-free` | APIs y endpoints |
+| `db-builder` | `minimax-m3.1-flash-free` | Base de datos |
+| `quality-auditor` | `minimax-m3.1-flash-free` | Testing y QA |
+| `dashboard-builder` | `minimax-m3.1-flash-free` | Builders UI |
 
 > La fuente de verdad de los modelos es **`opencode.json`**. Los `.md` de `.opencode/agents/` **no declaran `model:`** a propósito, para que no haya dos sitios que mantener sincronizados. Este archivo es documentación legible, no configuración.
+>
+> Y tampoco lo **nombran** en el cuerpo: un `.md` que escribe un id de modelo es un `.md` que se
+> caduca (ver la regla de modelos, más arriba).
 
 ## Flujo de Trabajo (OBLIGATORIO)
 
@@ -581,6 +651,53 @@ built-in `webfetch`.
 6. Documentar lo hecho, lo corregido y resultados finales (`docs/AI_LOG.md` + doc de fase)
 7. Crear release si es fase completa
 8. **Publicación social, si toca** — y es el **último** paso, siempre. Va por el subagente `social-publisher`, nunca desde el agente principal ni desde una API en Vercel, y **solo** ante petición explícita de la persona en la conversación: `--confirmar` no es la puerta, es una comprobación. Antes de `--publish` siempre el modo preview, que redacta y valida sin escribir en ninguna plataforma; si el preview falla, no se publica, porque un post a medias es peor que no publicar. Detalle y límites en **P14**.
+
+### Las fases tienen checklist viva (P17 en adelante)
+
+> Las reglas de abajo nacieron de una constatación: el repo tenía 11 documentos de fase y **ninguno**
+> decía qué tareas quedaban. `docs/PHASES.md` decía "completada" o "planificada" — el estado de una
+> fase entera, que es justo lo que no sirve para saber por dónde seguir. Por eso P17 en adelante
+> cada tarea es una fila con su propio estado.
+
+**Regla A — Cada fase es un documento con checklist viva.** Toda fase nueva tiene
+`docs/PHASE_P<n>.md` con esta cabecera y una tabla de tareas:
+
+```
+# FASE P<n> — <título>
+**Período:** <inicio> → <fin>   **Estado:** <pendiente|en curso|completada>
+**Rama:** main   **Issue:** <nº>   **Commits:** <hashes>
+```
+
+| # | Tarea | Estado | Commit | Evidencia |
+|---|-------|--------|--------|-----------|
+| P17.1 | Escapar `<` en el JSON-LD | ✅ hecha | `abc1234` | test rojo→verde |
+| P17.2 | Lectura pública con whitelist | ⬜ pendiente | — | — |
+
+Los estados permitidos son **solo** estos: `pendiente` · `en curso` · `hecha` · `hecha (con deuda)` ·
+`descartada`. **"Descartada" exige motivo en la misma fila.**
+
+**Regla B — El estado se actualiza en el mismo commit que la tarea.** Con el hash del commit y la
+evidencia (la salida literal del gate). *Una fase con la checklist a medias y el código mergesado es
+una fase mal documentada, no una fase a medias.*
+
+**Regla C — El índice se actualiza en el mismo commit.** `docs/PHASES.md` es el índice de fases y se
+toca en el mismo commit que la fase que registra. Añadir una fase sin indexarla es lo mismo que no
+haberla escrito.
+
+**Regla D — La issue es el espejo; el markdown es la fuente de verdad.** Una issue de GitHub por
+fase, con el checklist y el **criterio de cierre**; el detalle largo (investigación, tablas, el
+porqué) vive en `docs/PHASE_P<n>.md`. Al cerrar la fase, la issue se cierra con el enlace al commit
+y la salida del gate.
+
+**Regla E — Una sola fuente de verdad para los modelos.** `opencode.json` es la única. Los `.md` de
+`.opencode/agents/` no declaran `model:` **ni escriben un id de modelo en el cuerpo** (ver
+[Modelos Utilizados](#modelos-utilizados)).
+
+**Regla F — Las cifras de la documentación se calculan, no se literalan.** Una cifra escrita a mano
+en un documento vale lo que vale el día en que se escribió, y esa es exactamente la razón por la que
+caduca: nadie se acuerda de volver a mirarla. Las cifras viven en `docs/cifras.json` y un script
+`pnpm docs:check` **cuenta los tests reales** (`vitest list`) y falla si no coincide. Un test que
+ata literales obliga a que la documentación caduque.
 
 ## Convenciones
 

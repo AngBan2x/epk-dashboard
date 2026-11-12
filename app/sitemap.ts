@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getAllArtists, getAllTracks } from "@/lib/db";
+import { getPublicArtists, getAllTracks } from "@/lib/db";
 
 const BASE_URL = "https://epk-dashboard.vercel.app";
 
@@ -7,7 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const [artists, tracks] = await Promise.all([
-    getAllArtists().catch(() => []),
+    getPublicArtists().catch(() => []),
     getAllTracks().catch(() => []),
   ]);
 

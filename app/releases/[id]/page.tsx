@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
+import { decodeSessionToken, isSessionValid, type SessionData } from "@/lib/auth";
 import { CoverImage } from "@/components/CoverImage";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { PageTransition, SlideIn } from "@/components/MotionWrappers";
@@ -23,7 +25,7 @@ import {
   sumDurations,
 } from "@/lib/null-safe";
 import { metricsTooltip } from "@/lib/metrics-source";
-import { getReleaseWithTracks } from "@/lib/releases";
+import { getReleaseWithTracks, getVisibleReleaseWithTracks } from "@/lib/releases";
 import { NO_VALUE, ownDurationLabel, releaseTypeLabel, showableVideo, hasTrackLyrics } from "@/lib/release-page";
 import { buildReleaseLinks, type ReleaseLink } from "@/lib/release-links";
 import { getSocialPlatform } from "@/lib/social-platforms";
@@ -71,9 +73,40 @@ export const dynamic = "force-dynamic";
  * número y título, y 44 px de área táctil. Viven en `components/ReleaseTrackList.tsx`,
  * que es el componente que vuelve a montar esta sección y **no** se revierte.
  */
+/**
+ * P17 — la sesión de quien está viendo la página, o `null`.
+ *
+ * Se resuelve en servidor con la misma cookie y las mismas dos funciones que
+ * usa el middleware. Sirve para una sola pregunta: "¿esta página es para mí,
+ * o la estoy viendo de reojo?" — porque un release sin aprobar lo ven el
+ * admin y el propio artista, y nadie más.
+ */
+async function viewerSession(): Promise<SessionData | null> {
+  let token: string | undefined;
+  try {
+    token = cookies().get("auth_session")?.value;
+  } catch {
+    // `cookies()` lanza si no hay scope de petición —que es lo que pasa cuando
+    // la página se renderiza fuera de un request (los tests la llaman
+    // directamente). Sin scope no hay cookie, y sin cookie se es un
+    // visitante: se trata como invitado y se sigue.
+    return null;
+  }
+  if (!token) return null;
+
+  const session = await decodeSessionToken(token);
+  if (!session || !isSessionValid(session)) return null;
+  return session;
+}
+
 export async function generateMetadata({ params }: ReleaseDetailPageProps): Promise<Metadata> {
   const data = await getReleaseWithTracks(params.id);
   if (!data) return { title: "Release no encontrado" };
+
+  // P17: un release sin aprobar no se indexa. La ficha tampoco se le sirve al
+  // público (404, más abajo); el `noindex` evita que el buscador conserve una
+  // URL que antes sí servía contenido con `index, follow`.
+  const isApproved = data.release.status === "approved";
 
   const { release, trackCount, isMultiTrack, durationLabel, tracks: metaChildren } = data;
   const cover = getCoverImage(release);
@@ -98,6 +131,7 @@ export async function generateMetadata({ params }: ReleaseDetailPageProps): Prom
   return {
     title: `${release.title} — PressPlay`,
     description: parts.join(" · "),
+    robots: isApproved ? undefined : { index: false, follow: false },
     /**
      * `canonical` a la página del release. Es la respuesta a que en el esquema
      * un single y un álbum **son la misma fila** (`lib/db.ts:2926`), de modo
@@ -115,7 +149,10 @@ export async function generateMetadata({ params }: ReleaseDetailPageProps): Prom
 }
 
 export default async function ReleaseDetailPage({ params }: ReleaseDetailPageProps) {
-  const data = await getReleaseWithTracks(params.id);
+  // P17: el lector con alcance decide qué se sirve. Un release `draft`,
+  // `pending` o `rejected` le llega al admin y a su autor; al resto, 404.
+  const session = await viewerSession();
+  const data = await getVisibleReleaseWithTracks(params.id, session);
 
   if (!data) {
     notFound();

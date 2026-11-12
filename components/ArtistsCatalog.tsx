@@ -3,21 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import type { ArtistProfile } from "@/types/music";
+import type { PublicArtist } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
 import { imageOptimizationProps } from "@/lib/image-config";
 import { sortList, type ListSortState } from "@/lib/search";
 import { SortSelect, useListSort } from "@/components/SortSelect";
 
 const ARTIST_ACCESSORS = {
-  text: (artist: ArtistProfile) => artist.name,
-  date: (artist: ArtistProfile) => artist.created_at,
+  text: (artist: PublicArtist) => artist.name,
+  date: (artist: PublicArtist) => artist.created_at,
 };
 
 const DEFAULT_SORT: ListSortState = { sort: "name", order: "asc" };
 
 interface ArtistsCatalogProps {
-  artists: ArtistProfile[];
+  artists: PublicArtist[];
   initialSort?: ListSortState;
 }
 
@@ -44,7 +44,7 @@ interface ArtistsCatalogProps {
  * monta `<Image src="">`: `safeString` distingue "no hay" de "hay", y un src
  * vacío es una petición fallida garantizada.
  */
-function ArtistCard({ artist }: { artist: ArtistProfile }) {
+function ArtistCard({ artist }: { artist: PublicArtist }) {
   const [photoBroken, setPhotoBroken] = useState(false);
 
   const name = safeString(artist.name, "Artista");

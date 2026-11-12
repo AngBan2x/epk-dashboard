@@ -11,7 +11,8 @@ import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import type { Track } from "@/types/music";
 import { safeString } from "@/lib/null-safe";
-import { decodeSessionToken, isSessionValid } from "@/lib/auth";
+import { decodeSessionToken, isSessionValid, type SessionData } from "@/lib/auth";
+import { safeJsonLd } from "@/lib/safe-json-ld";
 import { collectVideoIds, getVideoStatsBatch, toStatsRecord } from "@/lib/youtube";
 import { fetchTopTracks } from "@/lib/lastfm";
 import {
@@ -23,6 +24,31 @@ import {
 export const dynamic = "force-dynamic";
 
 const BASE_URL = "https://epk-dashboard.vercel.app";
+
+/**
+ * La sesión de quien está viendo la página, o `null`.
+ *
+ * P17: la página la necesita para **dos** preguntas distintas —"¿puede
+ * descargar las secciones?" y "¿es el dueño del perfil?"— y resolverla dos
+ * veces era leer la cookie dos veces por el mismo motivo. Aquí se lee una.
+ */
+async function viewerSession(): Promise<SessionData | null> {
+  let token: string | undefined;
+  try {
+    token = cookies().get("auth_session")?.value;
+  } catch {
+    // `cookies()` lanza si no hay scope de petición —que es lo que pasa cuando
+    // la página se renderiza fuera de un request (los tests la llaman
+    // directamente). Sin scope no hay cookie, y sin cookie se es un
+    // visitante: se trata como invitado y se sigue.
+    return null;
+  }
+  if (!token) return null;
+
+  const session = await decodeSessionToken(token);
+  if (!session || !isSessionValid(session)) return null;
+  return session;
+}
 
 /**
  * ¿Puede quien está viendo esta página descargar el dossier y el rider?
@@ -59,11 +85,8 @@ const BASE_URL = "https://epk-dashboard.vercel.app";
  * `app/api/**` y `lib/**`, fuera de la ownership de esta ola.
  */
 async function viewerCanDownloadArtistSections(): Promise<boolean> {
-  const token = cookies().get("auth_session")?.value;
-  if (!token) return false;
-
-  const session = await decodeSessionToken(token);
-  if (!session || !isSessionValid(session)) return false;
+  const session = await viewerSession();
+  if (!session) return false;
 
   return session.role === "artist" || session.role === "admin";
 }
@@ -71,6 +94,13 @@ async function viewerCanDownloadArtistSections(): Promise<boolean> {
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const artist = await getArtistById(params.id);
   if (!artist) {
+    return { title: "Artista no encontrado", robots: { index: false, follow: false } };
+  }
+
+  // P17: un artista desactivado está oculto del público. Su ficha tampoco se
+  // sirve (404, más abajo), pero el `noindex` evita que el buscador conserve
+  // una URL que antes sí servía contenido.
+  if (!artist.is_active) {
     return { title: "Artista no encontrado", robots: { index: false, follow: false } };
   }
 
@@ -104,6 +134,20 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
   const artist = await getArtistById(params.id);
 
   if (!artist) {
+    notFound();
+  }
+
+  // P17: la sesión se resuelve **una vez** en servidor, y de ella salen las
+  // dos preguntas: si el visitante puede descargar las secciones y si es el
+  // dueño del perfil.
+  const session = await viewerSession();
+  const isAdmin = session?.role === "admin";
+  const isOwner = !!session && !!artist.user_id && session.userId === artist.user_id;
+
+  // Un artista desactivado está **oculto del público**: no se ve su ficha, no
+  // se indexa y no sale en el catálogo. El admin lo ve (para moderar) y el
+  // propio artista lo ve (su perfil no desaparece de un día para otro).
+  if (!artist.is_active && !isAdmin && !isOwner) {
     notFound();
   }
 
@@ -196,7 +240,11 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // P17: `safeJsonLd` escapa `<`, `>` y `&`, para que una biografía con
+        // `</script>` no cierre la etiqueta y ejecute markup en el navegador de
+        // quien mire la ficha. La función vive en `lib/safe-json-ld.ts` porque
+        // es pura y así tiene su propio test.
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
       <ArtistHero
         name={artist.name}
@@ -210,11 +258,11 @@ export default async function ArtistDetailPage({ params }: { params: { id: strin
             <SubscriptionButton
               artistId={artist.id}
               artistName={artist.name}
-              artistUserId={artist.user_id}
+              artistUserId={isOwner ? artist.user_id : null}
             />
             <SubscriberCount
               artistId={artist.id}
-              artistUserId={artist.user_id}
+              artistUserId={isOwner ? artist.user_id : null}
             />
           </>
         }

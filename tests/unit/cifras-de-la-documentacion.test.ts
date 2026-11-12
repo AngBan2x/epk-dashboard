@@ -59,6 +59,8 @@ describe("AI_LOG.md: los seis recuentos de docs/ai-log/", () => {
     "04-v4-alpha-beta.md": 2336,
     "05-rc10-rc28.md": 1438,
     "06-tranches-a-hoy.md": 1628,
+    // P17 + P22 — la época de 2026-11-12.
+    "07-p17-p22.md": 254,
   };
 
   it("los ficheros que se nombran son exactamente los que existen", () => {
@@ -118,18 +120,22 @@ describe("las cifras de test llevan el commit donde se midieron", () => {
 });
 
 describe("el invariante de Turso se cuenta, no se recuerda", () => {
-  it("los 93 guards existen de verdad y con esa forma", () => {
+  it("los 95 guards existen de verdad y con esa forma", () => {
     // AGENTS.md decía "83 guards `if (isTursoConfigured()) return;`". Ese patrón
     // tiene 1 ocurrencia en todo el repo: la está contando él mismo, en un
     // comentario. Quien fuera a verificar el invariante abría el patrón que el
     // doc le daba, no encontraba nada, y no podía distinguir entre "el doc
     // mintió" y "el invariante caducó".
+    //
+    // El número sube cuando se añade un lector dual-mode nuevo, y eso es lo
+    // que pasó en P17: `getPublicArtists()` y `getPublicArtistById()` son dos
+    // readers más con su rama de Turso y su rama local. 93 + 2 = 95.
     const db = leer("lib/db.ts");
     const guards = db.match(/if \(isTursoEnabled\(\)\) \{/g) ?? [];
-    expect(guards.length).toBe(93);
+    expect(guards.length).toBe(95);
 
     const agentes = leer("AGENTS.md");
-    expect(agentes).toContain("**93 guards `if (isTursoEnabled()) {` de `lib/db.ts`");
+    expect(agentes).toContain("**95 guards `if (isTursoEnabled()) {` de `lib/db.ts`");
     // Y el patrón que se daba por bueno no existe fuera del comentario:
     expect((leer("lib/turso.ts").match(/isTursoConfigured\(\)\) return;/g) ?? []).length).toBe(0);
   });

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllArtists } from "@/lib/db";
-import type { ArtistProfile } from "@/types/music";
+import { getAllArtists, getPublicArtists } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +8,6 @@ async function validateSession(req: NextRequest) {
   const session = await validateRequest(req);
   if (!session) return null;
   return { userId: session.userId, role: session.role };
-}
-
-function stripUserId(row: ArtistProfile): Omit<ArtistProfile, "user_id"> {
-  const { user_id: _user_id, ...rest } = row;
-  return rest;
 }
 
 /**
@@ -30,7 +24,10 @@ function createdAtKey(value: string | null | undefined): string {
   return value;
 }
 
-function byCreatedAtDesc(a: ArtistProfile, b: ArtistProfile): number {
+function byCreatedAtDesc(
+  a: { created_at: string | null | undefined },
+  b: { created_at: string | null | undefined }
+): number {
   const av = createdAtKey(a.created_at);
   const bv = createdAtKey(b.created_at);
   if (!av && !bv) return 0;
@@ -64,6 +61,13 @@ export async function GET(req: NextRequest) {
     // lectura), así que desaparece la discrepancia y con ella `getDbWrite()` y
     // `getTursoClient()`.
     const all = await getAllArtists();
+    // P17: el público lee por el lector de alcance (`getPublicArtists`), que
+    // ya filtra `is_active = 1` y `deleted_at IS NULL` **en el SQL** y no
+    // expone `user_id`. Antes esta ruta traía la lista entera y filtraba en
+    // JavaScript, lo que dejaba el filtro en un sitio distinto del que
+    // aplica el resto de la web — y la web, que usaba `getAllArtists()`, no
+    // filtraba nada. Dos rutas, dos reglas.
+    const publicArtists = isAdmin ? [] : await getPublicArtists();
 
     let artists;
     if (isAdmin) {
@@ -71,13 +75,7 @@ export async function GET(req: NextRequest) {
       // (`tests/unit/security-sweep.test.ts:241` afirma exactamente eso).
       artists = all;
     } else {
-      // `is_active = 1` se filtra aquí y no con un `SELECT` propio: el lector
-      // dual-mode correcto es `getAllArtists()`, y `user_id` se quita igual que
-      // antes (`tests/unit/security-sweep.test.ts:220`).
-      artists = [...all]
-        .sort(byCreatedAtDesc)
-        .filter((artist) => artist.is_active)
-        .map(stripUserId);
+      artists = [...publicArtists].sort(byCreatedAtDesc);
     }
 
     return NextResponse.json({ artists }, {

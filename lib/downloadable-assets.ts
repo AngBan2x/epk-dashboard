@@ -582,9 +582,18 @@ export function buildDossierJson(payload: ExportPayload): string {
       ),
       press_text: dossierText(data, "press_text"),
       influences: dossierText(data, "influences"),
-      contact_email: dossierText(data, "contact_email", dossierText(data, "booking_email", "booking@epk-dashboard.com")),
-      booking_email: dossierText(data, "booking_email"),
-      management: dossierText(data, "management", "PressPlay Records"),
+      // P17: el email de contacto **no** va en el JSON.
+      //
+      // El HTML (`buildDossierHtml`) y el PDF —que sale del HTML— **sí** lo
+      // llevan, porque eso lo lee una persona: el email de contacto es parte
+      // del producto de prensa, no un dato que haya que esconder.
+      //
+      // El JSON es lo otro: es lo que se descarga en bloque y se procesa con
+      // un script. Un endpoint público que devuelve un JSON con el email de
+      // contacto es una lista de direcciones para un scraper, y no hace falta
+      // ni una técnica nova: simplemente el campo no va.
+      //
+      // Lo que sí viaja es `website`, que es público por definición.
       website: dossierText(data, "website"),
       updated_at: dossierText(data, "updated_at"),
     },
