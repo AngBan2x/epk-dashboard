@@ -332,7 +332,30 @@ async function main(): Promise<void> {
   console.log("    npx tsx scripts/social-smoke.ts");
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+/**
+ * El `main()` solo corre si este fichero es el entry point.
+ *
+ * ## Por qué
+ *
+ * `tests/unit/threads-token.test.ts` importa `canjearCodigo`, `alargar` y
+ * `leerPerfil` de aquí. Con el `main()` al final del módulo a pelo, **importar
+ * el script ejecutaba el script**: sin credenciales de Threads (que en la CI no
+ * hay) fallaba, y el `process.exit(1)` **mataba el worker de vitest**. En local
+ * pasaba porque el `.env.local` sí las tiene.
+ *
+ * O sea: **el test dependía de un secreto del entorno**, y la diferencia entre
+ * "pasa" y "no pasa" era si la máquina tenía el `.env.local` puesto.
+ *
+ * El patrón es el de los scripts que ya lo tienen
+ * (`scripts/fetch-cover-art.ts` y otros seis).
+ */
+const invokedDirectly = (process.argv[1] ?? "")
+  .replace(/\\/g, "/")
+  .endsWith("threads-token.ts");
+
+if (invokedDirectly) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

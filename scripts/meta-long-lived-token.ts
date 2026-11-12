@@ -246,7 +246,32 @@ async function main(): Promise<void> {
   console.log("    npx tsx scripts/social-smoke.ts");
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+/**
+ * El `main()` solo corre si este fichero es el entry point.
+ *
+ * ## Por qué
+ *
+ * `tests/unit/meta-long-lived.test.ts` importa `intercambiar` y `leerPage` de
+ * aquí. Con el `main()` al final del módulo a pelo, **importar el script
+ * ejecutaba el script**: sin credenciales de Meta (que en la CI no hay, porque
+ * no son secretos del repo) fallaba, y el `process.exit(1)` **mataba el worker
+ * de vitest**. En local pasaba porque el `.env.local` sí tiene las
+ * credenciales y el script terminaba bien.
+ *
+ * O sea: **el test dependía de un secreto del entorno**, y la diferencia entre
+ * "pasa" y "no pasa" era si la máquina tenía el `.env.local` puesto. Es la
+ * misma clase de fallo que un test que solo funciona en el portátil.
+ *
+ * El patrón no es inventado aquí: es el de `scripts/fetch-cover-art.ts` y los
+ * otros seis scripts que ya lo tienen.
+ */
+const invokedDirectly = (process.argv[1] ?? "")
+  .replace(/\\/g, "/")
+  .endsWith("meta-long-lived-token.ts");
+
+if (invokedDirectly) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

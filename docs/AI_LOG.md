@@ -208,7 +208,7 @@ copiadas literales en el índice para que la comprobación las incluya también.
 | `ai-log/04-v4-alpha-beta.md` | 2.336 |
 | `ai-log/05-rc10-rc28.md` | 1.438 |
 | `ai-log/06-tranches-a-hoy.md` | 1.628 |
-| `ai-log/07-p17-p22.md` | 290 |
+| `ai-log/07-p17-p22.md` | 314 |
 
 **P12: los seis recuentos estaban mal por exactamente +5, y ya está explained.**
 La tabla de arriba decía 526, 1.128, 202, 2.331, 1.433 y 1.622. Medidos, son

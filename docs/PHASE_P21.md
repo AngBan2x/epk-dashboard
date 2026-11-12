@@ -117,7 +117,8 @@ Siguen rotos, y son las tareas de esta fase:
 
 | # | Tarea | Estado | Commit | Evidencia |
 |---|-------|--------|--------|-----------|
-| P21.0 | **La CI arranca**: alinear la versión de pnpm con la del repo y dejar de escribirla a mano | ✅ hecha | — | `packageManager` en `package.json` + `pnpm/action-setup` sin `version` |
+| P21.0 | **La CI arranca**: alinear la versión de pnpm con la del repo y dejar de escribirla a mano | ✅ hecha | — | `engines.pnpm` en `package.json` + `pnpm/action-setup` con `version: 12`. Install ✓ typecheck ✓ lint ✓ en el run `43258873008` |
+| P21.0b | **Los dos tests que mataban el worker**: `scripts/meta-long-lived-token.ts` y `scripts/threads-token.ts` ejecutaban su `main()` al importarse, y sin credenciales (que la CI no tiene) el `process.exit(1)` mataba vitest | ✅ hecha | — | El patrón `invokedDirectly` que ya tenían 7 scripts. Verificado **simulando la CI** (sin `.env.local`): 31/31 verdes, antes moría |
 | P21.1 | **Un solo gate**: `pnpm gate` = typecheck + lint + `vitest run --no-file-parallelism` + build, y que la skill, el tool, `package.json` y la CI llamen al mismo script | ⬜ pendiente | — | — |
 | P21.2 | **E2E completos en local y en producción**: local con SQLite + `next start` (el build real); producción contra Turso, con la limpieza automática al final | ⬜ pendiente | — | — |
 | P21.3 | **La limpieza al final de la corrida**: `qa-cleanup.ts --apply` en el mismo job. Sus patrones casan con lo que los specs producen (`@example.com`, `"QA …"`, `[QA]`/`[E2E]`/`[TEST]`) | ⬜ pendiente | — | — |
