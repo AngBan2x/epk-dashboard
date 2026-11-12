@@ -55,12 +55,28 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # El navegador no venía en la imagen del runner. Sin este paso, los E2E
+      # morían con "browserType.launch: Executable doesn't exist at
+      # /home/runner/.cache/ms-playwright/…" — y como la CI no se ejecutaba
+      # desde el 2026-09-30, **nadie se había enterado de que faltaba**.
+      #
+      # `--with-deps` instala también las librerías del sistema (en Linux,
+      # Chromium necesita un puñado). En el runner de GitHub se puede sin sudo.
+      - name: Instalar el navegador de Playwright
+        run: npx playwright install --with-deps chromium
+
       - name: E2E (Playwright)
         run: pnpm test:e2e
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # Las credenciales de los specs de E2E. `TEST_ADMIN_PASSWORD` **no
+          # tiene default en el repo** (P7), así que sin este secreto los
+          # E2E fallan al pedirlo — que es lo que debe pasar: un default
+          # silencioso sería una contraseña real en el código.
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
           CI: "1"
 
       - name: Deploy to Vercel (Preview)
