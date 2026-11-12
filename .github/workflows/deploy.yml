@@ -12,18 +12,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # La versión de pnpm sale de `packageManager` en `package.json`.
+      # La versión de pnpm tiene que ser la misma que la del repo.
       #
-      # Escribirla aquí fue lo que rompió la CI: el workflow iba con **pnpm 9**,
-      # que exige el campo `packages` en `pnpm-workspace.yaml`, y el fichero del
+      # Escribir aquí un **9** fue lo que rompió la CI: en pnpm 9, la existencia de
+      # un `pnpm-workspace.yaml` **exige** el campo `packages`, y el fichero del
       # repo usa campos de **pnpm 10+** (`allowBuilds`, `minimumReleaseAgeExclude`).
       # `pnpm store path` —que es lo que llama `setup-node` para la caché— fallaba
       # con "packages field missing or empty" y la CI moría en 13 s, **antes de
       # instalar nada**. Cero ejecuciones verdes en todo el historial del workflow.
       #
-      # Con la versión en un solo sitio, esto no puede volver a pasar: si el repo
-      # sube de pnpm, la CI sube sola.
+      # El rango vive en `engines.pnpm` de `package.json`; aquí se pide la major.
+      # Los dos sitios dicen lo mismo a propósito: pnpm **avisa** si la versión no
+      # cumple el rango, así que desalinearlas se ve en el install.
+      #
+      # P14 — **No usar `packageManager` en `package.json` para esto.** En pnpm 12 ese
+      # campo no es el "pin" de corepack: es el gestor de dependencias del gestor,
+      # y añadirlo convierte el lockfile en un **doble documento YAML** con 157
+      # líneas de binarios de pnpm para todas las plataformas. El lockfile de este
+      # repo es de un solo documento (`lockfileVersion 9.0`) y así se queda.
       - uses: pnpm/action-setup@v4
+        with:
+          version: 12
 
       - uses: actions/setup-node@v4
         with:

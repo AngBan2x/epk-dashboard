@@ -62,24 +62,42 @@ Un release sin CI verde detrás es un release sin gate, y por eso no se han hech
 
 ## El arreglo
 
-La versión de pnpm pasa a estar **en un solo sitio**: el campo `packageManager` de
-`package.json`.
+La versión de pnpm se declara en **un sitio**, el `engines.pnpm` de `package.json`:
 
 ```json
-"packageManager": "pnpm@12.5.1"
+"engines": {
+  "node": ">=24",
+  "pnpm": ">=12 <13"
+}
 ```
 
-Y el workflow **deja de escribirla**:
+Y el workflow pide **la major**, no un número escrito a mano:
 
 ```yaml
-- uses: pnpm/action-setup@v4     # sin `with: version:`
+- uses: pnpm/action-setup@v4
+  with:
+    version: 12
 ```
 
-`pnpm/action-setup` usa `packageManager` cuando no se le da `version`. Con la versión en un solo
-sitio, esto no puede volver a pasar: si el repo sube de pnpm, la CI sube sola.
+pnpm **avisa** si la versión no cumple el rango, así que una desalineación se ve en el install, en
+vez de descubrirse tres semanas después.
 
-Es el mismo patrón que el de los modelos (P22): **una sola fuente de verdad**, y nada escrito a
-mano que se pueda caducar.
+### ⚠️ El camino obvious, y por qué no era el bueno
+
+Lo primero que se piensa es `packageManager: "pnpm@12.5.1"` en `package.json` —el "pin" de
+corepack— y **es lo que se hizo primero**. En pnpm 12 ese campo **no** es un pin: es el gestor de
+dependencias del gestor. Añadirlo:
+
+1. Convierte el lockfile en un **doble documento YAML**, con 157 líneas de binarios de pnpm para
+   todas las plataformas (`@pnpm/exe.android-arm64`, `@pnpm/exe.win32-x64`…). El lockfile de este
+   repo es de un solo documento (`lockfileVersion 9.0`) y así se queda.
+2. Rompe la CI con `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`: el lockfile del repo no
+   estaba al día, y regenerarlo exige un `pnpm install` — que este repo **no puede ejecutar**
+   sin destruir el binario de `better-sqlite3` (ver AGENTS.md).
+
+La lección es la de siempre en este repo: **el camino que parece correcto porque es el
+documentado en otro sitio no es el que funciona aquí.** El "pin" de corepack es una cosa y el
+`packageManager` de pnpm 12 es otra, con el mismo nombre.
 
 ### Lo que este arreglo NO arregla
 
