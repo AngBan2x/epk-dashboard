@@ -1,6 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./credentials";
 
+// En `next dev` la primera visita a una ruta la compila al vuelo, y con 10 s el
+// primer login de la suite se quedaba corto en la CI (58 min de job, 150 tests):
+// fallaba en la redirección, no en el login, y el reintento pasaba porque la
+// ruta ya estaba compilada. El síntoma —"timeout esperando **/dashboard"— hacía
+// pensar en credenciales, que era justo lo que no fallaba.
+const NAV_TIMEOUT = 30_000;
+
 test.describe("N5: Artist Flow", () => {
   test("artist can login and access dashboard", async ({ page }) => {
     // Go to login
@@ -12,7 +19,7 @@ test.describe("N5: Artist Flow", () => {
     await page.click('button[type="submit"]');
 
     // Wait for redirect to dashboard
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
     await expect(page).toHaveURL(/\/dashboard/);
 
     // Screenshot artist dashboard
@@ -32,7 +39,7 @@ test.describe("N5: Artist Flow", () => {
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Check "Mis Tracks" section exists
     const misTracks = page.locator("h2", { hasText: "Mis Tracks" });
@@ -51,7 +58,7 @@ test.describe("N5: Artist Flow", () => {
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Check BioSection exists
     const bioSection = page.locator("text=Biografía").first();
@@ -71,7 +78,7 @@ test.describe("N5: Artist Flow", () => {
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Check Shows & Booking section exists
     const showsSection = page.locator("text=Shows").first();
@@ -93,7 +100,7 @@ test.describe("N5: Artist Flow", () => {
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Screenshot artist dashboard dark mode
     await page.screenshot({
@@ -110,7 +117,7 @@ test.describe("N5: Artist Flow", () => {
     await page.fill('input[type="email"]', ARTIST_EMAIL);
     await page.fill('input[type="password"]', ARTIST_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Screenshot artist dashboard mobile
     await page.screenshot({

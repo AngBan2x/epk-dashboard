@@ -15,7 +15,11 @@ const TRACKS = [
   { id: "trk-004", title: "Hotel California", sources: 3, youtubeOnly: false },
   { id: "trk-005", title: "Shape of You", sources: 3, youtubeOnly: false },
   { id: "trk-006", title: "Running Up That Hill", sources: 3, youtubeOnly: false },
-  { id: "7c922875-54c5-4670-8940-98b07403f691", title: "Se Va", sources: 0, youtubeOnly: true },
+  // `7c922875…` ("Se Va") estaba aquí y **es un draft** (`tracks.status = 'draft'`).
+  // Desde P17 el catálogo público oculta los drafts, así que `/track/7c922875…`
+  // responde **404** y los 13 tests de este fichero morían en la séptima vuelta
+  // del bucle — no en el botón, en la página. Un `youtubeOnly` de verdad y
+  // publicado es el de abajo.
   { id: "fa5b4397-c50e-4ae5-9b65-0ebdd6b1b898", title: "The Rain", sources: 0, youtubeOnly: true },
 ];
 

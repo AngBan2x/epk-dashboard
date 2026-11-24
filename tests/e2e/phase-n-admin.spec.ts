@@ -1,6 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
+// En `next dev` la primera visita a una ruta la compila al vuelo, y con 10 s el
+// primer login de la suite se quedaba corto en la CI (58 min de job, 150 tests):
+// fallaba en la redirección, no en el login, y el reintento pasaba porque la
+// ruta ya estaba compilada. El síntoma —"timeout esperando **/dashboard"— hacía
+// pensar en credenciales, que era justo lo que no fallaba.
+const NAV_TIMEOUT = 30_000;
+
 test.describe("N4: Admin Flow", () => {
   test("admin can login and access admin panel", async ({ page }) => {
     // Go to login
@@ -12,7 +19,7 @@ test.describe("N4: Admin Flow", () => {
     await page.click('button[type="submit"]');
 
     // Wait for redirect to dashboard
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
     await expect(page).toHaveURL(/\/dashboard/);
 
     // Screenshot dashboard as admin
@@ -27,7 +34,7 @@ test.describe("N4: Admin Flow", () => {
 
     // Click admin link
     await adminLink.click();
-    await page.waitForURL("**/admin", { timeout: 10000 });
+    await page.waitForURL("**/admin", { timeout: NAV_TIMEOUT });
     await expect(page).toHaveURL(/\/admin/);
 
     // Screenshot admin panel
@@ -56,7 +63,7 @@ test.describe("N4: Admin Flow", () => {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Go to admin
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
@@ -83,7 +90,7 @@ test.describe("N4: Admin Flow", () => {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Go to admin
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
@@ -105,7 +112,7 @@ test.describe("N4: Admin Flow", () => {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Go to admin
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
@@ -127,7 +134,7 @@ test.describe("N4: Admin Flow", () => {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Go to admin
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
@@ -151,7 +158,7 @@ test.describe("N4: Admin Flow", () => {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/dashboard", { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: NAV_TIMEOUT });
 
     // Go to admin
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
