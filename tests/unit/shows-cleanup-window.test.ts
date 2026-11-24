@@ -29,18 +29,25 @@ type FakeClient = {
 };
 
 const tursoRows: Record<string, unknown>[] = [];
-const deletedIds: string[] = [];
+const archivedIds: string[] = [];
+let lastSelectSql = "";
+let lastWriteSql = "";
 
 function fakeTursoClient(): FakeClient {
   return {
     execute: async (arg) => {
       const sql = typeof arg === "string" ? arg : arg.sql;
       if (/^\s*SELECT/i.test(sql)) {
+        lastSelectSql = sql;
         return { rows: tursoRows, rowsAffected: 0 };
       }
+      lastWriteSql = sql;
       const args = typeof arg === "string" ? [] : (arg.args ?? []);
-      deletedIds.push(...(args as string[]));
-      return { rows: [], rowsAffected: args.length };
+      // El UPDATE liga primero los dos timestamps y después los ids. Sin el
+      // `slice`, un ISO colaría como si fuera un id y el recuento mentiría.
+      const ids = (args as string[]).slice(/^\s*UPDATE/i.test(sql) ? 2 : 0);
+      archivedIds.push(...ids);
+      return { rows: [], rowsAffected: ids.length };
     },
   };
 }
@@ -74,8 +81,8 @@ vi.mock("@/lib/db", () => ({
     prepare: (sql: string) => ({
       all: () => localRows,
       run: (...args: unknown[]) => {
-        const ids = sql.includes("DELETE") ? (args as string[]) : [];
-        deletedIds.push(...ids);
+        const ids = (args as string[]).slice(/^\s*UPDATE/i.test(sql) ? 2 : 0);
+        archivedIds.push(...ids);
         return { changes: ids.length };
       },
     }),
@@ -122,7 +129,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   tursoRows.length = 0;
   localRows.length = 0;
-  deletedIds.length = 0;
+  archivedIds.length = 0;
+  lastSelectSql = "";
+  lastWriteSql = "";
   // Por defecto la ruta va a Turso (doble falso). Los tests que mitral el env
   // lo quitan o lo ponen explícitamente.
   process.env.TURSO_DATABASE_URL = "libsql://falso.example";
@@ -147,24 +156,24 @@ afterEach(() => {
 // ── 1. El borde de 48 h exactas ──────────────────────────────────────────────
 
 describe("el corte son 48 h exactas, no un día UTC", () => {
-  it("a 47 h 59 min NO borra", async () => {
+  it("a 47 h 59 min NO archiva", async () => {
     const casi = at(47 + 59 / 60);
     tursoRows.push(show("show-casi", casi.date, casi.time));
 
     const { body } = await callCleanup();
 
-    expect(body.deleted).toBe(0);
-    expect(deletedIds).toEqual([]);
+    expect(body.archived).toBe(0);
+    expect(archivedIds).toEqual([]);
   });
 
-  it("a 48 h 01 min SÍ borra", async () => {
+  it("a 48 h 01 min SÍ archiva", async () => {
     const pasado = at(48 + 1 / 60);
     tursoRows.push(show("show-pasado", pasado.date, pasado.time));
 
     const { body } = await callCleanup();
 
-    expect(body.deleted).toBe(1);
-    expect(deletedIds).toEqual(["show-pasado"]);
+    expect(body.archived).toBe(1);
+    expect(archivedIds).toEqual(["show-pasado"]);
   });
 
   it("justo a las 48 h 00 min ya cuenta como pasado", async () => {
@@ -173,13 +182,13 @@ describe("el corte son 48 h exactas, no un día UTC", () => {
 
     const { body } = await callCleanup();
 
-    expect(body.deleted).toBe(1);
+    expect(body.archived).toBe(1);
   });
 
   it("el corte del día UTC anterior daba un resultado DISTINTO, y por eso el caso es real", () => {
     // Este es el fallo que se arregla, escrito como contraste: el código viejo
     // hacía `now - 48h` y se quedaba con la FECHA (`.split("T")[0]`), así que un
-    // show de 48 h y 30 min antes caía el mismo día y no se borraba hasta el
+    // show de 48 h y 30 min antes caía el mismo día y no se archivaba hasta el
     // siguiente. Con el instante completo sí se borra.
     const pasado = at(48 + 30 / 60);
     const cutoffViejo = new Date(AHORA.getTime() - 48 * 3_600_000).toISOString().slice(0, 10);
@@ -200,21 +209,21 @@ describe("el corte son 48 h exactas, no un día UTC", () => {
 
     const { body } = await callCleanup();
 
-    expect(body.deleted).toBe(1);
+    expect(body.archived).toBe(1);
   });
 
-  it("un show sin fecha NO se borra nunca, porque no se puede saber que pasó", async () => {
+  it("un show sin fecha NO se archiva nunca, porque no se puede saber que pasó", async () => {
     tursoRows.push(show("show-sin-fecha", null, "20:00"));
     tursoRows.push(show("show-fecha-basura", "no-es-una-fecha", "20:00"));
 
     const { body } = await callCleanup();
 
-    expect(body.deleted).toBe(0);
+    expect(body.archived).toBe(0);
     expect(body.skippedSinFecha).toBe(2);
-    expect(deletedIds).toEqual([]);
+    expect(archivedIds).toEqual([]);
   });
 
-  it("no borra lo que aún no ha pasado aunque la fecha sea antigua", async () => {
+  it("no archiva lo que aún no ha pasado aunque la fecha sea antigua", async () => {
     // defense-in-depth: una fila con `release_id` de una resiembra podría llegar
     // con fecha futura.
     const futuro = new Date(AHORA.getTime() + 3 * 86_400_000);
@@ -224,7 +233,7 @@ describe("el corte son 48 h exactas, no un día UTC", () => {
 
     const { body } = await callCleanup();
 
-    expect(body.deleted).toBe(0);
+    expect(body.archived).toBe(0);
   });
 
   it("el corte se decide una vez y se devuelve en la respuesta", async () => {
@@ -248,7 +257,7 @@ describe("el backend se decide en tiempo de llamada, no al importar", () => {
     const { res, body } = await callCleanup({ freshImport: true });
 
     expect(res.status).toBe(200);
-    expect(body.deleted).toBe(1);
+    expect(body.archived).toBe(1);
     expect(mockGetTursoClientSync).toHaveBeenCalled();
   });
 
@@ -267,19 +276,19 @@ describe("el backend se decide en tiempo de llamada, no al importar", () => {
     const req = () => new NextRequest("http://localhost/api/shows/cleanup", { method: "DELETE" });
 
     // 1) Sin env: motor local.
-    expect((await (await DELETE(req())).json()).deleted).toBe(1);
+    expect((await (await DELETE(req())).json()).archived).toBe(1);
 
     // 2) El env llega después del import. Ahora debe ir a Turso.
     process.env.TURSO_DATABASE_URL = "libsql://aprovechado.example";
     process.env.TURSO_AUTH_TOKEN = "token";
-    deletedIds.length = 0;
+    archivedIds.length = 0;
 
     const res = await DELETE(req());
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.deleted).toBe(1);
-    expect(deletedIds).toEqual(["turso-1"]);
+    expect(body.archived).toBe(1);
+    expect(archivedIds).toEqual(["turso-1"]);
   });
 
   it("y quitando el env vuelve al motor local", async () => {
@@ -292,8 +301,8 @@ describe("el backend se decide en tiempo de llamada, no al importar", () => {
 
     const { body } = await callCleanup();
 
-    expect(body.deleted).toBe(1);
-    expect(deletedIds).toContain("local-2");
+    expect(body.archived).toBe(1);
+    expect(archivedIds).toContain("local-2");
   });
 
   it("el archivo no lee process.env ni abre su propio cliente de Turso", () => {
@@ -341,8 +350,8 @@ describe("el aviso al artista es best-effort", () => {
     const { res, body } = await callCleanup();
 
     expect(res.status).toBe(200);
-    expect(body.deleted).toBe(1);
-    expect(deletedIds).toEqual(["show-ok"]);
+    expect(body.archived).toBe(1);
+    expect(archivedIds).toEqual(["show-ok"]);
   });
 
   it("sigue con los demás shows aunque uno falle al avisar", async () => {
@@ -361,11 +370,11 @@ describe("el aviso al artista es best-effort", () => {
     const { res, body } = await callCleanup();
 
     expect(res.status).toBe(200);
-    expect(body.deleted).toBe(3);
+    expect(body.archived).toBe(3);
     expect(llamadas).toBe(3);
   });
 
-  it("notifica a los que se han borrado, con la fecha y la hora del show", async () => {
+  it("notifica a los que se han archivado, con la fecha y la hora del show", async () => {
     const pasado = at(50);
     tursoRows.push(show("show-x", pasado.date, pasado.time));
 
@@ -378,7 +387,7 @@ describe("el aviso al artista es best-effort", () => {
     expect(arg.emailData.showDate).toBe(`${pasado.date} ${pasado.time}`);
   });
 
-  it("no notifica a nadie cuando no se borra nada", async () => {
+  it("no notifica a nadie cuando no se archiva nada", async () => {
     tursoRows.push(show("show-futuro", at(-50).date, at(-50).time));
 
     await callCleanup();
@@ -430,9 +439,53 @@ describe("el workflow de GitHub Actions llama a esta ruta", () => {
     expect(yaml).toMatch(/if \[ "\$cleanup_code" != "200" \]/);
   });
 
+  it("comprueba el campo `archived`, no el viejo `deleted`", () => {
+    // El nombre del campo es el contrato: si alguien revierte la ruta a borrar y
+    // deja `archived`, esto sigue verde pero la ruta ya miente. Por eso el test
+    // de abajo mira el código, no solo el YAML.
+    expect(yaml).toMatch(/\.archived \| type == "number"/);
+    expect(yaml).not.toMatch(/\.deleted \| type == "number"/);
+  });
+
   it("y documenta en CONFIG_TODO qué secretos hay que crear", () => {
     const todo = fs.readFileSync(path.join(process.cwd(), "docs", "CONFIG_TODO.md"), "utf8");
     expect(todo).toMatch(/cleanup-shows/);
     expect(todo).toMatch(/TEST_ADMIN_PASSWORD/);
+  });
+});
+
+// ── 6. D5: se marca, no se borra ─────────────────────────────────────────────
+//
+// El cron corre a diario contra producción y no tiene marcha atrás. Este bloque
+// existe para que revertir la ruta a `DELETE FROM shows` no sea un cambio que
+// pasa desapercibido: es exactamente el tipo de reversión que no rompe ningún
+// test de comportamiento, porque el 200 y el recuento se ven iguales.
+
+describe("D5 — la limpieza marca el show, no lo destruye", () => {
+  it("la ruta no contiene ningún DELETE FROM shows", () => {
+    const fuente = sinComentarios(
+      fs.readFileSync(path.join(process.cwd(), "app", "api", "shows", "cleanup", "route.ts"), "utf8")
+    );
+    // Si el stripper se comiera el fichero, el `not.toMatch` pasaría sin mirar
+    // nada. El tamaño mínimo es lo que hace que este guard no pueda ser vacío.
+    expect(fuente.length).toBeGreaterThan(2000);
+    expect(fuente).not.toMatch(/DELETE\s+FROM\s+shows/i);
+  });
+
+  it("escribe deleted_at y updated_at en el mismo UPDATE", async () => {
+    tursoRows.push(show("show-viejo", at(72).date, at(72).time));
+
+    await callCleanup();
+
+    expect(lastWriteSql).toMatch(/UPDATE\s+shows\s+SET\s+deleted_at\s*=\s*\?/i);
+    expect(lastWriteSql).toMatch(/updated_at\s*=\s*\?/i);
+  });
+
+  it("no vuelve a leer los ya archivados, o los re-notificaría cada día", async () => {
+    tursoRows.push(show("show-viejo", at(72).date, at(72).time));
+
+    await callCleanup();
+
+    expect(lastSelectSql).toMatch(/WHERE\s+deleted_at\s+IS\s+NULL/i);
   });
 });

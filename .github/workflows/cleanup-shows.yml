@@ -4,6 +4,12 @@
 # cron, los shows pasados se acumulaban para siempre. Este workflow es ese
 # invocador.
 #
+# ⚠️ Desde P20.1 la ruta **archiva** (`shows.deleted_at`), no borra. Si algún día
+# vuelve a ser un `DELETE FROM shows`, este cron se convierte en un borrado
+# diario e irreversible de producción — por eso hay un test que falla si la ruta
+# vuelve a hard-deletear (`tests/unit/shows-cleanup-window.test.ts`). El único
+# que borra de verdad es `scripts/purge-deleted-shows.ts`, y es explícito.
+#
 # ── Autenticación: NO hay un mecanismo nuevo ──────────────────────────────────
 #
 # La ruta está detrás de `requireAdmin` (`lib/webhook-auth.ts`), o sea que hace
@@ -58,15 +64,15 @@ jobs:
           fi
           if [ -z "${BASE_URL:-}" ]; then
             # Antes caía a `https://epk-dashboard.vercel.app` por defecto. Es
-            # una operación que **borra filas**, y caer en silencio significa
-            # hacer un DELETE real en producción cada día sin que nadie lo pidiera.
-            # La credencial faltante ya falla ruidosamente; la URL faltaba de la
-            # única forma que no falla: la que destruye.
-            echo "::error::Falta la variable NEXT_PUBLIC_APP_URL (Settings > Secrets and variables > Actions > Variables). Sin ella este workflow borraría en la URL por defecto. No se pone a propósito: crear la variable es un paso de un minuto, y borrando sin querer no lo es."
+            # una operación que **escribe en la DB de producción**, y caer en
+            # silencio significa archivar shows reales cada día sin que nadie lo
+            # pidiera. La credencial faltante ya falla ruidosamente; la URL
+            # faltaba de la única forma que no falla: la que actúa sin querer.
+            echo "::error::Falta la variable NEXT_PUBLIC_APP_URL (Settings > Secrets and variables > Actions > Variables). Sin ella este workflow actuaría contra la URL por defecto. No se pone a propósito: crear la variable es un paso de un minuto, y archivando sin querer no lo es."
             exit 1
           fi
 
-      - name: Login de admin y borrado de los shows de más de 48 h
+      - name: Login de admin y archivado de los shows de más de 48 h
         env:
           BASE_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
           TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
@@ -102,9 +108,9 @@ jobs:
             exit 1
           fi
 
-          # La ruta devuelve 200 con `deleted`, así que un 200 con un cuerpo que
+          # La ruta devuelve 200 con `archived`, así que un 200 con un cuerpo que
           # no lo tiene significa que se deployed otra cosa.
-          if ! jq -e '.deleted | type == "number"' /tmp/cleanup.json >/dev/null; then
-            echo "::error::La respuesta no tiene 'deleted': $(cat /tmp/cleanup.json)"
+          if ! jq -e '.archived | type == "number"' /tmp/cleanup.json >/dev/null; then
+            echo "::error::La respuesta no tiene 'archived': $(cat /tmp/cleanup.json)"
             exit 1
           fi
