@@ -266,19 +266,27 @@ reiniciar la sesión**; no es un error de configuración y no se arregla editand
 ### Modelos Utilizados
 
 > Investigación **2026-11-12** (`opencode.ai/docs/zen` + `models.dev/api.json` + `opencode models` + **smoke tests reales** con la credencial del usuario).
+> **Revisión 2026-11-24**: dos de los tres modelos de la tabla de abajo **ya no existen**. Ver «Modelos que mueren» más abajo.
 > Tiers gratuitos recogen datos para mejora salvo indicación — **nunca poner secretos (tokens, keys, PII) en prompts**.
 
-**Los que se usan ahora (3):**
+**El que se usa ahora (1):**
 
 | Modelo | Contexto | Salida | Ventana útil | Modalidades | Cantidad | Uso principal |
 |--------|----------|--------|--------------|-------------|----------|---------------|
-| `opencode/minimax-m3.1-flash-free` | 1M | 512K | 50 % | text, image, video | 29 | **Modelo principal.** Orquestación, reasoning, APIs, DB, auth, security, testing, `small_model` para títulos y tareas cortas, y el agente interno `compaction` |
-| `opencode/longcat-2.5-free` | 1M | 262K | 75 % | text, image | 1 | `visual-tester` (ver screenshots). **Tope de 100 requests/día** |
-| `opencode/nemotron-3.5-super-vl-free` | 1M | 131K | 87,5 % | text, image | 3 | `release-manager`, `vercel-deployer`, `doc-writer` |
+| `opencode/nemotron-3.5-super-vl-free` | 1M | 131K | 87,5 % | text, image | **1 modelo, 33 agentes** | **Modelo por defecto** (`model` y `small_model`, o sea el agente `build`) y los **31 agentes que heredan**; más `visual-tester`, el **único** con `model` propio |
 
-⚠️ **La tabla de arriba no es una decisión estable: es el estado de hoy.** Se ha rehacido tres
-veces en dos meses (`space-bunny-free` → `muse-spark-1.3` → esta). Lo que sí es una regla, y no
-depende de qué modelo esté de moda, está más abajo.
+#### Modelos que mueren (lo pasan en dos meses)
+
+| Modelo | Estado el 2026-11-24 | Síntoma |
+|--------|----------------------|---------|
+| `opencode/minimax-m3.1-flash-free` | ❌ **retirado** — `opencode run` responde `Error: Model unavailable` | Era el modelo principal **y** el de 29 agentes. Sin este aviso, el `build` arranca y el error aparece en el primer turno |
+| `opencode/longcat-2.5-free` | ❌ **retirado** del catálogo de `opencode models` | Era `visual-tester` |
+| `opencode/muse-spark-1.3` | ❌ retirado (P22) | 4 subagentes apuntando al vacío |
+| `opencode/space-bunny-free` | ❌ retirado (P22) | — |
+
+**Lo que se hizo el 2026-11-24, y por qué:** los 32 agentes **dejaron de declarar `model`** y heredan el por defecto. Antes había **33 ids copiados a mano** en `opencode.json`: el día que el proveedor retira un modelo hay que editar 33 sitios, y basta con olvidar uno para que ese agente falle en silencio. Ahora hay **uno** — más `visual-tester`, que sí lleva el suyo a propósito (ver abajo).
+
+⚠️ **La tabla de arriba no es una decisión estable: es el estado de hoy.** Se ha rehacido **cuatro** veces en dos meses (`space-bunny-free` → `muse-spark-1.3` → `minimax-m3.1-flash-free` → esta). Lo que sí es una regla, y no depende de qué modelo esté de moda, está más abajo.
 
 #### Lo que hay que mirar antes de asignar un modelo: **disponibilidad geográfica**
 
@@ -293,19 +301,18 @@ depende de qué modelo esté de moda, está más abajo.
 > - **LongCat 2.5 Free**: *"free on OpenCode for a limited time, **with a limit of 100 requests per
 >   day**… It's **hosted in China**."* (zero-retention: no entrenan con los prompts)
 >
-> Los dos primeros **salen en `opencode models` y fallan al invocarlos**. Los terceros se usaron
-> en un smoke test real (respondieron y leyeron un PNG) — pero con el tope de 100/día encima, que
-> es el único punto frágil del reparto actual: cae sobre `visual-tester`, que es el agente que
-> más llama. **Fallback documentado**: si se agota, `visual-tester` cae a
-> `nemotron-3.5-super-vl-free` (también ve imágenes), que es un cambio de una línea en
-> `opencode.json`.
+> Los dos primeros **salen en `opencode models` y fallan al invocarlos**. Y el tercero
+> (`longcat-2.5-free`) **también se retiró** el 2026-11-24: `visual-tester` ya no depende de él.
+> **Por eso `visual-tester` es el único agente con `model` propio**: su trabajo depende de ver
+> imágenes, y si algún día el modelo por defecto cambia por uno sin visión, aquí tiene que fallar
+> **ruidosamente** (`Model unavailable`) y no en silencio con screenshots que nadie puede leer.
 
 **Los candidatos que quedan en la reserva, y por qué:**
 
 | Modelo | Ctx | Salida | Ventana | Imagen | ¿Sirve en Venezuela? |
 |--------|-----|--------|---------|--------|----------------------|
-| `nemotron-3.5-super-vl-free` | 1M | 131K | 87,5 % | ✅ | ✅ sin restricción en la doc |
-| `longcat-2.5-free` | 1M | 262K | 75 % | ✅ | ⚠️ **100 req/día**, alojado en China |
+| `nemotron-3.5-super-vl-free` | 1M | 131K | 87,5 % | ✅ | ✅ sin restricción en la doc — **es el que está en uso** |
+| ~~`longcat-2.5-free`~~ | 1M | 262K | 75 % | ✅ | ❌ **retirado del catálogo el 2026-11-24** |
 | `nemotron-3.5-lightning-free` | 262K | 262K | 50 % | ❌ | ✅ |
 | `flint-40b-free` | 262K | 65K | 75 % | ❌ | ✅ |
 | `iceman-free` | 262K | 131K | 50 % | ❌ | ✅ |
@@ -362,17 +369,19 @@ Configurado en `opencode.json`: `auto: true`, `prune: true`, `reserved: 20000`.
 **Lo que manda no es `reserved`: es `limit.output` del modelo.** La línea de abajo (hasta la de "98%") estaba mal, y la explicación buena es la siguiente.
 
 Medido contra `models.dev/api.json`. **Remedido el 2026-11-12**; los cuatro modelos que
-importan ahora:
+importaban entonces:
 
 | Modelo | `limit.context` | `limit.output` | usable | estado |
 |---|---|---|---|---|
-| `minimax-m3.1-flash-free` | 1.000.000 | 512.000 | 50,0 % | **el de ahora** (29 agentes) |
-| `longcat-2.5-free` | 1.000.000 | 262.144 | 75,0 % | `visual-tester`. Tope de 100 req/día |
-| `nemotron-3.5-super-vl-free` | 1.000.000 | 131.072 | 87,5 % | `release-manager`, `vercel-deployer`, `doc-writer` |
+| `minimax-m3.1-flash-free` | 1.000.000 | 512.000 | 50,0 % | ❌ **retirado el 2026-11-24** (`Model unavailable`) |
+| `longcat-2.5-free` | 1.000.000 | 262.144 | 75,0 % | ❌ **retirado el 2026-11-24** |
+| `nemotron-3.5-super-vl-free` | 1.000.000 | 131.072 | 87,5 % | ✅ **el de ahora**: modelo por defecto de todos los agentes |
 | `mimo-v2.6-flash-free` | 200.000 | 32.000 | 84 % | **fuera**: 200K es demasiado poco aquí |
 
-⚠️ `muse-spark-1.3` y `space-bunny-free` **ya no existen** en el catálogo: se eliminaron del
-proveedor, y por eso los 4 subagentes que los usaban estaban apuntando al vacío.
+⚠️ `muse-spark-1.3`, `space-bunny-free`, **`minimax-m3.1-flash-free`** y **`longcat-2.5-free`**
+**ya no existen** en el catálogo: se eliminaron del proveedor. La primera pareja la pilló P22 en
+los subagentes; esta, el 2026-11-24, **al modelo principal**. Un modelo que desaparece no avisa:
+el `build` arranca y el error sale en el primer turno.
 
 La salida máxima declarada se descuenta del presupuesto de entrada: `context − output`. Un modelo
 que declara una salida de **exactamente la mitad** de su contexto deja media ventana, y de ahí
@@ -409,10 +418,11 @@ Por eso partir el trabajo en subagentes no es estilo: es lo que hace que esto ag
 
 ### Reparto de subagentes (31)
 
-> **Todos usan `opencode/minimax-m3.1-flash-free` salvo los 4 de la tabla de
-> [Modelos Utilizados](#modelos-utilizados).** Por eso estas tablas ya no llevan columna de modelo:
-> una columna que repite el mismo valor en 27 filas es una columna que se caduca sola, y esta
-> tabla se había quedado tres modelos muertos sin que nadie lo notara.
+> **Todos heredan el modelo por defecto** (`opencode/nemotron-3.5-super-vl-free`), salvo
+> `visual-tester`, que lleva el suyo a propósito. **Ningún agente declara `model` salvo ese**:
+> antes los 32 lo hacían, y el 2026-11-24 el proveedor retiró el modelo principal y hubo que
+> tocar 33 sitios a mano. Por eso estas tablas no llevan columna de modelo: una columna que
+> repite el mismo valor en 27 filas es una columna que se caduca sola.
 
 ### Builders (18)
 | Subagente | Uso |
@@ -613,28 +623,24 @@ built-in `webfetch`.
 ## Agentes opencode
 
 ### Modelo Principal
-- **Modelo**: `opencode/minimax-m3.1-flash-free`
-- **Razón**: 1M de contexto, el más probado (29 agentes) y acepta imágenes
-- **Visión**: Sí (`text, image, video`) — ya no hace falta `test-visual` para leer un screenshot
-- **`small_model`**: `opencode/minimax-m3.1-flash-free` (títulos y tareas cortas)
-- **Los 4 con modelo propio**: `visual-tester` → `longcat-2.5-free` (visión), `release-manager`,
-  `vercel-deployer` y `doc-writer` → `nemotron-3.5-super-vl-free`. Ver
-  [Modelos Utilizados](#modelos-utilizados) para el porqué y el fallback.
+- **Modelo**: `opencode/nemotron-3.5-super-vl-free` (es el valor de `model`, o sea el agente `build`)
+- **Por qué**: 1M de contexto (ventana útil 87,5 %), acepta imágenes y sin restricción en Venezuela
+- **Visión**: Sí (`text, image`) — ya no hace falta `test-visual` para leer un screenshot
+- **`small_model`**: el mismo (títulos y tareas cortas)
+- **Por qué ya no hay 4 con modelo propio**: `release-manager`, `vercel-deployer` y `doc-writer`
+  pasaron a heredar (el valor era idéntico), y `visual-tester` se quedó con el suyo porque su
+  trabajo depende de ver imágenes. Ver [Modelos Utilizados](#modelos-utilizados).
 
 ### Subagentes Principales
 | Subagente | Modelo | Uso |
 |-----------|--------|-----|
-| `visual-tester` | `longcat-2.5-free` | Análisis de imágenes (1M ctx + image). Tope de 100 req/día |
-| `release-manager` | `nemotron-3.5-super-vl-free` | Releases y changelogs |
-| `vercel-deployer` | `nemotron-3.5-super-vl-free` | Deploy, build y rollback |
-| `doc-writer` | `nemotron-3.5-super-vl-free` | Documentación técnica |
-| `orchestrator` | `minimax-m3.1-flash-free` | Coordinación general |
-| `api-builder` | `minimax-m3.1-flash-free` | APIs y endpoints |
-| `db-builder` | `minimax-m3.1-flash-free` | Base de datos |
-| `quality-auditor` | `minimax-m3.1-flash-free` | Testing y QA |
-| `dashboard-builder` | `minimax-m3.1-flash-free` | Builders UI |
+| `visual-tester` | **propio**: `nemotron-3.5-super-vl-free` | Análisis de imágenes (1M ctx + image) |
+| el resto (31) | **heredado** del `model` por defecto | Coordinación, builders, QA, docs, deploy |
 
-> La fuente de verdad de los modelos es **`opencode.json`**. Los `.md` de `.opencode/agents/` **no declaran `model:`** a propósito, para que no haya dos sitios que mantener sincronizados. Este archivo es documentación legible, no configuración.
+> La fuente de verdad de los modelos es **`opencode.json`**, y dentro de él hay **un solo sitio**
+> que cambiar: `model` / `small_model`. Los `.md` de `.opencode/agents/` **no declaran `model:`**
+> a propósito, para que no haya dos sitios que mantener sincronizados. Este archivo es
+> documentación legible, no configuración.
 >
 > Y tampoco lo **nombran** en el cuerpo: un `.md` que escribe un id de modelo es un `.md` que se
 > caduca (ver la regla de modelos, más arriba).

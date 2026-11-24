@@ -128,6 +128,13 @@ Siguen rotos, y son las tareas de esta fase:
 | P21.6 | **Crear el secreto `TEST_ADMIN_PASSWORD`** (sin él el cron no corre **y** los E2E de la CI fallan) + alinear `docs/CONFIG_TODO.md` C12 | ⬜ pendiente | — | **Es de la persona**: un secreto del secret store. El workflow ya lo comprueba y dice qué falta |
 | P21.7 | Verificar `tracks.created_at` en Turso real (`scripts/turso-check.ts`): no está en el schema de `lib/turso.ts` y 3 consultas ordenan por ella | ⬜ pendiente | — | — |
 | P21.8 | Migrar `app/api/admin/users/[id]/role/route.ts:58-63` al patrón único (`getTursoClientSync()`) | ⬜ pendiente | — | — |
+| P21.9 | **El modelo por defecto de `build` ya no existe**: `opencode/minimax-m3.1-flash-free` → `Error: Model unavailable`. Bajar los **33 ids de modelo** copiados a mano a **uno** (los 32 agentes heredan; solo `visual-tester` lleva el suyo) | ✅ hecha | — | `opencode run --model opencode/minimax-m3.1-flash-free` → `Error: Model unavailable`. `opencode run` con el nuevo → `> build · nemotron-3.5-super-vl-free` → `OK`. `opencode debug config`: 31 agentes heredan, 1 con model propio |
+| P21.10 | **MCP `git` no conectaba**: el servidor habla `2026-07-28` y OpenCode mandaba el `initialize` de `legacy` | ✅ hecha | — | Log: *"connection is serving the 2026-07-28 protocol; the initialize handshake is not accepted"*. El campo `protocol` **no se aplicaba** hasta migrar `mcp` a la forma V2 (`mcp.servers`): la doc dice *"V2 does not place server names directly under `mcp`"*. Ahora `opencode mcp list` → `✓ git connected` (14 tools) |
+| P21.11 | **MCP `turso` no completaba el OAuth**: rechazaba el `redirect_uri` | ⬜ pendiente (falta el login de la persona) | — | El `client.json` de OpenCode solo lista 3 redirect **sin puerto**; OpenCode manda uno **con** puerto y Turso responde *"not permitted for this client"*. Arreglo aplicado: `oauth.redirect_uri` fijo → desactiva CIMD y cae a DCR (Turso sí publica `registration_endpoint`). **Falta que la persona lo pruebe con `/mcps`** |
+| P21.12 | **El preflight solo mira 1 de 3 roles**: ampliar `deploy.yml` a `TEST_ARTIST_EMAIL` + `TEST_ARTIST_PASSWORD` (6 specs las necesitan y `TEST_ARTIST_EMAIL` no tiene default: es PII) | ⬜ pendiente | — | Medido 2026-11-24: hoy comprueba `TEST_ADMIN_PASSWORD` y nada más. Si solo se crea ese, los specs de artista siguen en rojo con el preflight en verde |
+| P21.13 | **`CONFIG_TODO.md` C12 contradice al workflow**: dice que `NEXT_PUBLIC_APP_URL` es opcional y `cleanup-shows.yml` lleva 12 días fallando por no tenerla | ⬜ pendiente | — | `cleanup-shows.yml` falla en el preflight desde 2026-11-13 (12 corridas seguidas) por el secreto y la variable ausentes |
+| P21.14 | **La CI escribe en Turso de producción**: paso de `qa-cleanup.ts --apply` al final del job de E2E | ⬜ pendiente | — | El job levanta `pnpm dev` con `TURSO_*` inyectados → datos QA reales en prod. Latente: los runs fallan antes de llegar ahí |
+| P21.15 | **Rate limit de login: contar intentos fallidos**, no todos (hoy 5 intentos fallidos desde una IP bloquean a un usuario legítimo detrás de la misma NAT — el límite se aplica antes de validar la contraseña) | ⬜ pendiente | — | — |
 
 ## Criterio de cierre
 
@@ -135,7 +142,9 @@ Un push a `main` ejecuta typecheck, lint, los tests y el build **en verde**, sin
 Turso, y **no** despliega a producción. Un tag `v*` despliega a producción. Y existe un solo
 comando que hace lo mismo que la CI, en local.
 
-## Dónde está la CI ahora mismo (2026-11-12)
+## Dónde está la CI ahora mismo
+
+### Medición 2026-11-12 (al abrir la fase)
 
 | Step | Estado |
 |------|--------|
@@ -152,18 +161,39 @@ comando que hace lo mismo que la CI, en local.
 **Antes de esta fase, la CI no se ejecutaba: 0 ejecuciones verdes en todo el historial.** Ahora
 ejecuta, y su único punto rojo es **un secreto que solo la persona puede crear** (P21.6).
 
+### Re-medición 2026-11-24 (12 días después)
+
+El estado **no ha cambiado**: sigue habiendo **606 runs y 0 verdes**. Lo nuevo es que ahora se
+sabe *por qué* cada uno falla, y hay tres hallazgos que esta fase no tenía:
+
+| Hallazgo | Detalle |
+|----------|---------|
+| **El preflight solo mira 1 de 3 roles** | `deploy.yml` comprueba `TEST_ADMIN_PASSWORD`, pero **6 specs E2E necesitan credenciales de artista** (`TEST_ARTIST_EMAIL` no tiene default: es PII). El día que se cree el secreto de admin, los specs de artista seguirán fallando — y el preflight seguirá diciendo verde |
+| **`CONFIG_TODO.md` C12 miente** | Dice que `NEXT_PUBLIC_APP_URL` es *opcional*; el workflow la exige y `cleanup-shows.yml` lleva **12 días fallando** por no tenerla. Una doc que contradice al código no es documentación, es una trampa |
+| **La CI escribe en Turso de producción** | El job de E2E levanta `pnpm dev` con `TURSO_*` inyectados → los tests crean datos reales en la DB de producción y **no hay paso de `qa-cleanup --apply`** después. 12 días de runs fallidos no han llegado a ejecutarlo, así que el daño es latente, no activo |
+
+Y un cuarto, de configuración de OpenCode (P21.9–P21.11): el **modelo por defecto del agente
+`build` ya no existe**, el MCP `git` no conectaba y el `turso` no completa el OAuth. Los tres
+arreglados en este mismo pase.
+
 ### Lo que falta para cerrarla
 
 1. **Crear el secreto `TEST_ADMIN_PASSWORD`** en *Settings → Secrets and variables → Actions →
    Secrets*. Es la cuenta `admin@epk.local` de producción, cuya contraseña se rotó en la rotación de
    credenciales (`docs/ROTACION_CREDENCIALES.md`).
-2. Con eso, los E2E correrán. Y hay que mirar si se chocan con el rate limit de login: **5/min por
+2. **`TEST_ARTIST_EMAIL` y `TEST_ARTIST_PASSWORD`** — el preflight no los pide hoy, así que hay que
+   ampliarlo a los tres roles a la vez (P21.12). Sin ellos, 6 specs siguen en rojo aunque el secreto
+   de admin exista.
+3. **Variable `NEXT_PUBLIC_APP_URL`** para que `cleanup-shows.yml` deje de fallar, y alinear `C12`
+   de `docs/CONFIG_TODO.md` con lo que el workflow realmente exige (P21.13).
+4. **Paso de `qa-cleanup --apply` tras los E2E**, para que la CI no deje datos de QA en Turso
+   (P21.14).
+5. Con credenciales correctas, mirar si los E2E se chocan con el rate limit de login: **5/min por
    IP**, y la CI comparte IP. Con credenciales correctas no hay reintentos en cadena, así que
    debería ir; si no, el arreglo es **contar los intentos fallidos** en vez de todos (lo que además
    arregla un DoS real: hoy el límite se aplica **antes** de validar la contraseña, así que cinco
    intentos fallidos desde una IP bloquean a un usuario legítimo detrás de la misma NAT).
-3. `TEST_ARTIST_PASSWORD` y `TEST_SUBSCRIBER_PASSWORD` también, para los specs que usan esas
-   cuentas.
+6. `TEST_SUBSCRIBER_*` **no hacen falta**: esos specs se auto-registran.
 
 ## Lo que se hizo
 
