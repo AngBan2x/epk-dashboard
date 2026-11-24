@@ -28,6 +28,13 @@
 
 ## Lo que queda
 
+- **El workflow `Cleanup Shows` está desactivado a mano** (`gh workflow disable "Cleanup Shows"`,
+  2026-11-24 → `disabled_manually`). Motivo: el deploy a producción solo ocurre si los E2E pasan, y
+  en este repo **nunca han pasado**. Si la corrida que contiene P20.1 no llega a desplegar, el cron de
+  las 06:17 UTC seguiría llamando a la ruta vieja, que sí borra. Se reactiva con
+  `gh workflow enable "Cleanup Shows"` **después** de confirmar que producción sirve `c6622c4` o
+  posterior. Desactivar el workflow no cambia el YAML ni los tests: es estado remoto, reversible en un
+  comando.
 - **P20.4 es el que cambia comportamiento visible.** Hoy un show archivado
   desaparece del dashboard del artista, exactamente igual que cuando se borraba.
   No es una regresión (antes no existía), pero sí es la mitad de D16 que falta.
