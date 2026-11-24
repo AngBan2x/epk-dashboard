@@ -3,7 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getUserByEmail } from "@/lib/db";
 import { createSessionToken, SESSION_MAX_AGE, SESSION_MAX_AGE_REMEMBER } from "@/lib/auth";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, registerFailedAttempt } from "@/lib/rate-limit";
 
 const LoginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -12,9 +12,17 @@ const LoginSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // P21.15 — la clave se calcula **fuera** del `try`: el `catch` también
+  // castiga (un 400 de body mal formado es fallo del cliente, y sin contarlo
+  // el endpoint quedaba sin límite para payloads rotos).
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+  const key = `login:${ip}`;
+
   try {
-    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
-    const rateLimit = checkRateLimit(`login:${ip}`, 5, 60_000);
+    // P21.15 — se **lee** la cuota sin gastarla. Un login válido no debe
+    // apagar a nadie; el castigo se aplica abajo, solo cuando el intento
+    // falla de verdad (400 / 401 / 403).
+    const rateLimit = checkRateLimit(key, 5, 60_000, { count: false });
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Try again later." },
@@ -27,6 +35,7 @@ export async function POST(req: NextRequest) {
 
     const user = await getUserByEmail(validated.email);
     if (!user) {
+      registerFailedAttempt(key, 5, 60_000);
       return NextResponse.json(
         { error: "Credenciales inválidas" },
         { status: 401 }
@@ -34,6 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (user.deleted_at) {
+      registerFailedAttempt(key, 5, 60_000);
       return NextResponse.json(
         {
           error:
@@ -46,6 +56,7 @@ export async function POST(req: NextRequest) {
 
     const validPassword = await bcrypt.compare(validated.password, user.password_hash);
     if (!validPassword) {
+      registerFailedAttempt(key, 5, 60_000);
       return NextResponse.json(
         { error: "Credenciales inválidas" },
         { status: 401 }
@@ -85,11 +96,15 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
+      // P21.15 — 400 = fallo del cliente: cuenta.
+      registerFailedAttempt(key, 5, 60_000);
       return NextResponse.json(
         { error: error.errors[0].message },
         { status: 400 }
       );
     }
+    // P21.15 — 500 = fallo nuestro: **no** cuenta. Contarlo convertiría un
+    // bug del servidor en un bloqueo de 60 s para el usuario que lo pilla.
     console.error("[API/auth/login] Error: login failed");
     return NextResponse.json(
       { error: "Error al iniciar sesión" },

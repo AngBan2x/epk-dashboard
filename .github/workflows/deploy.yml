@@ -80,16 +80,41 @@ jobs:
       #
       # ⚠️ La contraseña **no** tiene default en el repo, a propósito (P7): un
       # default silencioso sería una contraseña real en el código.
+      #
+      # P21.12 — **Los tres roles, no solo el de admin.** Antes solo se miraba
+      # `TEST_ADMIN_PASSWORD`, y con él creado el run quedaba en verde mientras
+      # **6 specs** seguían muriendo: `approvals`, `fanout`, `notifications`,
+      # `phase-n-artist`, `shows-transitions` y `subscriptions` hacen login con
+      # `ARTIST_EMAIL` / `ARTIST_PASSWORD`. Ese email **no tiene default**
+      # (`scripts/lib/credentials.ts`): la única cuenta de artista conocida es de
+      # una persona real, así que es PII y no puede estar en el repo.
+      #
+      # Se comprueban **los tres a la vez** y se listan **todos** los que falten
+      # en un solo run: fallar de uno en uno costaría tres corridas para decir
+      # lo mismo.
+      #
+      # `TEST_SUBSCRIBER_*` **no** se piden aquí: esos specs se auto-registran.
       - name: Comprobar las credenciales de los E2E
         env:
           TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
           TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ARTIST_EMAIL: ${{ secrets.TEST_ARTIST_EMAIL }}
+          TEST_ARTIST_PASSWORD: ${{ secrets.TEST_ARTIST_PASSWORD }}
         run: |
+          faltan=0
           if [ -z "${TEST_ADMIN_PASSWORD:-}" ]; then
-            echo "::error::Falta el secreto TEST_ADMIN_PASSWORD. Los E2E hacen login contra /api/auth/login y, sin ese secreto, fallan con 'login -> 400' y luego 429 (el rate limit de login es 5/min por IP y la CI comparte IP). Créalo en Settings -> Secrets and variables -> Actions -> Secrets. Ver docs/PHASE_P21.md (P21.6)."
+            echo "::error::Falta el secreto TEST_ADMIN_PASSWORD (cuenta admin@epk.local). Sin él los specs de admin fallan con 'login -> 400'. Crear en Settings -> Secrets and variables -> Actions -> Secrets. Ver docs/PHASE_P21.md (P21.6)."
+            faltan=1
+          fi
+          if [ -z "${TEST_ARTIST_EMAIL:-}" ] || [ -z "${TEST_ARTIST_PASSWORD:-}" ]; then
+            echo "::error::Faltan los secretos TEST_ARTIST_EMAIL y/o TEST_ARTIST_PASSWORD. 6 specs hacen login como artista (approvals, fanout, notifications, phase-n-artist, shows-transitions, subscriptions). TEST_ARTIST_EMAIL no tiene default en el repo: es PII de una persona real y no puede estar en el código. Crear en Settings -> Secrets and variables -> Actions -> Secrets. Ver docs/PHASE_P21.md (P21.12)."
+            faltan=1
+          fi
+          if [ "$faltan" -ne 0 ]; then
+            echo "::error::Quedan secretos de E2E por crear. Este paso falla a propósito en el segundo 2 para no gastar una hora de corrida en 45 errores que no dicen nada."
             exit 1
           fi
-          echo "Credenciales de E2E presentes."
+          echo "Credenciales de los tres roles presentes."
 
       - name: E2E (Playwright)
         run: pnpm test:e2e
@@ -103,7 +128,29 @@ jobs:
           # silencioso sería una contraseña real en el código.
           TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
           TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          # P21.12 — los specs de artista leen estas dos. Sin exponerlas aquí,
+          # el preflight pasa y el spec revienta al importar `credentials.ts`.
+          TEST_ARTIST_EMAIL: ${{ secrets.TEST_ARTIST_EMAIL }}
+          TEST_ARTIST_PASSWORD: ${{ secrets.TEST_ARTIST_PASSWORD }}
           CI: "1"
+
+      # P21.14 — la CI escribe en Turso de producción (el job levanta `pnpm dev`
+      # con `TURSO_*` inyectados), así que lo que los specs dejan hay que
+      # retirarlo en el mismo job. Medido el 2026-11-24 con dry-run: **10
+      # usuarios QA** acumulados en `epk-dashboard` desde hace semanas.
+      #
+      # `if: always()`: si un spec falla a medias es cuando MÁS hace falta
+      # limpiar. Sin eso, la corrida roja es la que más datos basura deja.
+      #
+      # El script es dry-run por defecto; `--apply` es la única forma de escribir.
+      # Sus patrones son prefijos de QA (`@qa.test`, `[QA]`, `QA `…) y no casan
+      # con datos reales — ver `scripts/qa-cleanup.ts`.
+      - name: Limpiar los datos QA que dejaron los E2E
+        if: always()
+        run: npx tsx scripts/qa-cleanup.ts --apply
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
       - name: Deploy to Vercel (Preview)
         if: github.event_name == 'pull_request'

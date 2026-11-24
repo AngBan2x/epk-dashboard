@@ -4,11 +4,15 @@ import { NextRequest } from "next/server";
 const mockGetUserByEmail = vi.fn();
 const mockCreateSessionToken = vi.fn(async (_arg: Record<string, unknown>) => "token.fake");
 const mockCheckRateLimit = vi.fn();
+const mockRegisterFailedAttempt = vi.fn();
 const mockCompare = vi.fn();
 
 vi.mock("@/lib/db", () => ({ getUserByEmail: mockGetUserByEmail }));
 vi.mock("bcryptjs", () => ({ default: { compare: mockCompare } }));
-vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: mockCheckRateLimit }));
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: mockCheckRateLimit,
+  registerFailedAttempt: mockRegisterFailedAttempt,
+}));
 vi.mock("@/lib/auth", async () => {
   const actual = await vi.importActual<typeof import("@/lib/auth")>("@/lib/auth");
   return { ...actual, createSessionToken: mockCreateSessionToken };

@@ -61,11 +61,23 @@ Lo que hay que poner en **Settings → Secrets and variables → Actions**:
 | Nombre | Tipo | Estado |
 |---|---|---|
 | `TEST_ADMIN_PASSWORD` | Secret | **Falta crearlo.** Sin default en el repo, a propósito (`scripts/lib/credentials.ts`) |
+| `TEST_ARTIST_EMAIL` | Secret | **Falta crearlo.** Sin default: es PII de una persona real. Lo necesitan **6 specs** de E2E (P21.12) |
+| `TEST_ARTIST_PASSWORD` | Secret | **Falta crearlo.** Sin default, a propósito |
 | `TEST_ADMIN_EMAIL` | Secret | Opcional: el default del código es `admin@epk.local` |
-| `NEXT_PUBLIC_APP_URL` | **Variable** de repositorio (no secreto) | Opcional; si falta, el workflow usa `https://epk-dashboard.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | **Variable** de repositorio (no secreto) | **Obligatoria.** Sin ella el workflow **falla a propósito** |
 
-Mientras `TEST_ADMIN_PASSWORD` no exista, **el primer paso del workflow falla a
-deliberado** con un `::error::` que dice cuál falta. Es preferible a un fallo
+⚠️ **Corrección (2026-11-24, P21.13).** Este documento decía que
+`NEXT_PUBLIC_APP_URL` era *"Opcional; si falta, el workflow usa
+`https://epk-dashboard.vercel.app`"*. **Eso dejó de ser cierto** y era peor que
+una omisión: la URL por defecto se quitó **a propósito**, porque el workflow hace
+un `DELETE` real en producción y caer en silencio en la URL por defecto significa
+borrar filas que nadie pidió. Una doc que contradice al código no es
+documentación: es una trampa para quien la lea para no abrir el YAML. La fuente
+de verdad es `.github/workflows/cleanup-shows.yml`, y ahí el paso se llama
+*"Comprobar que hay credenciales y destino configurados"*.
+
+Mientras falte cualquiera de ellos, **el primer paso del workflow falla a
+deliberado** con un `::error::` que dice cuál. Es preferible a un fallo
 tarde y críptico al llamar a la API.
 
 ⚠️ **Los cron de GitHub se desactivan solos a los 60 días sin actividad** en el

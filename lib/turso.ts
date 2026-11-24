@@ -110,6 +110,7 @@ export async function ensureTursoSchema(): Promise<boolean> {
       release_id TEXT,
       start_time REAL DEFAULT 0,
       end_time REAL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
       video_kind TEXT
     )
   `);
@@ -118,6 +119,12 @@ export async function ensureTursoSchema(): Promise<boolean> {
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN is_instrumental INTEGER DEFAULT 0`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN status TEXT DEFAULT 'draft'`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN updated_at TEXT`); } catch {}
+  // P21.7 — `created_at` **no estaba** aquí aunque `lib/db.ts` sí lo crea, y tres
+  // consultas ordenan por ella (`lib/db.ts:2463`, `:2471`, `:2579`). La columna
+  // existía en Turso por un origen anterior al schema, así que no se veía: una DB
+  // nueva creada desde este fichero habría reventado con "no such column".
+  // Verificado 2026-11-24 contra `epk-dashboard` (MCP turso).
+  try { await client.execute(`ALTER TABLE tracks ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`); } catch {}
   // P3 Batch 2: Multi-track releases + YouTube timestamps
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN release_id TEXT`); } catch {}
   try { await client.execute(`ALTER TABLE tracks ADD COLUMN start_time REAL DEFAULT 0`); } catch {}

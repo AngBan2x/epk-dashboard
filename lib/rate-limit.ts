@@ -11,16 +11,34 @@ setInterval(() => {
   }
 }, 60_000);
 
+/**
+ * Lee o consume la cuota de un bucket.
+ *
+ * P21.15 — `options.count` es **`true` por defecto**, así que todos los llamantes
+ * que ya existen siguen comportándose igual. Ponerlo en `false` hace una
+ * **lectura**: devuelve si la cuota queda, pero no la gasta.
+ *
+ * Hace falta porque el rate limit del login se aplicaba **antes** de validar la
+ * contraseña: cinco intentos — fallidos o no — apagaban la IP durante 60 s. En
+ * la CI, donde todos los specs comparten IP, eso se comía la corrida entera con
+ * 429s; y en una NAT compartida, cinco logins válidos de cinco personas distintas
+ * se bloqueaban entre sí.
+ *
+ * Un login **válido** no debe costar cuota. El que debe costar es el que falla.
+ */
 export function checkRateLimit(
   key: string,
   maxAttempts: number,
-  windowMs: number
+  windowMs: number,
+  options: { count?: boolean } = {}
 ): { allowed: boolean; remaining: number; resetAt: number } {
+  const count = options.count !== false;
   const now = Date.now();
   const entry = store.get(key);
 
   if (!entry || now > entry.resetAt) {
     const resetAt = now + windowMs;
+    if (!count) return { allowed: true, remaining: maxAttempts, resetAt };
     store.set(key, { count: 1, resetAt });
     return { allowed: true, remaining: maxAttempts - 1, resetAt };
   }
@@ -29,8 +47,43 @@ export function checkRateLimit(
     return { allowed: false, remaining: 0, resetAt: entry.resetAt };
   }
 
+  if (!count) {
+    return { allowed: true, remaining: maxAttempts - entry.count, resetAt: entry.resetAt };
+  }
+
   entry.count++;
   return { allowed: true, remaining: maxAttempts - entry.count, resetAt: entry.resetAt };
+}
+
+/**
+ * Consume una unidad de cuota **después** de saber que el intento falló.
+ *
+ * Es la segunda mitad del arreglo de P21.15: `checkRateLimit(..., {count:false})`
+ * mira, y esta función castiga. Si el bucket ya está lleno no hace nada — el
+ * 429 ya se devolvió antes y volver a contar solo retrasaría el reseteo.
+ *
+ * Se cuenta todo lo que es **fallo del cliente** (400 / 401 / 403). Un 500 no:
+ * es un fallo nuestro, y bloquear a un usuario porque el servidor se cayó es
+ * convertir un bug en un DoS.
+ */
+export function registerFailedAttempt(
+  key: string,
+  maxAttempts: number,
+  windowMs: number
+): { count: number; resetAt: number } {
+  const now = Date.now();
+  const entry = store.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    const resetAt = now + windowMs;
+    store.set(key, { count: 1, resetAt });
+    return { count: 1, resetAt };
+  }
+
+  if (entry.count >= maxAttempts) return { count: entry.count, resetAt: entry.resetAt };
+
+  entry.count++;
+  return { count: entry.count, resetAt: entry.resetAt };
 }
 
 export function clientIp(req: NextRequest): string {
