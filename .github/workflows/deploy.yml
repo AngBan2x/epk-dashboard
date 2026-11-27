@@ -1,4 +1,4 @@
-name: Deploy to Vercel
+name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  build-and-deploy:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -152,26 +152,23 @@ jobs:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
-      - name: Deploy to Vercel (Preview)
-        if: github.event_name == 'pull_request'
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod=false'
-        env:
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-
-      - name: Deploy to Vercel (Production)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod=true'
-        env:
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+      # P21.16 — **aquí no se despliega.** El deploy lo hace la integración Git
+      # de Vercel: cada push a `main` crea un deployment de producción y deja un
+      # estado `Vercel` en el commit (`gh api repos/…/commits/<sha>/status`).
+      #
+      # Los dos pasos `amondnet/vercel-action` que había aquí se han quitado por
+      # tres motivos, y el primero es que **nunca funcionaron**:
+      #
+      #   1. `Error! Project not found ({"VERCEL_PROJECT_ID":…})`. Los secretos
+      #      son del 2026-08-30 y apuntan a un proyecto que ya no es el de
+      #      `.vercel/project.json` (`prj_qVpbwnHF9HAyZxlJXp8vT2Q6wK0B`,
+      #      team `team_bv2GM3Q7sN5Lyb7A1FjeuAJ5`). No es que se rompieran: es
+      #      que el paso solo se alcanza cuando el E2E pasa, y el E2E no pasó
+      #      nunca hasta el 2026-11-24. Se estrenó el 2026-11-26 en rojo.
+      #   2. Con la integración Git activa, el mismo commit tendría **dos**
+      #      deploys de producción compitiendo por el alias.
+      #   3. Un run verde tiene que quedar verde. Este paso convertía en rojo el
+      #      primer run de la historia con los 150 E2E en verde.
+      #
+      # Si algún día se quiere deploy por tags (P21.4), ese paso sustituye a la
+      # integración Git; no convive con ella sin decidir cuál manda el alias.

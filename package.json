@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=24",
+    "node": "24.x",
     "pnpm": ">=12 <13"
   },
   "description": "PressPlay - Donde la música se presenta",

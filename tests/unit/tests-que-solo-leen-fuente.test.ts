@@ -93,6 +93,7 @@ const NATURALEZA = new Set([
   "capturas-social.test.ts",         // mide JPEG en disco: una imagen no se importa
   "social-drafter-limites.test.ts", // mide opencode.json y un .md de agente
   "social-publish-permisos.test.ts", // mide opencode.json y dos .md de agente
+  "engines-node-acotado.test.ts",    // mide package.json: un rango de engines no se ejecuta
 ]);
 
 const CON_GEMELO = new Set([
