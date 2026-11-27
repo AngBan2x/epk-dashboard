@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { CountBadge, Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { showStatusClass, showStatusLabel, paymentMethodLabel } from "@/lib/show-status";
+import { isArchived, orderForOwner, showsCountLabel } from "@/lib/show-archive";
 
 interface ShowsBookingProps {
   artistId?: string;
@@ -48,6 +49,17 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
       (show.guest_artists && show.guest_artists.length > 0) ||
       (show.payment_methods && show.payment_methods.length > 0) ||
       (show.status === "pospuesto" && show.postponement_reason));
+
+  /**
+   * D16 — el dueño **sí** ve sus shows archivados, con distintivo.
+   *
+   * La decisión vive en `lib/show-archive.ts` para poder ejecutarla en un test:
+   * `getShowsByArtist()` no filtra a propósito, pero el SQL ordena por fecha ASC
+   * y un archivado es pasado por definición, así que sin ordenar saldrían los
+   * primeros. Los lectores públicos siguen filtrando.
+   */
+  const ordenados = orderForOwner(shows);
+  const archivados = shows.filter(isArchived).length;
 
   useEffect(() => {
     if (propShows) {
@@ -91,7 +103,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
           emoji="🎤"
           title="Shows & Booking"
           subtitle="Gestiona tus conciertos y booking"
-          badges={<CountBadge>{shows.length} shows</CountBadge>}
+          badges={<CountBadge>{showsCountLabel(shows.length, archivados)}</CountBadge>}
           action={
             editable && onAdd ? (
               <button
@@ -122,7 +134,7 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
         />
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {shows.map((show) => {
+          {ordenados.map((show) => {
             /*
              * RC.33 Ola 5 — aquí ya no se decide si el show pasó.
              *
@@ -154,6 +166,14 @@ export function ShowsBooking({ artistId, shows: propShows, editable = false, onE
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${showStatusClass(show.status)}`}>
                         {showStatusLabel(show.status)}
                       </span>
+                      {isArchived(show) && (
+                        <span
+                          className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                          title="Archivado: no aparece en tu perfil público ni en /shows, pero no se ha borrado. D5 deja la purga solo a un script explícito."
+                        >
+                          Archivado
+                        </span>
+                      )}
                     </div>
                     <div className="text-sm text-slate-500 dark:text-slate-400">
                       <p className="flex items-center gap-1">
