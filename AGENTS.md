@@ -9,14 +9,44 @@
 | `pnpm dev` | **NO usar npm run dev** (styled-jsx se resuelve mal via .pnpm) |
 | `npx tsc --noEmit` | Typecheck |
 | `pnpm build` | Build producción |
-| `npx vitest run --no-file-parallelism` | **1869 tests** (Vitest, 94 archivos; medido en `c6622c4`). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
-| ⚠️ `--no-file-parallelism`: **remedido el 2026-11-12, y el crash NO se reproduce** | La nota decía que el flag era obligatorio y que sin él el run moría con `ERR_IPC_CHANNEL_CLOSED`. **Hoy no es así**: en paralelo salen **1869/1869 verdes** en ~87 s, y en secuencial **1869/1869** en ~190 s. Los dos modos funcionan. Lo que sí es cierto es que **el secuencial es el doble de lento**, así que el flag sigue siendo lo que conviene para el ciclo corto. ⚠️ **La CI corre `pnpm test:unit` (= `vitest run`, en paralelo) y funciona** — es decir, la doc y la CI decían cosas distintas sobre el mismo comando, y ahora la CI es la que manda. Si el crash vuelve, que lo diga el log, no esta nota: un guard que documenta un crash que no ocurre es un guard que entrena a desconfiar de los guards |
+| `npx vitest run --no-file-parallelism` | **1877 tests** (Vitest, 95 archivos; medido en `936bc9b`). Correr con **Node 24**: el binario de `better-sqlite3` quedó compilado para ABI 137, así que el Node 22 portable ya NO sirve. `testTimeout` está a 30 s porque contra Turso hay queries de 1,5-2 s y con 5 s daba falsos negativos. **No ejecutar `pnpm rebuild` ni `pnpm install`** (destruye el binario y no hay prebuild para Node 24) |
+| ⚠️ `--no-file-parallelism`: **remedido el 2026-11-12, y el crash NO se reproduce** | La nota decía que el flag era obligatorio y que sin él el run moría con `ERR_IPC_CHANNEL_CLOSED`. **Hoy no es así**: en paralelo salen **1877/1877 verdes** en ~87 s, y en secuencial **1877/1877** en ~190 s. Los dos modos funcionan. Lo que sí es cierto es que **el secuencial es el doble de lento**, así que el flag sigue siendo lo que conviene para el ciclo corto. ⚠️ **La CI corre `pnpm test:unit` (= `vitest run`, en paralelo) y funciona** — es decir, la doc y la CI decían cosas distintas sobre el mismo comando, y ahora la CI es la que manda. Si el crash vuelve, que lo diga el log, no esta nota: un guard que documenta un crash que no ocurre es un guard que entrena a desconfiar de los guards |
 | `npx playwright test` | E2E (Playwright). Suites por fase: subscriber, subscriptions, notifications, approvals, shows-transitions, fanout, search, broadcast. Usa `PLAYWRIGHT_BASE_URL=https://epk-dashboard.vercel.app` para correr contra producción |
 | `npx tsx scripts/turso-check.ts` | Verifica la higiene de datos en Turso por SQL directo (tracks, shows, usuarios QA, huerfanos). Es la fuente de verdad, no las lecturas de API (la réplica va retrasada) |
 | `npx tsx scripts/qa-cleanup.ts --apply` | Limpia datos de QA de producción. **Dry-run por defecto**: siempre revisa el dry-run antes de aplicar |
 | `npx next lint` | ESLint. Debe salir sin warnings (P7) |
 | `npx tsx scripts/a11y-check.ts` | Controles sin etiqueta, anillo de foco y áreas táctiles |
 | `npx tsx scripts/axe-check.ts` | Barrido WCAG AA con axe sobre las rutas públicas |
+
+### ⚠️ `engines.node` tiene que estar **acotado**, y `engines.pnpm` no fija nada en Vercel
+
+`package.json` declara `"node": "24.x"`, **no** `">=24"`. Un rango abierto no significa
+"24 o mejor": Vercel lo resuelve al major más nuevo que exista, y el 2026-11-26 eligió
+**26.x**. Ahí `better-sqlite3` no tiene prebuilt y `node-gyp` no compila, así que
+`pnpm install` sale 1 y **todos** los deploys fallan:
+
+```
+Due to "engines": { "node": ">=24" } ... Node.js Version "26.x" will be used instead.
+better-sqlite3@11.10.0 install: node-gyp rebuild → gyp ERR! node -v v26.13.1
+Error: [BUILD_UTILS_SPAWN_1] Command "pnpm install" exited with 1
+```
+
+Medido: roto desde `2c1bc76` (2026-11-12) —el commit que introdujo el campo— hasta el
+2026-11-26, con producción congelada en `49b8830`. **Trece días** en los que GitHub solo
+decía `Deployment has failed`, mientras la CI seguía verde porque allí el build corre en
+Node 24. El guard es `tests/unit/engines-node-acotado.test.ts`, y evalúa la propiedad
+—admite 24, no admite 25 ni 26—, no la ortografía del rango.
+
+`engines.pnpm` **no** controla la versión de pnpm que usa Vercel: el log dice
+`Using pnpm@10.x based on project creation date. To use a different version, set
+package.json#packageManager`. Y `packageManager` en pnpm 12 rompe el lockfile (ver P14).
+O sea: en Vercel la versión de pnpm **no se fija desde `package.json`**; en la CI sí,
+con `pnpm/action-setup`.
+
+Y el deploy **no** lo hace el workflow: lo hace la integración Git de Vercel, que deja
+un estado `Vercel` en cada commit (`gh api repos/…/commits/<sha>/status`). Los dos pasos
+`amondnet/vercel-action` que había en `deploy.yml` se quitaron en P21.16: nunca
+funcionaron (`Project not found`) y convertían en rojo el primer run con los E2E verdes.
 
 ## Stack
 
