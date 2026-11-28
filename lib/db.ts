@@ -736,7 +736,20 @@ function parseTrack(row: Record<string, unknown>): Track {
     cover_image: safeString(row.cover_image),
     audio_preview_url: safeString(row.audio_preview_url),
     spotify_url: (row.spotify_url as string) ?? null,
-    youtube_video_id: (row.youtube_video_id as string) ?? null,
+    // RC.33 · Ola 4: los vídeos `live` y `topic_audio` no son el videoclip oficial
+    // de la pista, y YouTube rechaza su reproducción en iframe (error 150 "Video
+    // no disponible"). No los exponemos como fuente reproducible: `showableVideo()`
+    // en lib/release-page.ts ya hace lo mismo para la galería de la ficha, y aquí
+    // lo extendemos al reproductor global. `null` (desconocido) y `'videoclip'`
+    // se dejan tal cual: el primero porque puede ser un vídeo real cuya kind no
+    // se pudo determinar, y el segundo porque es el único kind que YouTube
+    // permite embebir como videoclip oficial.
+    youtube_video_id: (() => {
+      const kind = parseVideoKind(row.video_kind);
+      const id = (row.youtube_video_id as string) ?? null;
+      if (kind === 'live' || kind === 'topic_audio') return null;
+      return id;
+    })(),
     metrics: parseMetrics((row.metrics as string) ?? null),
     production_details: parseProductionDetails((row.production_details as string) ?? null),
     lyrics: (row.lyrics as string) ?? null,
