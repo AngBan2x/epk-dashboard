@@ -1,7 +1,7 @@
 # FASE P19 — Cabeceras de seguridad y CSP
 
 **Período:** 2026-11-27 → 2026-11-27  **Estado:** en curso
-**Rama:** main  **Issue:** —  **Commits:** (se completa al cerrar)
+**Rama:** main  **Issue:** —  **Commits:** `6e086dd`
 
 ## Hallazgos de auditoría
 
@@ -52,9 +52,9 @@ pasar a nonces o hashes.
 | P19.1 | Auditar cabeceras existentes (ninguna presente) | ✅ hecha | — | grep sin coincidencias en repo |
 | P19.2 | Implementar X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy en next.config.js | ✅ hecha | — | `headers()` con source `/:path*` |
 | P19.3 | Implementar Content-Security-Policy-Report-Only (sin bloqueo) | ✅ hecha | — | CSP report-only |
-| P19.4 | Verificar que no rompe rutas públicas ni dashboard | ✅ hecha | — | `tsc --noEmit` y `next lint` pasan limpios |
-| P19.5 | Documentar en docs/PHASE_P19.md | ✅ hecha | — | este documento |
-| P19.6 | Indexar P19 en docs/PHASES.md | ✅ hecha | — | Regla C, fila P19 enlazada |
+| P19.4 | Verificar que no rompe rutas públicas ni dashboard | ✅ hecha | 6e086dd | `tsc --noEmit` y `next lint` pasan limpios |
+| P19.5 | Documentar en docs/PHASE_P19.md | ✅ hecha | 6e086dd | este documento |
+| P19.6 | Indexar P19 en docs/PHASES.md | ✅ hecha | 6e086dd | Regla C, fila P19 enlazada |
 
 ## Criterio de cierre
 
