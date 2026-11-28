@@ -43,17 +43,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Unit Tests
-        run: pnpm test:unit
-
-      - name: Build
-        run: pnpm build
+      - name: Gate (typecheck + lint + unit tests + build)
+        run: pnpm gate
 
       # El navegador no venía en la imagen del runner. Sin este paso, los E2E
       # morían con "browserType.launch: Executable doesn't exist at

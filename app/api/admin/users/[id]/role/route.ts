@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getUserById, getAllUsers, isTursoEnabled, tursoExecUpdate, getLocalDbWrite } from "@/lib/db";
+import type { InValue } from "@libsql/client";
+import { getUserById, getAllUsers, getTursoClientSync, getLocalDbWrite } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -55,8 +56,12 @@ export async function PATCH(
     }
 
     // Update role in database
-    if (isTursoEnabled()) {
-      await tursoExecUpdate("UPDATE users SET role = ? WHERE id = ?", [validated.role, params.id]);
+    const client = getTursoClientSync();
+    if (client) {
+      await client.execute({
+        sql: "UPDATE users SET role = ? WHERE id = ?",
+        args: [validated.role, params.id] as InValue[],
+      });
     } else {
       const db = getLocalDbWrite();
       db.prepare("UPDATE users SET role = ? WHERE id = ?").run(validated.role, params.id);

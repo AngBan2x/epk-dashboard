@@ -15,8 +15,7 @@ vi.mock("@/lib/db", () => ({
   getUserById: vi.fn(),
   getAllUsers: vi.fn(),
   getArtistByUserId: vi.fn(),
-  isTursoEnabled: vi.fn(() => false),
-  tursoExecUpdate: vi.fn(),
+  getTursoClientSync: vi.fn(() => null),
   getLocalDbWrite: vi.fn(() => ({
     prepare: vi.fn(() => ({ run: vi.fn() })),
   })),
