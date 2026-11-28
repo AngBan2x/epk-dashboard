@@ -47,7 +47,7 @@ completo está en `.opencode/plans/P17-P25-pressplay.md`.
 | Fase | Documento | Estado | Tema |
 |------|-----------|--------|------|
 | **P17** | [`PHASE_P17.md`](./PHASE_P17.md) | **implementada** | **El catálogo público es un catálogo público.** XSS en el JSON-LD, `/api/search` sin filtro de estado, `user_id` filtrado por la API. Las 8 tareas hechas en `974d8d1`; falta la verificación en producción y el release |
-| **P18** | — | pendiente | La sesión caduca, se suspende y se degrada |
+| **P18** | [`PHASE_P18.md`](./PHASE_P18.md) | **completada** | La sesión caduca, se suspende y se degrada |
 | **P19** | [`PHASE_P19.md`](./PHASE_P19.md) | implementada | Cabeceras de seguridad y CSP |
 | **P20** | [`PHASE_P20.md`](./PHASE_P20.md) | **completada** | Nada se borra sin que alguien lo pida (soft delete + purga). Abierta por necesidad: P21.6 armó el cron de `cleanup-shows` y P20.1 tuvo que hacerse en el acto para que no borrase 3 shows al día siguiente |
 | **P21** | [`PHASE_P21.md`](./PHASE_P21.md) | **en curso** | **El pipeline: un gate, dos destinos, deploy por tags.** La CI **ya se ejecuta** (antes: 0 ejecuciones verdes en todo el historial). Único punto rojo: falta el secreto `TEST_ADMIN_PASSWORD` |
