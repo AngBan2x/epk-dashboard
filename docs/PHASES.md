@@ -48,13 +48,13 @@ completo está en `.opencode/plans/P17-P25-pressplay.md`.
 |------|-----------|--------|------|
 | **P17** | [`PHASE_P17.md`](./PHASE_P17.md) | **implementada** | **El catálogo público es un catálogo público.** XSS en el JSON-LD, `/api/search` sin filtro de estado, `user_id` filtrado por la API. Las 8 tareas hechas en `974d8d1`; falta la verificación en producción y el release |
 | **P18** | — | pendiente | La sesión caduca, se suspende y se degrada |
-| **P19** | — | pendiente | Cabeceras de seguridad y CSP |
+| **P19** | [`PHASE_P19.md`](./PHASE_P19.md) | implementada | Cabeceras de seguridad y CSP |
 | **P20** | [`PHASE_P20.md`](./PHASE_P20.md) | **completada** | Nada se borra sin que alguien lo pida (soft delete + purga). Abierta por necesidad: P21.6 armó el cron de `cleanup-shows` y P20.1 tuvo que hacerse en el acto para que no borrase 3 shows al día siguiente |
 | **P21** | [`PHASE_P21.md`](./PHASE_P21.md) | **en curso** | **El pipeline: un gate, dos destinos, deploy por tags.** La CI **ya se ejecuta** (antes: 0 ejecuciones verdes en todo el historial). Único punto rojo: falta el secreto `TEST_ADMIN_PASSWORD` |
 | **P22** | [`PHASE_P22.md`](./PHASE_P22.md) | **implementada** | **Los modelos que existen.** 4 subagentes apuntaban a un modelo retirado del catálogo. Hecha en `974d8d1`; queda **P22.5**, que es el topping up de OpenRouter y hace la persona |
-| **P23** | — | pendiente | La calidad que se nota |
-| **P24** | — | pendiente | La documentación que se puede leer |
-| **P25** | — | pendiente | Cerrar la frontera social |
+| **P23** | [`PHASE_P23.md`](./PHASE_P23.md) | pendiente | La calidad que se nota |
+| **P24** | [`PHASE_P24.md`](./PHASE_P24.md) | pendiente | La documentación que se puede leer |
+| **P25** | [`PHASE_P25.md`](./PHASE_P25.md) | pendiente | Cerrar la frontera social |
 
 ## Numeración: qué está ocupado y por qué
 
