@@ -1,5 +1,16 @@
+/**
+ * P21.5 · script de danger: escribe en Turso.
+ * Dry-run por defecto; --apply obligatorio para escribir.
+ */
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
+
+// P21.5: dry-run por defecto, --apply obligatorio
+const APPLY = process.argv.includes("--apply");
+if (!APPLY) {
+  console.log("🔍 Dry-run: no se escribe nada. Usa --apply para ejecutar.");
+  process.exit(0);
+}
 
 async function main() {
   const { getTursoClient } = await import("../lib/turso");

@@ -1,5 +1,13 @@
 #!/usr/bin/env tsx
 
+// P21.5 · script de danger: escribe en SQLite local.
+// Dry-run por defecto; --apply obligatorio para escribir.
+const APPLY = process.argv.includes("--apply");
+if (!APPLY) {
+  console.log("🔍 Dry-run: no se escribe nada. Usa --apply para ejecutar.");
+  process.exit(0);
+}
+
 import Database from "better-sqlite3";
 import path from "path";
 

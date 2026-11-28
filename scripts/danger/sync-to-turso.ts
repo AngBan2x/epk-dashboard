@@ -5,9 +5,19 @@
  * Tables synced:
  *   tracks, artists, users, track_submissions,
  *   likes, notifications, metrics_history, shows
+ *
+ * P21.5 · script de danger: escribe en Turso.
+ * Dry-run por defecto; --apply obligatorio para escribir.
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
+
+// P21.5: dry-run por defecto, --apply obligatorio
+const APPLY = process.argv.includes("--apply");
+if (!APPLY) {
+  console.log("🔍 Dry-run: no se escribe nada. Usa --apply para ejecutar.");
+  process.exit(0);
+}
 
 import { createClient, type InValue } from "@libsql/client";
 import Database from "better-sqlite3";

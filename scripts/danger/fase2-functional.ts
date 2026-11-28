@@ -1,3 +1,15 @@
+/**
+ * P21.5 · script de danger: escribe en SQLite local vía API.
+ * Dry-run por defecto; --apply obligatorio para ejecutar.
+ */
+
+// P21.5: dry-run por defecto, --apply obligatorio
+const APPLY = process.argv.includes("--apply");
+if (!APPLY) {
+  console.log("🔍 Dry-run: no se escribe nada. Usa --apply para ejecutar.");
+  process.exit(0);
+}
+
 import { chromium } from "@playwright/test";
 import { ARTIST_EMAIL, ARTIST_PASSWORD } from "./lib/credentials";
 

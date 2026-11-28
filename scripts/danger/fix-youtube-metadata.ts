@@ -3,19 +3,28 @@ dotenv.config({ path: ".env.local" });
 
 /**
  * Fix YouTube-only track metadata
- * 
+ *
  * Fetches metadata from YouTube Data API v3 for tracks that only have
  * YouTube video IDs, and updates cover_image, duration, and release_date.
- * 
+ *
  * Targets:
  * - "Se Va" (ID: 7c922875-54c5-4670-8940-98b07403f691, youtube: M7Z_1wzbxG8)
  * - "The Rain" (ID: fa5b4397-c50e-4ae5-9b65-0ebdd6b1b898, youtube: zgXZnJ2DtF4)
+ *
+ * P21.5 · script de danger: escribe en Turso.
+ * Dry-run por defecto; --apply obligatorio para escribir.
  */
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 if (!YOUTUBE_API_KEY) {
   console.error("Error: YOUTUBE_API_KEY environment variable is not set");
   process.exit(1);
+}
+
+// P21.5: dry-run por defecto, --apply obligatorio
+if (!process.argv.includes("--apply")) {
+  console.log("🔍 Dry-run: no se escribe nada. Usa --apply para ejecutar.");
+  process.exit(0);
 }
 
 interface YouTubeMetadata {

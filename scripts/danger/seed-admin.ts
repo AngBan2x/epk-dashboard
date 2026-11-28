@@ -22,6 +22,11 @@
  * Nunca imprime la contrasena. Antes lo hacia (`console.log("Password:
  * CONTRASENA_ADMIN_ROTADA")`), y un seed que imprime un secreto lo convierte en un secreto de
  * mas sitios.
+ *
+ * ── P21.5 · dry-run por defecto, --apply obligatorio ──────────────────────
+ *
+ * Este script escribe en la base de datos. Por defecto es dry-run: no escribe nada.
+ * Solo con `--apply` ejecuta las escrituras.
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
@@ -34,6 +39,13 @@ import { requireCredentials } from "./lib/credentials";
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 const USE_TURSO = Boolean(TURSO_URL && TURSO_TOKEN);
+const APPLY = process.argv.includes("--apply");
+
+if (!APPLY) {
+  console.log("🔍 Dry-run: se mostraría lo que se haría, pero no se escribe nada.");
+  console.log("   Para ejecutar de verdad: npx tsx scripts/danger/seed-admin.ts --apply");
+  process.exit(0);
+}
 
 async function main() {
   console.log("🌱 Seed Admin: Creando usuario admin por defecto...\n");
