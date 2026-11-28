@@ -50,7 +50,7 @@ completo está en `.opencode/plans/P17-P25-pressplay.md`.
 | **P18** | [`PHASE_P18.md`](./PHASE_P18.md) | **completada** | La sesión caduca, se suspende y se degrada |
 | **P19** | [`PHASE_P19.md`](./PHASE_P19.md) | implementada | Cabeceras de seguridad y CSP |
 | **P20** | [`PHASE_P20.md`](./PHASE_P20.md) | **completada** | Nada se borra sin que alguien lo pida (soft delete + purga). Abierta por necesidad: P21.6 armó el cron de `cleanup-shows` y P20.1 tuvo que hacerse en el acto para que no borrase 3 shows al día siguiente |
-| **P21** | [`PHASE_P21.md`](./PHASE_P21.md) | **en curso** | **El pipeline: un gate, dos destinos, deploy por tags.** La CI **ya se ejecuta** (antes: 0 ejecuciones verdes en todo el historial). Único punto rojo: falta el secreto `TEST_ADMIN_PASSWORD` |
+| **P21** | [`PHASE_P21.md`](./PHASE_P21.md) | **completada (con deuda)** | **El pipeline: un gate, dos destinos, deploy por tags.** La CI **ya se ejecuta** (antes: 0 ejecuciones verdes en todo el historial). Deploy a producción restaurado tras 13 días roto (engines.node). Pendientes: P21.1 (gate único `pnpm gate`), P21.4 (deploy por tags), P21.5 (scripts/danger/), P21.8 (migración de una ruta a getTursoClientSync) |
 | **P22** | [`PHASE_P22.md`](./PHASE_P22.md) | **implementada** | **Los modelos que existen.** 4 subagentes apuntaban a un modelo retirado del catálogo. Hecha en `974d8d1`; queda **P22.5**, que es el topping up de OpenRouter y hace la persona |
 | **P23** | [`PHASE_P23.md`](./PHASE_P23.md) | pendiente | La calidad que se nota |
 | **P24** | [`PHASE_P24.md`](./PHASE_P24.md) | pendiente | La documentación que se puede leer |
